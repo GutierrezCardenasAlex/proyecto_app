@@ -3,9 +3,9 @@ services:
     image: postgis/postgis:16-3.4
     container_name: taxiya-postgres
     environment:
-      POSTGRES_DB: taxiya
-      POSTGRES_USER: taxiya
-      POSTGRES_PASSWORD: taxiya
+      POSTGRES_DB: ${POSTGRES_DB:-taxiya}
+      POSTGRES_USER: ${POSTGRES_USER:-taxiya}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-taxiya}
     ports:
       - "5432:5432"
     volumes:
@@ -31,24 +31,24 @@ services:
       - "5672:5672"
       - "15672:15672"
     environment:
-      RABBITMQ_DEFAULT_USER: taxiya
-      RABBITMQ_DEFAULT_PASS: taxiya
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-taxiya}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-taxiya}
 
   gateway-api:
     build: ./services/gateway-api
     environment:
-      PORT: 3000
-      JWT_SECRET: super-secret
-      AUTH_SERVICE_URL: http://auth-service:3001
-      DRIVER_SERVICE_URL: http://driver-service:3002
-      TRIP_SERVICE_URL: http://trip-service:3003
-      DISPATCH_SERVICE_URL: http://dispatch-service:3004
-      LOCATION_SERVICE_URL: http://location-service:3005
-      NOTIFICATION_SERVICE_URL: http://notification-service:3006
-      ADMIN_SERVICE_URL: http://admin-service:3007
-      WEBSOCKET_SERVICE_URL: http://websocket-service:3008
+      PORT: ${GATEWAY_PORT:-3000}
+      JWT_SECRET: ${JWT_SECRET:-super-secret}
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://auth-service:3001}
+      DRIVER_SERVICE_URL: ${DRIVER_SERVICE_URL:-http://driver-service:3002}
+      TRIP_SERVICE_URL: ${TRIP_SERVICE_URL:-http://trip-service:3003}
+      DISPATCH_SERVICE_URL: ${DISPATCH_SERVICE_URL:-http://dispatch-service:3004}
+      LOCATION_SERVICE_URL: ${LOCATION_SERVICE_URL:-http://location-service:3005}
+      NOTIFICATION_SERVICE_URL: ${NOTIFICATION_SERVICE_URL:-http://notification-service:3006}
+      ADMIN_SERVICE_URL: ${ADMIN_SERVICE_URL:-http://admin-service:3007}
+      WEBSOCKET_SERVICE_URL: ${WEBSOCKET_SERVICE_URL:-http://websocket-service:3008}
     ports:
-      - "3000:3000"
+      - "${GATEWAY_PORT:-3000}:${GATEWAY_PORT:-3000}"
     depends_on:
       - auth-service
       - driver-service
@@ -62,11 +62,11 @@ services:
   auth-service:
     build: ./services/auth-service
     environment:
-      PORT: 3001
-      DATABASE_URL: postgresql://taxiya:taxiya@postgres:5432/taxiya
-      REDIS_URL: redis://redis:6379
-      RABBITMQ_URL: amqp://taxiya:taxiya@rabbitmq:5672
-      JWT_SECRET: super-secret
+      PORT: ${AUTH_PORT:-3001}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://taxiya:taxiya@postgres:5432/taxiya}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://taxiya:taxiya@rabbitmq:5672}
+      JWT_SECRET: ${JWT_SECRET:-super-secret}
     depends_on:
       postgres:
         condition: service_healthy
@@ -78,10 +78,10 @@ services:
   driver-service:
     build: ./services/driver-service
     environment:
-      PORT: 3002
-      DATABASE_URL: postgresql://taxiya:taxiya@postgres:5432/taxiya
-      REDIS_URL: redis://redis:6379
-      RABBITMQ_URL: amqp://taxiya:taxiya@rabbitmq:5672
+      PORT: ${DRIVER_PORT:-3002}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://taxiya:taxiya@postgres:5432/taxiya}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://taxiya:taxiya@rabbitmq:5672}
     depends_on:
       postgres:
         condition: service_healthy
@@ -93,11 +93,11 @@ services:
   trip-service:
     build: ./services/trip-service
     environment:
-      PORT: 3003
-      DATABASE_URL: postgresql://taxiya:taxiya@postgres:5432/taxiya
-      REDIS_URL: redis://redis:6379
-      RABBITMQ_URL: amqp://taxiya:taxiya@rabbitmq:5672
-      DISPATCH_SERVICE_URL: http://dispatch-service:3004
+      PORT: ${TRIP_PORT:-3003}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://taxiya:taxiya@postgres:5432/taxiya}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://taxiya:taxiya@rabbitmq:5672}
+      DISPATCH_SERVICE_URL: ${DISPATCH_SERVICE_URL:-http://dispatch-service:3004}
     depends_on:
       postgres:
         condition: service_healthy
@@ -109,11 +109,11 @@ services:
   dispatch-service:
     build: ./services/dispatch-service
     environment:
-      PORT: 3004
-      DATABASE_URL: postgresql://taxiya:taxiya@postgres:5432/taxiya
-      REDIS_URL: redis://redis:6379
-      RABBITMQ_URL: amqp://taxiya:taxiya@rabbitmq:5672
-      DRIVER_SERVICE_URL: http://driver-service:3002
+      PORT: ${DISPATCH_PORT:-3004}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://taxiya:taxiya@postgres:5432/taxiya}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://taxiya:taxiya@rabbitmq:5672}
+      DRIVER_SERVICE_URL: ${DRIVER_SERVICE_URL:-http://driver-service:3002}
     depends_on:
       postgres:
         condition: service_healthy
@@ -125,11 +125,11 @@ services:
   location-service:
     build: ./services/location-service
     environment:
-      PORT: 3005
-      DATABASE_URL: postgresql://taxiya:taxiya@postgres:5432/taxiya
-      REDIS_URL: redis://redis:6379
-      RABBITMQ_URL: amqp://taxiya:taxiya@rabbitmq:5672
-      WEBSOCKET_EMIT_URL: http://websocket-service:3008/internal/events
+      PORT: ${LOCATION_PORT:-3005}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://taxiya:taxiya@postgres:5432/taxiya}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://taxiya:taxiya@rabbitmq:5672}
+      WEBSOCKET_EMIT_URL: ${WEBSOCKET_EMIT_URL:-http://websocket-service:3008/internal/events}
     depends_on:
       postgres:
         condition: service_healthy
@@ -141,13 +141,13 @@ services:
   notification-service:
     build: ./services/notification-service
     environment:
-      PORT: 3006
-      DATABASE_URL: postgresql://taxiya:taxiya@postgres:5432/taxiya
-      REDIS_URL: redis://redis:6379
-      RABBITMQ_URL: amqp://taxiya:taxiya@rabbitmq:5672
-      FCM_PROJECT_ID: demo-project
-      FCM_CLIENT_EMAIL: demo@example.com
-      FCM_PRIVATE_KEY: demo
+      PORT: ${NOTIFICATION_PORT:-3006}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://taxiya:taxiya@postgres:5432/taxiya}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://taxiya:taxiya@rabbitmq:5672}
+      FCM_PROJECT_ID: ${FCM_PROJECT_ID:-demo-project}
+      FCM_CLIENT_EMAIL: ${FCM_CLIENT_EMAIL:-demo@example.com}
+      FCM_PRIVATE_KEY: ${FCM_PRIVATE_KEY:-demo}
     depends_on:
       postgres:
         condition: service_healthy
@@ -159,10 +159,10 @@ services:
   admin-service:
     build: ./services/admin-service
     environment:
-      PORT: 3007
-      DATABASE_URL: postgresql://taxiya:taxiya@postgres:5432/taxiya
-      REDIS_URL: redis://redis:6379
-      RABBITMQ_URL: amqp://taxiya:taxiya@rabbitmq:5672
+      PORT: ${ADMIN_API_PORT:-3007}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://taxiya:taxiya@postgres:5432/taxiya}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://taxiya:taxiya@rabbitmq:5672}
     depends_on:
       postgres:
         condition: service_healthy
@@ -174,11 +174,11 @@ services:
   websocket-service:
     build: ./services/websocket-service
     environment:
-      PORT: 3008
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: super-secret
+      PORT: ${WEBSOCKET_PORT:-3008}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      JWT_SECRET: ${JWT_SECRET:-super-secret}
     ports:
-      - "3008:3008"
+      - "${WEBSOCKET_PORT:-3008}:${WEBSOCKET_PORT:-3008}"
     depends_on:
       redis:
         condition: service_started

@@ -32,30 +32,36 @@ Taxi Ya is a production-oriented ride-hailing platform for Potosi, Bolivia. This
 
 ## Run locally
 
-1. Copy each service `.env.example` to `.env` if you want to override defaults.
+1. Copy the root environment:
+
+```powershell
+Copy-Item .env.example .env
+```
+
 2. Start infrastructure and services:
 
-```bash
+```powershell
 docker compose up --build
 ```
 
 3. Start the admin panel locally for development:
 
-```bash
+```powershell
 cd admin
+Copy-Item .env.example .env
 npm install
 npm run dev
 ```
 
 4. Start Flutter apps:
 
-```bash
+```powershell
 cd mobile/passenger_app
 flutter pub get
 flutter run
 ```
 
-```bash
+```powershell
 cd mobile/driver_app
 flutter pub get
 flutter run

@@ -4,14 +4,16 @@
 
 1. Start infrastructure and backend services:
 
-```bash
+```powershell
+Copy-Item .env.example .env
 docker compose up --build
 ```
 
 2. Start the admin panel:
 
-```bash
+```powershell
 cd admin
+Copy-Item .env.example .env
 npm install
 npm run dev
 ```
