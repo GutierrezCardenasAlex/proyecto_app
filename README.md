@@ -67,6 +67,27 @@ flutter pub get
 flutter run
 ```
 
+## Verify the stack
+
+After `docker compose up --build`, run:
+
+```powershell
+.\scripts\verify-stack.ps1
+```
+
+This checks:
+
+- all required containers are running
+- internal `/health` endpoints for every microservice
+- gateway availability on `http://localhost:3000/health`
+- RabbitMQ management UI on `http://localhost:15672`
+
+To run a simple auth smoke test through the gateway:
+
+```powershell
+.\scripts\smoke-auth.ps1
+```
+
 ## Production notes
 
 - All backend services are stateless and horizontally scalable.

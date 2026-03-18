@@ -34,6 +34,20 @@ flutter pub get
 flutter run
 ```
 
+## Verification
+
+Run the operational checks:
+
+```powershell
+.\scripts\verify-stack.ps1
+```
+
+Run an auth smoke test:
+
+```powershell
+.\scripts\smoke-auth.ps1
+```
+
 ## Environment variables
 
 Important backend variables are already wired in `docker-compose.yml`.
