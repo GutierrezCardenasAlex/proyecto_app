@@ -39,14 +39,14 @@ services:
     environment:
       PORT: ${GATEWAY_PORT:-3000}
       JWT_SECRET: ${JWT_SECRET:-super-secret}
-      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://auth-service:3001}
-      DRIVER_SERVICE_URL: ${DRIVER_SERVICE_URL:-http://driver-service:3002}
-      TRIP_SERVICE_URL: ${TRIP_SERVICE_URL:-http://trip-service:3003}
-      DISPATCH_SERVICE_URL: ${DISPATCH_SERVICE_URL:-http://dispatch-service:3004}
-      LOCATION_SERVICE_URL: ${LOCATION_SERVICE_URL:-http://location-service:3005}
-      NOTIFICATION_SERVICE_URL: ${NOTIFICATION_SERVICE_URL:-http://notification-service:3006}
-      ADMIN_SERVICE_URL: ${ADMIN_SERVICE_URL:-http://admin-service:3007}
-      WEBSOCKET_SERVICE_URL: ${WEBSOCKET_SERVICE_URL:-http://websocket-service:3008}
+      AUTH_SERVICE_URL: "http://auth-service:3001"
+      DRIVER_SERVICE_URL: "http://driver-service:3002"
+      TRIP_SERVICE_URL: "http://trip-service:3003"
+      DISPATCH_SERVICE_URL: "http://dispatch-service:3004"
+      LOCATION_SERVICE_URL: "http://location-service:3005"
+      NOTIFICATION_SERVICE_URL: "http://notification-service:3006"
+      ADMIN_SERVICE_URL: "http://admin-service:3007"
+      WEBSOCKET_SERVICE_URL: "http://websocket-service:3008"
     ports:
       - "${GATEWAY_PORT:-3000}:${GATEWAY_PORT:-3000}"
     depends_on:
@@ -97,7 +97,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql://taxiya:taxiya@postgres:5432/taxiya}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://taxiya:taxiya@rabbitmq:5672}
-      DISPATCH_SERVICE_URL: ${DISPATCH_SERVICE_URL:-http://dispatch-service:3004}
+      DISPATCH_SERVICE_URL: "http://dispatch-service:3004"
     depends_on:
       postgres:
         condition: service_healthy
@@ -113,7 +113,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql://taxiya:taxiya@postgres:5432/taxiya}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://taxiya:taxiya@rabbitmq:5672}
-      DRIVER_SERVICE_URL: ${DRIVER_SERVICE_URL:-http://driver-service:3002}
+      DRIVER_SERVICE_URL: "http://driver-service:3002"
     depends_on:
       postgres:
         condition: service_healthy
@@ -129,7 +129,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql://taxiya:taxiya@postgres:5432/taxiya}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://taxiya:taxiya@rabbitmq:5672}
-      WEBSOCKET_EMIT_URL: ${WEBSOCKET_EMIT_URL:-http://websocket-service:3008/internal/events}
+      WEBSOCKET_EMIT_URL: "http://websocket-service:3008/internal/events"
     depends_on:
       postgres:
         condition: service_healthy
