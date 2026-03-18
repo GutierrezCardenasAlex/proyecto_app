@@ -16,6 +16,12 @@ class TaxiYaDriverApp extends StatelessWidget {
           primary: const Color(0xFF16354C),
           secondary: const Color(0xFFDB5F2D),
         ),
+        scaffoldBackgroundColor: const Color(0xFFF2F5F8),
+        cardTheme: CardThemeData(
+          elevation: 0,
+          color: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        ),
         useMaterial3: true,
       ),
       home: const DriverHomePage(),

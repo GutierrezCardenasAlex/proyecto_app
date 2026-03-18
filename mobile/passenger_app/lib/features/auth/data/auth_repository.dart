@@ -1,5 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
+import '../../../core/config/app_config.dart';
 import '../domain/session.dart';
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
@@ -12,12 +15,32 @@ class AuthRepository {
   const AuthRepository();
 
   Future<void> requestOtp(String phone) async {
-    await Future<void>.delayed(const Duration(milliseconds: 400));
+    final response = await http.post(
+      Uri.parse('${AppConfig.apiBaseUrl}/auth/otp/request'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'phone': phone,
+        'role': 'passenger',
+        'fullName': 'Passenger Demo',
+      }),
+    );
+
+    if (response.statusCode >= 400) {
+      throw Exception('No se pudo solicitar OTP (${response.statusCode})');
+    }
   }
 
   Future<bool> verifyOtp(String phone, String otp) async {
-    await Future<void>.delayed(const Duration(milliseconds: 400));
-    return otp == '123456';
+    final response = await http.post(
+      Uri.parse('${AppConfig.apiBaseUrl}/auth/otp/verify'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'phone': phone,
+        'otp': otp,
+      }),
+    );
+
+    return response.statusCode < 400;
   }
 }
 
@@ -27,16 +50,47 @@ class SessionController extends Notifier<Session> {
   @override
   Session build() {
     _repository = ref.watch(authRepositoryProvider);
-    return const Session(phone: '', otpRequested: false, isAuthenticated: false);
+    return const Session(
+      phone: '',
+      otpRequested: false,
+      isAuthenticated: false,
+      isLoading: false,
+      errorMessage: null,
+    );
   }
 
   Future<void> requestOtp(String phone) async {
-    await _repository.requestOtp(phone);
-    state = state.copyWith(phone: phone, otpRequested: true);
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      await _repository.requestOtp(phone);
+      state = state.copyWith(
+        phone: phone,
+        otpRequested: true,
+        isLoading: false,
+        clearError: true,
+      );
+    } catch (error) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: error.toString(),
+      );
+    }
   }
 
   Future<void> verifyOtp(String otp) async {
-    final valid = await _repository.verifyOtp(state.phone, otp);
-    state = state.copyWith(isAuthenticated: valid);
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final valid = await _repository.verifyOtp(state.phone, otp);
+      state = state.copyWith(
+        isAuthenticated: valid,
+        isLoading: false,
+        errorMessage: valid ? null : 'OTP invalido',
+      );
+    } catch (error) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: error.toString(),
+      );
+    }
   }
 }
