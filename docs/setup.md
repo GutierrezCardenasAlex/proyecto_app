@@ -42,10 +42,23 @@ Run the operational checks:
 .\scripts\verify-stack.ps1
 ```
 
+Ubuntu/Linux:
+
+```bash
+chmod +x ./scripts/verify-stack.sh ./scripts/smoke-auth.sh
+./scripts/verify-stack.sh
+```
+
 Run an auth smoke test:
 
 ```powershell
 .\scripts\smoke-auth.ps1
+```
+
+Ubuntu/Linux:
+
+```bash
+./scripts/smoke-auth.sh
 ```
 
 ## Environment variables

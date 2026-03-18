@@ -75,6 +75,13 @@ After `docker compose up --build`, run:
 .\scripts\verify-stack.ps1
 ```
 
+On Ubuntu/Linux:
+
+```bash
+chmod +x ./scripts/verify-stack.sh ./scripts/smoke-auth.sh
+./scripts/verify-stack.sh
+```
+
 This checks:
 
 - all required containers are running
@@ -86,6 +93,12 @@ To run a simple auth smoke test through the gateway:
 
 ```powershell
 .\scripts\smoke-auth.ps1
+```
+
+On Ubuntu/Linux:
+
+```bash
+./scripts/smoke-auth.sh
 ```
 
 ## Production notes
