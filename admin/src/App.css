@@ -1,0 +1,145 @@
+body {
+  margin: 0;
+}
+
+.layout {
+  min-height: 100vh;
+  padding: 32px;
+  background:
+    radial-gradient(circle at top left, rgba(236, 106, 54, 0.22), transparent 25%),
+    radial-gradient(circle at bottom right, rgba(17, 64, 96, 0.32), transparent 30%),
+    #f3eee7;
+  color: #142634;
+}
+
+.hero-panel,
+.panel,
+.map-card {
+  background: rgba(255, 250, 243, 0.88);
+  border: 1px solid rgba(20, 38, 52, 0.1);
+  border-radius: 28px;
+  box-shadow: 0 20px 60px rgba(20, 38, 52, 0.08);
+  backdrop-filter: blur(12px);
+}
+
+.hero-panel {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: 1.3fr 1fr;
+  padding: 28px;
+  margin-bottom: 24px;
+}
+
+.eyebrow {
+  margin: 0 0 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: #c15225;
+  font-size: 0.82rem;
+}
+
+.hero-panel h1,
+.panel h2 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.subtitle {
+  max-width: 62ch;
+  color: #466072;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.stats article,
+.list-card {
+  background: #fffdfa;
+  border-radius: 20px;
+  padding: 18px;
+  border: 1px solid rgba(20, 38, 52, 0.08);
+}
+
+.stats span,
+.list-card p,
+.panel-header span {
+  color: #6d7e8a;
+}
+
+.stats strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 1.8rem;
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: 1.8fr 1fr;
+  gap: 24px;
+}
+
+.map-card,
+.panel {
+  padding: 18px;
+}
+
+.map {
+  height: 70vh;
+  border-radius: 22px;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.side-column {
+  display: grid;
+  gap: 24px;
+}
+
+.list {
+  display: grid;
+  gap: 12px;
+  max-height: 34vh;
+  overflow: auto;
+}
+
+.list-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.driver-pin {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #142634;
+  color: #fffdfa;
+  border: 3px solid #ec6a36;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+@media (max-width: 960px) {
+  .layout {
+    padding: 16px;
+  }
+
+  .hero-panel,
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .map {
+    height: 50vh;
+  }
+}
