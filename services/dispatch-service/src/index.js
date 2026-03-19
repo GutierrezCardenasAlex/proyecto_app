@@ -21,6 +21,13 @@ const acceptSchema = z.object({
   driverId: z.string().uuid()
 });
 
+const nearbySchema = z.object({
+  lat: z.coerce.number(),
+  lng: z.coerce.number(),
+  radiusMeters: z.coerce.number().int().positive().max(5000).default(3000),
+  limit: z.coerce.number().int().positive().max(20).default(5)
+});
+
 async function publish(routingKey, payload) {
   const connection = await amqp.connect(process.env.RABBITMQ_URL);
   const channel = await connection.createChannel();
@@ -77,6 +84,52 @@ async function bootstrap() {
     }
 
     return { tripId, candidates };
+  });
+
+  app.get("/nearby", async (request, reply) => {
+    const parsed = nearbySchema.safeParse(request.query);
+    if (!parsed.success) {
+      return reply.code(400).send({ message: "Invalid nearby query" });
+    }
+
+    const { lat, lng, radiusMeters, limit } = parsed.data;
+    const result = await pool.query(
+      `WITH latest_locations AS (
+         SELECT DISTINCT ON (dl.driver_id)
+           dl.driver_id,
+           dl.location,
+           dl.recorded_at
+         FROM driver_locations dl
+         ORDER BY dl.driver_id, dl.recorded_at DESC
+       )
+       SELECT d.id AS driver_id,
+              d.rating,
+              ST_Y(ll.location::geometry) AS lat,
+              ST_X(ll.location::geometry) AS lng,
+              ST_Distance(
+                ll.location,
+                ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
+              ) AS distance_meters
+       FROM drivers d
+       INNER JOIN latest_locations ll ON ll.driver_id = d.id
+       WHERE d.is_available = TRUE
+         AND d.status = 'available'
+         AND ST_DWithin(
+           ll.location,
+           ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
+           $3
+         )
+       ORDER BY distance_meters ASC
+       LIMIT $4`,
+      [lng, lat, radiusMeters, limit]
+    );
+
+    return {
+      drivers: result.rows.map((row) => ({
+        ...row,
+        eta_minutes: Math.max(2, Math.round(Number(row.distance_meters) / 350))
+      }))
+    };
   });
 
   app.post("/accept", async (request, reply) => {

@@ -12,6 +12,7 @@ class LoginCard extends ConsumerStatefulWidget {
 }
 
 class _LoginCardState extends ConsumerState<LoginCard> {
+  final _nameController = TextEditingController(text: 'Maylex');
   final _phoneController = TextEditingController(text: '+591 70000000');
   final _otpController = TextEditingController(text: '123456');
 
@@ -92,6 +93,12 @@ class _LoginCardState extends ConsumerState<LoginCard> {
             ),
             const SizedBox(height: 14),
             TextField(
+              controller: _nameController,
+              style: const TextStyle(color: Colors.white),
+              decoration: _inputDecoration('Nombre'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
               controller: _phoneController,
               style: const TextStyle(color: Colors.white),
               decoration: _inputDecoration('Telefono'),
@@ -100,7 +107,10 @@ class _LoginCardState extends ConsumerState<LoginCard> {
             FilledButton(
               onPressed: session.isLoading
                   ? null
-                  : () => ref.read(sessionProvider.notifier).requestOtp(_phoneController.text),
+                  : () => ref.read(sessionProvider.notifier).requestOtp(
+                        _phoneController.text,
+                        _nameController.text,
+                      ),
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFFEF8354),
                 foregroundColor: const Color(0xFF112B3C),

@@ -6,12 +6,12 @@ class PotosiMap extends StatelessWidget {
   const PotosiMap({
     super.key,
     required this.drivers,
-    required this.pickup,
+    required this.userLocation,
     required this.destination,
   });
 
   final List<LatLng> drivers;
-  final LatLng pickup;
+  final LatLng userLocation;
   final LatLng destination;
 
   @override
@@ -43,7 +43,7 @@ class PotosiMap extends StatelessWidget {
           MarkerLayer(
             markers: [
               Marker(
-                point: pickup,
+                point: userLocation,
                 width: 60,
                 height: 60,
                 child: const Icon(Icons.my_location, color: Color(0xFF16354C), size: 32),
@@ -73,7 +73,7 @@ class PotosiMap extends StatelessWidget {
           PolylineLayer(
             polylines: [
               Polyline(
-                points: [pickup, destination],
+                points: [userLocation, destination],
                 strokeWidth: 4,
                 color: const Color(0xFFDB5F2D),
               ),

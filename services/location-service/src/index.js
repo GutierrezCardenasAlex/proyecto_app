@@ -23,6 +23,13 @@ const locationSchema = z.object({
   speedKph: z.number().optional()
 });
 
+const nearbySchema = z.object({
+  lat: z.coerce.number(),
+  lng: z.coerce.number(),
+  radiusMeters: z.coerce.number().int().positive().max(5000).default(3000),
+  limit: z.coerce.number().int().positive().max(20).default(10)
+});
+
 function toRadians(value) {
   return (value * Math.PI) / 180;
 }
@@ -116,6 +123,56 @@ async function bootstrap() {
   app.get("/drivers/:driverId", async (request) => {
     const { driverId } = request.params;
     return redis.hgetall(`driver:last_location:${driverId}`);
+  });
+
+  app.get("/nearby", async (request, reply) => {
+    const parsed = nearbySchema.safeParse(request.query);
+    if (!parsed.success) {
+      return reply.code(400).send({ message: "Invalid nearby query" });
+    }
+
+    const { lat, lng, radiusMeters, limit } = parsed.data;
+    if (!isInsidePotosi(lat, lng)) {
+      return reply.code(400).send({ message: "Location is outside Potosi service radius" });
+    }
+
+    const result = await pool.query(
+      `WITH latest_locations AS (
+         SELECT DISTINCT ON (dl.driver_id)
+           dl.driver_id,
+           dl.location,
+           dl.heading,
+           dl.speed_kph,
+           dl.recorded_at
+         FROM driver_locations dl
+         ORDER BY dl.driver_id, dl.recorded_at DESC
+       )
+       SELECT d.id AS driver_id,
+              d.rating,
+              ST_Y(ll.location::geometry) AS lat,
+              ST_X(ll.location::geometry) AS lng,
+              ll.heading,
+              ll.speed_kph,
+              ll.recorded_at,
+              ST_Distance(
+                ll.location,
+                ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
+              ) AS distance_meters
+       FROM drivers d
+       INNER JOIN latest_locations ll ON ll.driver_id = d.id
+       WHERE d.is_available = TRUE
+         AND d.status = 'available'
+         AND ST_DWithin(
+           ll.location,
+           ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
+           $3
+         )
+       ORDER BY distance_meters ASC
+       LIMIT $4`,
+      [lng, lat, radiusMeters, limit]
+    );
+
+    return { drivers: result.rows };
   });
 
   await app.listen({ port, host: "0.0.0.0" });

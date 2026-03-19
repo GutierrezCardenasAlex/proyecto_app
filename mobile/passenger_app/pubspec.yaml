@@ -33,8 +33,10 @@ dependencies:
   cupertino_icons: ^1.0.8
   flutter_map: ^8.2.2
   flutter_riverpod: ^3.0.3
+  geolocator: ^14.0.2
   http: ^1.5.0
   latlong2: ^0.9.1
+  shared_preferences: ^2.5.3
 
 dev_dependencies:
   flutter_test:
