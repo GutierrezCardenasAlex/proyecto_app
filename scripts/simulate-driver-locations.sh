@@ -5,11 +5,11 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_ROOT"
 
 DRIVERS=(
-  "aaaaaaa1-aaaa-aaaa-aaaa-aaaaaaaaaaa1"
-  "aaaaaaa2-aaaa-aaaa-aaaa-aaaaaaaaaaa2"
-  "aaaaaaa3-aaaa-aaaa-aaaa-aaaaaaaaaaa3"
-  "aaaaaaa4-aaaa-aaaa-aaaa-aaaaaaaaaaa4"
-  "aaaaaaa5-aaaa-aaaa-aaaa-aaaaaaaaaaa5"
+  "7b8f6c11-1f39-4d40-8a11-111111111111"
+  "7b8f6c22-1f39-4d40-8a22-222222222222"
+  "7b8f6c33-1f39-4d40-8a33-333333333333"
+  "7b8f6c44-1f39-4d40-8a44-444444444444"
+  "7b8f6c55-1f39-4d40-8a55-555555555555"
 )
 
 BASE_LAT="-19.5836"
@@ -21,13 +21,14 @@ post_location() {
   local lng="$3"
 
   docker compose exec -T location-service node -e "
+const [driverId, lat, lng] = process.argv.slice(1);
 fetch('http://location-service:3005/drivers', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    driverId: process.argv[1],
-    lat: Number(process.argv[2]),
-    lng: Number(process.argv[3]),
+    driverId,
+    lat: parseFloat(lat),
+    lng: parseFloat(lng),
     heading: 90,
     speedKph: 28
   })
@@ -51,8 +52,8 @@ step=0
 while true; do
   for i in "${!DRIVERS[@]}"; do
     driver="${DRIVERS[$i]}"
-    lat=$(awk -v base="$BASE_LAT" -v step="$step" -v idx="$i" 'BEGIN { printf "%.6f", base + (idx * 0.0012) + (step % 5) * 0.00018 }')
-    lng=$(awk -v base="$BASE_LNG" -v step="$step" -v idx="$i" 'BEGIN { printf "%.6f", base + (idx * 0.0011) - (step % 4) * 0.00015 }')
+    lat=$(python3 -c "base=float('$BASE_LAT'); step=$step; idx=$i; print(f'{base + (idx * 0.0012) + ((step % 5) * 0.00018):.6f}')")
+    lng=$(python3 -c "base=float('$BASE_LNG'); step=$step; idx=$i; print(f'{base + (idx * 0.0011) - ((step % 4) * 0.00015):.6f}')")
     post_location "$driver" "$lat" "$lng"
     echo "driver=$driver lat=$lat lng=$lng"
   done

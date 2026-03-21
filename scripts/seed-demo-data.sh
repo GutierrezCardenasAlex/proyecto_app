@@ -9,8 +9,8 @@ docker compose exec -T postgres psql -U taxiya -d taxiya < infra/postgres/seed_d
 
 echo
 echo "Drivers demo listos:"
-echo "- aaaaaaa1-aaaa-aaaa-aaaa-aaaaaaaaaaa1"
-echo "- aaaaaaa2-aaaa-aaaa-aaaa-aaaaaaaaaaa2"
-echo "- aaaaaaa3-aaaa-aaaa-aaaa-aaaaaaaaaaa3"
-echo "- aaaaaaa4-aaaa-aaaa-aaaa-aaaaaaaaaaa4"
-echo "- aaaaaaa5-aaaa-aaaa-aaaa-aaaaaaaaaaa5"
+echo "- 7b8f6c11-1f39-4d40-8a11-111111111111"
+echo "- 7b8f6c22-1f39-4d40-8a22-222222222222"
+echo "- 7b8f6c33-1f39-4d40-8a33-333333333333"
+echo "- 7b8f6c44-1f39-4d40-8a44-444444444444"
+echo "- 7b8f6c55-1f39-4d40-8a55-555555555555"
