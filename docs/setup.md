@@ -61,6 +61,21 @@ Ubuntu/Linux:
 ./scripts/smoke-auth.sh
 ```
 
+## Demo driver data
+
+Seed demo drivers:
+
+```bash
+chmod +x ./scripts/seed-demo-data.sh ./scripts/simulate-driver-locations.sh
+./scripts/seed-demo-data.sh
+```
+
+Simulate moving drivers every 5 seconds:
+
+```bash
+./scripts/simulate-driver-locations.sh
+```
+
 ## Environment variables
 
 Important backend variables are already wired in `docker-compose.yml`.

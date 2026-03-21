@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
@@ -96,10 +98,16 @@ class _HomeTab extends ConsumerStatefulWidget {
 }
 
 class _HomeTabState extends ConsumerState<_HomeTab> {
+  Timer? _pollTimer;
+
   @override
   void initState() {
     super.initState();
-    Future<void>.microtask(_loadData);
+    Future<void>.microtask(() async {
+      await ref.read(passengerLocationProvider.notifier).loadCurrentLocation();
+      await _loadData();
+      _pollTimer = Timer.periodic(const Duration(seconds: 6), (_) => _loadData());
+    });
   }
 
   Future<void> _loadData() async {
@@ -116,6 +124,12 @@ class _HomeTabState extends ConsumerState<_HomeTab> {
   }
 
   @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final session = ref.watch(sessionProvider);
     final tripState = ref.watch(tripProvider);
@@ -126,186 +140,171 @@ class _HomeTabState extends ConsumerState<_HomeTab> {
     final destination = LatLng(userLocation.latitude + 0.0085, userLocation.longitude + 0.0065);
     final nearbyDrivers = tripState.nearbyDrivers;
 
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFFF4EEE4), Color(0xFFE7EDF3)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-      ),
-      child: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: () async {
-            await locationController.loadCurrentLocation();
-            await _loadData();
-          },
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Hola, ${session.fullName}',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF132A3A),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Text(
-                          'Potosi, Bolivia',
-                          style: TextStyle(
-                            color: Color(0xFF6C7B86),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton.filledTonal(
-                    onPressed: locationController.loadCurrentLocation,
-                    icon: const Icon(Icons.my_location),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              const _HeroSection(),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(28),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x1417354E),
-                      blurRadius: 24,
-                      offset: Offset(0, 12),
-                    ),
-                  ],
-                ),
+    return Scaffold(
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: PotosiMap(
+              drivers: nearbyDrivers.map((item) => LatLng(item.lat, item.lng)).toList(),
+              userLocation: userLocation,
+              destination: destination,
+            ),
+          ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Tu mapa',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 18,
-                                  color: Color(0xFF16354C),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.94),
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x1A17354E),
+                            blurRadius: 24,
+                            offset: Offset(0, 12),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Hola, ${session.fullName}',
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF132A3A),
+                                  ),
                                 ),
-                              ),
-                              SizedBox(height: 4),
-                              Text(
-                                'Ubicacion actual y conductores cercanos en tiempo real.',
-                                style: TextStyle(color: Color(0xFF667785)),
-                              ),
-                            ],
+                                const SizedBox(height: 4),
+                                const Text(
+                                  'Potosi, Bolivia',
+                                  style: TextStyle(
+                                    color: Color(0xFF6C7B86),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          IconButton.filledTonal(
+                            onPressed: () async {
+                              await locationController.loadCurrentLocation();
+                              await _loadData();
+                            },
+                            icon: const Icon(Icons.my_location),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (locationState.errorMessage != null || tripState.errorMessage != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFCE6DB),
-                            borderRadius: BorderRadius.circular(999),
+                            color: Colors.white.withValues(alpha: 0.94),
+                            borderRadius: BorderRadius.circular(20),
                           ),
-                          child: const Text(
-                            'Solo Potosi',
-                            style: TextStyle(
-                              color: Color(0xFFBE562C),
-                              fontWeight: FontWeight.w700,
+                          child: Text(
+                            locationState.errorMessage ?? tripState.errorMessage ?? '',
+                            style: const TextStyle(
+                              color: Color(0xFF214A6B),
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
-                      ],
-                    ),
-                    if (locationState.errorMessage != null) ...[
-                      const SizedBox(height: 12),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFEFE8),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Text(
-                          locationState.errorMessage!,
-                          style: const TextStyle(color: Color(0xFFB25228)),
-                        ),
                       ),
-                    ],
-                    if (tripState.errorMessage != null) ...[
-                      const SizedBox(height: 12),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEFF6FF),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Text(
-                          tripState.errorMessage!,
-                          style: const TextStyle(color: Color(0xFF214A6B)),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 14),
-                    SizedBox(
-                      height: 430,
-                      child: PotosiMap(
-                        drivers: nearbyDrivers.map((item) => LatLng(item.lat, item.lng)).toList(),
-                        userLocation: userLocation,
-                        destination: destination,
-                      ),
-                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
-              const Text(
-                'Que auto tomar',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF132A3A),
-                ),
-              ),
-              const SizedBox(height: 10),
-              if (tripState.isLoading)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (nearbyDrivers.isEmpty)
-                const _EmptyCard(
-                  title: 'No hay autos cercanos por ahora',
-                  subtitle: 'Actualiza tu ubicacion o espera a que un conductor este disponible.',
-                )
-              else
-                ...nearbyDrivers.map(
-                  (driver) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _NearbyCarTile(
-                      driver: driver,
-                      onRequest: () => _showRequestTripSheet(context, ref, userLocation),
-                    ),
-                  ),
-                ),
-            ],
+            ),
           ),
-        ),
+          DraggableScrollableSheet(
+            initialChildSize: 0.28,
+            minChildSize: 0.18,
+            maxChildSize: 0.76,
+            builder: (context, scrollController) {
+              return Container(
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF8F4EE),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Color(0x3317354E),
+                      blurRadius: 24,
+                      offset: Offset(0, -10),
+                    ),
+                  ],
+                ),
+                child: ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 44,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFD0D7DD),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Que auto tomar',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF132A3A),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      nearbyDrivers.isEmpty
+                          ? 'Aun no hay conductores cercanos.'
+                          : '${nearbyDrivers.length} autos cerca de tu ubicacion actual.',
+                      style: const TextStyle(color: Color(0xFF667785)),
+                    ),
+                    const SizedBox(height: 14),
+                    if (tripState.isLoading)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else if (nearbyDrivers.isEmpty)
+                      const _EmptyCard(
+                        title: 'No hay autos cercanos por ahora',
+                        subtitle: 'Deja el simulador corriendo o actualiza tu ubicacion.',
+                      )
+                    else
+                      ...nearbyDrivers.map(
+                        (driver) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _NearbyCarTile(
+                            driver: driver,
+                            onRequest: () => _showRequestTripSheet(context, ref, userLocation),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }

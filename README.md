@@ -101,6 +101,16 @@ On Ubuntu/Linux:
 ./scripts/smoke-auth.sh
 ```
 
+## Demo drivers
+
+On Ubuntu/Linux you can seed demo drivers and start simulated GPS updates:
+
+```bash
+chmod +x ./scripts/seed-demo-data.sh ./scripts/simulate-driver-locations.sh
+./scripts/seed-demo-data.sh
+./scripts/simulate-driver-locations.sh
+```
+
 ## Production notes
 
 - All backend services are stateless and horizontally scalable.
