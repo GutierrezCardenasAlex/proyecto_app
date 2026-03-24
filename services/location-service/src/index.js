@@ -54,6 +54,18 @@ async function publish(routingKey, payload) {
   setTimeout(() => connection.close(), 250);
 }
 
+async function emitRealtime(event, room, data) {
+  try {
+    await axios.post(process.env.WEBSOCKET_EMIT_URL, {
+      event,
+      room,
+      data
+    });
+  } catch (error) {
+    app.log.warn({ err: error, event, room }, "websocket emit failed");
+  }
+}
+
 async function bootstrap() {
   await app.register(cors, { origin: true, credentials: true });
 
@@ -103,18 +115,10 @@ async function bootstrap() {
     await redis.expire(`driver:last_location:${payload.driverId}`, 600);
     await publish("location.driver.updated", cachePayload);
 
-    await axios.post(process.env.WEBSOCKET_EMIT_URL, {
-      event: "driver:location",
-      room: `driver:${payload.driverId}`,
-      data: cachePayload
-    });
+    await emitRealtime("driver:location", `driver:${payload.driverId}`, cachePayload);
 
     if (payload.tripId) {
-      await axios.post(process.env.WEBSOCKET_EMIT_URL, {
-        event: "trip:tracking",
-        room: `trip:${payload.tripId}`,
-        data: cachePayload
-      });
+      await emitRealtime("trip:tracking", `trip:${payload.tripId}`, cachePayload);
     }
 
     reply.send({ success: true });

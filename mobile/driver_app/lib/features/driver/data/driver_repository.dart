@@ -89,6 +89,8 @@ class DriverRepository {
     required DriverState currentState,
     String? activeTripId,
   }) async {
+    final heading = position.heading.isFinite ? position.heading : null;
+    final speedKph = position.speed.isFinite && position.speed >= 0 ? position.speed * 3.6 : null;
     final response = await http.post(
       Uri.parse('${AppConfig.apiBaseUrl}/locations/drivers'),
       headers: _headers(token),
@@ -97,8 +99,8 @@ class DriverRepository {
         'tripId': activeTripId,
         'lat': position.latitude,
         'lng': position.longitude,
-        'heading': position.heading,
-        'speedKph': position.speed * 3.6,
+        'heading': heading,
+        'speedKph': speedKph,
       }),
     );
 
