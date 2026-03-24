@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../auth/data/auth_repository.dart';
@@ -50,11 +51,11 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
         selectedIndex: _selectedIndex,
         onDestinationSelected: (value) => setState(() => _selectedIndex = value),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Inicio'),
-          NavigationDestination(icon: Icon(Icons.history_rounded), selectedIcon: Icon(Icons.history), label: 'Historial'),
-          NavigationDestination(icon: Icon(Icons.notifications_none_rounded), selectedIcon: Icon(Icons.notifications), label: 'Avisos'),
-          NavigationDestination(icon: Icon(Icons.support_agent_outlined), selectedIcon: Icon(Icons.support_agent), label: 'Soporte'),
-          NavigationDestination(icon: Icon(Icons.person_outline_rounded), selectedIcon: Icon(Icons.person), label: 'Perfil'),
+          NavigationDestination(icon: Icon(Icons.local_taxi_outlined), selectedIcon: Icon(Icons.local_taxi), label: 'Ride'),
+          NavigationDestination(icon: Icon(Icons.history_rounded), selectedIcon: Icon(Icons.history), label: 'History'),
+          NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet), label: 'Wallet'),
+          NavigationDestination(icon: Icon(Icons.help_center_outlined), selectedIcon: Icon(Icons.help_center), label: 'Help'),
+          NavigationDestination(icon: Icon(Icons.person_outline_rounded), selectedIcon: Icon(Icons.person), label: 'Account'),
         ],
       ),
     );
@@ -131,7 +132,6 @@ class _HomeTabState extends ConsumerState<_HomeTab> {
 
   @override
   Widget build(BuildContext context) {
-    final session = ref.watch(sessionProvider);
     final tripState = ref.watch(tripProvider);
     final locationState = ref.watch(passengerLocationProvider);
     final locationController = ref.read(passengerLocationProvider.notifier);
@@ -159,18 +159,134 @@ class _HomeTabState extends ConsumerState<_HomeTab> {
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
                 child: Column(
                   children: [
+                    Row(
+                      children: [
+                        IconButton(
+                          onPressed: () {},
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.white.withValues(alpha: 0.72),
+                          ),
+                          icon: const Icon(Icons.menu_rounded),
+                        ),
+                        Expanded(
+                          child: Center(
+                            child: Text(
+                              'Taxi Ya',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 26,
+                                fontWeight: FontWeight.w900,
+                                color: const Color(0xFF000003),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.72),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: const Icon(Icons.person),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    GestureDetector(
+                      onTap: () => _showRequestTripSheet(context, ref, userLocation),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.82),
+                          borderRadius: BorderRadius.circular(32),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x12000003),
+                              blurRadius: 28,
+                              offset: Offset(0, 12),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF00E3FD),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.search, color: Color(0xFF001F24)),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Where to?',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.w800,
+                                      color: const Color(0xFF000003),
+                                    ),
+                                  ),
+                                  const Text(
+                                    'Choose a destination to start your journey',
+                                    style: TextStyle(
+                                      color: Color(0xFF47464B),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF3F3F5),
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              child: const Row(
+                                children: [
+                                  Icon(Icons.schedule_rounded, size: 18),
+                                  SizedBox(width: 6),
+                                  Text('Now', style: TextStyle(fontWeight: FontWeight.w800)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _QuickActionCard(
+                            icon: Icons.home_rounded,
+                            title: 'Home',
+                            subtitle: 'Potosi Centro',
+                            onTap: () => _showRequestTripSheet(context, ref, userLocation),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _QuickActionCard(
+                            icon: Icons.work_rounded,
+                            title: 'Work',
+                            subtitle: 'Zona Comercial',
+                            onTap: () => _showRequestTripSheet(context, ref, userLocation),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.94),
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color(0x1A17354E),
-                            blurRadius: 24,
-                            offset: Offset(0, 12),
-                          ),
-                        ],
+                        color: const Color(0xFF000003),
+                        borderRadius: BorderRadius.circular(26),
                       ),
                       child: Row(
                         children: [
@@ -178,31 +294,37 @@ class _HomeTabState extends ConsumerState<_HomeTab> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  'Hola, ${session.fullName}',
-                                  style: const TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w900,
-                                    color: Color(0xFF132A3A),
+                                const Text(
+                                  'Limited offer',
+                                  style: TextStyle(
+                                    color: Color(0xFFC8C5CC),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1.2,
                                   ),
                                 ),
-                                const SizedBox(height: 4),
-                                const Text(
-                                  'Potosi, Bolivia',
-                                  style: TextStyle(
-                                    color: Color(0xFF6C7B86),
-                                    fontWeight: FontWeight.w600,
+                                const SizedBox(height: 6),
+                                Text(
+                                  '20% off all Prime rides',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          IconButton.filledTonal(
+                          FilledButton(
                             onPressed: () async {
                               await locationController.loadCurrentLocation();
                               await _loadData();
                             },
-                            icon: const Icon(Icons.my_location),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFF00E3FD),
+                              foregroundColor: const Color(0xFF001F24),
+                            ),
+                            child: const Text('Apply'),
                           ),
                         ],
                       ),
@@ -392,8 +514,8 @@ class _HistoryTabState extends ConsumerState<_HistoryTab> {
   Widget build(BuildContext context) {
     final history = ref.watch(tripProvider).history;
     return _PageShell(
-      title: 'Historial de solicitudes',
-      subtitle: 'Tus viajes reales guardados en el backend.',
+      title: 'Your Journeys',
+      subtitle: 'Historial real de tus viajes guardados en backend.',
       child: history.isEmpty
           ? const _EmptyCard(
               title: 'Sin historial disponible',
@@ -419,15 +541,15 @@ class _NotificationsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const _PageShell(
-      title: 'Notificaciones',
-      subtitle: 'Actualizaciones de viajes, seguridad y actividad de la cuenta.',
+      title: 'Wallet',
+      subtitle: 'Tus pagos, promociones y saldo disponible.',
       child: Column(
         children: [
-          _SimpleListTile(title: 'Tu ultimo viaje fue completado', subtitle: 'Hace 1 hora', icon: Icons.check_circle_outline),
+          _SimpleListTile(title: 'Saldo promocional', subtitle: 'Bs 25 disponibles para viajes seleccionados', icon: Icons.account_balance_wallet_outlined),
           SizedBox(height: 12),
-          _SimpleListTile(title: 'Verifica siempre la placa del auto', subtitle: 'Consejo de seguridad', icon: Icons.verified_user_outlined),
+          _SimpleListTile(title: 'Método principal', subtitle: 'Efectivo', icon: Icons.payments_outlined),
           SizedBox(height: 12),
-          _SimpleListTile(title: 'Promociones activas en Potosi', subtitle: 'Ahorra en tus proximos viajes', icon: Icons.local_offer_outlined),
+          _SimpleListTile(title: 'Promociones activas', subtitle: 'Ahorra en tus próximos viajes', icon: Icons.local_offer_outlined),
         ],
       ),
     );
@@ -440,8 +562,8 @@ class _SupportTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const _PageShell(
-      title: 'Ayuda y soporte',
-      subtitle: 'Canales de soporte, seguridad y asistencia.',
+      title: 'Help',
+      subtitle: 'Centro de ayuda, seguridad y soporte.',
       child: Column(
         children: [
           _SimpleListTile(title: 'Centro de ayuda', subtitle: 'Guias para usar la app y resolver problemas', icon: Icons.help_outline_rounded),
@@ -464,8 +586,8 @@ class _ProfileTab extends ConsumerWidget {
     final trip = ref.watch(tripProvider).request;
 
     return _PageShell(
-      title: 'Perfil',
-      subtitle: 'Tus datos personales y configuraciones principales.',
+      title: 'Account',
+      subtitle: 'Tus datos, seguridad, configuraciones y soporte.',
       child: Column(
         children: [
           Container(
@@ -917,6 +1039,67 @@ class _ProfileMenuCard extends StatelessWidget {
               trailing: const Icon(Icons.chevron_right_rounded),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _QuickActionCard extends StatelessWidget {
+  const _QuickActionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        height: 116,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.72),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F3F5),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, color: const Color(0xFF000003)),
+            ),
+            const Spacer(),
+            Text(
+              title,
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF000003),
+              ),
+            ),
+            Text(
+              subtitle,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF77767C),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
