@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../core/config/app_config.dart';
 import '../data/auth_repository.dart';
 
 class LoginCard extends ConsumerStatefulWidget {
@@ -25,13 +24,14 @@ class _LoginCardState extends ConsumerState<LoginCard> {
     return Container(
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.82),
-        borderRadius: BorderRadius.circular(32),
+        color: Colors.white.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(36),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.65)),
         boxShadow: const [
           BoxShadow(
             color: Color(0x12000003),
-            blurRadius: 36,
-            offset: Offset(0, 18),
+            blurRadius: 40,
+            offset: Offset(0, 22),
           ),
         ],
       ),
@@ -39,39 +39,74 @@ class _LoginCardState extends ConsumerState<LoginCard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
+            'Taxi Ya',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.2,
+              color: const Color(0xFF006875),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
             'Bienvenido',
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 34,
-              fontWeight: FontWeight.w800,
+              fontSize: 42,
+              fontWeight: FontWeight.w900,
               color: const Color(0xFF000003),
             ),
           ),
           const SizedBox(height: 8),
           const Text(
-            'Ingresa tus datos para comenzar tu viaje.',
+            'Ingresa tus datos para comenzar tu viaje por Potosi.',
             style: TextStyle(
               color: Color(0xFF47464B),
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
+              fontSize: 16,
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 30),
           if (!showOtp) ...[
-            _LabelText('Nombre'),
+            _LabelText('Nombre completo'),
             const SizedBox(height: 8),
             _StyledField(
               controller: _nameController,
-              hintText: 'ej. Maylex',
+              hintText: 'Ej. Maylex Flores',
               icon: Icons.badge_outlined,
             ),
-            const SizedBox(height: 16),
-            _LabelText('Numero o Correo'),
+            const SizedBox(height: 18),
+            _LabelText('Numero de telefono'),
             const SizedBox(height: 8),
             _StyledField(
               controller: _phoneController,
-              hintText: 'ej. +591 700 00000',
+              hintText: 'Ej. +591 70000000',
               icon: Icons.person_outline_rounded,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F3F5).withValues(alpha: 0.9),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.location_city, size: 20, color: Color(0xFF006875)),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Ciudad operativa: Potosi, Bolivia',
+                      style: TextStyle(
+                        color: Color(0xFF47464B),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 22),
             SizedBox(
               width: double.infinity,
               child: FilledButton(
@@ -84,16 +119,17 @@ class _LoginCardState extends ConsumerState<LoginCard> {
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF006875),
                   foregroundColor: Colors.white,
-                  minimumSize: const Size.fromHeight(58),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                  minimumSize: const Size.fromHeight(62),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                  elevation: 0,
                 ),
                 child: Text(
                   session.isLoading ? 'Enviando...' : 'Continuar',
-                  style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800),
+                  style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 18),
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             const _DividerText('o continua con'),
             const SizedBox(height: 18),
             Row(
@@ -111,8 +147,8 @@ class _LoginCardState extends ConsumerState<LoginCard> {
             Text(
               'Codigo OTP',
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 28,
-                fontWeight: FontWeight.w800,
+                fontSize: 34,
+                fontWeight: FontWeight.w900,
                 color: const Color(0xFF000003),
               ),
             ),
@@ -139,12 +175,13 @@ class _LoginCardState extends ConsumerState<LoginCard> {
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF00E3FD),
                   foregroundColor: const Color(0xFF001F24),
-                  minimumSize: const Size.fromHeight(58),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                  minimumSize: const Size.fromHeight(62),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                  elevation: 0,
                 ),
                 child: Text(
                   session.isLoading ? 'Verificando...' : 'Ingresar',
-                  style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800),
+                  style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 18),
                 ),
               ),
             ),
@@ -178,9 +215,9 @@ class _LoginCardState extends ConsumerState<LoginCard> {
             ),
           ],
           const SizedBox(height: 18),
-          Text(
-            'Servidor: ${AppConfig.apiBaseUrl}',
-            style: const TextStyle(
+          const Text(
+            'Servidor activo',
+            style: TextStyle(
               fontSize: 12,
               color: Color(0xFF77767C),
               fontWeight: FontWeight.w700,
@@ -230,10 +267,18 @@ class _StyledField extends StatelessWidget {
         hintText: hintText,
         prefixIcon: Icon(icon, color: const Color(0xFF77767C)),
         filled: true,
-        fillColor: const Color(0xFFF3F3F5),
+        fillColor: Colors.white.withValues(alpha: 0.55),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(22),
           borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(22),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.7)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(22),
+          borderSide: const BorderSide(color: Color(0xFF00E3FD), width: 1.4),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
       ),
@@ -283,9 +328,9 @@ class _SecondaryAction extends StatelessWidget {
     return Container(
       height: 58,
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFFFF),
+        color: Colors.white.withValues(alpha: 0.52),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFC8C5CC).withValues(alpha: 0.4)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.65)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,

@@ -7,80 +7,93 @@ class PotosiMap extends StatelessWidget {
     super.key,
     required this.drivers,
     required this.userLocation,
-    required this.destination,
+    this.destination,
+    this.showRoute = false,
   });
 
   final List<LatLng> drivers;
   final LatLng userLocation;
-  final LatLng destination;
+  final LatLng? destination;
+  final bool showRoute;
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: FlutterMap(
-        options: const MapOptions(
-          initialCenter: LatLng(-19.5836, -65.7531),
-          initialZoom: 13,
+    return FlutterMap(
+      options: MapOptions(
+        initialCenter: userLocation,
+        initialZoom: 14.2,
+      ),
+      children: [
+        TileLayer(
+          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          userAgentPackageName: 'bo.taxiya.passenger',
         ),
-        children: [
-          TileLayer(
-            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-            userAgentPackageName: 'bo.taxiya.passenger',
-          ),
-          CircleLayer(
-            circles: const [
-              CircleMarker(
-                point: LatLng(-19.5836, -65.7531),
-                radius: 15000,
-                useRadiusInMeter: true,
-                color: Color(0x2216354C),
-                borderColor: Color(0xFFDB5F2D),
-                borderStrokeWidth: 2,
-              ),
-            ],
-          ),
-          MarkerLayer(
-            markers: [
-              Marker(
-                point: userLocation,
-                width: 60,
-                height: 60,
-                child: const Icon(Icons.my_location, color: Color(0xFF16354C), size: 32),
-              ),
-              Marker(
-                point: destination,
-                width: 60,
-                height: 60,
-                child: const Icon(Icons.flag, color: Color(0xFFDB5F2D), size: 32),
-              ),
-              ...drivers.map(
-                (driver) => Marker(
-                  point: driver,
-                  width: 48,
-                  height: 48,
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF16354C),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.local_taxi, color: Colors.white),
-                  ),
-                ),
-              ),
-            ],
-          ),
+        CircleLayer(
+          circles: const [
+            CircleMarker(
+              point: LatLng(-19.5836, -65.7531),
+              radius: 15000,
+              useRadiusInMeter: true,
+              color: Color(0x16006875),
+              borderColor: Color(0x3300E3FD),
+              borderStrokeWidth: 2,
+            ),
+          ],
+        ),
+        if (showRoute && destination != null)
           PolylineLayer(
             polylines: [
               Polyline(
-                points: [userLocation, destination],
+                points: [userLocation, destination!],
                 strokeWidth: 4,
-                color: const Color(0xFFDB5F2D),
+                color: const Color(0xFF00AFC3),
               ),
             ],
           ),
-        ],
-      ),
+        MarkerLayer(
+          markers: [
+            Marker(
+              point: userLocation,
+              width: 56,
+              height: 56,
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF00E3FD).withValues(alpha: 0.35),
+                      blurRadius: 18,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.person_pin_circle, color: Color(0xFF001F24), size: 40),
+              ),
+            ),
+            if (destination != null)
+              Marker(
+                point: destination!,
+                width: 54,
+                height: 54,
+                child: const Icon(Icons.place, color: Color(0xFF000003), size: 34),
+              ),
+            ...drivers.map(
+              (driver) => Marker(
+                point: driver,
+                width: 46,
+                height: 46,
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF000003),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.local_taxi, color: Color(0xFF00E3FD), size: 22),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

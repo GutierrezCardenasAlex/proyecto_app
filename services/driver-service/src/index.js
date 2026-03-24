@@ -27,6 +27,12 @@ const availabilitySchema = z.object({
   isAvailable: z.boolean()
 });
 
+const ensureProfileSchema = z.object({
+  userId: z.string().uuid(),
+  fullName: z.string().min(2).optional(),
+  phone: z.string().min(8).optional()
+});
+
 async function publish(routingKey, payload) {
   const connection = await amqp.connect(process.env.RABBITMQ_URL);
   const channel = await connection.createChannel();
@@ -103,6 +109,76 @@ async function bootstrap() {
     await publish("driver.availability.changed", { driverId, status, isAvailable });
 
     reply.send({ driver: result.rows[0] });
+  });
+
+  app.post("/ensure-profile", async (request, reply) => {
+    const { userId } = ensureProfileSchema.parse(request.body);
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+      const existing = await client.query(
+        `SELECT d.*, row_to_json(v.*) AS vehicle
+         FROM drivers d
+         LEFT JOIN vehicles v ON v.driver_id = d.id
+         WHERE d.user_id = $1`,
+        [userId]
+      );
+
+      if (existing.rows.length) {
+        await client.query("COMMIT");
+        return reply.send({ driver: existing.rows[0] });
+      }
+
+      const driverResult = await client.query(
+        `INSERT INTO drivers (user_id, license_number, status, is_available)
+         VALUES ($1, $2, 'offline', FALSE)
+         RETURNING *`,
+        [userId, `TEMP-${String(userId).slice(0, 8).toUpperCase()}`]
+      );
+
+      const driver = driverResult.rows[0];
+      const plateSuffix = String(driver.id).slice(0, 4).toUpperCase();
+      await client.query(
+        `INSERT INTO vehicles (driver_id, plate, brand, model, color, year)
+         VALUES ($1, $2, 'Toyota', 'Vitz', 'Blanco', 2020)`,
+        [driver.id, `POT-${plateSuffix}`]
+      );
+
+      const result = await client.query(
+        `SELECT d.*, row_to_json(v.*) AS vehicle
+         FROM drivers d
+         LEFT JOIN vehicles v ON v.driver_id = d.id
+         WHERE d.id = $1`,
+        [driver.id]
+      );
+
+      await client.query("COMMIT");
+      await publish("driver.profile.updated", { driverId: driver.id, userId });
+      reply.code(201).send({ driver: result.rows[0] });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  });
+
+  app.get("/by-user/:userId", async (request, reply) => {
+    const { userId } = request.params;
+    const result = await pool.query(
+      `SELECT d.*, row_to_json(v.*) AS vehicle
+       FROM drivers d
+       LEFT JOIN vehicles v ON v.driver_id = d.id
+       WHERE d.user_id = $1`,
+      [userId]
+    );
+
+    if (!result.rows.length) {
+      return reply.code(404).send({ message: "Driver not found" });
+    }
+
+    reply.send(result.rows[0]);
   });
 
   app.get("/:driverId", async (request, reply) => {

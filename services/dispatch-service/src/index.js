@@ -43,6 +43,12 @@ async function bootstrap() {
 
   app.post("/search", async (request) => {
     const { tripId, pickupLat, pickupLng } = searchSchema.parse(request.body);
+    await pool.query(
+      `UPDATE trips
+       SET status = 'searching', updated_at = NOW()
+       WHERE id = $1 AND status = 'requested'`,
+      [tripId]
+    );
     const result = await pool.query(
       `WITH latest_locations AS (
          SELECT DISTINCT ON (dl.driver_id)
@@ -76,6 +82,8 @@ async function bootstrap() {
     await publish("dispatch.search.completed", { tripId, candidates });
 
     for (const candidate of candidates) {
+      await redis.sadd(`driver:${candidate.driver_id}:offers`, tripId);
+      await redis.expire(`driver:${candidate.driver_id}:offers`, 600);
       await publish("dispatch.trip.offer", {
         tripId,
         driverId: candidate.driver_id,
@@ -84,6 +92,35 @@ async function bootstrap() {
     }
 
     return { tripId, candidates };
+  });
+
+  app.get("/offers/:driverId", async (request) => {
+    const { driverId } = request.params;
+    const tripIds = await redis.smembers(`driver:${driverId}:offers`);
+
+    if (!tripIds.length) {
+      return { offers: [] };
+    }
+
+    const result = await pool.query(
+      `SELECT t.id,
+              t.status,
+              t.pickup_address,
+              t.destination_address,
+              t.requested_at,
+              ST_Y(t.pickup_location::geometry) AS pickup_lat,
+              ST_X(t.pickup_location::geometry) AS pickup_lng,
+              ST_Y(t.destination_location::geometry) AS destination_lat,
+              ST_X(t.destination_location::geometry) AS destination_lng,
+              t.fare_amount
+       FROM trips t
+       WHERE t.id = ANY($1::uuid[])
+         AND t.status IN ('requested', 'searching')
+       ORDER BY t.requested_at DESC`,
+      [tripIds]
+    );
+
+    return { offers: result.rows };
   });
 
   app.get("/nearby", async (request, reply) => {
@@ -147,7 +184,7 @@ async function bootstrap() {
       const tripUpdate = await client.query(
         `UPDATE trips
          SET driver_id = $1, status = 'accepted', accepted_at = NOW(), updated_at = NOW()
-         WHERE id = $2 AND status = 'requested'
+         WHERE id = $2 AND status IN ('requested', 'searching')
          RETURNING *`,
         [driverId, tripId]
       );
@@ -171,6 +208,7 @@ async function bootstrap() {
       );
 
       await client.query("COMMIT");
+      await redis.del(`driver:${driverId}:offers`);
       await publish("dispatch.trip.accepted", { tripId, driverId });
       reply.send(tripUpdate.rows[0]);
     } catch (error) {
