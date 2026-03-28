@@ -91,17 +91,24 @@ class DriverRepository {
   }) async {
     final heading = position.heading.isFinite ? position.heading : null;
     final speedKph = position.speed.isFinite && position.speed >= 0 ? position.speed * 3.6 : null;
+    final payload = <String, Object>{
+      'driverId': driverId,
+      'lat': position.latitude,
+      'lng': position.longitude,
+    };
+    if (activeTripId != null && activeTripId.isNotEmpty) {
+      payload['tripId'] = activeTripId;
+    }
+    if (heading != null) {
+      payload['heading'] = heading;
+    }
+    if (speedKph != null) {
+      payload['speedKph'] = speedKph;
+    }
     final response = await http.post(
       Uri.parse('${AppConfig.apiBaseUrl}/locations/drivers'),
       headers: _headers(token),
-      body: jsonEncode({
-        'driverId': driverId,
-        'tripId': activeTripId,
-        'lat': position.latitude,
-        'lng': position.longitude,
-        'heading': heading,
-        'speedKph': speedKph,
-      }),
+      body: jsonEncode(payload),
     );
 
     if (response.statusCode >= 400) {

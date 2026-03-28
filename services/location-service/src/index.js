@@ -16,7 +16,7 @@ const POTOSI_RADIUS_KM = 15;
 
 const locationSchema = z.object({
   driverId: z.string().uuid(),
-  tripId: z.string().uuid().optional(),
+  tripId: z.string().uuid().nullable().optional(),
   lat: z.number(),
   lng: z.number(),
   heading: z.number().optional(),
