@@ -98,6 +98,7 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://taxiya:taxiya@rabbitmq:5672}
       DISPATCH_SERVICE_URL: "http://dispatch-service:3004"
+      WEBSOCKET_EMIT_URL: "http://websocket-service:3008/internal/events"
     depends_on:
       postgres:
         condition: service_healthy

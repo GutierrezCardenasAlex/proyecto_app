@@ -17,10 +17,46 @@ final offeredTripProvider =
 class DriverTripRepository {
   const DriverTripRepository();
 
+  Future<DriverTrip?> fetchActiveTrip({
+    required String token,
+    required String driverId,
+  }) async {
+    final response = await http.get(
+      Uri.parse('${AppConfig.apiBaseUrl}/trips/active/driver/$driverId'),
+      headers: _headers(token),
+    );
+
+    if (response.statusCode >= 400) {
+      throw Exception('No se pudo cargar el viaje activo (${response.statusCode})');
+    }
+
+    if (response.body.trim() == 'null') {
+      return null;
+    }
+
+    final item = jsonDecode(response.body) as Map<String, dynamic>;
+    return DriverTrip(
+      id: item['id']?.toString() ?? '',
+      passengerPickup: item['pickup_address']?.toString() ?? 'Recojo',
+      destination: item['destination_address']?.toString() ?? 'Destino',
+      status: item['status']?.toString() ?? 'accepted',
+      pickupLat: _toDouble(item['pickup_lat']),
+      pickupLng: _toDouble(item['pickup_lng']),
+      destinationLat: _toDouble(item['destination_lat']),
+      destinationLng: _toDouble(item['destination_lng']),
+      fareAmount: _toDouble(item['fare_amount']),
+    );
+  }
+
   Future<DriverTrip?> fetchOffer({
     required String token,
     required String driverId,
   }) async {
+    final activeTrip = await fetchActiveTrip(token: token, driverId: driverId);
+    if (activeTrip != null) {
+      return activeTrip;
+    }
+
     final response = await http.get(
       Uri.parse('${AppConfig.apiBaseUrl}/dispatch/offers/$driverId'),
       headers: _headers(token),
@@ -69,6 +105,45 @@ class DriverTripRepository {
     }
 
     return trip.copyWith(status: 'accepted');
+  }
+
+  Future<DriverTrip> updateStatus({
+    required String token,
+    required DriverTrip trip,
+    required String status,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('${AppConfig.apiBaseUrl}/trips/${trip.id}/status'),
+      headers: _headers(token),
+      body: jsonEncode({'status': status}),
+    );
+
+    if (response.statusCode >= 400) {
+      throw Exception('No se pudo actualizar el viaje (${response.statusCode})');
+    }
+
+    return trip.copyWith(status: status);
+  }
+
+  Future<void> submitRating({
+    required String token,
+    required String tripId,
+    required int score,
+    String? comment,
+  }) async {
+    final response = await http.post(
+      Uri.parse('${AppConfig.apiBaseUrl}/trips/$tripId/rating'),
+      headers: _headers(token),
+      body: jsonEncode({
+        'fromRole': 'driver',
+        'score': score,
+        if (comment != null && comment.trim().isNotEmpty) 'comment': comment.trim(),
+      }),
+    );
+
+    if (response.statusCode >= 400) {
+      throw Exception('No se pudo enviar la calificacion (${response.statusCode})');
+    }
   }
 
   static Map<String, String> _headers(String token) => {
@@ -120,5 +195,47 @@ class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
           driverId: session.driverId,
           trip: current,
         ));
+  }
+
+  Future<void> updateTripStatus(String status) async {
+    final session = ref.read(driverSessionProvider);
+    final current = state.value;
+    if (current == null || session.token.isEmpty) {
+      return;
+    }
+
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() => _repository.updateStatus(
+          token: session.token,
+          trip: current,
+          status: status,
+        ));
+  }
+
+  Future<void> submitRating({
+    required int score,
+    String? comment,
+  }) async {
+    final session = ref.read(driverSessionProvider);
+    final current = state.value;
+    if (current == null || session.token.isEmpty) {
+      return;
+    }
+
+    await _repository.submitRating(
+      token: session.token,
+      tripId: current.id,
+      score: score,
+      comment: comment,
+    );
+    state = const AsyncData(null);
+  }
+
+  void setLocalStatus(String status) {
+    final current = state.value;
+    if (current == null) {
+      return;
+    }
+    state = AsyncData(current.copyWith(status: status));
   }
 }

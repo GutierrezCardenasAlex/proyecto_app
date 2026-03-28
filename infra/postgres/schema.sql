@@ -15,6 +15,7 @@ BEGIN
       'searching',
       'accepted',
       'arriving',
+      'at_pickup',
       'in_progress',
       'completed',
       'cancelled',
@@ -102,6 +103,19 @@ CREATE TABLE IF NOT EXISTS trip_events (
   event_type VARCHAR(64) NOT NULL,
   payload JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS trip_ratings (
+  id BIGSERIAL PRIMARY KEY,
+  trip_id UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+  from_role VARCHAR(16) NOT NULL,
+  from_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  to_user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  to_driver_id UUID REFERENCES drivers(id) ON DELETE CASCADE,
+  score SMALLINT NOT NULL CHECK (score BETWEEN 1 AND 5),
+  comment VARCHAR(240),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (trip_id, from_role)
 );
 
 CREATE INDEX IF NOT EXISTS idx_driver_locations_driver_time

@@ -201,7 +201,11 @@ class DriverStateController extends Notifier<DriverState> {
       driverId: session.driverId,
       position: position,
       currentState: state,
-      activeTripId: trip?.status == 'accepted' ? trip?.id : null,
+      activeTripId: trip == null
+          ? null
+          : const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(trip.status)
+          ? trip.id
+          : null,
     );
   }
 }

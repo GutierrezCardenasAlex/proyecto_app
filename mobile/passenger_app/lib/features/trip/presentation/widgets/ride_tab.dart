@@ -39,6 +39,7 @@ class _RideTabState extends ConsumerState<RideTab> {
   RideMode _rideMode = RideMode.destino;
   String? _joinedTripId;
   String? _selectedDriverId;
+  String? _ratingPromptedTripId;
 
   @override
   void initState() {
@@ -49,8 +50,8 @@ class _RideTabState extends ConsumerState<RideTab> {
     _tripSubscription = ref.listenManual<TripState>(tripProvider, (previous, next) {
       final previousStatus = previous?.request.status;
       final currentStatus = next.request.status;
-      if (previousStatus != currentStatus && currentStatus == 'accepted') {
-        _showFloatingNotification('Tu auto ha sido aceptado');
+      if (previousStatus != currentStatus) {
+        _handleTripStatusChange(next.request);
       }
     });
   }
@@ -87,6 +88,14 @@ class _RideTabState extends ConsumerState<RideTab> {
       final tripId = map['tripId']?.toString();
       if (tripId != null && tripId.isNotEmpty) {
         ref.read(tripProvider.notifier).markTripAccepted(tripId: tripId);
+      }
+    });
+    _socket?.on('trip:status_changed', (data) {
+      final map = data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+      final tripId = map['tripId']?.toString();
+      final status = map['status']?.toString();
+      if (tripId != null && status != null && tripId.isNotEmpty && status.isNotEmpty) {
+        ref.read(tripProvider.notifier).markTripAccepted(tripId: tripId, status: status);
       }
     });
     _socket?.connect();
@@ -202,6 +211,124 @@ class _RideTabState extends ConsumerState<RideTab> {
         setState(() => _floatingNotification = null);
       }
     });
+  }
+
+  void _handleTripStatusChange(TripRequest request) {
+    final message = switch (request.status) {
+      'accepted' => 'Tu taxi fue aceptado.',
+      'arriving' => 'El conductor va en camino a recogerte.',
+      'at_pickup' => 'Tu taxi ya llegó al punto de recogida.',
+      'in_progress' => 'Viaje en progreso.',
+      'completed' => 'Viaje finalizado.',
+      'cancelled' => 'El viaje fue cancelado.',
+      _ => null,
+    };
+
+    if (message != null) {
+      _showFloatingNotification(message);
+    }
+
+    if (request.status == 'completed' &&
+        request.activeTripId != null &&
+        _ratingPromptedTripId != request.activeTripId) {
+      _ratingPromptedTripId = request.activeTripId;
+      Future<void>.microtask(() => _showPassengerRatingDialog(request.activeTripId!));
+    }
+  }
+
+  Future<void> _showPassengerRatingDialog(String tripId) async {
+    int selectedScore = 5;
+    final commentController = TextEditingController();
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) {
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              return AlertDialog(
+                title: const Text('Califica al conductor'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Wrap(
+                      spacing: 4,
+                      children: List<Widget>.generate(5, (index) {
+                        final value = index + 1;
+                        return IconButton(
+                          onPressed: () => setDialogState(() => selectedScore = value),
+                          icon: Icon(
+                            value <= selectedScore ? Icons.star : Icons.star_border,
+                            color: const Color(0xFF00E3FD),
+                          ),
+                        );
+                      }),
+                    ),
+                    TextField(
+                      controller: commentController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        hintText: 'Comentario opcional',
+                      ),
+                    ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Luego'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    child: const Text('Enviar'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+
+      if (confirmed == true) {
+        await ref.read(tripProvider.notifier).submitRating(
+              token: ref.read(sessionProvider).token,
+              tripId: tripId,
+              score: selectedScore,
+              comment: commentController.text,
+            );
+        await _syncDashboard();
+      }
+    } finally {
+      commentController.dispose();
+    }
+  }
+
+  Widget _buildTripActions(TripState tripState) {
+    final activeTripId = tripState.request.activeTripId;
+    if (activeTripId == null || activeTripId.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final status = tripState.request.status;
+    final session = ref.read(sessionProvider);
+
+    if (status == 'at_pickup') {
+      return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: SizedBox(
+          height: 52,
+          child: FilledButton(
+            onPressed: () => ref.read(tripProvider.notifier).updateTripStatus(
+                  token: session.token,
+                  tripId: activeTripId,
+                  status: 'in_progress',
+                ),
+            child: const Text('Estoy listo para el destino'),
+          ),
+        ),
+      );
+    }
+
+    return const SizedBox.shrink();
   }
 
   NearbyDriver? _findDriverById(List<NearbyDriver> drivers, String? driverId) {
@@ -550,6 +677,7 @@ class _RideTabState extends ConsumerState<RideTab> {
                           textColor: const Color(0xFF00616D),
                         ),
                       ),
+                    _buildTripActions(tripState),
                     const SizedBox(height: 12),
                     Text(
                       _rideMode == RideMode.destino ? 'Autos disponibles' : 'Que taxi tomar',

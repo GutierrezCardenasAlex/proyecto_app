@@ -7,6 +7,7 @@ import '../../auth/data/auth_repository.dart';
 import '../../auth/presentation/driver_login_card.dart';
 import '../../map/presentation/driver_map.dart';
 import '../../trip/data/trip_repository.dart';
+import '../../trip/domain/driver_trip.dart';
 import '../../../core/config/app_config.dart';
 import 'pages/driver_detail_pages.dart';
 import 'widgets/driver_app_drawer.dart';
@@ -24,6 +25,7 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   io.Socket? _socket;
   String? _joinedDriverId;
+  String? _joinedTripId;
   int _selectedIndex = 0;
   String _activeDrawerItem = 'Panel de viaje';
 
@@ -90,6 +92,10 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> {
     _socket?.onConnect((_) {
       _socket?.emit('join:driver', driverId);
       _joinedDriverId = driverId;
+      final tripId = ref.read(offeredTripProvider).value?.id;
+      if (tripId != null && tripId.isNotEmpty) {
+        _joinTripRoom(tripId);
+      }
     });
     _socket?.on('driver:trip_offer', (_) {
       ref.read(offeredTripProvider.notifier).loadOffer();
@@ -103,7 +109,51 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> {
         );
       }
     });
+    _socket?.on('trip:status_changed', (data) {
+      final map = data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+      final tripId = map['tripId']?.toString();
+      final status = map['status']?.toString();
+      final currentTripId = ref.read(offeredTripProvider).value?.id;
+      if (tripId != null &&
+          status != null &&
+          tripId.isNotEmpty &&
+          status.isNotEmpty &&
+          currentTripId == tripId) {
+        ref.read(offeredTripProvider.notifier).setLocalStatus(status);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(_statusMessage(status)),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      }
+    });
     _socket?.connect();
+  }
+
+  void _joinTripRoom(String tripId) {
+    if (_joinedTripId == tripId) {
+      return;
+    }
+    if (_joinedTripId != null && _joinedTripId!.isNotEmpty) {
+      _socket?.emit('leave:trip', _joinedTripId);
+    }
+    _socket?.emit('join:trip', tripId);
+    _joinedTripId = tripId;
+  }
+
+  String _statusMessage(String status) {
+    return switch (status) {
+      'arriving' => 'Dirigete al punto de recogida.',
+      'at_pickup' => 'Marcaste llegada al punto.',
+      'in_progress' => 'Viaje en progreso.',
+      'completed' => 'Viaje finalizado.',
+      'cancelled' => 'Viaje cancelado.',
+      _ => 'Estado actualizado: $status',
+    };
   }
 
   @override
@@ -126,6 +176,12 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> {
 
     if (session.driverId.isNotEmpty) {
       _ensureSocket(session.driverId);
+    }
+
+    final currentTrip = ref.watch(offeredTripProvider).value;
+    if (currentTrip != null &&
+        const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(currentTrip.status)) {
+      _joinTripRoom(currentTrip.id);
     }
 
     final pages = [
@@ -283,6 +339,100 @@ class _DriverDashboard extends ConsumerWidget {
 
   final VoidCallback onMenuTap;
   final VoidCallback onProfileTap;
+
+  String _tripDescription(DriverTrip? trip) {
+    if (trip == null) {
+      return 'No hay ofertas en este momento. Activa disponibilidad y mantente cerca de la demanda.';
+    }
+
+    return switch (trip.status) {
+      'accepted' => 'Ya aceptaste este viaje. Ahora ve hacia el punto de recogida.',
+      'arriving' => 'Estas en camino al punto de recogida.',
+      'at_pickup' => 'Ya llegaste. Espera a que el pasajero suba o inicia el trayecto.',
+      'in_progress' => 'Viaje en progreso hacia el destino.',
+      'completed' => 'Viaje finalizado. Ya puedes calificar al pasajero.',
+      _ => 'Revisa la solicitud y decide si quieres aceptarla.',
+    };
+  }
+
+  String _driverActionLabel(DriverTrip? trip) {
+    if (trip == null) {
+      return 'Aceptar viaje';
+    }
+
+    return switch (trip.status) {
+      'accepted' => 'Ir a recoger',
+      'arriving' => 'Llegue a la ubicacion',
+      'at_pickup' => 'Iniciar viaje',
+      'in_progress' => 'Finalizar viaje',
+      'completed' => 'Calificar pasajero',
+      _ => 'Aceptar viaje',
+    };
+  }
+
+  Future<void> _submitDriverRating(BuildContext context, WidgetRef ref, DriverTrip trip) async {
+    int selectedScore = 5;
+    final commentController = TextEditingController();
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) {
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              return AlertDialog(
+                title: const Text('Califica al pasajero'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Wrap(
+                      spacing: 4,
+                      children: List<Widget>.generate(5, (index) {
+                        final value = index + 1;
+                        return IconButton(
+                          onPressed: () => setDialogState(() => selectedScore = value),
+                          icon: Icon(
+                            value <= selectedScore ? Icons.star : Icons.star_border,
+                            color: const Color(0xFF00E3FD),
+                          ),
+                        );
+                      }),
+                    ),
+                    TextField(
+                      controller: commentController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        hintText: 'Comentario opcional',
+                      ),
+                    ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Luego'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    child: const Text('Enviar'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+
+      if (confirmed == true) {
+        await ref.read(offeredTripProvider.notifier).submitRating(
+              score: selectedScore,
+              comment: commentController.text,
+            );
+        await ref.read(driverStateProvider.notifier).toggleAvailability(true);
+      }
+    } finally {
+      commentController.dispose();
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -553,11 +703,7 @@ class _DriverDashboard extends ConsumerWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    trip == null
-                        ? 'No hay ofertas en este momento. Activa disponibilidad y mantente cerca de la demanda.'
-                        : trip.status == 'accepted'
-                        ? 'Ya aceptaste este viaje. Dirigete al punto de recogida.'
-                        : 'Revisa la solicitud y decide si quieres aceptarla.',
+                    _tripDescription(trip),
                     style: const TextStyle(
                       color: Color(0xFF47464B),
                       fontWeight: FontWeight.w600,
@@ -597,11 +743,22 @@ class _DriverDashboard extends ConsumerWidget {
                   SizedBox(
                     height: 56,
                     child: FilledButton(
-                      onPressed: session.loggedIn &&
-                              driverState.available &&
-                              trip != null &&
-                              trip.status != 'accepted'
-                          ? () => ref.read(offeredTripProvider.notifier).acceptTrip()
+                      onPressed: session.loggedIn && driverState.available && trip != null
+                          ? () async {
+                              if (trip.status == 'requested' || trip.status == 'searching') {
+                                await ref.read(offeredTripProvider.notifier).acceptTrip();
+                              } else if (trip.status == 'accepted') {
+                                await ref.read(offeredTripProvider.notifier).updateTripStatus('arriving');
+                              } else if (trip.status == 'arriving') {
+                                await ref.read(offeredTripProvider.notifier).updateTripStatus('at_pickup');
+                              } else if (trip.status == 'at_pickup') {
+                                await ref.read(offeredTripProvider.notifier).updateTripStatus('in_progress');
+                              } else if (trip.status == 'in_progress') {
+                                await ref.read(offeredTripProvider.notifier).updateTripStatus('completed');
+                              } else if (trip.status == 'completed') {
+                                await _submitDriverRating(context, ref, trip);
+                              }
+                            }
                           : null,
                       style: FilledButton.styleFrom(
                         backgroundColor: const Color(0xFF00E3FD),
@@ -609,7 +766,7 @@ class _DriverDashboard extends ConsumerWidget {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
                       ),
                       child: Text(
-                        trip?.status == 'accepted' ? 'Viaje aceptado' : 'Aceptar viaje',
+                        _driverActionLabel(trip),
                         style: const TextStyle(fontWeight: FontWeight.w800),
                       ),
                     ),
