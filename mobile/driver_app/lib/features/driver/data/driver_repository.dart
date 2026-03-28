@@ -170,7 +170,6 @@ class DriverStateController extends Notifier<DriverState> {
         _gpsTimer?.cancel();
         _gpsTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
           await _sendLocation();
-          await ref.read(offeredTripProvider.notifier).loadOffer();
         });
       } else {
         _gpsTimer?.cancel();

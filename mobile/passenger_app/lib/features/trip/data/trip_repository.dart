@@ -243,4 +243,18 @@ class TripController extends Notifier<TripState> {
       );
     }
   }
+
+  void markTripAccepted({
+    required String tripId,
+    String status = 'accepted',
+  }) {
+    if (state.request.activeTripId != tripId) {
+      return;
+    }
+
+    state = state.copyWith(
+      request: state.request.copyWith(status: status),
+      clearError: true,
+    );
+  }
 }

@@ -1,5 +1,6 @@
 const Fastify = require("fastify");
 const cors = require("@fastify/cors");
+const axios = require("axios");
 const { Pool } = require("pg");
 const Redis = require("ioredis");
 const amqp = require("amqplib");
@@ -34,6 +35,22 @@ async function publish(routingKey, payload) {
   await channel.assertExchange("taxiya.events", "topic", { durable: true });
   channel.publish("taxiya.events", routingKey, Buffer.from(JSON.stringify(payload)));
   setTimeout(() => connection.close(), 250);
+}
+
+async function emitRealtime(event, room, data) {
+  if (!process.env.WEBSOCKET_EMIT_URL) {
+    return;
+  }
+
+  try {
+    await axios.post(process.env.WEBSOCKET_EMIT_URL, {
+      event,
+      room,
+      data
+    });
+  } catch (error) {
+    app.log.warn({ err: error, event, room }, "websocket emit failed");
+  }
 }
 
 async function bootstrap() {
@@ -85,6 +102,11 @@ async function bootstrap() {
       await redis.sadd(`driver:${candidate.driver_id}:offers`, tripId);
       await redis.expire(`driver:${candidate.driver_id}:offers`, 600);
       await publish("dispatch.trip.offer", {
+        tripId,
+        driverId: candidate.driver_id,
+        distanceMeters: Number(candidate.distance_meters)
+      });
+      await emitRealtime("driver:trip_offer", `driver:${candidate.driver_id}`, {
         tripId,
         driverId: candidate.driver_id,
         distanceMeters: Number(candidate.distance_meters)
@@ -210,6 +232,16 @@ async function bootstrap() {
       await client.query("COMMIT");
       await redis.del(`driver:${driverId}:offers`);
       await publish("dispatch.trip.accepted", { tripId, driverId });
+      await emitRealtime("trip:accepted", `trip:${tripId}`, {
+        tripId,
+        driverId,
+        status: "accepted"
+      });
+      await emitRealtime("driver:trip_accepted", `driver:${driverId}`, {
+        tripId,
+        driverId,
+        status: "accepted"
+      });
       reply.send(tripUpdate.rows[0]);
     } catch (error) {
       await client.query("ROLLBACK");

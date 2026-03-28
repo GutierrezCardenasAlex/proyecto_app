@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../auth/data/auth_repository.dart';
 import '../../auth/presentation/driver_login_card.dart';
 import '../../map/presentation/driver_map.dart';
 import '../../trip/data/trip_repository.dart';
+import '../../../core/config/app_config.dart';
 import 'pages/driver_detail_pages.dart';
 import 'widgets/driver_app_drawer.dart';
 import 'widgets/driver_ui_kit.dart';
@@ -20,6 +22,8 @@ class DriverHomePage extends ConsumerStatefulWidget {
 
 class _DriverHomePageState extends ConsumerState<DriverHomePage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  io.Socket? _socket;
+  String? _joinedDriverId;
   int _selectedIndex = 0;
   String _activeDrawerItem = 'Panel de viaje';
 
@@ -69,6 +73,36 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> {
     );
   }
 
+  void _ensureSocket(String driverId) {
+    if (_socket != null && _joinedDriverId == driverId) {
+      return;
+    }
+
+    _socket?.dispose();
+    _socket = io.io(
+      AppConfig.websocketUrl,
+      io.OptionBuilder()
+          .setTransports(['websocket'])
+          .disableAutoConnect()
+          .enableForceNew()
+          .build(),
+    );
+    _socket?.onConnect((_) {
+      _socket?.emit('join:driver', driverId);
+      _joinedDriverId = driverId;
+    });
+    _socket?.on('driver:trip_offer', (_) {
+      ref.read(offeredTripProvider.notifier).loadOffer();
+    });
+    _socket?.connect();
+  }
+
+  @override
+  void dispose() {
+    _socket?.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(driverSessionProvider);
@@ -79,6 +113,10 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> {
 
     if (!session.loggedIn) {
       return const _DriverLoginShell();
+    }
+
+    if (session.driverId.isNotEmpty) {
+      _ensureSocket(session.driverId);
     }
 
     final pages = [

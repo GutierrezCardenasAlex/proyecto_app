@@ -20,6 +20,8 @@ async function bootstrap() {
   io.on("connection", (socket) => {
     socket.on("join:trip", (tripId) => socket.join(`trip:${tripId}`));
     socket.on("join:driver", (driverId) => socket.join(`driver:${driverId}`));
+    socket.on("leave:trip", (tripId) => socket.leave(`trip:${tripId}`));
+    socket.on("leave:driver", (driverId) => socket.leave(`driver:${driverId}`));
     socket.on("join:admin", () => socket.join("admin"));
   });
 

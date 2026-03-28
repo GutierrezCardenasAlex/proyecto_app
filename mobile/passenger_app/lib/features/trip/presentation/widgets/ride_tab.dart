@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../../auth/data/auth_repository.dart';
+import '../../../../core/config/app_config.dart';
 import '../../../map/data/location_controller.dart';
 import '../../../map/presentation/potosi_map.dart';
 import '../../data/trip_repository.dart';
@@ -31,15 +33,18 @@ class _RideTabState extends ConsumerState<RideTab> {
   Timer? _refreshTimer;
   Timer? _notificationTimer;
   ProviderSubscription<TripState>? _tripSubscription;
+  io.Socket? _socket;
   double _sheetSize = 0.34;
   String? _floatingNotification;
   RideMode _rideMode = RideMode.destino;
+  String? _joinedTripId;
 
   @override
   void initState() {
     super.initState();
     Future<void>.microtask(_syncDashboard);
     _refreshTimer = Timer.periodic(const Duration(seconds: 12), (_) => _syncDashboard());
+    _connectSocket();
     _tripSubscription = ref.listenManual<TripState>(tripProvider, (previous, next) {
       final previousStatus = previous?.request.status;
       final currentStatus = next.request.status;
@@ -54,9 +59,47 @@ class _RideTabState extends ConsumerState<RideTab> {
     _refreshTimer?.cancel();
     _notificationTimer?.cancel();
     _tripSubscription?.close();
+    _socket?.dispose();
     _sheetController.dispose();
     _destinationController.dispose();
     super.dispose();
+  }
+
+  void _connectSocket() {
+    _socket?.dispose();
+    _socket = io.io(
+      AppConfig.websocketUrl,
+      io.OptionBuilder()
+          .setTransports(['websocket'])
+          .disableAutoConnect()
+          .enableForceNew()
+          .build(),
+    );
+    _socket?.onConnect((_) {
+      final tripId = ref.read(tripProvider).request.activeTripId;
+      if (tripId != null && tripId.isNotEmpty) {
+        _joinTripRoom(tripId);
+      }
+    });
+    _socket?.on('trip:accepted', (data) {
+      final map = data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+      final tripId = map['tripId']?.toString();
+      if (tripId != null && tripId.isNotEmpty) {
+        ref.read(tripProvider.notifier).markTripAccepted(tripId: tripId);
+      }
+    });
+    _socket?.connect();
+  }
+
+  void _joinTripRoom(String tripId) {
+    if (_joinedTripId == tripId) {
+      return;
+    }
+    if (_joinedTripId != null && _joinedTripId!.isNotEmpty) {
+      _socket?.emit('leave:trip', _joinedTripId);
+    }
+    _socket?.emit('join:trip', tripId);
+    _joinedTripId = tripId;
   }
 
   Future<void> _syncDashboard() async {
@@ -149,6 +192,10 @@ class _RideTabState extends ConsumerState<RideTab> {
   Widget build(BuildContext context) {
     final locationState = ref.watch(passengerLocationProvider);
     final tripState = ref.watch(tripProvider);
+    final activeTripId = tripState.request.activeTripId;
+    if (activeTripId != null && activeTripId.isNotEmpty && _socket?.connected == true) {
+      _joinTripRoom(activeTripId);
+    }
     final userLocation = locationState.position ?? const LatLng(-19.5836, -65.7531);
     final driverPoints = tripState.nearbyDrivers
         .map((driver) => LatLng(driver.lat, driver.lng))
