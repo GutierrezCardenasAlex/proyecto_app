@@ -80,13 +80,21 @@ class TripRepository {
     return dispatchDrivers.map((driver) {
       final id = driver['driver_id']?.toString() ?? '';
       final live = locationById[id] ?? driver;
+      final brand = _stringValue(driver['brand'], fallback: 'Taxi');
+      final model = _stringValue(driver['model'], fallback: 'Disponible');
+      final color = _stringValue(driver['color'], fallback: 'Color por confirmar');
+      final plate = _stringValue(driver['plate'], fallback: 'Sin placa');
+      final distanceMeters = _toDouble(driver['distance_meters']);
       return NearbyDriver(
         driverId: id,
         lat: _toDouble(live['lat']),
         lng: _toDouble(live['lng']),
-        distanceMeters: _toDouble(driver['distance_meters']),
+        distanceMeters: distanceMeters,
         rating: _toDouble(driver['rating'], fallback: 5),
-        etaMinutes: (driver['eta_minutes'] as num?)?.toInt() ?? max(2, (_toDouble(driver['distance_meters']) / 350).round()),
+        etaMinutes: (driver['eta_minutes'] as num?)?.toInt() ?? max(2, (distanceMeters / 350).round()),
+        vehicleLabel: '$brand $model',
+        vehicleDetail: '$color · $plate',
+        priceLabel: 'Bs ${(8 + distanceMeters / 300).toStringAsFixed(0)}',
       );
     }).toList();
   }
@@ -97,6 +105,7 @@ class TripRepository {
     required LatLng pickup,
     required String pickupAddress,
     required String destinationAddress,
+    String? preferredDriverId,
   }) async {
     final destination = _deriveDestinationFromPickup(pickup);
     final distanceMeters = _estimateDistanceMeters(pickup, destination);
@@ -117,6 +126,8 @@ class TripRepository {
         'estimatedDistanceMeters': distanceMeters,
         'estimatedDurationSeconds': durationSeconds,
         'fareAmount': fareAmount,
+        if (preferredDriverId != null && preferredDriverId.isNotEmpty)
+          'preferredDriverId': preferredDriverId,
       }),
     );
 
@@ -152,6 +163,11 @@ class TripRepository {
       return value.toDouble();
     }
     return double.tryParse(value?.toString() ?? '') ?? fallback;
+  }
+
+  static String _stringValue(Object? value, {required String fallback}) {
+    final text = value?.toString().trim() ?? '';
+    return text.isEmpty ? fallback : text;
   }
 }
 
@@ -215,6 +231,7 @@ class TripController extends Notifier<TripState> {
     required String passengerId,
     required LatLng userLocation,
     required String destinationAddress,
+    String? preferredDriverId,
   }) async {
     state = state.copyWith(isRequestingTrip: true, clearError: true);
     try {
@@ -224,6 +241,7 @@ class TripController extends Notifier<TripState> {
         pickup: userLocation,
         pickupAddress: 'Mi ubicacion actual',
         destinationAddress: destinationAddress,
+        preferredDriverId: preferredDriverId,
       );
 
       state = state.copyWith(

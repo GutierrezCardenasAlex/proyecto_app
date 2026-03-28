@@ -51,6 +51,9 @@ class NearbyDriver {
     required this.distanceMeters,
     required this.rating,
     required this.etaMinutes,
+    required this.vehicleLabel,
+    required this.vehicleDetail,
+    required this.priceLabel,
   });
 
   final String driverId;
@@ -59,6 +62,9 @@ class NearbyDriver {
   final double distanceMeters;
   final double rating;
   final int etaMinutes;
+  final String vehicleLabel;
+  final String vehicleDetail;
+  final String priceLabel;
 }
 
 class TripState {

@@ -14,7 +14,8 @@ const redis = new Redis(process.env.REDIS_URL);
 const searchSchema = z.object({
   tripId: z.string().uuid(),
   pickupLat: z.number(),
-  pickupLng: z.number()
+  pickupLng: z.number(),
+  preferredDriverId: z.string().uuid().optional()
 });
 
 const acceptSchema = z.object({
@@ -59,7 +60,7 @@ async function bootstrap() {
   app.get("/health", async () => ({ status: "ok", service: "dispatch-service" }));
 
   app.post("/search", async (request) => {
-    const { tripId, pickupLat, pickupLng } = searchSchema.parse(request.body);
+    const { tripId, pickupLat, pickupLng, preferredDriverId } = searchSchema.parse(request.body);
     await pool.query(
       `UPDATE trips
        SET status = 'searching', updated_at = NOW()
@@ -76,22 +77,29 @@ async function bootstrap() {
          ORDER BY dl.driver_id, dl.recorded_at DESC
        )
        SELECT d.id AS driver_id,
+              d.rating,
+              v.brand,
+              v.model,
+              v.color,
+              v.plate,
               ST_Distance(
                 ll.location,
                 ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
               ) AS distance_meters
        FROM drivers d
        INNER JOIN latest_locations ll ON ll.driver_id = d.id
+       LEFT JOIN vehicles v ON v.driver_id = d.id
        WHERE d.is_available = TRUE
          AND d.status = 'available'
+         AND ($3::uuid IS NULL OR d.id = $3)
          AND ST_DWithin(
-           ll.location,
-           ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
-           3000
+            ll.location,
+            ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
+            3000
          )
        ORDER BY distance_meters ASC
        LIMIT 5`,
-      [pickupLng, pickupLat]
+      [pickupLng, pickupLat, preferredDriverId ?? null]
     );
 
     const candidates = result.rows;
@@ -104,12 +112,24 @@ async function bootstrap() {
       await publish("dispatch.trip.offer", {
         tripId,
         driverId: candidate.driver_id,
-        distanceMeters: Number(candidate.distance_meters)
+        distanceMeters: Number(candidate.distance_meters),
+        vehicle: {
+          brand: candidate.brand,
+          model: candidate.model,
+          color: candidate.color,
+          plate: candidate.plate
+        }
       });
       await emitRealtime("driver:trip_offer", `driver:${candidate.driver_id}`, {
         tripId,
         driverId: candidate.driver_id,
-        distanceMeters: Number(candidate.distance_meters)
+        distanceMeters: Number(candidate.distance_meters),
+        vehicle: {
+          brand: candidate.brand,
+          model: candidate.model,
+          color: candidate.color,
+          plate: candidate.plate
+        }
       });
     }
 
@@ -163,6 +183,10 @@ async function bootstrap() {
        )
        SELECT d.id AS driver_id,
               d.rating,
+              v.brand,
+              v.model,
+              v.color,
+              v.plate,
               ST_Y(ll.location::geometry) AS lat,
               ST_X(ll.location::geometry) AS lng,
               ST_Distance(
@@ -171,6 +195,7 @@ async function bootstrap() {
               ) AS distance_meters
        FROM drivers d
        INNER JOIN latest_locations ll ON ll.driver_id = d.id
+       LEFT JOIN vehicles v ON v.driver_id = d.id
        WHERE d.is_available = TRUE
          AND d.status = 'available'
          AND ST_DWithin(

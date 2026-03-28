@@ -38,6 +38,7 @@ class _RideTabState extends ConsumerState<RideTab> {
   String? _floatingNotification;
   RideMode _rideMode = RideMode.destino;
   String? _joinedTripId;
+  String? _selectedDriverId;
 
   @override
   void initState() {
@@ -121,13 +122,16 @@ class _RideTabState extends ConsumerState<RideTab> {
     final locationState = ref.read(passengerLocationProvider);
     final location = locationState.position;
     final destination = _destinationController.text.trim();
+    final resolvedDestination =
+        _rideMode == RideMode.cercano && destination.isEmpty ? 'Abordaje inmediato' : destination;
+    final selectedDriverId = _selectedDriverId;
 
     if (location == null) {
       _showMessage(locationState.errorMessage ?? 'Activa tu ubicacion para pedir un taxi.');
       return;
     }
 
-    if (destination.isEmpty) {
+    if (resolvedDestination.isEmpty) {
       _showMessage('Ingresa un destino para continuar.');
       return;
     }
@@ -136,7 +140,8 @@ class _RideTabState extends ConsumerState<RideTab> {
           token: session.token,
           passengerId: session.userId,
           userLocation: location,
-          destinationAddress: destination,
+          destinationAddress: resolvedDestination,
+          preferredDriverId: selectedDriverId,
         );
 
     final error = ref.read(tripProvider).errorMessage;
@@ -146,7 +151,13 @@ class _RideTabState extends ConsumerState<RideTab> {
     }
 
     if (mounted) {
-      _showFloatingNotification('Solicitud enviada. Estamos buscando un conductor.');
+      final selectedDriver =
+          _findDriverById(ref.read(tripProvider).nearbyDrivers, selectedDriverId);
+      _showFloatingNotification(
+        selectedDriver == null
+            ? 'Solicitud enviada. Estamos buscando un conductor.'
+            : 'Solicitud enviada a ${selectedDriver.vehicleLabel}. Esperando respuesta.',
+      );
     }
   }
 
@@ -167,9 +178,14 @@ class _RideTabState extends ConsumerState<RideTab> {
     }
 
     final nearest = drivers.first;
+    setState(() => _selectedDriverId = nearest.driverId);
     _showFloatingNotification(
-      'El taxi mas cercano llega en ${nearest.etaMinutes} min. Puedes abordarlo directamente.',
+      '${nearest.vehicleLabel} fue seleccionado. Llega en ${nearest.etaMinutes} min.',
     );
+  }
+
+  void _selectDriver(String driverId) {
+    setState(() => _selectedDriverId = driverId);
   }
 
   void _showMessage(String message) {
@@ -186,6 +202,28 @@ class _RideTabState extends ConsumerState<RideTab> {
         setState(() => _floatingNotification = null);
       }
     });
+  }
+
+  NearbyDriver? _findDriverById(List<NearbyDriver> drivers, String? driverId) {
+    if (driverId == null || driverId.isEmpty) {
+      return null;
+    }
+    for (final driver in drivers) {
+      if (driver.driverId == driverId) {
+        return driver;
+      }
+    }
+    return null;
+  }
+
+  String _primaryActionLabel(TripState tripState) {
+    if (tripState.isRequestingTrip) {
+      return 'Enviando solicitud...';
+    }
+    if (_rideMode == RideMode.cercano) {
+      return _selectedDriverId == null ? 'Elegir taxi mas cercano' : 'Solicitar este taxi';
+    }
+    return _selectedDriverId == null ? 'Solicitar taxi' : 'Solicitar este auto';
   }
 
   @override
@@ -539,7 +577,9 @@ class _RideTabState extends ConsumerState<RideTab> {
                       child: FilledButton(
                         onPressed: tripState.isRequestingTrip
                             ? null
-                            : (_rideMode == RideMode.destino ? _requestRide : _selectNearestTaxi),
+                            : (_rideMode == RideMode.destino
+                                ? _requestRide
+                                : (_selectedDriverId == null ? _selectNearestTaxi : _requestRide)),
                         style: FilledButton.styleFrom(
                           backgroundColor: const Color(0xFF00E3FD),
                           foregroundColor: const Color(0xFF001F24),
@@ -554,9 +594,7 @@ class _RideTabState extends ConsumerState<RideTab> {
                                 child: CircularProgressIndicator(strokeWidth: 2.2),
                               )
                             : Text(
-                                _rideMode == RideMode.destino
-                                    ? 'Solicitar taxi'
-                                    : 'Elegir taxi mas cercano',
+                                _primaryActionLabel(tripState),
                                 style: const TextStyle(fontWeight: FontWeight.w800),
                               ),
                       ),
@@ -601,16 +639,19 @@ class _RideTabState extends ConsumerState<RideTab> {
 
     return List<Widget>.generate(drivers.length, (index) {
       final driver = drivers[index];
+      final isSelected = driver.driverId == (_selectedDriverId ?? drivers.first.driverId);
       return Padding(
         padding: const EdgeInsets.only(bottom: 12),
         child: _VehicleOptionCard(
-          title: names[index % names.length],
+          title: driver.vehicleLabel.isEmpty ? names[index % names.length] : driver.vehicleLabel,
+          subtitle: driver.vehicleDetail,
           eta: '${driver.etaMinutes} min',
-          price: 'Bs ${(8 + driver.distanceMeters / 300).toStringAsFixed(0)}',
+          price: driver.priceLabel,
           rating: driver.rating.toStringAsFixed(1),
           distance: '${(driver.distanceMeters / 1000).toStringAsFixed(1)} km',
           icon: icons[index % icons.length],
-          highlighted: index == 0,
+          highlighted: isSelected,
+          onTap: () => _selectDriver(driver.driverId),
         ),
       );
     });
@@ -716,95 +757,119 @@ class _ModeButton extends StatelessWidget {
 class _VehicleOptionCard extends StatelessWidget {
   const _VehicleOptionCard({
     required this.title,
+    required this.subtitle,
     required this.eta,
     required this.price,
     required this.rating,
     required this.distance,
     required this.icon,
     required this.highlighted,
+    required this.onTap,
   });
 
   final String title;
+  final String subtitle;
   final String eta;
   final String price;
   final String rating;
   final String distance;
   final IconData icon;
   final bool highlighted;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: highlighted ? const Color(0xFFF3F3F5) : Colors.white,
+    return Material(
+      color: highlighted ? const Color(0xFFF3F3F5) : Colors.white,
+      borderRadius: BorderRadius.circular(24),
+      child: InkWell(
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: highlighted ? Colors.transparent : const Color(0x1AC8C5CC),
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: highlighted ? const Color(0xFF000003) : const Color(0xFFE8E8EA),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Icon(
-              icon,
-              color: highlighted ? const Color(0xFF00E3FD) : const Color(0xFF000003),
-              size: 28,
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: highlighted ? const Color(0xFF00E3FD) : const Color(0x1AC8C5CC),
+              width: highlighted ? 1.5 : 1,
             ),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Llega en $eta · $distance',
-                  style: const TextStyle(
-                    color: Color(0xFF47464B),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          child: Row(
             children: [
-              Text(
-                price,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: highlighted ? const Color(0xFF000003) : const Color(0xFFE8E8EA),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Icon(
+                  icon,
+                  color: highlighted ? const Color(0xFF00E3FD) : const Color(0xFF000003),
+                  size: 28,
                 ),
               ),
-              const SizedBox(height: 4),
-              Row(
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: Color(0xFF77767C),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Llega en $eta · $distance',
+                      style: const TextStyle(
+                        color: Color(0xFF47464B),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  const Icon(Icons.star, color: Color(0xFF00E3FD), size: 16),
-                  const SizedBox(width: 4),
+                  if (highlighted) ...[
+                    const Icon(Icons.check_circle, color: Color(0xFF006875), size: 18),
+                    const SizedBox(height: 6),
+                  ],
                   Text(
-                    rating,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                    price,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.star, color: Color(0xFF00E3FD), size: 16),
+                      const SizedBox(width: 4),
+                      Text(
+                        rating,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }

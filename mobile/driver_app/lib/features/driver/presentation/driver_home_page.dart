@@ -93,6 +93,15 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> {
     });
     _socket?.on('driver:trip_offer', (_) {
       ref.read(offeredTripProvider.notifier).loadOffer();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Nueva oferta disponible. Revisa el viaje entrante.'),
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
     });
     _socket?.connect();
   }

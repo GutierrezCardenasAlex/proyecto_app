@@ -24,7 +24,8 @@ const tripSchema = z.object({
   destinationLng: z.number(),
   estimatedDistanceMeters: z.number().int().positive(),
   estimatedDurationSeconds: z.number().int().positive(),
-  fareAmount: z.number().positive()
+  fareAmount: z.number().positive(),
+  preferredDriverId: z.string().uuid().optional()
 });
 
 const statusSchema = z.object({
@@ -113,7 +114,8 @@ async function bootstrap() {
     await axios.post(`${process.env.DISPATCH_SERVICE_URL}/search`, {
       tripId: trip.id,
       pickupLat: input.pickupLat,
-      pickupLng: input.pickupLng
+      pickupLng: input.pickupLng,
+      preferredDriverId: input.preferredDriverId
     });
 
     reply.code(201).send(trip);
