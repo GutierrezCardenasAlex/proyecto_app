@@ -194,6 +194,12 @@ class DriverSessionController extends Notifier<DriverSession> {
     );
   }
 
+  Future<void> updateDriverId(String driverId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('driver_session_driver_id', driverId);
+    state = state.copyWith(driverId: driverId, clearError: true);
+  }
+
   Future<void> _restoreSession() async {
     final prefs = await SharedPreferences.getInstance();
     final loggedIn = prefs.getBool('driver_session_logged_in') ?? false;

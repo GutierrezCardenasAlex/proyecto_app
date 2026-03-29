@@ -174,12 +174,16 @@ async function bootstrap() {
     await redis.set(`trip:${trip.id}:status`, trip.status, "EX", 3600);
     await publish("trip.requested", { tripId: trip.id, passengerId: input.passengerId });
 
-    await axios.post(`${process.env.DISPATCH_SERVICE_URL}/search`, {
-      tripId: trip.id,
-      pickupLat: input.pickupLat,
-      pickupLng: input.pickupLng,
-      preferredDriverId: input.preferredDriverId
-    });
+    try {
+      await axios.post(`${process.env.DISPATCH_SERVICE_URL}/search`, {
+        tripId: trip.id,
+        pickupLat: input.pickupLat,
+        pickupLng: input.pickupLng,
+        preferredDriverId: input.preferredDriverId
+      });
+    } catch (error) {
+      app.log.warn({ err: error, tripId: trip.id }, "dispatch search failed after trip creation");
+    }
 
     reply.code(201).send(trip);
   });

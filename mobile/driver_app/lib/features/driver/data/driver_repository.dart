@@ -59,6 +59,35 @@ class DriverRepository {
     );
   }
 
+  Future<String> ensureDriverProfile({
+    required String token,
+    required String userId,
+    required String fullName,
+    required String phone,
+  }) async {
+    final response = await http.post(
+      Uri.parse('${AppConfig.apiBaseUrl}/drivers/ensure-profile'),
+      headers: _headers(token),
+      body: jsonEncode({
+        'userId': userId,
+        'fullName': fullName,
+        'phone': phone,
+      }),
+    );
+
+    if (response.statusCode >= 400) {
+      throw Exception('No se pudo restaurar el perfil del conductor (${response.statusCode})');
+    }
+
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    final driver = payload['driver'] as Map<String, dynamic>? ?? const {};
+    final driverId = driver['id']?.toString() ?? '';
+    if (driverId.isEmpty) {
+      throw Exception('El servidor no devolvio un conductor valido.');
+    }
+    return driverId;
+  }
+
   Future<Position> getCurrentPosition() async {
     final enabled = await Geolocator.isLocationServiceEnabled();
     if (!enabled) {
@@ -158,12 +187,34 @@ class DriverStateController extends Notifier<DriverState> {
 
     state = state.copyWith(isUpdatingAvailability: true, clearError: true);
     try {
-      state = await _repository.updateAvailability(
-        token: session.token,
-        driverId: session.driverId,
-        available: available,
-        currentState: state,
-      );
+      var effectiveDriverId = session.driverId;
+      try {
+        state = await _repository.updateAvailability(
+          token: session.token,
+          driverId: effectiveDriverId,
+          available: available,
+          currentState: state,
+        );
+      } catch (error) {
+        final message = error.toString();
+        if (message.contains('(404)')) {
+          effectiveDriverId = await _repository.ensureDriverProfile(
+            token: session.token,
+            userId: session.userId,
+            fullName: session.fullName,
+            phone: session.phone,
+          );
+          await ref.read(driverSessionProvider.notifier).updateDriverId(effectiveDriverId);
+          state = await _repository.updateAvailability(
+            token: session.token,
+            driverId: effectiveDriverId,
+            available: available,
+            currentState: state,
+          );
+        } else {
+          rethrow;
+        }
+      }
 
       if (available) {
         await _sendLocation();
