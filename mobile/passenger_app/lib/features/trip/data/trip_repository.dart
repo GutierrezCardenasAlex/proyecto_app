@@ -68,6 +68,14 @@ class TripRepository {
       destinationAddress: payload['destination_address']?.toString() ?? 'Destino por confirmar',
       status: payload['status']?.toString() ?? 'idle',
       activeTripId: payload['id']?.toString(),
+      pickupLat: _toNullableDouble(payload['pickup_lat']),
+      pickupLng: _toNullableDouble(payload['pickup_lng']),
+      destinationLat: _toNullableDouble(payload['destination_lat']),
+      destinationLng: _toNullableDouble(payload['destination_lng']),
+      driverLat: _toNullableDouble(payload['driver_lat']),
+      driverLng: _toNullableDouble(payload['driver_lng']),
+      vehicleLabel: _joinVehicleLabel(payload['vehicle_brand'], payload['vehicle_model']),
+      vehiclePlate: payload['vehicle_plate']?.toString(),
     );
   }
 
@@ -191,6 +199,14 @@ class TripRepository {
       destinationAddress: payload['destination_address']?.toString() ?? 'Destino por confirmar',
       status: payload['status']?.toString() ?? status,
       activeTripId: payload['id']?.toString() ?? tripId,
+      pickupLat: _toNullableDouble(payload['pickup_lat']),
+      pickupLng: _toNullableDouble(payload['pickup_lng']),
+      destinationLat: _toNullableDouble(payload['destination_lat']),
+      destinationLng: _toNullableDouble(payload['destination_lng']),
+      driverLat: _toNullableDouble(payload['driver_lat']),
+      driverLng: _toNullableDouble(payload['driver_lng']),
+      vehicleLabel: _joinVehicleLabel(payload['vehicle_brand'], payload['vehicle_model']),
+      vehiclePlate: payload['vehicle_plate']?.toString(),
     );
   }
 
@@ -240,6 +256,23 @@ class TripRepository {
   static String _stringValue(Object? value, {required String fallback}) {
     final text = value?.toString().trim() ?? '';
     return text.isEmpty ? fallback : text;
+  }
+
+  static double? _toNullableDouble(Object? value) {
+    if (value == null) {
+      return null;
+    }
+    if (value is num) {
+      return value.toDouble();
+    }
+    return double.tryParse(value.toString());
+  }
+
+  static String? _joinVehicleLabel(Object? brand, Object? model) {
+    final brandText = brand?.toString().trim() ?? '';
+    final modelText = model?.toString().trim() ?? '';
+    final value = '$brandText $modelText'.trim();
+    return value.isEmpty ? null : value;
   }
 }
 

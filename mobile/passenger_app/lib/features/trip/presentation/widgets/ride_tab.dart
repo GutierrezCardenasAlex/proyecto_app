@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../../auth/data/auth_repository.dart';
@@ -47,6 +48,7 @@ class _RideTabState extends ConsumerState<RideTab> {
     Future<void>.microtask(_syncDashboard);
     _refreshTimer = Timer.periodic(const Duration(seconds: 12), (_) => _syncDashboard());
     _connectSocket();
+    Future<void>.microtask(_requestNotificationPermission);
     _tripSubscription = ref.listenManual<TripState>(tripProvider, (previous, next) {
       final previousStatus = previous?.request.status;
       final currentStatus = next.request.status;
@@ -54,6 +56,10 @@ class _RideTabState extends ConsumerState<RideTab> {
         _handleTripStatusChange(next.request);
       }
     });
+  }
+
+  Future<void> _requestNotificationPermission() async {
+    await Permission.notification.request();
   }
 
   @override
@@ -362,9 +368,22 @@ class _RideTabState extends ConsumerState<RideTab> {
       _joinTripRoom(activeTripId);
     }
     final userLocation = locationState.position ?? const LatLng(-19.5836, -65.7531);
-    final driverPoints = tripState.nearbyDrivers
-        .map((driver) => LatLng(driver.lat, driver.lng))
-        .toList(growable: false);
+    final hasActiveTrip = activeTripId != null && activeTripId.isNotEmpty;
+    final activeDriverPoint =
+        tripState.request.driverLat != null && tripState.request.driverLng != null
+            ? LatLng(tripState.request.driverLat!, tripState.request.driverLng!)
+            : null;
+    final activeDestination =
+        tripState.request.destinationLat != null && tripState.request.destinationLng != null
+            ? LatLng(tripState.request.destinationLat!, tripState.request.destinationLng!)
+            : null;
+    final driverPoints = hasActiveTrip
+        ? [
+            activeDriverPoint,
+          ].whereType<LatLng>().toList(growable: false)
+        : tripState.nearbyDrivers
+              .map((driver) => LatLng(driver.lat, driver.lng))
+              .toList(growable: false);
 
     return Stack(
       children: [
@@ -381,8 +400,8 @@ class _RideTabState extends ConsumerState<RideTab> {
               child: PotosiMap(
                 drivers: driverPoints,
                 userLocation: userLocation,
-                destination: null,
-                showRoute: false,
+                destination: activeDestination,
+                showRoute: hasActiveTrip && activeDestination != null,
               ),
             ),
           ),
@@ -563,10 +582,10 @@ class _RideTabState extends ConsumerState<RideTab> {
           child: DraggableScrollableSheet(
             controller: _sheetController,
             initialChildSize: 0.34,
-            minChildSize: 0.0,
+            minChildSize: hasActiveTrip ? 0.26 : 0.0,
             maxChildSize: 0.80,
             snap: true,
-            snapSizes: const [0.0, 0.34, 0.58, 0.80],
+            snapSizes: hasActiveTrip ? const [0.26, 0.34, 0.58, 0.80] : const [0.0, 0.34, 0.58, 0.80],
             builder: (context, scrollController) {
               return DecoratedBox(
                 decoration: const BoxDecoration(
@@ -670,11 +689,11 @@ class _RideTabState extends ConsumerState<RideTab> {
                     if (tripState.request.activeTripId != null)
                       Padding(
                         padding: const EdgeInsets.only(top: 12),
-                        child: _StatusBanner(
-                          message:
-                              'Viaje activo: ${tripState.request.destinationAddress} · estado ${tripState.request.status}',
-                          color: const Color(0x1A00E3FD),
-                          textColor: const Color(0xFF00616D),
+                        child: _LargeTripStatusCard(
+                          status: tripState.request.status,
+                          destination: tripState.request.destinationAddress,
+                          vehicleLabel: tripState.request.vehicleLabel,
+                          vehiclePlate: tripState.request.vehiclePlate,
                         ),
                       ),
                     _buildTripActions(tripState),
@@ -1020,6 +1039,137 @@ class _EmptyRideCard extends StatelessWidget {
           color: Color(0xFF47464B),
           fontWeight: FontWeight.w700,
         ),
+      ),
+    );
+  }
+}
+
+class _LargeTripStatusCard extends StatelessWidget {
+  const _LargeTripStatusCard({
+    required this.status,
+    required this.destination,
+    this.vehicleLabel,
+    this.vehiclePlate,
+  });
+
+  final String status;
+  final String destination;
+  final String? vehicleLabel;
+  final String? vehiclePlate;
+
+  String get _title => switch (status) {
+        'accepted' => 'Taxi aceptado',
+        'arriving' => 'Taxi en camino',
+        'at_pickup' => 'Taxi listo para subir',
+        'in_progress' => 'Viaje en progreso',
+        'completed' => 'Viaje finalizado',
+        'cancelled' => 'Viaje cancelado',
+        _ => 'Estado del viaje',
+      };
+
+  String get _subtitle => switch (status) {
+        'accepted' => 'Tu conductor ya confirmo el viaje.',
+        'arriving' => 'Sigue el recorrido del conductor hacia tu punto.',
+        'at_pickup' => 'Verifica el auto y sube cuando estes listo.',
+        'in_progress' => 'Sigue el trayecto hasta tu destino.',
+        'completed' => 'Gracias por viajar con Taxi Ya.',
+        'cancelled' => 'Puedes volver a solicitar un taxi cuando quieras.',
+        _ => destination,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF001F24).withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x1F000003),
+            blurRadius: 28,
+            offset: Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _title,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _subtitle,
+            style: const TextStyle(
+              color: Color(0xFFD4F9FF),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            destination,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if ((vehicleLabel ?? '').isNotEmpty || (vehiclePlate ?? '').isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if ((vehicleLabel ?? '').isNotEmpty)
+                  _TripBadge(icon: Icons.local_taxi, label: vehicleLabel!),
+                if ((vehiclePlate ?? '').isNotEmpty)
+                  _TripBadge(icon: Icons.badge_outlined, label: 'Placa $vehiclePlate'),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _TripBadge extends StatelessWidget {
+  const _TripBadge({
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: const Color(0xFF00E3FD), size: 16),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }

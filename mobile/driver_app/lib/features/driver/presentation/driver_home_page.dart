@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../auth/data/auth_repository.dart';
@@ -270,6 +271,12 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> {
       ),
     );
   }
+
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.microtask(() => Permission.notification.request());
+  }
 }
 
 class _DriverLoginShell extends StatelessWidget {
@@ -454,8 +461,11 @@ class _DriverDashboard extends ConsumerWidget {
               tripAccepted: trip?.status == 'accepted',
               driverLat: driverState.lat,
               driverLng: driverState.lng,
+              tripStatus: trip?.status,
               pickupLat: trip?.pickupLat,
               pickupLng: trip?.pickupLng,
+              destinationLat: trip?.destinationLat,
+              destinationLng: trip?.destinationLng,
             ),
           ),
         ),

@@ -115,6 +115,8 @@ function mapTrip(row) {
     pickup_lng: row.pickup_lng == null ? null : Number(row.pickup_lng),
     destination_lat: row.destination_lat == null ? null : Number(row.destination_lat),
     destination_lng: row.destination_lng == null ? null : Number(row.destination_lng),
+    driver_lat: row.driver_lat == null ? null : Number(row.driver_lat),
+    driver_lng: row.driver_lng == null ? null : Number(row.driver_lng),
     fare_amount: row.fare_amount == null ? null : Number(row.fare_amount)
   };
 }
@@ -204,12 +206,28 @@ async function bootstrap() {
   app.get("/active/passenger/:passengerId", async (request) => {
     const { passengerId } = request.params;
     const result = await pool.query(
-      `SELECT t.*,
+      `WITH latest_location AS (
+         SELECT DISTINCT ON (dl.driver_id)
+           dl.driver_id,
+           ST_Y(dl.location::geometry) AS driver_lat,
+           ST_X(dl.location::geometry) AS driver_lng
+         FROM driver_locations dl
+         ORDER BY dl.driver_id, dl.recorded_at DESC
+       )
+       SELECT t.*,
               ST_Y(t.pickup_location::geometry) AS pickup_lat,
               ST_X(t.pickup_location::geometry) AS pickup_lng,
               ST_Y(t.destination_location::geometry) AS destination_lat,
-              ST_X(t.destination_location::geometry) AS destination_lng
+              ST_X(t.destination_location::geometry) AS destination_lng,
+              v.brand AS vehicle_brand,
+              v.model AS vehicle_model,
+              v.color AS vehicle_color,
+              v.plate AS vehicle_plate,
+              ll.driver_lat,
+              ll.driver_lng
        FROM trips t
+       LEFT JOIN vehicles v ON v.driver_id = t.driver_id
+       LEFT JOIN latest_location ll ON ll.driver_id = t.driver_id
        WHERE t.passenger_id = $1
          AND t.status IN ('accepted', 'arriving', 'at_pickup', 'in_progress')
        ORDER BY t.updated_at DESC
@@ -227,8 +245,13 @@ async function bootstrap() {
               ST_Y(t.pickup_location::geometry) AS pickup_lat,
               ST_X(t.pickup_location::geometry) AS pickup_lng,
               ST_Y(t.destination_location::geometry) AS destination_lat,
-              ST_X(t.destination_location::geometry) AS destination_lng
+              ST_X(t.destination_location::geometry) AS destination_lng,
+              v.brand AS vehicle_brand,
+              v.model AS vehicle_model,
+              v.color AS vehicle_color,
+              v.plate AS vehicle_plate
        FROM trips t
+       LEFT JOIN vehicles v ON v.driver_id = t.driver_id
        WHERE t.driver_id = $1
          AND t.status IN ('accepted', 'arriving', 'at_pickup', 'in_progress')
        ORDER BY t.updated_at DESC

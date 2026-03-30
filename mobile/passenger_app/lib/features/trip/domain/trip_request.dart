@@ -4,18 +4,42 @@ class TripRequest {
     required this.destinationAddress,
     required this.status,
     required this.activeTripId,
+    this.pickupLat,
+    this.pickupLng,
+    this.destinationLat,
+    this.destinationLng,
+    this.driverLat,
+    this.driverLng,
+    this.vehicleLabel,
+    this.vehiclePlate,
   });
 
   final String pickupAddress;
   final String destinationAddress;
   final String status;
   final String? activeTripId;
+  final double? pickupLat;
+  final double? pickupLng;
+  final double? destinationLat;
+  final double? destinationLng;
+  final double? driverLat;
+  final double? driverLng;
+  final String? vehicleLabel;
+  final String? vehiclePlate;
 
   TripRequest copyWith({
     String? pickupAddress,
     String? destinationAddress,
     String? status,
     String? activeTripId,
+    double? pickupLat,
+    double? pickupLng,
+    double? destinationLat,
+    double? destinationLng,
+    double? driverLat,
+    double? driverLng,
+    String? vehicleLabel,
+    String? vehiclePlate,
     bool clearTripId = false,
   }) {
     return TripRequest(
@@ -23,6 +47,14 @@ class TripRequest {
       destinationAddress: destinationAddress ?? this.destinationAddress,
       status: status ?? this.status,
       activeTripId: clearTripId ? null : activeTripId ?? this.activeTripId,
+      pickupLat: pickupLat ?? this.pickupLat,
+      pickupLng: pickupLng ?? this.pickupLng,
+      destinationLat: destinationLat ?? this.destinationLat,
+      destinationLng: destinationLng ?? this.destinationLng,
+      driverLat: driverLat ?? this.driverLat,
+      driverLng: driverLng ?? this.driverLng,
+      vehicleLabel: vehicleLabel ?? this.vehicleLabel,
+      vehiclePlate: vehiclePlate ?? this.vehiclePlate,
     );
   }
 }
