@@ -76,6 +76,7 @@ class TripRepository {
       driverLng: _toNullableDouble(payload['driver_lng']),
       vehicleLabel: _joinVehicleLabel(payload['vehicle_brand'], payload['vehicle_model']),
       vehiclePlate: payload['vehicle_plate']?.toString(),
+      etaMinutes: _toNullableInt(payload['eta_minutes']),
     );
   }
 
@@ -175,6 +176,7 @@ class TripRepository {
       destinationAddress: destinationAddress,
       status: payload['status']?.toString() ?? 'requested',
       activeTripId: payload['id']?.toString(),
+      etaMinutes: _toNullableInt(payload['eta_minutes']),
     );
   }
 
@@ -207,6 +209,7 @@ class TripRepository {
       driverLng: _toNullableDouble(payload['driver_lng']),
       vehicleLabel: _joinVehicleLabel(payload['vehicle_brand'], payload['vehicle_model']),
       vehiclePlate: payload['vehicle_plate']?.toString(),
+      etaMinutes: _toNullableInt(payload['eta_minutes']),
     );
   }
 
@@ -266,6 +269,16 @@ class TripRepository {
       return value.toDouble();
     }
     return double.tryParse(value.toString());
+  }
+
+  static int? _toNullableInt(Object? value) {
+    if (value == null) {
+      return null;
+    }
+    if (value is num) {
+      return value.toInt();
+    }
+    return int.tryParse(value.toString());
   }
 
   static String? _joinVehicleLabel(Object? brand, Object? model) {
@@ -376,13 +389,17 @@ class TripController extends Notifier<TripState> {
   void markTripAccepted({
     required String tripId,
     String status = 'accepted',
+    int? etaMinutes,
   }) {
     if (state.request.activeTripId != tripId) {
       return;
     }
 
     state = state.copyWith(
-      request: state.request.copyWith(status: status),
+      request: state.request.copyWith(
+        status: status,
+        etaMinutes: etaMinutes ?? state.request.etaMinutes,
+      ),
       clearError: true,
     );
   }

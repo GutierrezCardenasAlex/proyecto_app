@@ -241,6 +241,8 @@ async function bootstrap() {
         return reply.code(409).send({ message: "Trip already taken" });
       }
 
+      const trip = tripUpdate.rows[0];
+
       await client.query(
         `UPDATE drivers
          SET status = 'busy', is_available = FALSE, current_trip_id = $2, updated_at = NOW()
@@ -256,18 +258,46 @@ async function bootstrap() {
 
       await client.query("COMMIT");
       await redis.del(`driver:${driverId}:offers`);
+      const etaResult = await pool.query(
+        `WITH latest_location AS (
+           SELECT DISTINCT ON (dl.driver_id)
+             dl.driver_id,
+             dl.location
+           FROM driver_locations dl
+           WHERE dl.driver_id = $1
+           ORDER BY dl.driver_id, dl.recorded_at DESC
+         )
+         SELECT COALESCE(
+           ROUND(
+             ST_Distance(
+               ll.location,
+               t.pickup_location
+             ) / 350.0
+           )::int,
+           2
+         ) AS eta_minutes
+         FROM trips t
+         LEFT JOIN latest_location ll ON ll.driver_id = $1
+         WHERE t.id = $2`,
+        [driverId, tripId]
+      );
+      const etaMinutes = Math.max(2, Number(etaResult.rows[0]?.eta_minutes || 2));
       await publish("dispatch.trip.accepted", { tripId, driverId });
       await emitRealtime("trip:accepted", `trip:${tripId}`, {
         tripId,
         driverId,
-        status: "accepted"
+        status: "accepted",
+        etaMinutes
       });
       await emitRealtime("driver:trip_accepted", `driver:${driverId}`, {
         tripId,
         driverId,
         status: "accepted"
       });
-      reply.send(tripUpdate.rows[0]);
+      reply.send({
+        ...trip,
+        eta_minutes: etaMinutes
+      });
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;

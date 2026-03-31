@@ -12,6 +12,7 @@ class TripRequest {
     this.driverLng,
     this.vehicleLabel,
     this.vehiclePlate,
+    this.etaMinutes,
   });
 
   final String pickupAddress;
@@ -26,6 +27,7 @@ class TripRequest {
   final double? driverLng;
   final String? vehicleLabel;
   final String? vehiclePlate;
+  final int? etaMinutes;
 
   TripRequest copyWith({
     String? pickupAddress,
@@ -40,6 +42,7 @@ class TripRequest {
     double? driverLng,
     String? vehicleLabel,
     String? vehiclePlate,
+    int? etaMinutes,
     bool clearTripId = false,
   }) {
     return TripRequest(
@@ -55,6 +58,7 @@ class TripRequest {
       driverLng: driverLng ?? this.driverLng,
       vehicleLabel: vehicleLabel ?? this.vehicleLabel,
       vehiclePlate: vehiclePlate ?? this.vehiclePlate,
+      etaMinutes: etaMinutes ?? this.etaMinutes,
     );
   }
 }

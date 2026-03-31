@@ -92,8 +92,14 @@ class _RideTabState extends ConsumerState<RideTab> {
     _socket?.on('trip:accepted', (data) {
       final map = data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
       final tripId = map['tripId']?.toString();
+      final etaMinutes = map['etaMinutes'] is num
+          ? (map['etaMinutes'] as num).toInt()
+          : int.tryParse(map['etaMinutes']?.toString() ?? '');
       if (tripId != null && tripId.isNotEmpty) {
-        ref.read(tripProvider.notifier).markTripAccepted(tripId: tripId);
+        ref.read(tripProvider.notifier).markTripAccepted(
+              tripId: tripId,
+              etaMinutes: etaMinutes,
+            );
       }
     });
     _socket?.on('trip:status_changed', (data) {
@@ -373,10 +379,6 @@ class _RideTabState extends ConsumerState<RideTab> {
         tripState.request.driverLat != null && tripState.request.driverLng != null
             ? LatLng(tripState.request.driverLat!, tripState.request.driverLng!)
             : null;
-    final activeDestination =
-        tripState.request.destinationLat != null && tripState.request.destinationLng != null
-            ? LatLng(tripState.request.destinationLat!, tripState.request.destinationLng!)
-            : null;
     final driverPoints = hasActiveTrip
         ? [
             activeDriverPoint,
@@ -400,8 +402,9 @@ class _RideTabState extends ConsumerState<RideTab> {
               child: PotosiMap(
                 drivers: driverPoints,
                 userLocation: userLocation,
-                destination: activeDestination,
-                showRoute: hasActiveTrip && activeDestination != null,
+                routeTarget: activeDriverPoint,
+                showRoute: hasActiveTrip && activeDriverPoint != null,
+                showTargetMarker: false,
               ),
             ),
           ),
@@ -694,6 +697,7 @@ class _RideTabState extends ConsumerState<RideTab> {
                           destination: tripState.request.destinationAddress,
                           vehicleLabel: tripState.request.vehicleLabel,
                           vehiclePlate: tripState.request.vehiclePlate,
+                          etaMinutes: tripState.request.etaMinutes,
                         ),
                       ),
                     _buildTripActions(tripState),
@@ -1050,12 +1054,14 @@ class _LargeTripStatusCard extends StatelessWidget {
     required this.destination,
     this.vehicleLabel,
     this.vehiclePlate,
+    this.etaMinutes,
   });
 
   final String status;
   final String destination;
   final String? vehicleLabel;
   final String? vehiclePlate;
+  final int? etaMinutes;
 
   String get _title => switch (status) {
         'accepted' => 'Taxi aceptado',
@@ -1068,8 +1074,12 @@ class _LargeTripStatusCard extends StatelessWidget {
       };
 
   String get _subtitle => switch (status) {
-        'accepted' => 'Tu conductor ya confirmo el viaje.',
-        'arriving' => 'Sigue el recorrido del conductor hacia tu punto.',
+        'accepted' => etaMinutes == null
+            ? 'Tu conductor ya confirmo el viaje.'
+            : 'Tu conductor ya confirmo el viaje y llega en $etaMinutes min.',
+        'arriving' => etaMinutes == null
+            ? 'Sigue el recorrido del conductor hacia tu punto.'
+            : 'Tu conductor va en camino y llega en $etaMinutes min.',
         'at_pickup' => 'Verifica el auto y sube cuando estes listo.',
         'in_progress' => 'Sigue el trayecto hasta tu destino.',
         'completed' => 'Gracias por viajar con Taxi Ya.',
@@ -1126,6 +1136,8 @@ class _LargeTripStatusCard extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
+                if (etaMinutes != null && const {'accepted', 'arriving'}.contains(status))
+                  _TripBadge(icon: Icons.schedule, label: 'Llega en $etaMinutes min'),
                 if ((vehicleLabel ?? '').isNotEmpty)
                   _TripBadge(icon: Icons.local_taxi, label: vehicleLabel!),
                 if ((vehiclePlate ?? '').isNotEmpty)

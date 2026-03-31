@@ -117,7 +117,8 @@ function mapTrip(row) {
     destination_lng: row.destination_lng == null ? null : Number(row.destination_lng),
     driver_lat: row.driver_lat == null ? null : Number(row.driver_lat),
     driver_lng: row.driver_lng == null ? null : Number(row.driver_lng),
-    fare_amount: row.fare_amount == null ? null : Number(row.fare_amount)
+    fare_amount: row.fare_amount == null ? null : Number(row.fare_amount),
+    eta_minutes: row.eta_minutes == null ? null : Number(row.eta_minutes)
   };
 }
 
@@ -209,6 +210,7 @@ async function bootstrap() {
       `WITH latest_location AS (
          SELECT DISTINCT ON (dl.driver_id)
            dl.driver_id,
+           dl.location,
            ST_Y(dl.location::geometry) AS driver_lat,
            ST_X(dl.location::geometry) AS driver_lng
          FROM driver_locations dl
@@ -224,7 +226,14 @@ async function bootstrap() {
               v.color AS vehicle_color,
               v.plate AS vehicle_plate,
               ll.driver_lat,
-              ll.driver_lng
+              ll.driver_lng,
+              CASE
+                WHEN ll.location IS NULL THEN NULL
+                ELSE GREATEST(
+                  2,
+                  ROUND(ST_Distance(ll.location, t.pickup_location) / 350.0)::int
+                )
+              END AS eta_minutes
        FROM trips t
        LEFT JOIN vehicles v ON v.driver_id = t.driver_id
        LEFT JOIN latest_location ll ON ll.driver_id = t.driver_id

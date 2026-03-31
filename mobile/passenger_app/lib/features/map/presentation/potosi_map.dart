@@ -7,14 +7,16 @@ class PotosiMap extends StatelessWidget {
     super.key,
     required this.drivers,
     required this.userLocation,
-    this.destination,
+    this.routeTarget,
     this.showRoute = false,
+    this.showTargetMarker = true,
   });
 
   final List<LatLng> drivers;
   final LatLng userLocation;
-  final LatLng? destination;
+  final LatLng? routeTarget;
   final bool showRoute;
+  final bool showTargetMarker;
 
   @override
   Widget build(BuildContext context) {
@@ -40,11 +42,11 @@ class PotosiMap extends StatelessWidget {
             ),
           ],
         ),
-        if (showRoute && destination != null)
+        if (showRoute && routeTarget != null)
           PolylineLayer(
             polylines: [
               Polyline(
-                points: [userLocation, destination!],
+                points: [userLocation, routeTarget!],
                 strokeWidth: 4,
                 color: const Color(0xFF00AFC3),
               ),
@@ -70,9 +72,9 @@ class PotosiMap extends StatelessWidget {
                 child: const Icon(Icons.person_pin_circle, color: Color(0xFF001F24), size: 40),
               ),
             ),
-            if (destination != null)
+            if (showTargetMarker && routeTarget != null)
               Marker(
-                point: destination!,
+                point: routeTarget!,
                 width: 54,
                 height: 54,
                 child: const Icon(Icons.place, color: Color(0xFF000003), size: 34),
