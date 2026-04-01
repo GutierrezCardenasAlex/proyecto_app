@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 class DriverAppDrawer extends StatelessWidget {
   const DriverAppDrawer({
     super.key,
+    required this.fullName,
     required this.phone,
     required this.activeItem,
     required this.onSelect,
@@ -11,6 +12,7 @@ class DriverAppDrawer extends StatelessWidget {
     required this.onOpenProfile,
   });
 
+  final String fullName;
   final String phone;
   final String activeItem;
   final ValueChanged<String> onSelect;
@@ -79,7 +81,7 @@ class DriverAppDrawer extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Conductor Taxi Ya',
+                                  fullName,
                                   style: GoogleFonts.plusJakartaSans(
                                     fontSize: 22,
                                     fontWeight: FontWeight.w800,

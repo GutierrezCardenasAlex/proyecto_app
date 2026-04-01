@@ -14,6 +14,7 @@ const driverProfileSchema = z.object({
   userId: z.string().uuid(),
   licenseNumber: z.string().min(4),
   vehicle: z.object({
+    type: z.enum(["taxi", "moto"]).default("taxi"),
     plate: z.string().min(4),
     brand: z.string().min(2),
     model: z.string().min(1),
@@ -44,6 +45,11 @@ async function publish(routingKey, payload) {
 async function bootstrap() {
   await app.register(cors, { origin: true, credentials: true });
 
+  await pool.query(`
+    ALTER TABLE vehicles
+    ADD COLUMN IF NOT EXISTS vehicle_type VARCHAR(16) NOT NULL DEFAULT 'taxi'
+  `);
+
   app.get("/health", async () => ({ status: "ok", service: "driver-service" }));
 
   app.post("/profile", async (request, reply) => {
@@ -63,16 +69,25 @@ async function bootstrap() {
 
       const driver = driverResult.rows[0];
       await client.query(
-        `INSERT INTO vehicles (driver_id, plate, brand, model, color, year)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO vehicles (driver_id, vehicle_type, plate, brand, model, color, year)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (driver_id)
-         DO UPDATE SET plate = EXCLUDED.plate,
+         DO UPDATE SET vehicle_type = EXCLUDED.vehicle_type,
+                       plate = EXCLUDED.plate,
                        brand = EXCLUDED.brand,
                        model = EXCLUDED.model,
                        color = EXCLUDED.color,
                        year = EXCLUDED.year,
                        updated_at = NOW()`,
-        [driver.id, vehicle.plate, vehicle.brand, vehicle.model, vehicle.color, vehicle.year || null]
+        [
+          driver.id,
+          vehicle.type,
+          vehicle.plate,
+          vehicle.brand,
+          vehicle.model,
+          vehicle.color,
+          vehicle.year || null
+        ]
       );
       await client.query("COMMIT");
 
@@ -140,8 +155,8 @@ async function bootstrap() {
       const driver = driverResult.rows[0];
       const plateSuffix = String(driver.id).slice(0, 4).toUpperCase();
       await client.query(
-        `INSERT INTO vehicles (driver_id, plate, brand, model, color, year)
-         VALUES ($1, $2, 'Toyota', 'Vitz', 'Blanco', 2020)`,
+        `INSERT INTO vehicles (driver_id, vehicle_type, plate, brand, model, color, year)
+         VALUES ($1, 'taxi', $2, 'Toyota', 'Vitz', 'Blanco', 2020)`,
         [driver.id, `POT-${plateSuffix}`]
       );
 

@@ -6,6 +6,7 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../auth/data/auth_repository.dart';
 import '../../auth/presentation/driver_login_card.dart';
+import '../../auth/presentation/driver_profile_completion_page.dart';
 import '../../map/presentation/driver_map.dart';
 import '../../trip/data/trip_repository.dart';
 import '../../trip/domain/driver_trip.dart';
@@ -186,6 +187,10 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> {
       return const _DriverLoginShell();
     }
 
+    if (!session.profileCompleted) {
+      return const DriverProfileCompletionPage();
+    }
+
     if (session.driverId.isNotEmpty) {
       _ensureSocket(session.driverId);
     }
@@ -200,15 +205,16 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> {
       _DriverDashboard(
         onMenuTap: () => _scaffoldKey.currentState?.openDrawer(),
         onProfileTap: () => _openPage(
-          DriverProfilePage(phone: session.phone),
+          DriverProfilePage(phone: session.phone, fullName: session.fullName),
           drawerItem: 'Configuraciones',
         ),
       ),
       const _DriverTripsTab(),
       _DriverAccountTab(
+        fullName: session.fullName,
         phone: session.phone,
         onOpenProfile: () => _openPage(
-          DriverProfilePage(phone: session.phone),
+          DriverProfilePage(phone: session.phone, fullName: session.fullName),
           drawerItem: 'Configuraciones',
         ),
         onOpenSecurity: () => _openPage(const DriverSecurityPage(), drawerItem: 'Seguridad'),
@@ -220,13 +226,17 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> {
     return Scaffold(
       key: _scaffoldKey,
       drawer: DriverAppDrawer(
+        fullName: session.fullName,
         phone: session.phone,
         activeItem: _activeDrawerItem,
         onSelect: _handleDrawerSelection,
         onLogout: () => ref.read(driverSessionProvider.notifier).logout(),
         onOpenProfile: () {
           Navigator.pop(context);
-          _openPage(DriverProfilePage(phone: session.phone), drawerItem: 'Configuraciones');
+          _openPage(
+            DriverProfilePage(phone: session.phone, fullName: session.fullName),
+            drawerItem: 'Configuraciones',
+          );
         },
       ),
       backgroundColor: const Color(0xFFF9F9FB),
@@ -857,6 +867,7 @@ class _DriverTripsTab extends ConsumerWidget {
 
 class _DriverAccountTab extends ConsumerWidget {
   const _DriverAccountTab({
+    required this.fullName,
     required this.phone,
     required this.onOpenProfile,
     required this.onOpenSecurity,
@@ -864,6 +875,7 @@ class _DriverAccountTab extends ConsumerWidget {
     required this.onOpenHelp,
   });
 
+  final String fullName;
   final String phone;
   final VoidCallback onOpenProfile;
   final VoidCallback onOpenSecurity;
@@ -904,7 +916,7 @@ class _DriverAccountTab extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Conductor Taxi Ya',
+                        fullName,
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 24,
                           fontWeight: FontWeight.w800,

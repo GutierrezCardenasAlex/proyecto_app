@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/data/auth_repository.dart';
 import '../../auth/presentation/login_card.dart';
+import '../../auth/presentation/passenger_profile_completion_page.dart';
 import 'pages/detail_pages.dart';
 import 'widgets/account_tab.dart';
 import 'widgets/activity_tab.dart';
@@ -74,6 +75,10 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
 
     if (!session.isAuthenticated) {
       return const _LoginShell();
+    }
+
+    if (!session.profileCompleted) {
+      return const PassengerProfileCompletionPage();
     }
 
     final pages = [

@@ -10,6 +10,7 @@
     "@fastify/cors": "^11.1.0",
     "@fastify/jwt": "^10.0.0",
     "amqplib": "^0.10.9",
+    "bcryptjs": "^3.0.3",
     "fastify": "^5.6.1",
     "ioredis": "^5.8.1",
     "pg": "^8.16.3",

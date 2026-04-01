@@ -4,9 +4,10 @@ import 'package:google_fonts/google_fonts.dart';
 import '../widgets/driver_ui_kit.dart';
 
 class DriverProfilePage extends StatelessWidget {
-  const DriverProfilePage({super.key, required this.phone});
+  const DriverProfilePage({super.key, required this.phone, required this.fullName});
 
   final String phone;
+  final String fullName;
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +37,7 @@ class DriverProfilePage extends StatelessWidget {
                   ),
                   const SizedBox(height: 18),
                   Text(
-                    'Conductor Taxi Ya',
+                    fullName,
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 24,
                       fontWeight: FontWeight.w800,

@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../data/auth_repository.dart';
 
+enum _DriverAuthMode { login, register }
+
 class DriverLoginCard extends ConsumerStatefulWidget {
   const DriverLoginCard({super.key});
 
@@ -12,22 +14,53 @@ class DriverLoginCard extends ConsumerStatefulWidget {
 }
 
 class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
-  final _nameController = TextEditingController(text: 'Conductor Demo');
-  final _phoneController = TextEditingController(text: '+591 71111111');
+  final _firstNameController = TextEditingController(text: 'Juan');
+  final _phoneController = TextEditingController(text: '71111111');
   final _otpController = TextEditingController(text: '123456');
+  final _passwordController = TextEditingController();
+  _DriverAuthMode _mode = _DriverAuthMode.login;
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _firstNameController.dispose();
     _phoneController.dispose();
     _otpController.dispose();
+    _passwordController.dispose();
     super.dispose();
+  }
+
+  String? _validatePhone() {
+    final digits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
+    if (digits.length != 8) {
+      return 'El numero debe tener 8 digitos.';
+    }
+    return null;
+  }
+
+  String _normalizedPhone() {
+    final digits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
+    return '+591$digits';
+  }
+
+  String? _validatePassword() {
+    final password = _passwordController.text.trim();
+    final valid = RegExp(r'^(?=.*[A-Za-z])(?=.*\d).{8,}$').hasMatch(password);
+    if (!valid) {
+      return 'La contrasena debe tener al menos 8 caracteres, una letra y un numero.';
+    }
+    return null;
+  }
+
+  void _showInlineError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(driverSessionProvider);
-    final showOtp = session.otpRequested;
+    final showRegisterOtp = _mode == _DriverAuthMode.register && session.otpRequested;
 
     return Container(
       padding: const EdgeInsets.all(28),
@@ -56,62 +89,48 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
           ),
           const SizedBox(height: 14),
           Text(
-            'Bienvenido conductor',
+            _mode == _DriverAuthMode.login ? 'Ingreso de conductor' : 'Registro de conductor',
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 40,
+              fontSize: 38,
               fontWeight: FontWeight.w900,
               color: const Color(0xFF000003),
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Inicia sesion para activar disponibilidad, recibir viajes y compartir tu ubicacion.',
-            style: TextStyle(
+          Text(
+            _mode == _DriverAuthMode.login
+                ? 'Entra con celular y contrasena. El equipo registrado entra sin volver a pedir OTP.'
+                : 'Registra tu numero, valida con OTP y crea tu contrasena para empezar.',
+            style: const TextStyle(
               color: Color(0xFF47464B),
               fontWeight: FontWeight.w600,
               fontSize: 16,
             ),
           ),
-          const SizedBox(height: 30),
-          if (!showOtp) ...[
-            _LabelText('Nombre completo'),
+          const SizedBox(height: 24),
+          SegmentedButton<_DriverAuthMode>(
+            segments: const [
+              ButtonSegment(value: _DriverAuthMode.login, label: Text('Ingresar')),
+              ButtonSegment(value: _DriverAuthMode.register, label: Text('Registrarme')),
+            ],
+            selected: {_mode},
+            onSelectionChanged: (selection) {
+              setState(() => _mode = selection.first);
+            },
+          ),
+          const SizedBox(height: 26),
+          if (_mode == _DriverAuthMode.login) ...[
+            const _LabelText('Celular'),
             const SizedBox(height: 8),
-            _StyledField(
-              controller: _nameController,
-              hintText: 'Ej. Juan Choque',
-              icon: Icons.badge_outlined,
-            ),
+            _PhoneField(controller: _phoneController),
             const SizedBox(height: 18),
-            _LabelText('Telefono'),
+            const _LabelText('Contrasena'),
             const SizedBox(height: 8),
             _StyledField(
-              controller: _phoneController,
-              hintText: 'Ej. +591 71111111',
-              icon: Icons.phone_outlined,
-            ),
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF3F3F5).withValues(alpha: 0.9),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.location_city, size: 20, color: Color(0xFF006875)),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Zona operativa: Potosi, Bolivia',
-                      style: TextStyle(
-                        color: Color(0xFF47464B),
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              controller: _passwordController,
+              hintText: 'Tu contrasena',
+              icon: Icons.lock_outline_rounded,
+              obscureText: true,
             ),
             const SizedBox(height: 22),
             SizedBox(
@@ -119,74 +138,120 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
               child: FilledButton(
                 onPressed: session.isLoading
                     ? null
-                    : () => ref.read(driverSessionProvider.notifier).requestOtp(
-                          _phoneController.text,
-                          _nameController.text,
-                        ),
+                    : () {
+                        final phoneError = _validatePhone();
+                        if (phoneError != null) {
+                          _showInlineError(phoneError);
+                          return;
+                        }
+                        ref.read(driverSessionProvider.notifier).login(
+                              _normalizedPhone(),
+                              _passwordController.text.trim(),
+                            );
+                      },
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF006875),
                   foregroundColor: Colors.white,
                   minimumSize: const Size.fromHeight(62),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-                  elevation: 0,
                 ),
                 child: Text(
-                  session.isLoading ? 'Enviando...' : 'Continuar',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 18,
-                  ),
+                  session.isLoading ? 'Ingresando...' : 'Entrar al panel',
+                  style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 18),
                 ),
               ),
             ),
-          ] else ...[
-            _LabelText('Codigo OTP'),
+          ] else if (!showRegisterOtp) ...[
+            const _LabelText('Nombre'),
             const SizedBox(height: 8),
             _StyledField(
-              controller: _otpController,
-              hintText: '123456',
-              icon: Icons.password_rounded,
+              controller: _firstNameController,
+              hintText: 'Ej. Juan',
+              icon: Icons.badge_outlined,
             ),
-            const SizedBox(height: 14),
-            Text(
-              'Te enviamos un codigo al ${session.phone}',
-              style: const TextStyle(
-                color: Color(0xFF47464B),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 18),
+            const _LabelText('Celular'),
+            const SizedBox(height: 8),
+            _PhoneField(controller: _phoneController),
+            const SizedBox(height: 22),
             SizedBox(
               width: double.infinity,
               child: FilledButton(
                 onPressed: session.isLoading
                     ? null
-                    : () => ref.read(driverSessionProvider.notifier).verifyOtp(_otpController.text),
+                    : () {
+                        final phoneError = _validatePhone();
+                        if (phoneError != null) {
+                          _showInlineError(phoneError);
+                          return;
+                        }
+                        ref.read(driverSessionProvider.notifier).requestRegistrationOtp(
+                              _normalizedPhone(),
+                              _firstNameController.text.trim(),
+                            );
+                      },
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF006875),
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(62),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                ),
+                child: Text(
+                  session.isLoading ? 'Enviando...' : 'Enviar OTP',
+                  style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 18),
+                ),
+              ),
+            ),
+          ] else ...[
+            const _LabelText('Codigo OTP'),
+            const SizedBox(height: 8),
+            _StyledField(
+              controller: _otpController,
+              hintText: '123456',
+              icon: Icons.sms_outlined,
+            ),
+            const SizedBox(height: 18),
+            const _LabelText('Contrasena'),
+            const SizedBox(height: 8),
+            _StyledField(
+              controller: _passwordController,
+              hintText: 'Minimo 8 caracteres',
+              icon: Icons.lock_outline_rounded,
+              obscureText: true,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Codigo enviado a ${_normalizedPhone()}',
+              style: const TextStyle(color: Color(0xFF47464B), fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 22),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: session.isLoading
+                    ? null
+                    : () {
+                        final passwordError = _validatePassword();
+                        if (passwordError != null) {
+                          _showInlineError(passwordError);
+                          return;
+                        }
+                        ref.read(driverSessionProvider.notifier).completeRegistration(
+                              _otpController.text.trim(),
+                              _passwordController.text.trim(),
+                            );
+                      },
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFF00E3FD),
                   foregroundColor: const Color(0xFF001F24),
                   minimumSize: const Size.fromHeight(62),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-                  elevation: 0,
                 ),
                 child: Text(
-                  session.isLoading ? 'Verificando...' : 'Entrar al panel',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 18,
-                  ),
+                  session.isLoading ? 'Verificando...' : 'Crear cuenta',
+                  style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 18),
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: session.isLoading
-                  ? null
-                  : () => ref.read(driverSessionProvider.notifier).requestOtp(
-                        _phoneController.text,
-                        _nameController.text,
-                      ),
-              child: const Text('Reenviar codigo'),
             ),
           ],
           if (session.errorMessage != null) ...[
@@ -246,19 +311,65 @@ class _StyledField extends StatelessWidget {
     required this.controller,
     required this.hintText,
     required this.icon,
+    this.obscureText = false,
   });
 
   final TextEditingController controller;
   final String hintText;
   final IconData icon;
+  final bool obscureText;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
+      obscureText: obscureText,
       decoration: InputDecoration(
         hintText: hintText,
         prefixIcon: Icon(icon, color: const Color(0xFF77767C)),
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.55),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(22),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(22),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.7)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(22),
+          borderSide: const BorderSide(color: Color(0xFF00E3FD), width: 1.4),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+      ),
+    );
+  }
+}
+
+class _PhoneField extends StatelessWidget {
+  const _PhoneField({required this.controller});
+
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      keyboardType: TextInputType.phone,
+      decoration: InputDecoration(
+        hintText: '71111111',
+        prefixIcon: const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+          child: Text(
+            '+591',
+            style: TextStyle(
+              color: Color(0xFF000003),
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
         filled: true,
         fillColor: Colors.white.withValues(alpha: 0.55),
         border: OutlineInputBorder(
