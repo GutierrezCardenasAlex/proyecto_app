@@ -99,6 +99,32 @@ class AuthRepository {
     return _parseAuthResult(response.body, fallbackPhone: phone);
   }
 
+  Future<void> requestPasswordResetOtp(String phone) async {
+    final response = await http.post(
+      Uri.parse('${AppConfig.apiBaseUrl}/auth/password/request-otp'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'phone': phone}),
+    );
+    await _throwIfError(response, fallbackMessage: 'No se pudo solicitar el OTP de recuperacion');
+  }
+
+  Future<void> resetPassword({
+    required String phone,
+    required String otp,
+    required String password,
+  }) async {
+    final response = await http.post(
+      Uri.parse('${AppConfig.apiBaseUrl}/auth/password/reset'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'phone': phone,
+        'otp': otp,
+        'password': password,
+      }),
+    );
+    await _throwIfError(response, fallbackMessage: 'No se pudo cambiar la contrasena');
+  }
+
   Future<AuthResult> completeProfile({
     required String token,
     required String firstName,

@@ -40,6 +40,16 @@ const loginSchema = z.object({
   platform: z.string().min(2).optional()
 });
 
+const resetRequestSchema = z.object({
+  phone: z.string().min(8)
+});
+
+const resetVerifySchema = z.object({
+  phone: z.string().min(8),
+  otp: z.string().length(6),
+  password: z.string().min(8)
+});
+
 const completeProfileSchema = z.object({
   firstName: z.string().min(2),
   lastName: z.string().min(2),
@@ -435,6 +445,79 @@ async function bootstrap() {
       status: "AUTORIZADO",
       user: mapUser(user)
     });
+  });
+
+  app.post("/password/request-otp", async (request, reply) => {
+    const parsed = resetRequestSchema.parse(request.body);
+    const phone = normalizePhone(parsed.phone);
+    assertValidPhone(phone);
+
+    const userResult = await pool.query(
+      `SELECT id, phone FROM users WHERE phone = $1`,
+      [phone]
+    );
+
+    if (!userResult.rows.length) {
+      return reply.code(404).send({ message: "El usuario no existe." });
+    }
+
+    const otp = "123456";
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+    await pool.query(
+      `UPDATE users
+       SET otp_code = $2,
+           otp_expires_at = $3,
+           updated_at = NOW()
+       WHERE phone = $1`,
+      [phone, otp, expiresAt]
+    );
+    await redis.set(`otp:${phone}`, otp, "EX", 300);
+
+    reply.send({
+      message: "OTP de recuperacion generado",
+      otp,
+      expiresAt
+    });
+  });
+
+  app.post("/password/reset", async (request, reply) => {
+    const parsed = resetVerifySchema.parse(request.body);
+    const phone = normalizePhone(parsed.phone);
+    assertValidPhone(phone);
+    assertValidPassword(parsed.password);
+
+    const userResult = await pool.query(
+      `SELECT id, otp_code, otp_expires_at
+       FROM users
+       WHERE phone = $1`,
+      [phone]
+    );
+
+    if (!userResult.rows.length) {
+      return reply.code(404).send({ message: "El usuario no existe." });
+    }
+
+    const user = userResult.rows[0];
+    const cachedOtp = await redis.get(`otp:${phone}`);
+    const validOtp = cachedOtp || user.otp_code;
+
+    if (validOtp !== parsed.otp || !user.otp_expires_at || new Date(user.otp_expires_at) < new Date()) {
+      return reply.code(400).send({ message: "OTP invalido o vencido" });
+    }
+
+    const passwordHash = await bcrypt.hash(parsed.password, 10);
+    await pool.query(
+      `UPDATE users
+       SET password_hash = $2,
+           otp_code = NULL,
+           otp_expires_at = NULL,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [user.id, passwordHash]
+    );
+    await redis.del(`otp:${phone}`);
+
+    reply.send({ message: "Contrasena actualizada correctamente." });
   });
 
   app.post("/profile", { preHandler: [app.authenticate] }, async (request, reply) => {

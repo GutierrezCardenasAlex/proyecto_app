@@ -217,6 +217,89 @@ class _RideTabState extends ConsumerState<RideTab> {
     );
   }
 
+  void _showTripRequestSheet(TripState tripState) {
+    final request = tripState.request;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(22, 18, 22, 28),
+          decoration: const BoxDecoration(
+            color: Color(0xFFFEFEFF),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 46,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE2E2E4),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Pedido de taxi',
+                style: GoogleFonts.plusJakartaSans(fontSize: 26, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 10),
+              _StatusBanner(
+                message: _tripStatusHeadline(request.status),
+                color: const Color(0xFFEAFBFD),
+                textColor: const Color(0xFF00616D),
+              ),
+              const SizedBox(height: 16),
+              _TripInfoRow(label: 'Estado', value: request.status),
+              _TripInfoRow(label: 'Recojo', value: request.pickupAddress),
+              _TripInfoRow(
+                label: 'Taxi',
+                value: (request.vehicleLabel?.isNotEmpty ?? false)
+                    ? request.vehicleLabel!
+                    : 'Aun sin asignar',
+              ),
+              _TripInfoRow(
+                label: 'Placa',
+                value: (request.vehiclePlate?.isNotEmpty ?? false)
+                    ? request.vehiclePlate!
+                    : 'Por confirmar',
+              ),
+              _TripInfoRow(
+                label: 'Llegada',
+                value: request.etaMinutes == null ? 'Calculando...' : '${request.etaMinutes} min',
+              ),
+              _TripInfoRow(
+                label: 'Ubicacion taxi',
+                value: request.driverLat == null || request.driverLng == null
+                    ? 'Aun no disponible'
+                    : '${request.driverLat!.toStringAsFixed(5)}, ${request.driverLng!.toStringAsFixed(5)}',
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  String _tripStatusHeadline(String status) {
+    return switch (status) {
+      'requested' => 'Tu pedido esta enviado y esperando conductor.',
+      'searching' => 'Estamos buscando el taxi mas adecuado.',
+      'accepted' => 'Un conductor ya acepto tu viaje.',
+      'arriving' => 'Tu taxi va en camino a recogerte.',
+      'at_pickup' => 'Tu taxi ya esta listo para subir.',
+      'in_progress' => 'Tu viaje esta en progreso.',
+      'completed' => 'El viaje ya fue finalizado.',
+      _ => 'Seguimiento activo del pedido.',
+    };
+  }
+
   void _showFloatingNotification(String message) {
     _notificationTimer?.cancel();
     setState(() => _floatingNotification = message);
@@ -480,47 +563,65 @@ class _RideTabState extends ConsumerState<RideTab> {
                 const SizedBox(height: 18),
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.84),
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x12000003),
-                          blurRadius: 20,
-                          offset: Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.place, color: Color(0xFF006875)),
-                        const SizedBox(width: 10),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Tu ubicacion',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                                color: const Color(0xFF000003),
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            const Text(
-                              'Potosi, Bolivia',
-                              style: TextStyle(
-                                color: Color(0xFF47464B),
-                                fontWeight: FontWeight.w700,
-                              ),
+                  child: Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.84),
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x12000003),
+                              blurRadius: 20,
+                              offset: Offset(0, 8),
                             ),
                           ],
                         ),
-                      ],
-                    ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.place, color: Color(0xFF006875)),
+                            const SizedBox(width: 10),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Tu ubicacion',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                    color: const Color(0xFF000003),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                const Text(
+                                  'Potosi, Bolivia',
+                                  style: TextStyle(
+                                    color: Color(0xFF47464B),
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (tripState.request.activeTripId != null)
+                        FilledButton.tonalIcon(
+                          onPressed: () => _showTripRequestSheet(tripState),
+                          icon: const Icon(Icons.receipt_long),
+                          label: const Text('Pedido de taxi'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.white.withValues(alpha: 0.86),
+                            foregroundColor: const Color(0xFF001F24),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 if (_floatingNotification != null) ...[
@@ -1197,6 +1298,47 @@ class _TripBadge extends StatelessWidget {
             style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TripInfoRow extends StatelessWidget {
+  const _TripInfoRow({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 92,
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF657684),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: Color(0xFF102A3B),
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],

@@ -371,6 +371,60 @@ class _DriverDashboard extends ConsumerWidget {
   final VoidCallback onMenuTap;
   final VoidCallback onProfileTap;
 
+  void _showOfferSheet(BuildContext context, DriverTrip? trip) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(22, 18, 22, 28),
+          decoration: const BoxDecoration(
+            color: Color(0xFFFEFEFF),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 46,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE2E2E4),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Ofertas activas',
+                style: GoogleFonts.plusJakartaSans(fontSize: 26, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 12),
+              if (trip == null)
+                const DriverEmptyCard(
+                  title: 'Sin ofertas por ahora',
+                  subtitle: 'Activa disponibilidad para recibir solicitudes cercanas.',
+                )
+              else ...[
+                _InfoTile(label: 'Viaje', value: trip.id),
+                _InfoTile(label: 'Recojo', value: trip.passengerPickup),
+                _InfoTile(label: 'Tarifa', value: 'Bs ${trip.fareAmount.toStringAsFixed(0)}'),
+                _InfoTile(label: 'Estado', value: trip.status),
+                _InfoTile(
+                  label: 'Ubicacion',
+                  value: '${trip.pickupLat.toStringAsFixed(5)}, ${trip.pickupLng.toStringAsFixed(5)}',
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   String _tripDescription(DriverTrip? trip) {
     if (trip == null) {
       return 'No hay ofertas en este momento. Activa disponibilidad y mantente cerca de la demanda.';
@@ -551,50 +605,67 @@ class _DriverDashboard extends ConsumerWidget {
                 const SizedBox(height: 18),
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.84),
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x12000003),
-                          blurRadius: 20,
-                          offset: Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          driverState.available ? Icons.radio_button_checked : Icons.pause_circle_outline,
-                          color: driverState.available ? const Color(0xFF006875) : const Color(0xFF77767C),
-                        ),
-                        const SizedBox(width: 10),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              driverState.available ? 'Disponible' : 'Fuera de linea',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            Text(
-                              driverState.lastLocationPing == null
-                                  ? 'Sin GPS enviado aun'
-                                  : 'Ultimo ping ${driverState.lastLocationPing}',
-                              style: const TextStyle(
-                                color: Color(0xFF47464B),
-                                fontWeight: FontWeight.w700,
-                              ),
+                  child: Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.84),
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x12000003),
+                              blurRadius: 20,
+                              offset: Offset(0, 8),
                             ),
                           ],
                         ),
-                      ],
-                    ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              driverState.available ? Icons.radio_button_checked : Icons.pause_circle_outline,
+                              color: driverState.available ? const Color(0xFF006875) : const Color(0xFF77767C),
+                            ),
+                            const SizedBox(width: 10),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  driverState.available ? 'Disponible' : 'Fuera de linea',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                Text(
+                                  driverState.lastLocationPing == null
+                                      ? 'Sin GPS enviado aun'
+                                      : 'Ultimo ping ${driverState.lastLocationPing}',
+                                  style: const TextStyle(
+                                    color: Color(0xFF47464B),
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      FilledButton.tonalIcon(
+                        onPressed: () => _showOfferSheet(context, trip),
+                        icon: const Icon(Icons.local_activity_outlined),
+                        label: const Text('Ofertas activas'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.white.withValues(alpha: 0.86),
+                          foregroundColor: const Color(0xFF001F24),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const Spacer(),
@@ -602,12 +673,20 @@ class _DriverDashboard extends ConsumerWidget {
             ),
           ),
         ),
+        Positioned(
+          right: 20,
+          bottom: 170,
+          child: _MapActionButton(
+            icon: Icons.local_activity_outlined,
+            onTap: () => _showOfferSheet(context, trip),
+          ),
+        ),
         DraggableScrollableSheet(
           initialChildSize: 0.36,
-          minChildSize: 0.22,
+          minChildSize: 0.0,
           maxChildSize: 0.82,
           snap: true,
-          snapSizes: const [0.22, 0.36, 0.60, 0.82],
+          snapSizes: const [0.0, 0.22, 0.36, 0.60, 0.82],
           builder: (context, scrollController) {
             return DecoratedBox(
               decoration: const BoxDecoration(
@@ -984,6 +1063,35 @@ class _GlassIconButton extends StatelessWidget {
           width: 48,
           height: 48,
           child: Icon(icon, color: const Color(0xFF000003)),
+        ),
+      ),
+    );
+  }
+}
+
+class _MapActionButton extends StatelessWidget {
+  const _MapActionButton({
+    required this.icon,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      elevation: 6,
+      shadowColor: const Color(0x14000003),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: SizedBox(
+          width: 52,
+          height: 52,
+          child: Icon(icon, color: const Color(0xFF1A1C1D)),
         ),
       ),
     );

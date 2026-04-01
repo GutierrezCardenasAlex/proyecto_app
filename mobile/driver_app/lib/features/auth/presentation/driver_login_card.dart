@@ -57,6 +57,106 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
     );
   }
 
+  Future<void> _showResetPasswordDialog() async {
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final otpController = TextEditingController();
+    final newPasswordController = TextEditingController();
+    bool otpRequested = false;
+
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (context) {
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              return AlertDialog(
+                title: const Text('Recuperar contrasena'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Solicita un OTP de recuperacion y luego define una nueva contrasena.'),
+                    const SizedBox(height: 16),
+                    _PhoneField(controller: _phoneController),
+                    const SizedBox(height: 12),
+                    if (otpRequested) ...[
+                      _StyledField(
+                        controller: otpController,
+                        hintText: 'Codigo OTP',
+                        icon: Icons.sms_outlined,
+                      ),
+                      const SizedBox(height: 12),
+                      _StyledField(
+                        controller: newPasswordController,
+                        hintText: 'Nueva contrasena',
+                        icon: Icons.lock_outline_rounded,
+                        obscureText: true,
+                      ),
+                    ],
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancelar'),
+                  ),
+                  if (!otpRequested)
+                    FilledButton(
+                      onPressed: () async {
+                        final phoneError = _validatePhone();
+                        if (phoneError != null) {
+                          _showInlineError(phoneError);
+                          return;
+                        }
+                        await ref.read(authRepositoryProvider).requestPasswordResetOtp(_normalizedPhone());
+                        setDialogState(() => otpRequested = true);
+                        messenger.showSnackBar(
+                          const SnackBar(
+                            content: Text('OTP enviado para recuperar la contrasena.'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      },
+                      child: const Text('Enviar OTP'),
+                    )
+                  else
+                    FilledButton(
+                      onPressed: () async {
+                        final password = newPasswordController.text.trim();
+                        final valid = RegExp(r'^(?=.*[A-Za-z])(?=.*\d).{8,}$').hasMatch(password);
+                        if (!valid) {
+                          _showInlineError(
+                            'La contrasena debe tener al menos 8 caracteres, una letra y un numero.',
+                          );
+                          return;
+                        }
+                        await ref.read(authRepositoryProvider).resetPassword(
+                              phone: _normalizedPhone(),
+                              otp: otpController.text.trim(),
+                              password: password,
+                            );
+                        navigator.pop();
+                        messenger.showSnackBar(
+                          const SnackBar(
+                            content: Text('Contrasena actualizada. Ya puedes ingresar.'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      },
+                      child: const Text('Actualizar'),
+                    ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      otpController.dispose();
+      newPasswordController.dispose();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(driverSessionProvider);
@@ -159,6 +259,13 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
                   session.isLoading ? 'Ingresando...' : 'Entrar al panel',
                   style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 18),
                 ),
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: _showResetPasswordDialog,
+                child: const Text('Olvide mi contrasena'),
               ),
             ),
           ] else if (!showRegisterOtp) ...[
