@@ -173,6 +173,17 @@ services:
       rabbitmq:
         condition: service_started
 
+  admin-web:
+    build:
+      context: ./admin
+      args:
+        VITE_API_BASE_URL: "http://${PUBLIC_HOST:-62.171.186.246}:${GATEWAY_PORT:-3000}/api"
+        VITE_WS_URL: "http://${PUBLIC_HOST:-62.171.186.246}:${WEBSOCKET_PORT:-3008}"
+    ports:
+      - "${ADMIN_WEB_PORT:-8081}:80"
+    depends_on:
+      - gateway-api
+
   websocket-service:
     build: ./services/websocket-service
     environment:

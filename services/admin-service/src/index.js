@@ -134,6 +134,34 @@ async function bootstrap() {
     return result.rows;
   });
 
+  app.get("/devices/user/:userId/history", { preHandler: ensureAdmin }, async (request) => {
+    const { userId } = request.params;
+    const result = await pool.query(
+      `SELECT ud.id,
+              ud.user_id,
+              ud.device_identifier,
+              ud.device_name,
+              ud.platform,
+              ud.status,
+              ud.created_at,
+              ud.updated_at,
+              ud.approved_at,
+              ud.last_login_at,
+              u.phone,
+              u.full_name,
+              u.role,
+              aa.full_name AS approved_by_name
+       FROM user_devices ud
+       INNER JOIN users u ON u.id = ud.user_id
+       LEFT JOIN admin_accounts aa ON aa.id = ud.approved_by
+       WHERE ud.user_id = $1
+       ORDER BY ud.updated_at DESC, ud.created_at DESC`,
+      [userId]
+    );
+
+    return result.rows;
+  });
+
   app.post("/devices/:deviceId/status", { preHandler: ensureAdmin }, async (request, reply) => {
     const { deviceId } = request.params;
     const { status } = changeDeviceStatusSchema.parse(request.body);
@@ -159,6 +187,63 @@ async function bootstrap() {
       message: `Dispositivo ${status === "AUTORIZADO" ? "autorizado" : "rechazado"}`,
       device: result.rows[0]
     };
+  });
+
+  app.post("/devices/:deviceId/replace", { preHandler: ensureAdmin }, async (request, reply) => {
+    const { deviceId } = request.params;
+    const adminId = request.user.sub;
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+      const targetResult = await client.query(
+        `SELECT id, user_id
+         FROM user_devices
+         WHERE id = $1
+         FOR UPDATE`,
+        [deviceId]
+      );
+
+      if (!targetResult.rows.length) {
+        await client.query("ROLLBACK");
+        return reply.code(404).send({ message: "Dispositivo no encontrado" });
+      }
+
+      const target = targetResult.rows[0];
+      await client.query(
+        `UPDATE user_devices
+         SET status = 'RECHAZADO',
+             approved_by = $2,
+             approved_at = NOW(),
+             updated_at = NOW()
+         WHERE user_id = $1
+           AND id <> $3`,
+        [target.user_id, adminId, deviceId]
+      );
+
+      const updatedResult = await client.query(
+        `UPDATE user_devices
+         SET status = 'AUTORIZADO',
+             approved_by = $2,
+             approved_at = NOW(),
+             updated_at = NOW(),
+             last_login_at = NOW()
+         WHERE id = $1
+         RETURNING *`,
+        [deviceId, adminId]
+      );
+
+      await client.query("COMMIT");
+      return {
+        message: "Equipo reemplazado y autorizado por central",
+        device: updatedResult.rows[0]
+      };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   });
 
   await app.listen({ port, host: "0.0.0.0" });

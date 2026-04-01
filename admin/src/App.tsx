@@ -56,6 +56,7 @@ type DeviceRow = {
   created_at: string
   approved_at?: string | null
   approved_by_name?: string | null
+  last_login_at?: string | null
 }
 
 type AdminProfile = {
@@ -85,6 +86,8 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [token, setToken] = useState(localStorage.getItem('admin_token') ?? '')
+  const [selectedHistoryUser, setSelectedHistoryUser] = useState<DeviceRow | null>(null)
+  const [userHistory, setUserHistory] = useState<DeviceRow[]>([])
   const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(() => {
     const raw = localStorage.getItem('admin_profile')
     return raw ? (JSON.parse(raw) as AdminProfile) : null
@@ -205,6 +208,59 @@ function App() {
       await loadCentralData()
     } catch (updateError) {
       setError(updateError instanceof Error ? updateError.message : 'No se pudo actualizar el dispositivo')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function loadUserHistory(device: DeviceRow) {
+    if (!token) {
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    try {
+      const response = await fetch(`${apiBase}/admin/devices/user/${device.user_id}/history`, {
+        headers: authHeaders,
+      })
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(payload.message ?? 'No se pudo cargar el historial del usuario')
+      }
+
+      setSelectedHistoryUser(device)
+      setUserHistory(payload)
+    } catch (historyError) {
+      setError(historyError instanceof Error ? historyError.message : 'No se pudo cargar el historial del usuario')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function replaceDevice(deviceId: number) {
+    if (!token) {
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    try {
+      const response = await fetch(`${apiBase}/admin/devices/${deviceId}/replace`, {
+        method: 'POST',
+        headers: authHeaders,
+      })
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(payload.message ?? 'No se pudo reemplazar el equipo')
+      }
+
+      await loadCentralData()
+      if (selectedHistoryUser) {
+        await loadUserHistory(selectedHistoryUser)
+      }
+    } catch (replaceError) {
+      setError(replaceError instanceof Error ? replaceError.message : 'No se pudo reemplazar el equipo')
     } finally {
       setLoading(false)
     }
@@ -392,6 +448,9 @@ function App() {
                     <button className="danger-button" onClick={() => updateDeviceStatus(device.id, 'RECHAZADO')}>
                       Rechazar
                     </button>
+                    <button className="secondary-button" onClick={() => loadUserHistory(device)}>
+                      Ver historial
+                    </button>
                   </div>
                 </article>
               ))}
@@ -451,8 +510,14 @@ function App() {
                   <td>{device.approved_by_name || 'Sin accion'}</td>
                   <td>
                     <div className="action-row compact">
+                      <button className="secondary-button" onClick={() => loadUserHistory(device)}>
+                        Historial
+                      </button>
                       <button className="secondary-button" onClick={() => updateDeviceStatus(device.id, 'AUTORIZADO')}>
                         Autorizar
+                      </button>
+                      <button className="primary-button" onClick={() => replaceDevice(device.id)}>
+                        Reemplazar
                       </button>
                       <button className="danger-button" onClick={() => updateDeviceStatus(device.id, 'RECHAZADO')}>
                         Bloquear
@@ -465,6 +530,41 @@ function App() {
           </table>
         </div>
       </section>
+
+      {selectedHistoryUser && (
+        <section className="panel devices-panel">
+          <div className="panel-header">
+            <h2>Historial por usuario</h2>
+            <span>
+              {selectedHistoryUser.full_name || selectedHistoryUser.phone} · {selectedHistoryUser.phone}
+            </span>
+          </div>
+          <div className="list">
+            {userHistory.map((device) => (
+              <article key={device.id} className="list-card stack-card">
+                <div>
+                  <strong>{device.device_name || 'Equipo desconocido'}</strong>
+                  <p>{device.platform || 'sin plataforma'} · {device.device_identifier}</p>
+                  <p>Estado: {device.status}</p>
+                  <p>Ultimo acceso: {device.last_login_at || 'sin registros'}</p>
+                  <p>Central: {device.approved_by_name || 'sin accion'}</p>
+                </div>
+                <div className="action-row">
+                  <button className="primary-button" onClick={() => replaceDevice(device.id)}>
+                    Autorizar este equipo
+                  </button>
+                  <button className="secondary-button" onClick={() => updateDeviceStatus(device.id, 'AUTORIZADO')}>
+                    Solo autorizar
+                  </button>
+                  <button className="danger-button" onClick={() => updateDeviceStatus(device.id, 'RECHAZADO')}>
+                    Bloquear
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
     </main>
   )
 }
