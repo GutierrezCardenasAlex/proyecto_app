@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import L from 'leaflet'
 import { io } from 'socket.io-client'
 import './App.css'
 
 const cityCenter: [number, number] = [-19.5836, -65.7531]
+const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api'
+const wsBase = import.meta.env.VITE_WS_URL ?? 'http://localhost:3008'
 
 const driverIcon = new L.DivIcon({
   className: 'driver-pin',
@@ -38,6 +40,28 @@ type Dashboard = {
   trips: number
   activeTrips: number
   revenue: string
+  pendingDevices: number
+}
+
+type DeviceRow = {
+  id: number
+  user_id: string
+  phone: string
+  full_name: string
+  role: string
+  device_identifier: string
+  device_name?: string | null
+  platform?: string | null
+  status: 'PENDIENTE' | 'AUTORIZADO' | 'RECHAZADO'
+  created_at: string
+  approved_at?: string | null
+  approved_by_name?: string | null
+}
+
+type AdminProfile = {
+  id: string
+  phone: string
+  fullName?: string
 }
 
 function App() {
@@ -49,47 +73,150 @@ function App() {
     trips: 0,
     activeTrips: 0,
     revenue: '0.00',
+    pendingDevices: 0,
   })
   const [drivers, setDrivers] = useState<Driver[]>([])
   const [trips, setTrips] = useState<Trip[]>([])
+  const [pendingDevices, setPendingDevices] = useState<DeviceRow[]>([])
+  const [allDevices, setAllDevices] = useState<DeviceRow[]>([])
+  const [phone, setPhone] = useState('+59170000001')
+  const [otp, setOtp] = useState('123456')
+  const [otpRequested, setOtpRequested] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [token, setToken] = useState(localStorage.getItem('admin_token') ?? '')
+  const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(() => {
+    const raw = localStorage.getItem('admin_profile')
+    return raw ? (JSON.parse(raw) as AdminProfile) : null
+  })
 
-  useEffect(() => {
-    const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api'
-    const wsBase = import.meta.env.VITE_WS_URL ?? 'http://localhost:3008'
+  const isAuthenticated = token.length > 0
 
-    const load = async () => {
-      const [dashboardResponse, driversResponse, tripsResponse] = await Promise.all([
-        fetch(`${apiBase}/admin/dashboard`).then((res) => res.json()),
-        fetch(`${apiBase}/admin/drivers/live`).then((res) => res.json()),
-        fetch(`${apiBase}/admin/active-trips`).then((res) => res.json()),
-      ])
+  const authHeaders = useMemo(
+    () => ({
+      Authorization: `Bearer ${token}`,
+    }),
+    [token],
+  )
 
-      setDashboard(dashboardResponse)
-      setDrivers(driversResponse)
-      setTrips(tripsResponse)
+  async function loadCentralData() {
+    if (!token) {
+      return
     }
 
-    load().catch(() => {
-      setDashboard({ drivers: 1, trips: 12, activeTrips: 1, revenue: '144.00' })
-      setDrivers([
-        {
-          id: 'demo-driver',
-          status: 'available',
-          is_available: true,
-          location: { lat: '-19.5900', lng: '-65.7540', updatedAt: new Date().toISOString() },
-        },
+    const [dashboardResponse, driversResponse, tripsResponse, pendingResponse, devicesResponse] =
+      await Promise.all([
+        fetch(`${apiBase}/admin/dashboard`, { headers: authHeaders }).then((res) => res.json()),
+        fetch(`${apiBase}/admin/drivers/live`, { headers: authHeaders }).then((res) => res.json()),
+        fetch(`${apiBase}/admin/active-trips`, { headers: authHeaders }).then((res) => res.json()),
+        fetch(`${apiBase}/admin/devices/pending`, { headers: authHeaders }).then((res) => res.json()),
+        fetch(`${apiBase}/admin/devices`, { headers: authHeaders }).then((res) => res.json()),
       ])
-      setTrips([
-        {
-          id: 'demo-trip',
-          status: 'accepted',
-          pickup_lat: -19.5855,
-          pickup_lng: -65.7545,
-          destination_lat: -19.574,
-          destination_lng: -65.745,
-          driver_id: 'demo-driver',
+
+    setDashboard(dashboardResponse)
+    setDrivers(driversResponse)
+    setTrips(tripsResponse)
+    setPendingDevices(pendingResponse)
+    setAllDevices(devicesResponse)
+  }
+
+  async function requestOtp() {
+    setLoading(true)
+    setError(null)
+    try {
+      const response = await fetch(`${apiBase}/auth/admin/otp/request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone }),
+      })
+
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(payload.message ?? 'No se pudo solicitar OTP')
+      }
+
+      setOtpRequested(true)
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'No se pudo solicitar OTP')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function verifyOtp() {
+    setLoading(true)
+    setError(null)
+    try {
+      const response = await fetch(`${apiBase}/auth/admin/otp/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, otp }),
+      })
+
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(payload.message ?? 'No se pudo validar OTP')
+      }
+
+      localStorage.setItem('admin_token', payload.token)
+      localStorage.setItem('admin_profile', JSON.stringify(payload.admin))
+      setToken(payload.token)
+      setAdminProfile(payload.admin)
+      setOtpRequested(false)
+    } catch (verifyError) {
+      setError(verifyError instanceof Error ? verifyError.message : 'No se pudo validar OTP')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function logout() {
+    localStorage.removeItem('admin_token')
+    localStorage.removeItem('admin_profile')
+    setToken('')
+    setAdminProfile(null)
+    setOtpRequested(false)
+    setPendingDevices([])
+    setAllDevices([])
+  }
+
+  async function updateDeviceStatus(deviceId: number, status: 'AUTORIZADO' | 'RECHAZADO') {
+    if (!token) {
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    try {
+      const response = await fetch(`${apiBase}/admin/devices/${deviceId}/status`, {
+        method: 'POST',
+        headers: {
+          ...authHeaders,
+          'Content-Type': 'application/json',
         },
-      ])
+        body: JSON.stringify({ status }),
+      })
+
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(payload.message ?? 'No se pudo actualizar el dispositivo')
+      }
+
+      await loadCentralData()
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : 'No se pudo actualizar el dispositivo')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return
+    }
+
+    loadCentralData().catch(() => {
+      setError('No se pudo cargar la central.')
     })
 
     const socket = io(wsBase, { transports: ['websocket'] })
@@ -107,10 +234,10 @@ function App() {
     return () => {
       socket.close()
     }
-  }, [])
+  }, [authHeaders, isAuthenticated, token])
 
   useEffect(() => {
-    if (!mapRef.current || mapInstanceRef.current) {
+    if (!mapRef.current || mapInstanceRef.current || !isAuthenticated) {
       return
     }
 
@@ -133,7 +260,7 @@ function App() {
       mapInstanceRef.current = null
       markersLayerRef.current = null
     }
-  }, [])
+  }, [isAuthenticated])
 
   useEffect(() => {
     if (!markersLayerRef.current) {
@@ -150,41 +277,94 @@ function App() {
       })
   }, [drivers])
 
+  if (!isAuthenticated) {
+    return (
+      <main className="layout auth-layout">
+        <section className="hero-panel auth-card">
+          <div>
+            <p className="eyebrow">Central Taxi Ya</p>
+            <h1>Autoriza dispositivos y controla accesos desde oficina.</h1>
+            <p className="subtitle">
+              Solo la central puede liberar un nuevo telefono para pasajero o conductor.
+            </p>
+          </div>
+          <div className="auth-form">
+            <label>
+              <span>Numero de la central</span>
+              <input value={phone} onChange={(event) => setPhone(event.target.value)} />
+            </label>
+
+            {otpRequested && (
+              <label>
+                <span>OTP</span>
+                <input value={otp} onChange={(event) => setOtp(event.target.value)} />
+              </label>
+            )}
+
+            <button className="primary-button" disabled={loading} onClick={otpRequested ? verifyOtp : requestOtp}>
+              {loading ? 'Procesando...' : otpRequested ? 'Ingresar a central' : 'Solicitar OTP'}
+            </button>
+
+            {otpRequested && (
+              <button className="secondary-button" disabled={loading} onClick={requestOtp}>
+                Reenviar OTP
+              </button>
+            )}
+
+            {error && <div className="error-box">{error}</div>}
+          </div>
+        </section>
+      </main>
+    )
+  }
+
   return (
     <main className="layout">
       <section className="hero-panel">
         <div>
-          <p className="eyebrow">Taxi Ya / Potosi Control</p>
-          <h1>Real-time dispatch operations for a 15 km service boundary.</h1>
+          <p className="eyebrow">Central Taxi Ya / Potosi</p>
+          <h1>Despacho, control de dispositivos y monitoreo operativo en tiempo real.</h1>
           <p className="subtitle">
-            Live driver telemetry, active trip monitoring, and dispatch visibility for the Taxi Ya platform.
+            La central valida nuevos equipos, sigue la flota y mantiene el servicio bajo control.
           </p>
         </div>
         <div className="stats">
           <article>
-            <span>Drivers</span>
+            <span>Conductores</span>
             <strong>{dashboard.drivers}</strong>
           </article>
           <article>
-            <span>Total Trips</span>
+            <span>Viajes</span>
             <strong>{dashboard.trips}</strong>
           </article>
           <article>
-            <span>Active Trips</span>
+            <span>Activos</span>
             <strong>{dashboard.activeTrips}</strong>
           </article>
           <article>
-            <span>Revenue</span>
-            <strong>Bs {dashboard.revenue}</strong>
+            <span>Pendientes</span>
+            <strong>{dashboard.pendingDevices}</strong>
           </article>
         </div>
       </section>
 
+      <section className="toolbar">
+        <div>
+          <strong>{adminProfile?.fullName ?? 'Central'}</strong>
+          <span>{adminProfile?.phone}</span>
+        </div>
+        <button className="secondary-button" onClick={logout}>
+          Cerrar sesion
+        </button>
+      </section>
+
+      {error && <div className="error-box">{error}</div>}
+
       <section className="content-grid">
         <div className="map-card">
           <div className="panel-header">
-            <h2>Live Map</h2>
-            <span>Potosi radius lock active</span>
+            <h2>Mapa en vivo</h2>
+            <span>Potosi protegido por radio operativo</span>
           </div>
           <div ref={mapRef} className="map" />
         </div>
@@ -192,8 +372,36 @@ function App() {
         <div className="side-column">
           <div className="panel">
             <div className="panel-header">
-              <h2>Active Trips</h2>
-              <span>{trips.length} visible</span>
+              <h2>Solicitudes de dispositivos</h2>
+              <span>{pendingDevices.length} pendientes</span>
+            </div>
+            <div className="list">
+              {pendingDevices.length === 0 && <article className="list-card">Sin solicitudes pendientes.</article>}
+              {pendingDevices.map((device) => (
+                <article key={device.id} className="list-card stack-card">
+                  <div>
+                    <strong>{device.full_name || device.phone}</strong>
+                    <p>{device.role} · {device.phone}</p>
+                    <p>{device.device_name || 'Equipo desconocido'}</p>
+                    <p>{device.platform || 'sin plataforma'} · {device.device_identifier}</p>
+                  </div>
+                  <div className="action-row">
+                    <button className="primary-button" onClick={() => updateDeviceStatus(device.id, 'AUTORIZADO')}>
+                      Aprobar
+                    </button>
+                    <button className="danger-button" onClick={() => updateDeviceStatus(device.id, 'RECHAZADO')}>
+                      Rechazar
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+
+          <div className="panel">
+            <div className="panel-header">
+              <h2>Viajes activos</h2>
+              <span>{trips.length} visibles</span>
             </div>
             <div className="list">
               {trips.map((trip) => (
@@ -202,29 +410,59 @@ function App() {
                     <strong>{trip.id.slice(0, 8)}</strong>
                     <p>{trip.status}</p>
                   </div>
-                  <span>{trip.driver_id ? 'Assigned' : 'Searching'}</span>
+                  <span>{trip.driver_id ? 'Asignado' : 'Buscando'}</span>
                 </article>
               ))}
             </div>
           </div>
+        </div>
+      </section>
 
-          <div className="panel">
-            <div className="panel-header">
-              <h2>Fleet Pulse</h2>
-              <span>Redis-backed</span>
-            </div>
-            <div className="list">
-              {drivers.map((driver) => (
-                <article key={driver.id} className="list-card">
-                  <div>
-                    <strong>{driver.id.slice(0, 8)}</strong>
-                    <p>{driver.status}</p>
-                  </div>
-                  <span>{driver.is_available ? 'Available' : 'Busy'}</span>
-                </article>
+      <section className="panel devices-panel">
+        <div className="panel-header">
+          <h2>Dispositivos registrados</h2>
+          <span>{allDevices.length} en total</span>
+        </div>
+        <div className="table-wrapper">
+          <table className="devices-table">
+            <thead>
+              <tr>
+                <th>Usuario</th>
+                <th>Rol</th>
+                <th>Equipo</th>
+                <th>Estado</th>
+                <th>Central</th>
+                <th>Accion</th>
+              </tr>
+            </thead>
+            <tbody>
+              {allDevices.map((device) => (
+                <tr key={device.id}>
+                  <td>
+                    <strong>{device.full_name || 'Sin nombre'}</strong>
+                    <div>{device.phone}</div>
+                  </td>
+                  <td>{device.role}</td>
+                  <td>
+                    <strong>{device.device_name || 'Equipo desconocido'}</strong>
+                    <div>{device.platform || 'sin plataforma'}</div>
+                  </td>
+                  <td>{device.status}</td>
+                  <td>{device.approved_by_name || 'Sin accion'}</td>
+                  <td>
+                    <div className="action-row compact">
+                      <button className="secondary-button" onClick={() => updateDeviceStatus(device.id, 'AUTORIZADO')}>
+                        Autorizar
+                      </button>
+                      <button className="danger-button" onClick={() => updateDeviceStatus(device.id, 'RECHAZADO')}>
+                        Bloquear
+                      </button>
+                    </div>
+                  </td>
+                </tr>
               ))}
-            </div>
-          </div>
+            </tbody>
+          </table>
         </div>
       </section>
     </main>

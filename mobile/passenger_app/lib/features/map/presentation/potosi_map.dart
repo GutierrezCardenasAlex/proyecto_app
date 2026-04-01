@@ -20,9 +20,10 @@ class PotosiMap extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final initialCenter = routeTarget ?? userLocation;
     return FlutterMap(
       options: MapOptions(
-        initialCenter: userLocation,
+        initialCenter: initialCenter,
         initialZoom: 14.2,
       ),
       children: [

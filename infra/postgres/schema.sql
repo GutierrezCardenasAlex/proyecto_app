@@ -35,6 +35,32 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS admin_accounts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  phone VARCHAR(32) UNIQUE NOT NULL,
+  full_name VARCHAR(120),
+  otp_code VARCHAR(8),
+  otp_expires_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS user_devices (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  device_identifier VARCHAR(255) NOT NULL,
+  device_name VARCHAR(100),
+  platform VARCHAR(32),
+  status VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  approved_by UUID REFERENCES admin_accounts(id) ON DELETE SET NULL,
+  approved_at TIMESTAMPTZ,
+  last_login_at TIMESTAMPTZ,
+  CONSTRAINT chk_user_devices_status
+    CHECK (status IN ('PENDIENTE', 'AUTORIZADO', 'RECHAZADO'))
+);
+
 CREATE TABLE IF NOT EXISTS drivers (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
@@ -138,3 +164,6 @@ CREATE INDEX IF NOT EXISTS idx_trips_status
 CREATE INDEX IF NOT EXISTS idx_trips_pickup_geo
   ON trips
   USING GIST (pickup_location);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_user_devices_user_identifier
+  ON user_devices (user_id, device_identifier);

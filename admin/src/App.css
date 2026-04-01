@@ -12,6 +12,11 @@ body {
   color: #142634;
 }
 
+.auth-layout {
+  display: grid;
+  place-items: center;
+}
+
 .hero-panel,
 .panel,
 .map-card {
@@ -28,6 +33,10 @@ body {
   grid-template-columns: 1.3fr 1fr;
   padding: 28px;
   margin-bottom: 24px;
+}
+
+.auth-card {
+  width: min(980px, 100%);
 }
 
 .eyebrow {
@@ -81,6 +90,20 @@ body {
   gap: 24px;
 }
 
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.toolbar span {
+  display: block;
+  color: #6d7e8a;
+  margin-top: 4px;
+}
+
 .map-card,
 .panel {
   padding: 18px;
@@ -103,11 +126,114 @@ body {
   gap: 24px;
 }
 
+.auth-form {
+  display: grid;
+  gap: 16px;
+}
+
+.auth-form label {
+  display: grid;
+  gap: 8px;
+}
+
+.auth-form span {
+  color: #466072;
+  font-weight: 700;
+}
+
+.auth-form input {
+  border: 1px solid rgba(20, 38, 52, 0.12);
+  border-radius: 16px;
+  padding: 14px 16px;
+  background: #fffdfa;
+  color: #142634;
+  font: inherit;
+}
+
+.primary-button,
+.secondary-button,
+.danger-button {
+  border: 0;
+  border-radius: 16px;
+  padding: 12px 16px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primary-button {
+  background: #142634;
+  color: #fffdfa;
+}
+
+.secondary-button {
+  background: #fffdfa;
+  color: #142634;
+  border: 1px solid rgba(20, 38, 52, 0.12);
+}
+
+.danger-button {
+  background: #8f2d1a;
+  color: #fffdfa;
+}
+
+.error-box {
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: #ffe0db;
+  color: #7f2010;
+  font-weight: 700;
+}
+
 .list {
   display: grid;
   gap: 12px;
   max-height: 34vh;
   overflow: auto;
+}
+
+.stack-card {
+  display: grid;
+  gap: 14px;
+}
+
+.action-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.action-row.compact {
+  gap: 8px;
+}
+
+.devices-panel {
+  margin-top: 24px;
+}
+
+.table-wrapper {
+  overflow: auto;
+}
+
+.devices-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.devices-table th,
+.devices-table td {
+  text-align: left;
+  padding: 14px 12px;
+  border-bottom: 1px solid rgba(20, 38, 52, 0.08);
+  vertical-align: top;
+}
+
+.devices-table th {
+  color: #6d7e8a;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .list-card {

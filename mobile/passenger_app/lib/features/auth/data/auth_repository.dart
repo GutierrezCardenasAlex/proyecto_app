@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
 import '../../../core/config/app_config.dart';
+import '../../../core/device/device_identity.dart';
 import '../domain/session.dart';
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
@@ -46,14 +47,23 @@ class AuthRepository {
   }
 
   Future<AuthResult> verifyOtp(String phone, String otp) async {
+    final device = await DeviceIdentityService.load();
     final response = await http.post(
       Uri.parse('${AppConfig.apiBaseUrl}/auth/otp/verify'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'phone': phone,
         'otp': otp,
+        'deviceIdentifier': device.identifier,
+        'deviceName': device.name,
+        'platform': device.platform,
       }),
     );
+
+    if (response.statusCode == 202 || response.statusCode == 403) {
+      final payload = jsonDecode(response.body) as Map<String, dynamic>;
+      throw Exception(payload['message']?.toString() ?? 'La central debe autorizar este dispositivo.');
+    }
 
     if (response.statusCode >= 400) {
       throw Exception('OTP invalido (${response.statusCode})');

@@ -9,6 +9,7 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../../auth/data/auth_repository.dart';
 import '../../../../core/config/app_config.dart';
+import '../../../../core/notifications/local_notifications.dart';
 import '../../../map/data/location_controller.dart';
 import '../../../map/presentation/potosi_map.dart';
 import '../../data/trip_repository.dart';
@@ -60,6 +61,7 @@ class _RideTabState extends ConsumerState<RideTab> {
 
   Future<void> _requestNotificationPermission() async {
     await Permission.notification.request();
+    await LocalNotifications.ensureInitialized();
   }
 
   @override
@@ -145,7 +147,7 @@ class _RideTabState extends ConsumerState<RideTab> {
     final destination = _destinationController.text.trim();
     final resolvedDestination =
         _rideMode == RideMode.cercano && destination.isEmpty ? 'Abordaje inmediato' : destination;
-    final selectedDriverId = _selectedDriverId;
+    final selectedDriverId = _rideMode == RideMode.cercano ? _selectedDriverId : null;
 
     if (location == null) {
       _showMessage(locationState.errorMessage ?? 'Activa tu ubicacion para pedir un taxi.');
@@ -218,6 +220,11 @@ class _RideTabState extends ConsumerState<RideTab> {
   void _showFloatingNotification(String message) {
     _notificationTimer?.cancel();
     setState(() => _floatingNotification = message);
+    LocalNotifications.show(
+      id: message.hashCode,
+      title: 'Taxi Ya',
+      body: message,
+    );
     _notificationTimer = Timer(const Duration(seconds: 5), () {
       if (mounted) {
         setState(() => _floatingNotification = null);
@@ -334,7 +341,7 @@ class _RideTabState extends ConsumerState<RideTab> {
                   tripId: activeTripId,
                   status: 'in_progress',
                 ),
-            child: const Text('Estoy listo para el destino'),
+            child: const Text('Estoy listo para salir'),
           ),
         ),
       );
@@ -400,6 +407,9 @@ class _RideTabState extends ConsumerState<RideTab> {
                 ),
               ),
               child: PotosiMap(
+                key: ValueKey(
+                  'passenger-map-${tripState.request.status}-${activeDriverPoint?.latitude}-${activeDriverPoint?.longitude}',
+                ),
                 drivers: driverPoints,
                 userLocation: userLocation,
                 routeTarget: activeDriverPoint,
@@ -629,7 +639,10 @@ class _RideTabState extends ConsumerState<RideTab> {
                             child: _ModeButton(
                               label: 'Pedir taxi',
                               selected: _rideMode == RideMode.destino,
-                              onTap: () => setState(() => _rideMode = RideMode.destino),
+                              onTap: () => setState(() {
+                                _rideMode = RideMode.destino;
+                                _selectedDriverId = null;
+                              }),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -694,7 +707,6 @@ class _RideTabState extends ConsumerState<RideTab> {
                         padding: const EdgeInsets.only(top: 12),
                         child: _LargeTripStatusCard(
                           status: tripState.request.status,
-                          destination: tripState.request.destinationAddress,
                           vehicleLabel: tripState.request.vehicleLabel,
                           vehiclePlate: tripState.request.vehiclePlate,
                           etaMinutes: tripState.request.etaMinutes,
@@ -703,7 +715,7 @@ class _RideTabState extends ConsumerState<RideTab> {
                     _buildTripActions(tripState),
                     const SizedBox(height: 12),
                     Text(
-                      _rideMode == RideMode.destino ? 'Autos disponibles' : 'Que taxi tomar',
+                      _rideMode == RideMode.destino ? 'Solicitud de viaje' : 'Que taxi tomar',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 24,
                         fontWeight: FontWeight.w800,
@@ -713,7 +725,7 @@ class _RideTabState extends ConsumerState<RideTab> {
                     const SizedBox(height: 8),
                     Text(
                       _rideMode == RideMode.destino
-                          ? 'Tu viaje sale desde tu ubicacion actual y termina donde elijas.'
+                          ? 'Aqui solo preparas la solicitud desde tu ubicacion actual.'
                           : 'Mira los taxis cercanos para subir al que te convenga mas rapido.',
                       style: const TextStyle(
                         color: Color(0xFF47464B),
@@ -721,7 +733,23 @@ class _RideTabState extends ConsumerState<RideTab> {
                       ),
                     ),
                     const SizedBox(height: 18),
-                    ..._buildVehicleCards(tripState.nearbyDrivers),
+                    if (_rideMode == RideMode.cercano) ..._buildVehicleCards(tripState.nearbyDrivers),
+                    if (_rideMode == RideMode.destino)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF3F3F5),
+                          borderRadius: BorderRadius.circular(22),
+                        ),
+                        child: const Text(
+                          'Los taxis cercanos solo aparecen en "Tomar taxi". En este modo la app envia una solicitud normal de viaje.',
+                          style: TextStyle(
+                            color: Color(0xFF47464B),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: 22),
                     SizedBox(
                       height: 56,
@@ -1051,14 +1079,12 @@ class _EmptyRideCard extends StatelessWidget {
 class _LargeTripStatusCard extends StatelessWidget {
   const _LargeTripStatusCard({
     required this.status,
-    required this.destination,
     this.vehicleLabel,
     this.vehiclePlate,
     this.etaMinutes,
   });
 
   final String status;
-  final String destination;
   final String? vehicleLabel;
   final String? vehiclePlate;
   final int? etaMinutes;
@@ -1081,10 +1107,10 @@ class _LargeTripStatusCard extends StatelessWidget {
             ? 'Sigue el recorrido del conductor hacia tu punto.'
             : 'Tu conductor va en camino y llega en $etaMinutes min.',
         'at_pickup' => 'Verifica el auto y sube cuando estes listo.',
-        'in_progress' => 'Sigue el trayecto hasta tu destino.',
+        'in_progress' => 'Viaje en progreso.',
         'completed' => 'Gracias por viajar con Taxi Ya.',
         'cancelled' => 'Puedes volver a solicitar un taxi cuando quieras.',
-        _ => destination,
+        _ => 'Estamos actualizando el estado de tu viaje.',
       };
 
   @override
@@ -1119,14 +1145,6 @@ class _LargeTripStatusCard extends StatelessWidget {
             _subtitle,
             style: const TextStyle(
               color: Color(0xFFD4F9FF),
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            destination,
-            style: const TextStyle(
-              color: Colors.white,
               fontWeight: FontWeight.w700,
             ),
           ),

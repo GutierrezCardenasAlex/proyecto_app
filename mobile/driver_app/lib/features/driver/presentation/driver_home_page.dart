@@ -10,6 +10,7 @@ import '../../map/presentation/driver_map.dart';
 import '../../trip/data/trip_repository.dart';
 import '../../trip/domain/driver_trip.dart';
 import '../../../core/config/app_config.dart';
+import '../../../core/notifications/local_notifications.dart';
 import 'pages/driver_detail_pages.dart';
 import 'widgets/driver_app_drawer.dart';
 import 'widgets/driver_ui_kit.dart';
@@ -100,6 +101,11 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> {
     });
     _socket?.on('driver:trip_offer', (_) {
       ref.read(offeredTripProvider.notifier).loadOffer();
+      LocalNotifications.show(
+        id: 2001,
+        title: 'Nueva oferta',
+        body: 'Tienes una solicitud de viaje disponible.',
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -121,6 +127,11 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> {
           status.isNotEmpty &&
           currentTripId == tripId) {
         ref.read(offeredTripProvider.notifier).setLocalStatus(status);
+        LocalNotifications.show(
+          id: 2002,
+          title: 'Estado del viaje',
+          body: _statusMessage(status),
+        );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -275,7 +286,10 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> {
   @override
   void initState() {
     super.initState();
-    Future<void>.microtask(() => Permission.notification.request());
+    Future<void>.microtask(() async {
+      await Permission.notification.request();
+      await LocalNotifications.ensureInitialized();
+    });
   }
 }
 
@@ -457,6 +471,9 @@ class _DriverDashboard extends ConsumerWidget {
         Positioned.fill(
           child: RepaintBoundary(
             child: DriverMap(
+              key: ValueKey(
+                'driver-map-${trip?.status}-${trip?.pickupLat}-${trip?.pickupLng}-${driverState.lat}-${driverState.lng}',
+              ),
               available: driverState.available,
               tripAccepted: trip?.status == 'accepted',
               driverLat: driverState.lat,
@@ -464,8 +481,6 @@ class _DriverDashboard extends ConsumerWidget {
               tripStatus: trip?.status,
               pickupLat: trip?.pickupLat,
               pickupLng: trip?.pickupLng,
-              destinationLat: trip?.destinationLat,
-              destinationLng: trip?.destinationLng,
             ),
           ),
         ),

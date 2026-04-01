@@ -12,8 +12,6 @@ class DriverMap extends StatelessWidget {
     this.tripStatus,
     this.pickupLat,
     this.pickupLng,
-    this.destinationLat,
-    this.destinationLng,
   });
 
   final bool available;
@@ -23,20 +21,17 @@ class DriverMap extends StatelessWidget {
   final String? tripStatus;
   final double? pickupLat;
   final double? pickupLng;
-  final double? destinationLat;
-  final double? destinationLng;
 
   @override
   Widget build(BuildContext context) {
     final driverPoint = LatLng(driverLat, driverLng);
     final pickupPoint = pickupLat != null && pickupLng != null ? LatLng(pickupLat!, pickupLng!) : null;
-    final destinationPoint =
-        destinationLat != null && destinationLng != null ? LatLng(destinationLat!, destinationLng!) : null;
     final isOnPickupStage = const {'accepted', 'arriving', 'at_pickup'}.contains(tripStatus);
+    final initialCenter = tripAccepted && pickupPoint != null ? pickupPoint : driverPoint;
 
     return FlutterMap(
       options: MapOptions(
-        initialCenter: driverPoint,
+        initialCenter: initialCenter,
         initialZoom: 14.2,
       ),
       children: [
@@ -66,16 +61,6 @@ class DriverMap extends StatelessWidget {
               ),
             ],
           ),
-        if (tripStatus == 'in_progress' && pickupPoint != null && destinationPoint != null)
-          PolylineLayer(
-            polylines: [
-              Polyline(
-                points: [pickupPoint, destinationPoint],
-                strokeWidth: 4,
-                color: Color(0xFF006875),
-              ),
-            ],
-          ),
         MarkerLayer(
           markers: [
             Marker(
@@ -99,13 +84,6 @@ class DriverMap extends StatelessWidget {
                 width: 54,
                 height: 54,
                 child: const Icon(Icons.place, color: Color(0xFF000003), size: 34),
-              ),
-            if (destinationPoint != null)
-              Marker(
-                point: destinationPoint,
-                width: 54,
-                height: 54,
-                child: const Icon(Icons.flag_circle, color: Color(0xFF006875), size: 30),
               ),
           ],
         ),
