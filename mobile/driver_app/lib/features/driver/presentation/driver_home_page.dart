@@ -16,6 +16,7 @@ import 'pages/driver_detail_pages.dart';
 import 'widgets/driver_app_drawer.dart';
 import 'widgets/driver_ui_kit.dart';
 import '../data/driver_repository.dart';
+import '../domain/driver_state.dart';
 
 class DriverHomePage extends ConsumerStatefulWidget {
   const DriverHomePage({super.key});
@@ -24,11 +25,12 @@ class DriverHomePage extends ConsumerStatefulWidget {
   ConsumerState<DriverHomePage> createState() => _DriverHomePageState();
 }
 
-class _DriverHomePageState extends ConsumerState<DriverHomePage> {
+class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBindingObserver {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   io.Socket? _socket;
   String? _joinedDriverId;
   String? _joinedTripId;
+  String? _restoredDriverId;
   int _selectedIndex = 0;
   String _activeDrawerItem = 'Panel de viaje';
 
@@ -171,6 +173,7 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _socket?.dispose();
     super.dispose();
   }
@@ -189,6 +192,11 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> {
 
     if (!session.profileCompleted) {
       return const DriverProfileCompletionPage();
+    }
+
+    if (_restoredDriverId != session.driverId && session.driverId.isNotEmpty) {
+      _restoredDriverId = session.driverId;
+      Future<void>.microtask(_restoreDriverOperationalState);
     }
 
     if (session.driverId.isNotEmpty) {
@@ -296,10 +304,26 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     Future<void>.microtask(() async {
       await Permission.notification.request();
       await LocalNotifications.ensureInitialized();
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      Future<void>.microtask(_restoreDriverOperationalState);
+    }
+  }
+
+  Future<void> _restoreDriverOperationalState() async {
+    if (!mounted) {
+      return;
+    }
+    await ref.read(driverStateProvider.notifier).restoreOperationalState();
+    await ref.read(offeredTripProvider.notifier).loadOffer();
   }
 }
 
@@ -362,7 +386,7 @@ class _DriverLoginShell extends StatelessWidget {
   }
 }
 
-class _DriverDashboard extends ConsumerWidget {
+class _DriverDashboard extends ConsumerStatefulWidget {
   const _DriverDashboard({
     required this.onMenuTap,
     required this.onProfileTap,
@@ -370,6 +394,29 @@ class _DriverDashboard extends ConsumerWidget {
 
   final VoidCallback onMenuTap;
   final VoidCallback onProfileTap;
+
+  @override
+  ConsumerState<_DriverDashboard> createState() => _DriverDashboardState();
+}
+
+class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
+  final DraggableScrollableController _sheetController = DraggableScrollableController();
+  double _sheetSize = 0.36;
+
+  @override
+  void dispose() {
+    _sheetController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggleSheet() async {
+    final target = _sheetSize <= 0.08 ? 0.36 : 0.0;
+    await _sheetController.animateTo(
+      target,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+    );
+  }
 
   void _showOfferSheet(BuildContext context, DriverTrip? trip) {
     showModalBottomSheet<void>(
@@ -417,7 +464,90 @@ class _DriverDashboard extends ConsumerWidget {
                   label: 'Ubicacion',
                   value: '${trip.pickupLat.toStringAsFixed(5)}, ${trip.pickupLng.toStringAsFixed(5)}',
                 ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () async {
+                      Navigator.of(context).pop();
+                      await _handleDriverPrimaryAction(trip);
+                    },
+                    child: Text(_driverActionLabel(trip)),
+                  ),
+                ),
               ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showStatusSheet(BuildContext context, DriverState driverState, DriverTrip? trip) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(22, 18, 22, 28),
+          decoration: const BoxDecoration(
+            color: Color(0xFFFEFEFF),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 46,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE2E2E4),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Estado del conductor',
+                style: GoogleFonts.plusJakartaSans(fontSize: 26, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 12),
+              _InfoTile(
+                label: 'Disponibilidad',
+                value: driverState.available ? 'Buscando viaje' : 'Fuera de linea',
+              ),
+              _InfoTile(
+                label: 'Operacion',
+                value: _statusChipLabel(driverState, trip),
+              ),
+              _InfoTile(
+                label: 'Ultimo GPS',
+                value: driverState.lastLocationPing == null
+                    ? 'Sin ubicacion enviada aun'
+                    : driverState.lastLocationPing.toString(),
+              ),
+              if (trip != null) ...[
+                _InfoTile(label: 'Viaje', value: trip.id),
+                _InfoTile(label: 'Recojo', value: trip.passengerPickup),
+                _InfoTile(label: 'Estado viaje', value: trip.status),
+              ],
+              const SizedBox(height: 14),
+              SwitchListTile(
+                value: driverState.available,
+                contentPadding: EdgeInsets.zero,
+                onChanged: (value) async {
+                  Navigator.of(context).pop();
+                  await ref.read(driverStateProvider.notifier).toggleAvailability(value);
+                },
+                title: const Text(
+                  'Activar disponibilidad',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                subtitle: const Text('Mantiene tu estado de busqueda y vuelve a enviar GPS.'),
+              ),
             ],
           ),
         );
@@ -453,6 +583,48 @@ class _DriverDashboard extends ConsumerWidget {
       'completed' => 'Calificar pasajero',
       _ => 'Aceptar viaje',
     };
+  }
+
+  String _statusChipLabel(DriverState driverState, DriverTrip? trip) {
+    if (trip != null) {
+      return switch (trip.status) {
+        'accepted' => 'Viaje aceptado',
+        'arriving' => 'En camino al recojo',
+        'at_pickup' => 'Esperando al pasajero',
+        'in_progress' => 'Viaje en progreso',
+        'completed' => 'Listo para nueva solicitud',
+        _ => 'Nueva oferta recibida',
+      };
+    }
+    return driverState.available ? 'Buscando viaje' : 'Desconectado';
+  }
+
+  Future<void> _handleDriverPrimaryAction(DriverTrip? trip) async {
+    if (trip == null) {
+      return;
+    }
+
+    if (trip.status == 'requested') {
+      await ref.read(offeredTripProvider.notifier).acceptTrip();
+      return;
+    }
+    if (trip.status == 'accepted') {
+      await ref.read(offeredTripProvider.notifier).updateTripStatus('arriving');
+      return;
+    }
+    if (trip.status == 'arriving') {
+      await ref.read(offeredTripProvider.notifier).updateTripStatus('at_pickup');
+      return;
+    }
+    if (trip.status == 'at_pickup') {
+      await ref.read(offeredTripProvider.notifier).updateTripStatus('in_progress');
+      return;
+    }
+    if (trip.status == 'in_progress') {
+      await ref.read(offeredTripProvider.notifier).updateTripStatus('completed');
+      return;
+    }
+    await _submitDriverRating(context, ref, trip);
   }
 
   Future<void> _submitDriverRating(BuildContext context, WidgetRef ref, DriverTrip trip) async {
@@ -520,7 +692,7 @@ class _DriverDashboard extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final driverState = ref.watch(driverStateProvider);
     final tripAsync = ref.watch(offeredTripProvider);
     final trip = tripAsync.value;
@@ -574,7 +746,7 @@ class _DriverDashboard extends ConsumerWidget {
               children: [
                 Row(
                   children: [
-                    _GlassIconButton(icon: Icons.menu, onTap: onMenuTap),
+                    _GlassIconButton(icon: Icons.menu, onTap: widget.onMenuTap),
                     Expanded(
                       child: Center(
                         child: Text(
@@ -596,7 +768,7 @@ class _DriverDashboard extends ConsumerWidget {
                       ),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(18),
-                        onTap: onProfileTap,
+                        onTap: widget.onProfileTap,
                         child: const Icon(Icons.person, color: Color(0xFF000003)),
                       ),
                     ),
@@ -634,16 +806,14 @@ class _DriverDashboard extends ConsumerWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  driverState.available ? 'Disponible' : 'Fuera de linea',
+                                  driverState.available ? 'Buscando viaje' : 'Fuera de linea',
                                   style: GoogleFonts.plusJakartaSans(
                                     fontSize: 15,
                                     fontWeight: FontWeight.w800,
                                   ),
                                 ),
                                 Text(
-                                  driverState.lastLocationPing == null
-                                      ? 'Sin GPS enviado aun'
-                                      : 'Ultimo ping ${driverState.lastLocationPing}',
+                                  _statusChipLabel(driverState, trip),
                                   style: const TextStyle(
                                     color: Color(0xFF47464B),
                                     fontWeight: FontWeight.w700,
@@ -652,6 +822,17 @@ class _DriverDashboard extends ConsumerWidget {
                               ],
                             ),
                           ],
+                        ),
+                      ),
+                      FilledButton.tonalIcon(
+                        onPressed: () => _showStatusSheet(context, driverState, trip),
+                        icon: const Icon(Icons.tune_outlined),
+                        label: const Text('Estado'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.white.withValues(alpha: 0.86),
+                          foregroundColor: const Color(0xFF001F24),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
                         ),
                       ),
                       FilledButton.tonalIcon(
@@ -675,20 +856,41 @@ class _DriverDashboard extends ConsumerWidget {
         ),
         Positioned(
           right: 20,
-          bottom: 170,
-          child: _MapActionButton(
-            icon: Icons.local_activity_outlined,
-            onTap: () => _showOfferSheet(context, trip),
+          bottom: 236,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _MapActionButton(
+                icon: _sheetSize <= 0.08 ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                onTap: _toggleSheet,
+              ),
+              const SizedBox(height: 12),
+              _MapActionButton(
+                icon: Icons.tune_outlined,
+                onTap: () => _showStatusSheet(context, driverState, trip),
+              ),
+              const SizedBox(height: 12),
+              _MapActionButton(
+                icon: Icons.local_activity_outlined,
+                onTap: () => _showOfferSheet(context, trip),
+              ),
+            ],
           ),
         ),
-        DraggableScrollableSheet(
-          initialChildSize: 0.36,
-          minChildSize: 0.0,
-          maxChildSize: 0.82,
-          snap: true,
-          snapSizes: const [0.0, 0.22, 0.36, 0.60, 0.82],
-          builder: (context, scrollController) {
-            return DecoratedBox(
+        NotificationListener<DraggableScrollableNotification>(
+          onNotification: (notification) {
+            setState(() => _sheetSize = notification.extent);
+            return false;
+          },
+          child: DraggableScrollableSheet(
+            controller: _sheetController,
+            initialChildSize: 0.36,
+            minChildSize: 0.0,
+            maxChildSize: 0.82,
+            snap: true,
+            snapSizes: const [0.0, 0.22, 0.36, 0.60, 0.82],
+            builder: (context, scrollController) {
+              return DecoratedBox(
               decoration: const BoxDecoration(
                 color: Color(0xFFFEFEFF),
                 borderRadius: BorderRadius.vertical(top: Radius.circular(40)),
@@ -700,10 +902,10 @@ class _DriverDashboard extends ConsumerWidget {
                   ),
                 ],
               ),
-              child: ListView(
-                controller: scrollController,
-                padding: const EdgeInsets.fromLTRB(22, 10, 22, 120),
-                children: [
+                child: ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(22, 10, 22, 120),
+                  children: [
                   Center(
                     child: Container(
                       width: 52,
@@ -766,7 +968,7 @@ class _DriverDashboard extends ConsumerWidget {
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                driverState.available ? 'Buscando viajes' : 'Descansando',
+                                _statusChipLabel(driverState, trip),
                                 style: const TextStyle(
                                   color: Color(0xFF47464B),
                                   fontWeight: FontWeight.w700,
@@ -789,6 +991,40 @@ class _DriverDashboard extends ConsumerWidget {
                     ),
                     subtitle: const Text('Envia tu GPS cada 5 segundos y permite recibir viajes.'),
                   ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      FilledButton.tonalIcon(
+                        onPressed: () => _showStatusSheet(context, driverState, trip),
+                        icon: const Icon(Icons.tune_outlined),
+                        label: const Text('Ver estado'),
+                      ),
+                      FilledButton.tonalIcon(
+                        onPressed: () => _showOfferSheet(context, trip),
+                        icon: const Icon(Icons.local_activity_outlined),
+                        label: const Text('Ver ofertas'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      FilledButton.tonalIcon(
+                        onPressed: () => _showStatusSheet(context, driverState, trip),
+                        icon: const Icon(Icons.tune_outlined),
+                        label: const Text('Ver estado'),
+                      ),
+                      FilledButton.tonalIcon(
+                        onPressed: () => _showOfferSheet(context, trip),
+                        icon: const Icon(Icons.local_activity_outlined),
+                        label: const Text('Ver ofertas'),
+                      ),
+                    ],
+                  ),
                   if (driverState.errorMessage != null) ...[
                     const SizedBox(height: 12),
                     Container(
@@ -799,7 +1035,7 @@ class _DriverDashboard extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(18),
                       ),
                       child: Text(
-                        driverState.errorMessage!,
+                        driverState.errorMessage!.replaceFirst('Exception: ', ''),
                         style: const TextStyle(
                           color: Color(0xFF93000A),
                           fontWeight: FontWeight.w700,
@@ -858,21 +1094,7 @@ class _DriverDashboard extends ConsumerWidget {
                     height: 56,
                     child: FilledButton(
                       onPressed: session.loggedIn && driverState.available && trip != null
-                          ? () async {
-                              if (trip.status == 'requested' || trip.status == 'searching') {
-                                await ref.read(offeredTripProvider.notifier).acceptTrip();
-                              } else if (trip.status == 'accepted') {
-                                await ref.read(offeredTripProvider.notifier).updateTripStatus('arriving');
-                              } else if (trip.status == 'arriving') {
-                                await ref.read(offeredTripProvider.notifier).updateTripStatus('at_pickup');
-                              } else if (trip.status == 'at_pickup') {
-                                await ref.read(offeredTripProvider.notifier).updateTripStatus('in_progress');
-                              } else if (trip.status == 'in_progress') {
-                                await ref.read(offeredTripProvider.notifier).updateTripStatus('completed');
-                              } else if (trip.status == 'completed') {
-                                await _submitDriverRating(context, ref, trip);
-                              }
-                            }
+                          ? () => _handleDriverPrimaryAction(trip)
                           : null,
                       style: FilledButton.styleFrom(
                         backgroundColor: const Color(0xFF00E3FD),
@@ -885,10 +1107,11 @@ class _DriverDashboard extends ConsumerWidget {
                       ),
                     ),
                   ),
-                ],
-              ),
-            );
-          },
+                  ],
+                ),
+              );
+            },
+          ),
         ),
       ],
     );

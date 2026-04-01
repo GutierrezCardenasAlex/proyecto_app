@@ -1,6 +1,7 @@
 class DriverState {
   const DriverState({
     required this.available,
+    required this.backendStatus,
     required this.lastLocationPing,
     required this.lat,
     required this.lng,
@@ -9,6 +10,7 @@ class DriverState {
   });
 
   final bool available;
+  final String backendStatus;
   final DateTime? lastLocationPing;
   final double lat;
   final double lng;
@@ -17,6 +19,7 @@ class DriverState {
 
   DriverState copyWith({
     bool? available,
+    String? backendStatus,
     DateTime? lastLocationPing,
     double? lat,
     double? lng,
@@ -26,6 +29,7 @@ class DriverState {
   }) {
     return DriverState(
       available: available ?? this.available,
+      backendStatus: backendStatus ?? this.backendStatus,
       lastLocationPing: lastLocationPing ?? this.lastLocationPing,
       lat: lat ?? this.lat,
       lng: lng ?? this.lng,

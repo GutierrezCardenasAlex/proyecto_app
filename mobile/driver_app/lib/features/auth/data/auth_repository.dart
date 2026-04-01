@@ -373,6 +373,7 @@ class DriverSessionController extends Notifier<DriverSession> {
     await prefs.remove('driver_session_address');
     await prefs.remove('driver_session_token');
     await prefs.remove('driver_session_profile_completed');
+    await prefs.remove('driver_desired_availability');
 
     state = const DriverSession(
       userId: '',

@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/config/potosi_geo.dart';
@@ -20,6 +21,8 @@ final driverStateProvider = NotifierProvider<DriverStateController, DriverState>
 
 class DriverRepository {
   const DriverRepository();
+
+  static const _desiredAvailabilityKey = 'driver_desired_availability';
 
   bool _isInsidePotosi(double lat, double lng) {
     const earthRadiusKm = 6371.0;
@@ -55,6 +58,7 @@ class DriverRepository {
 
     return currentState.copyWith(
       available: available,
+      backendStatus: available ? 'available' : 'offline',
       clearError: true,
     );
   }
@@ -109,6 +113,44 @@ class DriverRepository {
     }
 
     return current;
+  }
+
+  Future<DriverSnapshot> fetchDriverSnapshot({
+    required String token,
+    required String driverId,
+  }) async {
+    final response = await http.get(
+      Uri.parse('${AppConfig.apiBaseUrl}/drivers/$driverId'),
+      headers: _headers(token),
+    );
+
+    if (response.statusCode >= 400) {
+      throw Exception('No se pudo consultar el estado del conductor (${response.statusCode})');
+    }
+
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    return DriverSnapshot(
+      isAvailable: payload['is_available'] == true,
+      status: payload['status']?.toString() ?? 'offline',
+    );
+  }
+
+  Future<void> persistDesiredAvailability(bool available) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_desiredAvailabilityKey, available);
+  }
+
+  Future<bool?> readDesiredAvailability() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!prefs.containsKey(_desiredAvailabilityKey)) {
+      return null;
+    }
+    return prefs.getBool(_desiredAvailabilityKey);
+  }
+
+  Future<void> clearDesiredAvailability() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_desiredAvailabilityKey);
   }
 
   Future<DriverState> sendLocation({
@@ -170,6 +212,7 @@ class DriverStateController extends Notifier<DriverState> {
     ref.onDispose(() => _gpsTimer?.cancel());
     return const DriverState(
       available: false,
+      backendStatus: 'offline',
       lastLocationPing: null,
       lat: -19.5842,
       lng: -65.7525,
@@ -226,6 +269,8 @@ class DriverStateController extends Notifier<DriverState> {
         _gpsTimer?.cancel();
       }
 
+      await _repository.persistDesiredAvailability(available);
+
       state = state.copyWith(isUpdatingAvailability: false, clearError: true);
     } catch (error) {
       state = state.copyWith(
@@ -238,6 +283,53 @@ class DriverStateController extends Notifier<DriverState> {
   Future<void> refreshLocation() async {
     try {
       await _sendLocation();
+    } catch (error) {
+      state = state.copyWith(errorMessage: error.toString());
+    }
+  }
+
+  Future<void> restoreOperationalState({bool force = false}) async {
+    final session = ref.read(driverSessionProvider);
+    if (!session.loggedIn || session.driverId.isEmpty || session.token.isEmpty) {
+      return;
+    }
+
+    try {
+      final snapshot = await _repository.fetchDriverSnapshot(
+        token: session.token,
+        driverId: session.driverId,
+      );
+      final desiredAvailability = await _repository.readDesiredAvailability();
+      final shouldBeAvailable = force
+          ? snapshot.isAvailable
+          : (desiredAvailability ?? snapshot.isAvailable);
+
+      state = state.copyWith(
+        available: shouldBeAvailable,
+        backendStatus: snapshot.status,
+        clearError: true,
+      );
+
+      if (snapshot.isAvailable != shouldBeAvailable) {
+        state = await _repository.updateAvailability(
+          token: session.token,
+          driverId: session.driverId,
+          available: shouldBeAvailable,
+          currentState: state,
+        );
+      }
+
+      await _repository.persistDesiredAvailability(shouldBeAvailable);
+
+      if (shouldBeAvailable) {
+        await _sendLocation();
+        _gpsTimer?.cancel();
+        _gpsTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+          await _sendLocation();
+        });
+      } else {
+        _gpsTimer?.cancel();
+      }
     } catch (error) {
       state = state.copyWith(errorMessage: error.toString());
     }
@@ -259,4 +351,14 @@ class DriverStateController extends Notifier<DriverState> {
           : null,
     );
   }
+}
+
+class DriverSnapshot {
+  const DriverSnapshot({
+    required this.isAvailable,
+    required this.status,
+  });
+
+  final bool isAvailable;
+  final String status;
 }

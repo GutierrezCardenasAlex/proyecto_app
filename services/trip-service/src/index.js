@@ -238,7 +238,7 @@ async function bootstrap() {
        LEFT JOIN vehicles v ON v.driver_id = t.driver_id
        LEFT JOIN latest_location ll ON ll.driver_id = t.driver_id
        WHERE t.passenger_id = $1
-         AND t.status IN ('accepted', 'arriving', 'at_pickup', 'in_progress')
+         AND t.status IN ('requested', 'searching', 'accepted', 'arriving', 'at_pickup', 'in_progress')
        ORDER BY t.updated_at DESC
        LIMIT 1`,
       [passengerId]
