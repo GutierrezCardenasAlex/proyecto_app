@@ -991,24 +991,6 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                     ),
                     subtitle: const Text('Envia tu GPS cada 5 segundos y permite recibir viajes.'),
                   ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      FilledButton.tonalIcon(
-                        onPressed: () => _showStatusSheet(context, driverState, trip),
-                        icon: const Icon(Icons.tune_outlined),
-                        label: const Text('Ver estado'),
-                      ),
-                      FilledButton.tonalIcon(
-                        onPressed: () => _showOfferSheet(context, trip),
-                        icon: const Icon(Icons.local_activity_outlined),
-                        label: const Text('Ver ofertas'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
                   Wrap(
                     spacing: 10,
                     runSpacing: 10,
@@ -1093,7 +1075,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                   SizedBox(
                     height: 56,
                     child: FilledButton(
-                      onPressed: session.loggedIn && driverState.available && trip != null
+                      onPressed: session.loggedIn && trip != null
                           ? () => _handleDriverPrimaryAction(trip)
                           : null,
                       style: FilledButton.styleFrom(
