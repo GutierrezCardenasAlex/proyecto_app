@@ -212,19 +212,13 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
     final pages = [
       _DriverDashboard(
         onMenuTap: () => _scaffoldKey.currentState?.openDrawer(),
-        onProfileTap: () => _openPage(
-          DriverProfilePage(phone: session.phone, fullName: session.fullName),
-          drawerItem: 'Configuraciones',
-        ),
+        onProfileTap: () => _openPage(const DriverProfilePage(), drawerItem: 'Configuraciones'),
       ),
       const _DriverTripsTab(),
       _DriverAccountTab(
         fullName: session.fullName,
         phone: session.phone,
-        onOpenProfile: () => _openPage(
-          DriverProfilePage(phone: session.phone, fullName: session.fullName),
-          drawerItem: 'Configuraciones',
-        ),
+        onOpenProfile: () => _openPage(const DriverProfilePage(), drawerItem: 'Configuraciones'),
         onOpenSecurity: () => _openPage(const DriverSecurityPage(), drawerItem: 'Seguridad'),
         onOpenSettings: () => _openPage(const DriverSettingsPage(), drawerItem: 'Configuraciones'),
         onOpenHelp: () => _openPage(const DriverHelpPage(), drawerItem: 'Centro de ayuda'),
@@ -241,10 +235,7 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
         onLogout: () => ref.read(driverSessionProvider.notifier).logout(),
         onOpenProfile: () {
           Navigator.pop(context);
-          _openPage(
-            DriverProfilePage(phone: session.phone, fullName: session.fullName),
-            drawerItem: 'Configuraciones',
-          );
+          _openPage(const DriverProfilePage(), drawerItem: 'Configuraciones');
         },
       ),
       backgroundColor: const Color(0xFFF9F9FB),
@@ -722,6 +713,9 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
               tripAccepted: trip?.status == 'accepted',
               driverLat: driverState.lat,
               driverLng: driverState.lng,
+              vehicleType: (trip?.vehicleType?.isNotEmpty ?? false)
+                  ? trip!.vehicleType!
+                  : session.vehicleType,
               tripStatus: trip?.status,
               pickupLat: trip?.pickupLat,
               pickupLng: trip?.pickupLng,

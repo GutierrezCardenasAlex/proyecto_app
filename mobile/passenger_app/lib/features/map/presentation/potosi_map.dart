@@ -2,6 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+class PotosiMapDriverMarker {
+  const PotosiMapDriverMarker({
+    required this.point,
+    this.vehicleType,
+  });
+
+  final LatLng point;
+  final String? vehicleType;
+}
+
 class PotosiMap extends StatelessWidget {
   const PotosiMap({
     super.key,
@@ -12,7 +22,7 @@ class PotosiMap extends StatelessWidget {
     this.showTargetMarker = true,
   });
 
-  final List<LatLng> drivers;
+  final List<PotosiMapDriverMarker> drivers;
   final LatLng userLocation;
   final LatLng? routeTarget;
   final bool showRoute;
@@ -82,7 +92,7 @@ class PotosiMap extends StatelessWidget {
               ),
             ...drivers.map(
               (driver) => Marker(
-                point: driver,
+                point: driver.point,
                 width: 46,
                 height: 46,
                 child: Container(
@@ -90,7 +100,11 @@ class PotosiMap extends StatelessWidget {
                     color: Color(0xFF000003),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.local_taxi, color: Color(0xFF00E3FD), size: 22),
+                  child: Icon(
+                    _vehicleIcon(driver.vehicleType),
+                    color: const Color(0xFF00E3FD),
+                    size: 22,
+                  ),
                 ),
               ),
             ),
@@ -98,5 +112,12 @@ class PotosiMap extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  IconData _vehicleIcon(String? vehicleType) {
+    return switch ((vehicleType ?? '').toLowerCase()) {
+      'moto' => Icons.two_wheeler_rounded,
+      _ => Icons.directions_car_filled_rounded,
+    };
   }
 }

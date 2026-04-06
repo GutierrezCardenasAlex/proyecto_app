@@ -19,6 +19,7 @@ class DriverAuthResult {
   const DriverAuthResult({
     required this.userId,
     required this.driverId,
+    required this.vehicleType,
     required this.phone,
     required this.fullName,
     required this.firstName,
@@ -31,6 +32,7 @@ class DriverAuthResult {
 
   final String userId;
   final String driverId;
+  final String vehicleType;
   final String phone;
   final String fullName;
   final String firstName;
@@ -41,8 +43,53 @@ class DriverAuthResult {
   final bool profileCompleted;
 }
 
+class DriverProfileDetails {
+  const DriverProfileDetails({
+    required this.licenseNumber,
+    required this.vehicleType,
+    required this.plate,
+    required this.brand,
+    required this.model,
+    required this.color,
+    required this.year,
+  });
+
+  final String licenseNumber;
+  final String vehicleType;
+  final String plate;
+  final String brand;
+  final String model;
+  final String color;
+  final int? year;
+}
+
 class DriverAuthRepository {
   const DriverAuthRepository();
+
+  Future<DriverProfileDetails> fetchDriverProfile({
+    required String token,
+    required String userId,
+  }) async {
+    final response = await http.get(
+      Uri.parse('${AppConfig.apiBaseUrl}/drivers/by-user/$userId'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+    await _throwIfError(response, fallbackMessage: 'No se pudo cargar el perfil del conductor');
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    final vehicle = payload['vehicle'] as Map<String, dynamic>? ?? const {};
+    return DriverProfileDetails(
+      licenseNumber: payload['license_number']?.toString() ?? payload['licenseNumber']?.toString() ?? '',
+      vehicleType: vehicle['vehicle_type']?.toString() ?? vehicle['type']?.toString() ?? 'taxi',
+      plate: vehicle['plate']?.toString() ?? '',
+      brand: vehicle['brand']?.toString() ?? '',
+      model: vehicle['model']?.toString() ?? '',
+      color: vehicle['color']?.toString() ?? '',
+      year: vehicle['year'] is num ? (vehicle['year'] as num).toInt() : int.tryParse(vehicle['year']?.toString() ?? ''),
+    );
+  }
 
   Future<void> requestRegistrationOtp(String phone, String firstName) async {
     final response = await http.post(
@@ -187,6 +234,7 @@ class DriverAuthRepository {
     return DriverAuthResult(
       userId: user['id']?.toString() ?? userId,
       driverId: driverId,
+      vehicleType: vehicleType,
       phone: user['phone']?.toString() ?? phone,
       fullName: user['fullName']?.toString() ?? '$firstName $lastName'.trim(),
       firstName: user['firstName']?.toString() ?? firstName,
@@ -236,10 +284,12 @@ class DriverAuthRepository {
 
     final ensurePayload = jsonDecode(ensureProfile.body) as Map<String, dynamic>;
     final driver = ensurePayload['driver'] as Map<String, dynamic>? ?? const {};
+    final vehicle = driver['vehicle'] as Map<String, dynamic>? ?? const {};
 
     return DriverAuthResult(
       userId: userId,
       driverId: driver['id']?.toString() ?? '',
+      vehicleType: vehicle['vehicle_type']?.toString() ?? vehicle['type']?.toString() ?? 'taxi',
       phone: user['phone']?.toString() ?? fallbackPhone,
       fullName: user['fullName']?.toString() ?? 'Conductor Taxi Ya',
       firstName: user['firstName']?.toString() ?? '',
@@ -261,6 +311,7 @@ class DriverSessionController extends Notifier<DriverSession> {
     final initial = const DriverSession(
       userId: '',
       driverId: '',
+      vehicleType: 'taxi',
       phone: '',
       fullName: 'Conductor Taxi Ya',
       firstName: '',
@@ -283,11 +334,12 @@ class DriverSessionController extends Notifier<DriverSession> {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       await _repository.requestRegistrationOtp(phone, firstName);
-      state = state.copyWith(
-        phone: phone,
-        firstName: firstName,
-        fullName: firstName,
-        otpRequested: true,
+    state = state.copyWith(
+      phone: phone,
+      firstName: firstName,
+      fullName: firstName,
+      vehicleType: state.vehicleType,
+      otpRequested: true,
         isLoading: false,
         clearError: true,
       );
@@ -365,6 +417,7 @@ class DriverSessionController extends Notifier<DriverSession> {
     await prefs.remove('driver_session_logged_in');
     await prefs.remove('driver_session_user_id');
     await prefs.remove('driver_session_driver_id');
+    await prefs.remove('driver_session_vehicle_type');
     await prefs.remove('driver_session_phone');
     await prefs.remove('driver_session_full_name');
     await prefs.remove('driver_session_first_name');
@@ -378,6 +431,7 @@ class DriverSessionController extends Notifier<DriverSession> {
     state = const DriverSession(
       userId: '',
       driverId: '',
+      vehicleType: 'taxi',
       phone: '',
       fullName: 'Conductor Taxi Ya',
       firstName: '',
@@ -405,6 +459,7 @@ class DriverSessionController extends Notifier<DriverSession> {
     await prefs.setBool('driver_session_logged_in', true);
     await prefs.setString('driver_session_user_id', result.userId);
     await prefs.setString('driver_session_driver_id', result.driverId);
+    await prefs.setString('driver_session_vehicle_type', result.vehicleType);
     await prefs.setString('driver_session_phone', result.phone);
     await prefs.setString('driver_session_full_name', result.fullName);
     await prefs.setString('driver_session_first_name', result.firstName);
@@ -417,6 +472,7 @@ class DriverSessionController extends Notifier<DriverSession> {
     state = state.copyWith(
       userId: result.userId,
       driverId: result.driverId,
+      vehicleType: result.vehicleType,
       phone: result.phone,
       fullName: result.fullName,
       firstName: result.firstName,
@@ -438,6 +494,7 @@ class DriverSessionController extends Notifier<DriverSession> {
     state = state.copyWith(
       userId: prefs.getString('driver_session_user_id') ?? '',
       driverId: prefs.getString('driver_session_driver_id') ?? '',
+      vehicleType: prefs.getString('driver_session_vehicle_type') ?? 'taxi',
       phone: prefs.getString('driver_session_phone') ?? '',
       fullName: prefs.getString('driver_session_full_name') ?? 'Conductor Taxi Ya',
       firstName: prefs.getString('driver_session_first_name') ?? '',

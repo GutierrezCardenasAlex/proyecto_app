@@ -2,6 +2,7 @@ class DriverSession {
   const DriverSession({
     required this.userId,
     required this.driverId,
+    required this.vehicleType,
     required this.phone,
     required this.fullName,
     required this.firstName,
@@ -19,6 +20,7 @@ class DriverSession {
 
   final String userId;
   final String driverId;
+  final String vehicleType;
   final String phone;
   final String fullName;
   final String firstName;
@@ -36,6 +38,7 @@ class DriverSession {
   DriverSession copyWith({
     String? userId,
     String? driverId,
+    String? vehicleType,
     String? phone,
     String? fullName,
     String? firstName,
@@ -54,6 +57,7 @@ class DriverSession {
     return DriverSession(
       userId: userId ?? this.userId,
       driverId: driverId ?? this.driverId,
+      vehicleType: vehicleType ?? this.vehicleType,
       phone: phone ?? this.phone,
       fullName: fullName ?? this.fullName,
       firstName: firstName ?? this.firstName,

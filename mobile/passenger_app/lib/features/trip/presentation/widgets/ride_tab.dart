@@ -471,10 +471,19 @@ class _RideTabState extends ConsumerState<RideTab> {
             : null;
     final driverPoints = hasActiveTrip
         ? [
-            activeDriverPoint,
-          ].whereType<LatLng>().toList(growable: false)
+            if (activeDriverPoint != null)
+              PotosiMapDriverMarker(
+                point: activeDriverPoint,
+                vehicleType: tripState.request.vehicleType,
+              ),
+          ]
         : tripState.nearbyDrivers
-              .map((driver) => LatLng(driver.lat, driver.lng))
+              .map(
+                (driver) => PotosiMapDriverMarker(
+                  point: LatLng(driver.lat, driver.lng),
+                  vehicleType: driver.vehicleType,
+                ),
+              )
               .toList(growable: false);
 
     return Stack(

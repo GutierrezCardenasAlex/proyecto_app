@@ -92,6 +92,7 @@ function App() {
     const raw = localStorage.getItem('admin_profile')
     return raw ? (JSON.parse(raw) as AdminProfile) : null
   })
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null)
 
   const isAuthenticated = token.length > 0
 
@@ -121,6 +122,7 @@ function App() {
     setTrips(tripsResponse)
     setPendingDevices(pendingResponse)
     setAllDevices(devicesResponse)
+    setLastUpdatedAt(new Date().toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
   }
 
   async function requestOtp() {
@@ -287,7 +289,27 @@ function App() {
       )
     })
 
+    const intervalId = window.setInterval(() => {
+      loadCentralData().catch(() => {
+        setError('No se pudo actualizar la central automaticamente.')
+      })
+    }, 8000)
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        loadCentralData().catch(() => {
+          setError('No se pudo recargar la central al volver a la pantalla.')
+        })
+      }
+    }
+
+    window.addEventListener('focus', handleVisibility)
+    document.addEventListener('visibilitychange', handleVisibility)
+
     return () => {
+      window.clearInterval(intervalId)
+      window.removeEventListener('focus', handleVisibility)
+      document.removeEventListener('visibilitychange', handleVisibility)
       socket.close()
     }
   }, [authHeaders, isAuthenticated, token])
@@ -407,11 +429,23 @@ function App() {
       <section className="toolbar">
         <div>
           <strong>{adminProfile?.fullName ?? 'Central'}</strong>
-          <span>{adminProfile?.phone}</span>
+          <span>
+            {adminProfile?.phone}
+            {lastUpdatedAt ? ` · Actualizado ${lastUpdatedAt}` : ''}
+          </span>
         </div>
-        <button className="secondary-button" onClick={logout}>
-          Cerrar sesion
-        </button>
+        <div className="action-row compact">
+          <button
+            className="secondary-button"
+            disabled={loading}
+            onClick={() => loadCentralData().catch(() => setError('No se pudo actualizar la central.'))}
+          >
+            {loading ? 'Actualizando...' : 'Actualizar ahora'}
+          </button>
+          <button className="secondary-button" onClick={logout}>
+            Cerrar sesion
+          </button>
+        </div>
       </section>
 
       {error && <div className="error-box">{error}</div>}

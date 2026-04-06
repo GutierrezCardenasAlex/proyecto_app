@@ -9,6 +9,7 @@ class DriverMap extends StatelessWidget {
     required this.tripAccepted,
     required this.driverLat,
     required this.driverLng,
+    required this.vehicleType,
     this.tripStatus,
     this.pickupLat,
     this.pickupLng,
@@ -18,6 +19,7 @@ class DriverMap extends StatelessWidget {
   final bool tripAccepted;
   final double driverLat;
   final double driverLng;
+  final String vehicleType;
   final String? tripStatus;
   final double? pickupLat;
   final double? pickupLng;
@@ -73,7 +75,7 @@ class DriverMap extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  Icons.local_taxi,
+                  _vehicleIcon(vehicleType),
                   color: available ? const Color(0xFF00E3FD) : Colors.white,
                 ),
               ),
@@ -89,5 +91,11 @@ class DriverMap extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  IconData _vehicleIcon(String type) {
+    return type.toLowerCase() == 'moto'
+        ? Icons.two_wheeler_rounded
+        : Icons.directions_car_filled_rounded;
   }
 }
