@@ -14,9 +14,9 @@ class DriverLoginCard extends ConsumerStatefulWidget {
 }
 
 class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
-  final _firstNameController = TextEditingController(text: 'Juan');
-  final _phoneController = TextEditingController(text: '71111111');
-  final _otpController = TextEditingController(text: '123456');
+  final _firstNameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _otpController = TextEditingController();
   final _passwordController = TextEditingController();
   _DriverAuthMode _mode = _DriverAuthMode.login;
 
@@ -82,13 +82,11 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
                     if (otpRequested) ...[
                       _StyledField(
                         controller: otpController,
-                        hintText: 'Codigo OTP',
                         icon: Icons.sms_outlined,
                       ),
                       const SizedBox(height: 12),
                       _StyledField(
                         controller: newPasswordController,
-                        hintText: 'Nueva contrasena',
                         icon: Icons.lock_outline_rounded,
                         obscureText: true,
                       ),
@@ -228,7 +226,6 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
             const SizedBox(height: 8),
             _StyledField(
               controller: _passwordController,
-              hintText: 'Tu contrasena',
               icon: Icons.lock_outline_rounded,
               obscureText: true,
             ),
@@ -273,7 +270,6 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
             const SizedBox(height: 8),
             _StyledField(
               controller: _firstNameController,
-              hintText: 'Ej. Juan',
               icon: Icons.badge_outlined,
             ),
             const SizedBox(height: 18),
@@ -314,7 +310,6 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
             const SizedBox(height: 8),
             _StyledField(
               controller: _otpController,
-              hintText: '123456',
               icon: Icons.sms_outlined,
             ),
             const SizedBox(height: 18),
@@ -322,7 +317,6 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
             const SizedBox(height: 8),
             _StyledField(
               controller: _passwordController,
-              hintText: 'Minimo 8 caracteres',
               icon: Icons.lock_outline_rounded,
               obscureText: true,
             ),
@@ -416,13 +410,11 @@ class _LabelText extends StatelessWidget {
 class _StyledField extends StatelessWidget {
   const _StyledField({
     required this.controller,
-    required this.hintText,
     required this.icon,
     this.obscureText = false,
   });
 
   final TextEditingController controller;
-  final String hintText;
   final IconData icon;
   final bool obscureText;
 
@@ -432,7 +424,6 @@ class _StyledField extends StatelessWidget {
       controller: controller,
       obscureText: obscureText,
       decoration: InputDecoration(
-        hintText: hintText,
         prefixIcon: Icon(icon, color: const Color(0xFF77767C)),
         filled: true,
         fillColor: Colors.white.withValues(alpha: 0.55),
@@ -465,7 +456,6 @@ class _PhoneField extends StatelessWidget {
       controller: controller,
       keyboardType: TextInputType.phone,
       decoration: InputDecoration(
-        hintText: '71111111',
         prefixIcon: const Padding(
           padding: EdgeInsets.symmetric(horizontal: 14, vertical: 16),
           child: Text(

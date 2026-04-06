@@ -576,6 +576,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
     }
 
     return switch (trip.status) {
+      'searching' => 'Aceptar viaje',
       'accepted' => 'Ir a recoger',
       'arriving' => 'Llegue a la ubicacion',
       'at_pickup' => 'Iniciar viaje',
@@ -599,12 +600,19 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
     return driverState.available ? 'Buscando viaje' : 'Desconectado';
   }
 
+  IconData _tripVehicleIcon(DriverTrip? trip) {
+    return switch ((trip?.vehicleType ?? '').toLowerCase()) {
+      'moto' => Icons.two_wheeler_rounded,
+      _ => Icons.directions_car_filled_rounded,
+    };
+  }
+
   Future<void> _handleDriverPrimaryAction(DriverTrip? trip) async {
     if (trip == null) {
       return;
     }
 
-    if (trip.status == 'requested') {
+    if (trip.status == 'requested' || trip.status == 'searching') {
       await ref.read(offeredTripProvider.notifier).acceptTrip();
       return;
     }
@@ -1063,6 +1071,28 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF3F3F5),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Icon(_tripVehicleIcon(trip), color: const Color(0xFF006875)),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                (trip.vehicleType ?? 'taxi').toUpperCase(),
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
                           _InfoTile(label: 'Viaje', value: trip.id),
                           _InfoTile(label: 'Recojo', value: trip.passengerPickup),
                           _InfoTile(label: 'Destino', value: trip.destination),

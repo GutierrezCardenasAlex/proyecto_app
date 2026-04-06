@@ -9,6 +9,7 @@ class DriverTrip {
     required this.destinationLat,
     required this.destinationLng,
     required this.fareAmount,
+    this.vehicleType,
   });
 
   final String id;
@@ -20,6 +21,7 @@ class DriverTrip {
   final double destinationLat;
   final double destinationLng;
   final double fareAmount;
+  final String? vehicleType;
 
   DriverTrip copyWith({
     String? id,
@@ -31,6 +33,7 @@ class DriverTrip {
     double? destinationLat,
     double? destinationLng,
     double? fareAmount,
+    String? vehicleType,
   }) {
     return DriverTrip(
       id: id ?? this.id,
@@ -42,6 +45,7 @@ class DriverTrip {
       destinationLat: destinationLat ?? this.destinationLat,
       destinationLng: destinationLng ?? this.destinationLng,
       fareAmount: fareAmount ?? this.fareAmount,
+      vehicleType: vehicleType ?? this.vehicleType,
     );
   }
 }

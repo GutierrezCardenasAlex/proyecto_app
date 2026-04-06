@@ -10,6 +10,7 @@ class TripRequest {
     this.destinationLng,
     this.driverLat,
     this.driverLng,
+    this.vehicleType,
     this.vehicleLabel,
     this.vehiclePlate,
     this.etaMinutes,
@@ -25,6 +26,7 @@ class TripRequest {
   final double? destinationLng;
   final double? driverLat;
   final double? driverLng;
+  final String? vehicleType;
   final String? vehicleLabel;
   final String? vehiclePlate;
   final int? etaMinutes;
@@ -40,6 +42,7 @@ class TripRequest {
     double? destinationLng,
     double? driverLat,
     double? driverLng,
+    String? vehicleType,
     String? vehicleLabel,
     String? vehiclePlate,
     int? etaMinutes,
@@ -56,6 +59,7 @@ class TripRequest {
       destinationLng: destinationLng ?? this.destinationLng,
       driverLat: driverLat ?? this.driverLat,
       driverLng: driverLng ?? this.driverLng,
+      vehicleType: vehicleType ?? this.vehicleType,
       vehicleLabel: vehicleLabel ?? this.vehicleLabel,
       vehiclePlate: vehiclePlate ?? this.vehiclePlate,
       etaMinutes: etaMinutes ?? this.etaMinutes,
@@ -87,6 +91,7 @@ class NearbyDriver {
     required this.distanceMeters,
     required this.rating,
     required this.etaMinutes,
+    required this.vehicleType,
     required this.vehicleLabel,
     required this.vehicleDetail,
     required this.priceLabel,
@@ -98,6 +103,7 @@ class NearbyDriver {
   final double distanceMeters;
   final double rating;
   final int etaMinutes;
+  final String vehicleType;
   final String vehicleLabel;
   final String vehicleDetail;
   final String priceLabel;

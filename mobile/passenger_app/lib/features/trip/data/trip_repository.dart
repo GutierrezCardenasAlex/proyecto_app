@@ -74,6 +74,7 @@ class TripRepository {
       destinationLng: _toNullableDouble(payload['destination_lng']),
       driverLat: _toNullableDouble(payload['driver_lat']),
       driverLng: _toNullableDouble(payload['driver_lng']),
+      vehicleType: payload['vehicle_type']?.toString(),
       vehicleLabel: _joinVehicleLabel(payload['vehicle_brand'], payload['vehicle_model']),
       vehiclePlate: payload['vehicle_plate']?.toString(),
       etaMinutes: _toNullableInt(payload['eta_minutes']),
@@ -127,6 +128,7 @@ class TripRepository {
         distanceMeters: distanceMeters,
         rating: _toDouble(driver['rating'], fallback: 5),
         etaMinutes: (driver['eta_minutes'] as num?)?.toInt() ?? max(2, (distanceMeters / 350).round()),
+        vehicleType: _stringValue(driver['vehicle_type'], fallback: _guessVehicleType('$brand $model')),
         vehicleLabel: '$brand $model',
         vehicleDetail: '$color · $plate',
         priceLabel: 'Bs ${(8 + distanceMeters / 300).toStringAsFixed(0)}',
@@ -207,6 +209,7 @@ class TripRepository {
       destinationLng: _toNullableDouble(payload['destination_lng']),
       driverLat: _toNullableDouble(payload['driver_lat']),
       driverLng: _toNullableDouble(payload['driver_lng']),
+      vehicleType: payload['vehicle_type']?.toString(),
       vehicleLabel: _joinVehicleLabel(payload['vehicle_brand'], payload['vehicle_model']),
       vehiclePlate: payload['vehicle_plate']?.toString(),
       etaMinutes: _toNullableInt(payload['eta_minutes']),
@@ -286,6 +289,14 @@ class TripRepository {
     final modelText = model?.toString().trim() ?? '';
     final value = '$brandText $modelText'.trim();
     return value.isEmpty ? null : value;
+  }
+
+  static String _guessVehicleType(String raw) {
+    final normalized = raw.toLowerCase();
+    if (normalized.contains('moto')) {
+      return 'moto';
+    }
+    return 'taxi';
   }
 }
 

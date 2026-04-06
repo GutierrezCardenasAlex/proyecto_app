@@ -233,9 +233,16 @@ async function bootstrap() {
         [deviceId, adminId]
       );
 
+      await client.query(
+        `DELETE FROM user_devices
+         WHERE user_id = $1
+           AND id <> $2`,
+        [target.user_id, deviceId]
+      );
+
       await client.query("COMMIT");
       return {
-        message: "Equipo reemplazado y autorizado por central",
+        message: "Equipo nuevo autorizado y registros anteriores eliminados por central",
         device: updatedResult.rows[0]
       };
     } catch (error) {

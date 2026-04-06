@@ -78,6 +78,7 @@ async function bootstrap() {
        )
        SELECT d.id AS driver_id,
               d.rating,
+              v.vehicle_type,
               v.brand,
               v.model,
               v.color,
@@ -114,6 +115,7 @@ async function bootstrap() {
         driverId: candidate.driver_id,
         distanceMeters: Number(candidate.distance_meters),
         vehicle: {
+          type: candidate.vehicle_type,
           brand: candidate.brand,
           model: candidate.model,
           color: candidate.color,
@@ -125,6 +127,7 @@ async function bootstrap() {
         driverId: candidate.driver_id,
         distanceMeters: Number(candidate.distance_meters),
         vehicle: {
+          type: candidate.vehicle_type,
           brand: candidate.brand,
           model: candidate.model,
           color: candidate.color,
@@ -183,6 +186,7 @@ async function bootstrap() {
        )
        SELECT d.id AS driver_id,
               d.rating,
+              v.vehicle_type,
               v.brand,
               v.model,
               v.color,

@@ -45,6 +45,7 @@ class DriverTripRepository {
       destinationLat: _toDouble(item['destination_lat']),
       destinationLng: _toDouble(item['destination_lng']),
       fareAmount: _toDouble(item['fare_amount']),
+      vehicleType: item['vehicle_type']?.toString(),
     );
   }
 
@@ -83,6 +84,7 @@ class DriverTripRepository {
       destinationLat: _toDouble(item['destination_lat']),
       destinationLng: _toDouble(item['destination_lng']),
       fareAmount: _toDouble(item['fare_amount']),
+      vehicleType: item['vehicle_type']?.toString(),
     );
   }
 

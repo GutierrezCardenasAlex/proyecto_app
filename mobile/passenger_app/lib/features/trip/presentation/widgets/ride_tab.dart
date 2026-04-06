@@ -908,13 +908,6 @@ class _RideTabState extends ConsumerState<RideTab> {
         _EmptyRideCard(),
       ];
     }
-
-    const icons = [
-      Icons.electric_car,
-      Icons.directions_car,
-      Icons.local_taxi,
-      Icons.airport_shuttle,
-    ];
     const names = ['Taxi Eco', 'Taxi Plus', 'Taxi Ejecutivo', 'Taxi Max'];
 
     return List<Widget>.generate(drivers.length, (index) {
@@ -929,12 +922,19 @@ class _RideTabState extends ConsumerState<RideTab> {
           price: driver.priceLabel,
           rating: driver.rating.toStringAsFixed(1),
           distance: '${(driver.distanceMeters / 1000).toStringAsFixed(1)} km',
-          icon: icons[index % icons.length],
+          icon: _vehicleIcon(driver.vehicleType),
           highlighted: isSelected,
           onTap: () => _selectDriver(driver.driverId),
         ),
       );
     });
+  }
+
+  IconData _vehicleIcon(String? vehicleType) {
+    return switch ((vehicleType ?? '').toLowerCase()) {
+      'moto' => Icons.two_wheeler_rounded,
+      _ => Icons.directions_car_filled_rounded,
+    };
   }
 }
 
@@ -1258,7 +1258,12 @@ class _LargeTripStatusCard extends StatelessWidget {
                 if (etaMinutes != null && const {'accepted', 'arriving'}.contains(status))
                   _TripBadge(icon: Icons.schedule, label: 'Llega en $etaMinutes min'),
                 if ((vehicleLabel ?? '').isNotEmpty)
-                  _TripBadge(icon: Icons.local_taxi, label: vehicleLabel!),
+                  _TripBadge(
+                    icon: (vehicleLabel ?? '').toLowerCase().contains('moto')
+                        ? Icons.two_wheeler_rounded
+                        : Icons.directions_car_filled_rounded,
+                    label: vehicleLabel!,
+                  ),
                 if ((vehiclePlate ?? '').isNotEmpty)
                   _TripBadge(icon: Icons.badge_outlined, label: 'Placa $vehiclePlate'),
               ],
