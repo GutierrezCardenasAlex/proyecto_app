@@ -134,7 +134,7 @@ async function sendOtpSms({ phone, otp, contextLabel }) {
   if (!response.ok) {
     const errorText = await response.text();
     app.log.error({ phone, contextLabel, errorText }, "Twilio SMS delivery failed");
-    throw new Error("No se pudo enviar el SMS de verificacion.");
+    return false;
   }
 
   return true;
