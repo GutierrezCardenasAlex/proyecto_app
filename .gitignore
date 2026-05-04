@@ -16,3 +16,4 @@ mobile/passenger_app/.dart_tool/
 mobile/passenger_app/build/
 mobile/driver_app/.dart_tool/
 mobile/driver_app/build/
+.claude/

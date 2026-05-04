@@ -14,6 +14,8 @@ const redis = new Redis(process.env.REDIS_URL);
 
 const phoneRegex = /^\+591\d{8}$/;
 const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
+const smsProvider = (process.env.SMS_PROVIDER || "").toLowerCase();
+const exposeOtpInResponse = String(process.env.AUTH_EXPOSE_OTP || "true").toLowerCase() === "true";
 
 const registerRequestSchema = z.object({
   phone: z.string().min(8),
@@ -93,6 +95,49 @@ function assertValidPassword(password) {
 function getFullName(firstName, lastName, fallback) {
   const merged = [firstName, lastName].filter(Boolean).join(" ").trim();
   return merged || fallback || null;
+}
+
+function generateOtp() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+async function sendOtpSms({ phone, otp, contextLabel }) {
+  if (smsProvider !== "twilio") {
+    app.log.warn({ phone, contextLabel }, "SMS provider not configured. OTP delivery fallback active.");
+    return false;
+  }
+
+  const accountSid = process.env.SMS_TWILIO_ACCOUNT_SID;
+  const authToken = process.env.SMS_TWILIO_AUTH_TOKEN;
+  const from = process.env.SMS_TWILIO_FROM;
+
+  if (!accountSid || !authToken || !from) {
+    app.log.warn({ phone, contextLabel }, "Twilio credentials missing. OTP delivery fallback active.");
+    return false;
+  }
+
+  const body = new URLSearchParams({
+    To: phone,
+    From: from,
+    Body: `Taxi Ya: tu codigo de verificacion es ${otp}. No lo compartas con nadie.`,
+  });
+
+  const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString("base64")}`,
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    app.log.error({ phone, contextLabel, errorText }, "Twilio SMS delivery failed");
+    throw new Error("No se pudo enviar el SMS de verificacion.");
+  }
+
+  return true;
 }
 
 function mapUser(user) {
@@ -295,7 +340,7 @@ async function bootstrap() {
       return reply.code(409).send({ message: "El usuario ya existe. Inicia sesion con tu contrasena." });
     }
 
-    const otp = "123456";
+    const otp = generateOtp();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
     const result = await pool.query(
       `INSERT INTO users (phone, role, full_name, first_name, otp_code, otp_expires_at, profile_completed)
@@ -318,9 +363,12 @@ async function bootstrap() {
       userId: result.rows[0].id
     });
 
+    const smsDelivered = await sendOtpSms({ phone, otp, contextLabel: "register" });
+
     reply.send({
       message: "OTP generado",
-      otp,
+      smsDelivered,
+      otp: exposeOtpInResponse && !smsDelivered ? otp : undefined,
       expiresAt,
       user: result.rows[0]
     });
@@ -461,7 +509,7 @@ async function bootstrap() {
       return reply.code(404).send({ message: "El usuario no existe." });
     }
 
-    const otp = "123456";
+    const otp = generateOtp();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
     await pool.query(
       `UPDATE users
@@ -473,9 +521,12 @@ async function bootstrap() {
     );
     await redis.set(`otp:${phone}`, otp, "EX", 300);
 
+    const smsDelivered = await sendOtpSms({ phone, otp, contextLabel: "password-reset" });
+
     reply.send({
       message: "OTP de recuperacion generado",
-      otp,
+      smsDelivered,
+      otp: exposeOtpInResponse && !smsDelivered ? otp : undefined,
       expiresAt
     });
   });
@@ -557,7 +608,7 @@ async function bootstrap() {
     const phone = normalizePhone(parsed.phone);
     assertValidPhone(phone);
 
-    const otp = "123456";
+    const otp = generateOtp();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
     const adminResult = await pool.query(
       `UPDATE admin_accounts
@@ -574,9 +625,12 @@ async function bootstrap() {
     }
 
     await redis.set(`admin-otp:${phone}`, otp, "EX", 300);
+    const smsDelivered = await sendOtpSms({ phone, otp, contextLabel: "admin-login" });
+
     reply.send({
       message: "OTP generado",
-      otp,
+      smsDelivered,
+      otp: exposeOtpInResponse && !smsDelivered ? otp : undefined,
       expiresAt
     });
   });

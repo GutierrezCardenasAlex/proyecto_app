@@ -67,6 +67,11 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://taxiya:taxiya@rabbitmq:5672}
       JWT_SECRET: ${JWT_SECRET:-super-secret}
+      SMS_PROVIDER: ${SMS_PROVIDER:-}
+      SMS_TWILIO_ACCOUNT_SID: ${SMS_TWILIO_ACCOUNT_SID:-}
+      SMS_TWILIO_AUTH_TOKEN: ${SMS_TWILIO_AUTH_TOKEN:-}
+      SMS_TWILIO_FROM: ${SMS_TWILIO_FROM:-}
+      AUTH_EXPOSE_OTP: ${AUTH_EXPOSE_OTP:-true}
     depends_on:
       postgres:
         condition: service_healthy
