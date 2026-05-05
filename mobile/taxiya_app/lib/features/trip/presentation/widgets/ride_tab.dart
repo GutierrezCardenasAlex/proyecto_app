@@ -133,7 +133,7 @@ class _RideTabState extends ConsumerState<RideTab> {
         location,
         LatLng(lat, lng),
       );
-      if (distanceMeters > 15000) {
+      if (distanceMeters > 50000) {
         return;
       }
 
@@ -239,7 +239,7 @@ class _RideTabState extends ConsumerState<RideTab> {
     return activeTripId != null && activeTripId.isNotEmpty;
   }
 
-  void _selectNearestTaxi() {
+  Future<void> _selectNearestTaxi() async {
     final drivers = _requestableDrivers(ref.read(tripProvider).nearbyDrivers);
     if (drivers.isEmpty) {
       _showMessage('No hay taxis cercanos disponibles en este momento.');
@@ -248,9 +248,7 @@ class _RideTabState extends ConsumerState<RideTab> {
 
     final nearest = drivers.first;
     setState(() => _selectedDriverId = nearest.driverId);
-    _showFloatingNotification(
-      '${nearest.vehicleLabel} fue seleccionado. Llega en ${nearest.etaMinutes} min.',
-    );
+    await _requestRide();
   }
 
   void _selectDriver(String driverId) {
@@ -483,7 +481,7 @@ class _RideTabState extends ConsumerState<RideTab> {
   }
 
   List<NearbyDriver> _requestableDrivers(List<NearbyDriver> drivers) {
-    return drivers.where((driver) => driver.distanceMeters <= 3000).toList(growable: false);
+    return drivers.where((driver) => driver.distanceMeters <= 100).toList(growable: false);
   }
 
   NearbyDriver? _findDriverById(List<NearbyDriver> drivers, String? driverId) {

@@ -62,7 +62,7 @@ async function bootstrap() {
 
   app.post("/search", async (request) => {
     const { tripId, pickupLat, pickupLng, dispatchMode, preferredDriverId } = searchSchema.parse(request.body);
-    const radiusMeters = preferredDriverId ? 3000 : dispatchMode === "nearby" ? 3000 : null;
+    const radiusMeters = dispatchMode === "nearby" ? 100 : null;
     const limit = preferredDriverId ? 1 : dispatchMode === "nearby" ? 8 : 1000;
     await pool.query(
       `UPDATE trips
