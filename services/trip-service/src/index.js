@@ -25,6 +25,7 @@ const tripSchema = z.object({
   estimatedDistanceMeters: z.number().int().positive(),
   estimatedDurationSeconds: z.number().int().positive(),
   fareAmount: z.number().positive(),
+  dispatchMode: z.enum(["broadcast", "nearby"]).default("broadcast"),
   preferredDriverId: z.string().uuid().optional()
 });
 
@@ -182,6 +183,7 @@ async function bootstrap() {
         tripId: trip.id,
         pickupLat: input.pickupLat,
         pickupLng: input.pickupLng,
+        dispatchMode: input.dispatchMode,
         preferredDriverId: input.preferredDriverId
       });
     } catch (error) {
@@ -202,6 +204,30 @@ async function bootstrap() {
       [passengerId]
     );
     return result.rows;
+  });
+
+  app.get("/history/driver/:driverId", async (request) => {
+    const { driverId } = request.params;
+    const result = await pool.query(
+      `SELECT t.*,
+              ST_Y(t.pickup_location::geometry) AS pickup_lat,
+              ST_X(t.pickup_location::geometry) AS pickup_lng,
+              ST_Y(t.destination_location::geometry) AS destination_lat,
+              ST_X(t.destination_location::geometry) AS destination_lng,
+              v.vehicle_type,
+              v.brand AS vehicle_brand,
+              v.model AS vehicle_model,
+              v.color AS vehicle_color,
+              v.plate AS vehicle_plate
+       FROM trips t
+       LEFT JOIN vehicles v ON v.driver_id = t.driver_id
+       WHERE t.driver_id = $1
+       ORDER BY COALESCE(t.completed_at, t.cancelled_at, t.updated_at, t.requested_at) DESC
+       LIMIT 50`,
+      [driverId]
+    );
+
+    return result.rows.map(mapTrip);
   });
 
   app.get("/active/passenger/:passengerId", async (request) => {

@@ -246,7 +246,7 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Taxi Ya Driver',
+            'Flash Go Driver',
             style: GoogleFonts.plusJakartaSans(
               fontSize: 16,
               fontWeight: FontWeight.w900,
@@ -346,7 +346,7 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
                                 },
                           style: FilledButton.styleFrom(
                             backgroundColor: const Color(0xFFC2410C),
-                            foregroundColor: Colors.white,
+                            foregroundColor: const Color(0xFFFFF4EC),
                             minimumSize: const Size.fromHeight(62),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
                           ),
@@ -420,7 +420,7 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
                                     },
                               style: FilledButton.styleFrom(
                                 backgroundColor: const Color(0xFFC2410C),
-                                foregroundColor: Colors.white,
+                                foregroundColor: const Color(0xFFFFF4EC),
                                 minimumSize: const Size.fromHeight(62),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
                               ),
@@ -462,7 +462,7 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
                           const SizedBox(height: 10),
                           Text(
                             'Codigo enviado a ${_normalizedPhone()}',
-                            style: const TextStyle(color: Color(0xFF47464B), fontWeight: FontWeight.w600),
+                            style: const TextStyle(color: Color(0xFFFFC89B), fontWeight: FontWeight.w600),
                           ),
                           const SizedBox(height: 18),
                           Row(
@@ -505,7 +505,7 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
                                         },
                                   style: FilledButton.styleFrom(
                                     backgroundColor: const Color(0xFFF97316),
-                                    foregroundColor: const Color(0xFF0F0F10),
+                                    foregroundColor: const Color(0xFFFFF4EC),
                                     minimumSize: const Size.fromHeight(54),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
                                   ),
@@ -564,7 +564,7 @@ class _LabelText extends StatelessWidget {
       text.toUpperCase(),
       style: const TextStyle(
         fontSize: 11,
-        color: Color(0xFF77767C),
+        color: Color(0xFFFFDCC1),
         fontWeight: FontWeight.w800,
         letterSpacing: 1.3,
       ),
@@ -649,7 +649,7 @@ class _FieldHint extends StatelessWidget {
     return Text(
       text,
       style: const TextStyle(
-        color: Color(0xFF77767C),
+        color: Color(0xFFFFDCC1),
         fontSize: 13,
         fontWeight: FontWeight.w600,
         height: 1.35,
@@ -694,7 +694,9 @@ class _StyledField extends StatelessWidget {
           borderSide: const BorderSide(color: Color(0xFFF97316), width: 1.4),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+        helperStyle: const TextStyle(color: Color(0xFFFFC89B)),
       ),
+      style: const TextStyle(color: Color(0xFFFFF4EC)),
     );
   }
 }
@@ -741,7 +743,9 @@ class _PhoneField extends StatelessWidget {
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
         helperText: helperText,
+        helperStyle: const TextStyle(color: Color(0xFFFFC89B)),
       ),
+      style: const TextStyle(color: Color(0xFFFFF4EC)),
     );
   }
 }
@@ -768,7 +772,7 @@ class _OtpFallbackCard extends StatelessWidget {
             'Codigo de respaldo',
             style: GoogleFonts.plusJakartaSans(
               fontWeight: FontWeight.w800,
-              color: const Color(0xFF0F0F10),
+              color: const Color(0xFFFFF4EC),
             ),
           ),
           const SizedBox(height: 6),
@@ -778,14 +782,14 @@ class _OtpFallbackCard extends StatelessWidget {
               fontSize: 24,
               fontWeight: FontWeight.w900,
               letterSpacing: 2,
-              color: const Color(0xFFC2410C),
+              color: const Color(0xFFFFF4EC),
             ),
           ),
           const SizedBox(height: 6),
           const Text(
             'Usa este codigo si el SMS no llego. Ya lo dejamos escrito en el campo OTP.',
             style: TextStyle(
-              color: Color(0xFF6F3A12),
+              color: Color(0xFFFFDCC1),
               fontWeight: FontWeight.w600,
             ),
           ),

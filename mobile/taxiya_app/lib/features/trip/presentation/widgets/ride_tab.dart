@@ -87,6 +87,7 @@ class _RideTabState extends ConsumerState<RideTab> {
           .build(),
     );
     _socket?.onConnect((_) {
+      _socket?.emit('join:drivers_live');
       final tripId = ref.read(tripProvider).request.activeTripId;
       if (tripId != null && tripId.isNotEmpty) {
         _joinTripRoom(tripId);
@@ -112,6 +113,44 @@ class _RideTabState extends ConsumerState<RideTab> {
       if (tripId != null && status != null && tripId.isNotEmpty && status.isNotEmpty) {
         ref.read(tripProvider.notifier).markTripAccepted(tripId: tripId, status: status);
       }
+    });
+    _socket?.on('driver:location', (data) {
+      final map = data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+      final location = ref.read(passengerLocationProvider).position;
+      if (location == null) {
+        return;
+      }
+      final driverId = map['driverId']?.toString() ?? '';
+      final lat = double.tryParse(map['lat']?.toString() ?? '');
+      final lng = double.tryParse(map['lng']?.toString() ?? '');
+      if (driverId.isEmpty || lat == null || lng == null) {
+        return;
+      }
+
+      final current = _findDriverById(ref.read(tripProvider).nearbyDrivers, driverId);
+      final distanceMeters = const Distance().as(
+        LengthUnit.Meter,
+        location,
+        LatLng(lat, lng),
+      );
+      if (distanceMeters > 15000) {
+        return;
+      }
+
+      ref.read(tripProvider.notifier).upsertLiveDriver(
+            NearbyDriver(
+              driverId: driverId,
+              lat: lat,
+              lng: lng,
+              distanceMeters: distanceMeters,
+              rating: current?.rating ?? 5,
+              etaMinutes: current?.etaMinutes ?? (distanceMeters / 350).round().clamp(2, 60),
+              vehicleType: current?.vehicleType ?? 'taxi',
+              vehicleLabel: current?.vehicleLabel ?? 'Flash Go',
+              vehicleDetail: current?.vehicleDetail ?? 'Disponible',
+              priceLabel: current?.priceLabel ?? 'Bs ${(8 + distanceMeters / 300).toStringAsFixed(0)}',
+            ),
+          );
     });
     _socket?.connect();
   }
@@ -165,6 +204,7 @@ class _RideTabState extends ConsumerState<RideTab> {
           passengerId: session.userId,
           userLocation: location,
           destinationAddress: resolvedDestination,
+          dispatchMode: _rideMode == RideMode.destino ? 'broadcast' : 'nearby',
           preferredDriverId: selectedDriverId,
         );
 
@@ -186,7 +226,7 @@ class _RideTabState extends ConsumerState<RideTab> {
   }
 
   Future<void> _toggleSheet() async {
-    final target = _sheetSize <= 0.08 ? 0.34 : 0.0;
+    final target = _sheetSize <= 0.08 ? (_hasActiveTrip ? 0.26 : 0.34) : 0.0;
     await _sheetController.animateTo(
       target,
       duration: const Duration(milliseconds: 260),
@@ -194,8 +234,13 @@ class _RideTabState extends ConsumerState<RideTab> {
     );
   }
 
+  bool get _hasActiveTrip {
+    final activeTripId = ref.read(tripProvider).request.activeTripId;
+    return activeTripId != null && activeTripId.isNotEmpty;
+  }
+
   void _selectNearestTaxi() {
-    final drivers = ref.read(tripProvider).nearbyDrivers;
+    final drivers = _requestableDrivers(ref.read(tripProvider).nearbyDrivers);
     if (drivers.isEmpty) {
       _showMessage('No hay taxis cercanos disponibles en este momento.');
       return;
@@ -309,7 +354,7 @@ class _RideTabState extends ConsumerState<RideTab> {
     setState(() => _floatingNotification = message);
     LocalNotifications.show(
       id: message.hashCode,
-      title: 'Taxi Ya',
+      title: 'Flash Go',
       body: message,
     );
     _notificationTimer = Timer(const Duration(seconds: 5), () {
@@ -437,6 +482,10 @@ class _RideTabState extends ConsumerState<RideTab> {
     return const SizedBox.shrink();
   }
 
+  List<NearbyDriver> _requestableDrivers(List<NearbyDriver> drivers) {
+    return drivers.where((driver) => driver.distanceMeters <= 3000).toList(growable: false);
+  }
+
   NearbyDriver? _findDriverById(List<NearbyDriver> drivers, String? driverId) {
     if (driverId == null || driverId.isEmpty) {
       return null;
@@ -473,6 +522,7 @@ class _RideTabState extends ConsumerState<RideTab> {
         tripState.request.driverLat != null && tripState.request.driverLng != null
             ? LatLng(tripState.request.driverLat!, tripState.request.driverLng!)
             : null;
+    final requestableDrivers = _requestableDrivers(tripState.nearbyDrivers);
     final driverPoints = hasActiveTrip
         ? [
             if (activeDriverPoint != null)
@@ -497,7 +547,7 @@ class _RideTabState extends ConsumerState<RideTab> {
             child: DecoratedBox(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Color(0xFFEDF8FB), Color(0xFFF9F9FB)],
+                  colors: [Color(0xFF0E0F12), Color(0xFF2A1406)],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
@@ -523,10 +573,10 @@ class _RideTabState extends ConsumerState<RideTab> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    const Color(0xFFF9F9FB).withValues(alpha: 0.90),
+                    const Color(0xFF101114).withValues(alpha: 0.92),
                     Colors.transparent,
                     Colors.transparent,
-                    const Color(0xFFF9F9FB),
+                    const Color(0xFF121316),
                   ],
                   stops: const [0, 0.18, 0.72, 1],
                 ),
@@ -548,15 +598,23 @@ class _RideTabState extends ConsumerState<RideTab> {
                     Expanded(
                       child: Center(
                         child: Text(
-                          'Taxi Ya',
+                          'Flash Go',
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 22,
                             fontWeight: FontWeight.w800,
-                            color: const Color(0xFF000003),
+                            color: const Color(0xFFFFF4EC),
                           ),
                         ),
                       ),
                     ),
+                    _GlassIconButton(
+                      icon: Icons.my_location_rounded,
+                      onTap: () async {
+                        await ref.read(passengerLocationProvider.notifier).loadCurrentLocation();
+                        await _syncDashboard();
+                      },
+                    ),
+                    const SizedBox(width: 10),
                     Container(
                       width: 48,
                       height: 48,
@@ -576,65 +634,75 @@ class _RideTabState extends ConsumerState<RideTab> {
                 const SizedBox(height: 18),
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1A1A1D).withValues(alpha: 0.92),
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x12000003),
-                              blurRadius: 20,
-                              offset: Offset(0, 8),
-                            ),
-                          ],
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF17181B).withValues(alpha: 0.96),
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(color: const Color(0x44F97316)),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x18000000),
+                          blurRadius: 24,
+                          offset: Offset(0, 10),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.place, color: Color(0xFFC2410C)),
-                            const SizedBox(width: 10),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Tu ubicacion',
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                const Text(
-                                  'Potosi, Bolivia',
-                                  style: TextStyle(
-                                    color: Color(0xFFFFD8BF),
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (tripState.request.activeTripId != null)
-                        FilledButton.tonalIcon(
-                          onPressed: () => _showTripRequestSheet(tripState),
-                          icon: const Icon(Icons.receipt_long),
-                          label: const Text('Ver estados'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFFF97316),
-                            foregroundColor: const Color(0xFF0F0F10),
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: hasActiveTrip
+                                ? _tripStatusAccentColor(tripState.request.status).withValues(alpha: 0.24)
+                                : const Color(0x33F97316),
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Icon(
+                            hasActiveTrip
+                                ? _tripStatusIcon(tripState.request.status)
+                                : (_rideMode == RideMode.destino
+                                    ? Icons.route_rounded
+                                    : Icons.local_taxi_rounded),
+                            color: hasActiveTrip
+                                ? _tripStatusAccentColor(tripState.request.status)
+                                : const Color(0xFFF97316),
                           ),
                         ),
-                    ],
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                hasActiveTrip
+                                    ? _tripStatusShortLabel(tripState.request.status)
+                                    : (_rideMode == RideMode.destino
+                                        ? 'Pedir taxi'
+                                        : 'Tomar taxi'),
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFFFFF4EC),
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                hasActiveTrip
+                                    ? _tripStatusMiniDetail(tripState.request)
+                                    : 'Potosi, Bolivia',
+                                style: const TextStyle(
+                                  color: Color(0xFFFFC89B),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 if (_floatingNotification != null) ...[
@@ -697,17 +765,16 @@ class _RideTabState extends ConsumerState<RideTab> {
           child: Column(
             children: [
               _MapActionButton(
-                icon: Icons.my_location,
-                onTap: () async {
-                  await ref.read(passengerLocationProvider.notifier).loadCurrentLocation();
-                  await _syncDashboard();
-                },
-              ),
-              const SizedBox(height: 12),
-              _MapActionButton(
                 icon: _sheetSize <= 0.08 ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
                 onTap: _toggleSheet,
               ),
+              if (hasActiveTrip) ...[
+                const SizedBox(height: 12),
+                _MapActionButton(
+                  icon: Icons.tune_rounded,
+                  onTap: () => _showTripRequestSheet(tripState),
+                ),
+              ],
             ],
           ),
         ),
@@ -721,10 +788,12 @@ class _RideTabState extends ConsumerState<RideTab> {
           child: DraggableScrollableSheet(
             controller: _sheetController,
             initialChildSize: 0.34,
-            minChildSize: hasActiveTrip ? 0.26 : 0.0,
+            minChildSize: 0.0,
             maxChildSize: 0.80,
             snap: true,
-            snapSizes: hasActiveTrip ? const [0.26, 0.34, 0.58, 0.80] : const [0.0, 0.34, 0.58, 0.80],
+            snapSizes: hasActiveTrip
+                ? const [0.0, 0.26, 0.34, 0.58, 0.80]
+                : const [0.0, 0.34, 0.58, 0.80],
             builder: (context, scrollController) {
               return DecoratedBox(
                 decoration: const BoxDecoration(
@@ -847,7 +916,7 @@ class _RideTabState extends ConsumerState<RideTab> {
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 24,
                         fontWeight: FontWeight.w800,
-                        color: const Color(0xFF000003),
+                        color: const Color(0xFFFFF4EC),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -855,25 +924,23 @@ class _RideTabState extends ConsumerState<RideTab> {
                       _rideMode == RideMode.destino
                           ? 'Aqui solo preparas la solicitud desde tu ubicacion actual.'
                           : 'Mira los taxis cercanos para subir al que te convenga mas rapido.',
-                      style: const TextStyle(
-                        color: Color(0xFF47464B),
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: const TextStyle(color: Color(0xFFFFC89B), fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 18),
-                    if (_rideMode == RideMode.cercano) ..._buildVehicleCards(tripState.nearbyDrivers),
+                    if (_rideMode == RideMode.cercano) ..._buildVehicleCards(requestableDrivers),
                     if (_rideMode == RideMode.destino)
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(18),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF3F3F5),
+                          color: const Color(0xFF1B1B1F),
                           borderRadius: BorderRadius.circular(22),
+                          border: Border.all(color: const Color(0xFF303035)),
                         ),
                         child: const Text(
                           'Los taxis cercanos solo aparecen en "Tomar taxi". En este modo la app envia una solicitud normal de viaje.',
                           style: TextStyle(
-                            color: Color(0xFF47464B),
+                            color: Color(0xFFFFC89B),
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -997,6 +1064,17 @@ class _RideTabState extends ConsumerState<RideTab> {
       _ => const Color(0xFFF97316),
     };
   }
+
+  IconData _tripStatusIcon(String status) {
+    return switch (status) {
+      'requested' || 'searching' => Icons.travel_explore_rounded,
+      'accepted' || 'arriving' => Icons.directions_car_filled_rounded,
+      'at_pickup' => Icons.place_rounded,
+      'in_progress' => Icons.alt_route_rounded,
+      'completed' => Icons.verified_rounded,
+      _ => Icons.route_rounded,
+    };
+  }
 }
 
 enum RideMode {
@@ -1016,15 +1094,17 @@ class _GlassIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white.withValues(alpha: 0.78),
+      color: const Color(0xFF1A1A1D).withValues(alpha: 0.94),
       borderRadius: BorderRadius.circular(18),
+      shadowColor: const Color(0x22000000),
+      elevation: 4,
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: onTap,
         child: SizedBox(
           width: 48,
           height: 48,
-          child: Icon(icon, color: const Color(0xFF000003)),
+          child: Icon(icon, color: const Color(0xFFF97316)),
         ),
       ),
     );
@@ -1164,7 +1244,7 @@ class _ModeButton extends StatelessWidget {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontWeight: FontWeight.w800,
-              color: selected ? const Color(0xFF0F0F10) : const Color(0xFF47464B),
+              color: selected ? const Color(0xFF0F0F10) : const Color(0xFFFFC89B),
             ),
           ),
         ),
@@ -1199,7 +1279,7 @@ class _VehicleOptionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: highlighted ? const Color(0xFFF3F3F5) : Colors.white,
+      color: highlighted ? const Color(0xFF20160F) : const Color(0xFF18191C),
       borderRadius: BorderRadius.circular(24),
       child: InkWell(
         borderRadius: BorderRadius.circular(24),
@@ -1209,7 +1289,7 @@ class _VehicleOptionCard extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: highlighted ? const Color(0xFFF97316) : const Color(0x1AC8C5CC),
+              color: highlighted ? const Color(0xFFF97316) : const Color(0xFF2E2E34),
               width: highlighted ? 1.5 : 1,
             ),
           ),
@@ -1219,12 +1299,12 @@ class _VehicleOptionCard extends StatelessWidget {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: highlighted ? const Color(0xFF000003) : const Color(0xFFE8E8EA),
+                  color: highlighted ? const Color(0xFF0F0F10) : const Color(0xFF25252B),
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: Icon(
                   icon,
-                  color: highlighted ? const Color(0xFFF97316) : const Color(0xFF0F0F10),
+                  color: highlighted ? const Color(0xFFF97316) : const Color(0xFFFFC89B),
                   size: 28,
                 ),
               ),
@@ -1238,23 +1318,18 @@ class _VehicleOptionCard extends StatelessWidget {
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 17,
                         fontWeight: FontWeight.w800,
+                        color: const Color(0xFFFFF4EC),
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
-                      style: const TextStyle(
-                        color: Color(0xFF77767C),
-                        fontWeight: FontWeight.w700,
-                      ),
+                      style: const TextStyle(color: Color(0xFFFFC89B), fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'Llega en $eta · $distance',
-                      style: const TextStyle(
-                        color: Color(0xFF47464B),
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: const TextStyle(color: Color(0xFFFFDCC1), fontWeight: FontWeight.w600),
                     ),
                   ],
                 ),
@@ -1271,6 +1346,7 @@ class _VehicleOptionCard extends StatelessWidget {
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
+                      color: const Color(0xFFFFF4EC),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -1280,7 +1356,10 @@ class _VehicleOptionCard extends StatelessWidget {
                       const SizedBox(width: 4),
                       Text(
                         rating,
-                        style: const TextStyle(fontWeight: FontWeight.w800),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFFFFF4EC),
+                        ),
                       ),
                     ],
                   ),
@@ -1302,13 +1381,14 @@ class _EmptyRideCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFFF3F3F5),
+        color: const Color(0xFF1B1B1F),
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFF303035)),
       ),
       child: const Text(
         'Todavia no vemos taxis activos. Usa "mi ubicacion" y espera unos segundos para cargar autos cercanos.',
         style: TextStyle(
-          color: Color(0xFF47464B),
+          color: Color(0xFFFFC89B),
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -1352,7 +1432,7 @@ class _LargeTripStatusCard extends StatelessWidget {
             : 'Tu conductor va en camino y llega en $etaMinutes min.',
         'at_pickup' => 'Verifica el auto y sube cuando estes listo.',
         'in_progress' => 'Viaje en progreso.',
-        'completed' => 'Gracias por viajar con Taxi Ya.',
+        'completed' => 'Gracias por viajar con Flash Go.',
         'cancelled' => 'Puedes volver a solicitar un taxi cuando quieras.',
         _ => 'Estamos actualizando el estado de tu viaje.',
       };
@@ -1388,7 +1468,7 @@ class _LargeTripStatusCard extends StatelessWidget {
           Text(
             _subtitle,
             style: const TextStyle(
-              color: Color(0xFFD4F9FF),
+              color: Color(0xFFFFC89B),
               fontWeight: FontWeight.w700,
             ),
           ),

@@ -209,7 +209,7 @@ class AuthRepository {
     return AuthResult(
       userId: user['id']?.toString() ?? '',
       phone: user['phone']?.toString() ?? fallbackPhone,
-      fullName: user['fullName']?.toString() ?? 'Pasajero Taxi Ya',
+      fullName: user['fullName']?.toString() ?? 'Pasajero Flash Go',
       firstName: user['firstName']?.toString() ?? '',
       lastName: user['lastName']?.toString() ?? '',
       email: user['email']?.toString() ?? '',
@@ -229,7 +229,7 @@ class SessionController extends Notifier<Session> {
     final initial = const Session(
       userId: '',
       phone: '',
-      fullName: 'Pasajero Taxi Ya',
+      fullName: 'Pasajero Flash Go',
       firstName: '',
       lastName: '',
       email: '',
@@ -335,7 +335,7 @@ class SessionController extends Notifier<Session> {
     state = const Session(
       userId: '',
       phone: '',
-      fullName: 'Pasajero Taxi Ya',
+      fullName: 'Pasajero Flash Go',
       firstName: '',
       lastName: '',
       email: '',
@@ -386,7 +386,7 @@ class SessionController extends Notifier<Session> {
     state = state.copyWith(
       userId: prefs.getString('session_user_id') ?? '',
       phone: prefs.getString('session_phone') ?? '',
-      fullName: prefs.getString('session_full_name') ?? 'Pasajero Taxi Ya',
+      fullName: prefs.getString('session_full_name') ?? 'Pasajero Flash Go',
       firstName: prefs.getString('session_first_name') ?? '',
       lastName: prefs.getString('session_last_name') ?? '',
       email: prefs.getString('session_email') ?? '',

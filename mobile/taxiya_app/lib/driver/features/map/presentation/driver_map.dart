@@ -71,8 +71,19 @@ class DriverMap extends StatelessWidget {
               height: 56,
               child: Container(
                 decoration: BoxDecoration(
-                  color: available ? const Color(0xFF000003) : const Color(0xFF77767C),
+                  color: available ? const Color(0xFF17181B) : const Color(0xFF3A3A41),
                   shape: BoxShape.circle,
+                  border: Border.all(
+                    color: available ? const Color(0x66F97316) : const Color(0xFF55555E),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (available ? const Color(0xFFF97316) : const Color(0xFF0F0F10))
+                          .withValues(alpha: 0.20),
+                      blurRadius: 14,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
                 ),
                 child: Icon(
                   _vehicleIcon(vehicleType),

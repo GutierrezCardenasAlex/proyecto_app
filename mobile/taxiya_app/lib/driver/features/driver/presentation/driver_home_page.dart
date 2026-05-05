@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -27,7 +29,10 @@ class DriverHomePage extends ConsumerStatefulWidget {
 }
 
 class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBindingObserver {
+  static const _inactivityDuration = Duration(minutes: 5);
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  Timer? _inactivityTimer;
+  DateTime _lastInteractionAt = DateTime.now();
   io.Socket? _socket;
   String? _joinedDriverId;
   String? _joinedTripId;
@@ -174,6 +179,7 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _socket?.dispose();
+    _inactivityTimer?.cancel();
     super.dispose();
   }
 
@@ -224,68 +230,73 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
       ),
     ];
 
-    return Scaffold(
-      key: _scaffoldKey,
-      drawer: DriverAppDrawer(
-        fullName: session.fullName,
-        phone: session.phone,
-        activeItem: _activeDrawerItem,
-        onSelect: _handleDrawerSelection,
-        onLogout: () => ref.read(driverSessionProvider.notifier).logout(),
-        onOpenProfile: () {
-          Navigator.pop(context);
-          _openPage(const DriverProfilePage(), drawerItem: 'Configuraciones');
-        },
-      ),
-      backgroundColor: const Color(0xFFFFF7F1),
-      extendBody: true,
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: pages,
-      ),
-      bottomNavigationBar: Container(
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 18),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFF7F1).withValues(alpha: 0.88),
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x12000003),
-              blurRadius: 24,
-              offset: Offset(0, -4),
-            ),
-          ],
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (_) => _markInteraction(),
+      child: Scaffold(
+        key: _scaffoldKey,
+        drawer: DriverAppDrawer(
+          fullName: session.fullName,
+          phone: session.phone,
+          activeItem: _activeDrawerItem,
+          onSelect: _handleDrawerSelection,
+          onLogout: () => ref.read(driverSessionProvider.notifier).logout(),
+          onOpenProfile: () {
+            Navigator.pop(context);
+            _openPage(const DriverProfilePage(), drawerItem: 'Configuraciones');
+          },
         ),
-        child: NavigationBar(
-          height: 74,
-          backgroundColor: Colors.transparent,
-          indicatorColor: const Color(0x1AF97316),
-          selectedIndex: _selectedIndex,
-          onDestinationSelected: (value) => setState(() {
-            _selectedIndex = value;
-            _activeDrawerItem = switch (value) {
-              0 => 'Panel de viaje',
-              1 => 'Historial',
-              _ => 'Configuraciones',
-            };
-          }),
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.local_taxi_outlined),
-              selectedIcon: Icon(Icons.local_taxi),
-              label: 'Inicio',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.history),
-              selectedIcon: Icon(Icons.history),
-              label: 'Viajes',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              selectedIcon: Icon(Icons.person),
-              label: 'Cuenta',
-            ),
-          ],
+        backgroundColor: const Color(0xFF111214),
+        extendBody: true,
+        body: IndexedStack(
+          index: _selectedIndex,
+          children: pages,
+        ),
+        bottomNavigationBar: Container(
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A1A1D).withValues(alpha: 0.96),
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x22000000),
+                blurRadius: 24,
+                offset: Offset(0, -4),
+              ),
+            ],
+          ),
+          child: NavigationBar(
+            height: 74,
+            backgroundColor: Colors.transparent,
+            indicatorColor: const Color(0x22F97316),
+            selectedIndex: _selectedIndex,
+            onDestinationSelected: (value) => setState(() {
+              _markInteraction();
+              _selectedIndex = value;
+              _activeDrawerItem = switch (value) {
+                0 => 'Panel de viaje',
+                1 => 'Historial',
+                _ => 'Configuraciones',
+              };
+            }),
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.local_taxi_outlined),
+                selectedIcon: Icon(Icons.local_taxi),
+                label: 'Inicio',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.history),
+                selectedIcon: Icon(Icons.history),
+                label: 'Viajes',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.person_outline),
+                selectedIcon: Icon(Icons.person),
+                label: 'Cuenta',
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -295,15 +306,43 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _armInactivityTimer();
     Future<void>.microtask(() async {
       await Permission.notification.request();
       await LocalNotifications.ensureInitialized();
     });
   }
 
+  void _armInactivityTimer() {
+    _inactivityTimer?.cancel();
+    _inactivityTimer = Timer(_inactivityDuration, _handleInactivityTimeout);
+  }
+
+  void _markInteraction() {
+    _lastInteractionAt = DateTime.now();
+    _armInactivityTimer();
+  }
+
+  Future<void> _handleInactivityTimeout() async {
+    final session = ref.read(driverSessionProvider);
+    if (!session.loggedIn) {
+      return;
+    }
+    final driverState = ref.read(driverStateProvider);
+    if (driverState.available) {
+      await ref.read(driverStateProvider.notifier).toggleAvailability(false);
+    }
+    await ref.read(driverSessionProvider.notifier).logout();
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      if (DateTime.now().difference(_lastInteractionAt) >= _inactivityDuration) {
+        Future<void>.microtask(_handleInactivityTimeout);
+        return;
+      }
+      _markInteraction();
       Future<void>.microtask(_restoreDriverOperationalState);
     }
   }
@@ -323,11 +362,11 @@ class _DriverLoginShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9F9FB),
+      backgroundColor: const Color(0xFF111214),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFFF9F9FB), Color(0xFFEAFBFD)],
+            colors: [Color(0xFF111214), Color(0xFF2A1406)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -353,7 +392,7 @@ class _DriverLoginShell extends StatelessWidget {
                 width: 240,
                 height: 240,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFC2410C).withValues(alpha: 0.10),
+                  color: const Color(0xFFC2410C).withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -408,73 +447,6 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
     );
   }
 
-  void _showOfferSheet(BuildContext context, DriverTrip? trip) {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.fromLTRB(22, 18, 22, 28),
-          decoration: const BoxDecoration(
-            color: Color(0xFFFEFEFF),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 46,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE2E2E4),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                'Ofertas activas',
-                style: GoogleFonts.plusJakartaSans(fontSize: 26, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 12),
-              if (trip == null)
-                const DriverEmptyCard(
-                  title: 'Sin ofertas por ahora',
-                  subtitle: 'Activa disponibilidad para recibir solicitudes cercanas.',
-                )
-              else ...[
-                _InfoTile(label: 'Viaje', value: trip.id),
-                _InfoTile(label: 'Recojo', value: trip.passengerPickup),
-                _InfoTile(label: 'Tarifa', value: 'Bs ${trip.fareAmount.toStringAsFixed(0)}'),
-                _InfoTile(label: 'Estado', value: trip.status),
-                _InfoTile(
-                  label: 'Ubicacion',
-                  value: '${trip.pickupLat.toStringAsFixed(5)}, ${trip.pickupLng.toStringAsFixed(5)}',
-                ),
-                const SizedBox(height: 12),
-                _DriverTripProgressBar(status: trip.status),
-                const SizedBox(height: 14),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: () async {
-                      Navigator.of(context).pop();
-                      await _handleDriverPrimaryAction(trip);
-                    },
-                    child: Text(_driverActionLabel(trip)),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        );
-      },
-    );
-  }
-
   void _showStatusSheet(BuildContext context, DriverState driverState, DriverTrip? trip) {
     showModalBottomSheet<void>(
       context: context,
@@ -484,7 +456,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
         return Container(
           padding: const EdgeInsets.fromLTRB(22, 18, 22, 28),
           decoration: const BoxDecoration(
-            color: Color(0xFFFEFEFF),
+            color: Color(0xFF121214),
             borderRadius: BorderRadius.vertical(top: Radius.circular(34)),
           ),
           child: Column(
@@ -496,7 +468,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                   width: 46,
                   height: 5,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE2E2E4),
+                    color: const Color(0x66F97316),
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
@@ -504,7 +476,11 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
               const SizedBox(height: 18),
               Text(
                 'Estado del conductor',
-                style: GoogleFonts.plusJakartaSans(fontSize: 26, fontWeight: FontWeight.w800),
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFFFFF4EC),
+                ),
               ),
               const SizedBox(height: 12),
               _InfoTile(
@@ -536,9 +512,15 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                 },
                 title: const Text(
                   'Activar disponibilidad',
-                  style: TextStyle(fontWeight: FontWeight.w800),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFFFFF4EC),
+                  ),
                 ),
-                subtitle: const Text('Mantiene tu estado de busqueda y vuelve a enviar GPS.'),
+                subtitle: const Text(
+                  'Mantiene tu estado de busqueda y vuelve a enviar GPS.',
+                  style: TextStyle(color: Color(0xFFFFC89B)),
+                ),
               ),
             ],
           ),
@@ -741,7 +723,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                 'driver-map-${trip?.status}-${trip?.pickupLat}-${trip?.pickupLng}-${driverState.lat}-${driverState.lng}',
               ),
               available: driverState.available,
-              tripAccepted: trip?.status == 'accepted',
+              tripAccepted: const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(trip?.status),
               driverLat: driverState.lat,
               driverLng: driverState.lng,
               vehicleType: (trip?.vehicleType?.isNotEmpty ?? false)
@@ -783,14 +765,23 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                     Expanded(
                       child: Center(
                         child: Text(
-                          'Taxi Ya Driver',
+                          'Flash Go Driver',
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 22,
                             fontWeight: FontWeight.w800,
+                            color: const Color(0xFFFFF4EC),
                           ),
                         ),
                       ),
                     ),
+                    _GlassIconButton(
+                      icon: Icons.my_location_rounded,
+                      onTap: () async {
+                        await ref.read(driverStateProvider.notifier).restoreOperationalState();
+                        await ref.read(offeredTripProvider.notifier).loadOffer();
+                      },
+                    ),
+                    const SizedBox(width: 10),
                     Container(
                       width: 48,
                       height: 48,
@@ -810,77 +801,63 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                 const SizedBox(height: 18),
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1A1A1D).withValues(alpha: 0.92),
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x12000003),
-                              blurRadius: 20,
-                              offset: Offset(0, 8),
-                            ),
-                          ],
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF17181B).withValues(alpha: 0.96),
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(color: const Color(0x44F97316)),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x18000000),
+                          blurRadius: 24,
+                          offset: Offset(0, 10),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              driverState.available ? Icons.radio_button_checked : Icons.pause_circle_outline,
-                              color: driverState.available ? const Color(0xFFC2410C) : const Color(0xFF77767C),
-                            ),
-                            const SizedBox(width: 10),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  driverState.available ? 'Buscando viaje' : 'Fuera de linea',
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.white,
-                                  ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: driverState.available
+                                ? const Color(0x33F97316)
+                                : const Color(0xFF25252B),
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Icon(
+                            driverState.available ? Icons.radar_rounded : Icons.pause_circle_outline,
+                            color: driverState.available ? const Color(0xFFF97316) : const Color(0xFFFFC89B),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                driverState.available ? 'Buscando viaje' : 'Fuera de linea',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFFFFF4EC),
                                 ),
-                                Text(
-                                  _statusChipLabel(driverState, trip),
-                                  style: const TextStyle(
-                                    color: Color(0xFFFFD8BF),
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                _statusChipLabel(driverState, trip),
+                                style: const TextStyle(
+                                  color: Color(0xFFFFC89B),
+                                  fontWeight: FontWeight.w700,
                                 ),
-                              ],
-                            ),
-                          ],
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      FilledButton.tonalIcon(
-                        onPressed: () => _showStatusSheet(context, driverState, trip),
-                        icon: const Icon(Icons.tune_outlined),
-                        label: const Text('Ver estados'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFFF97316),
-                          foregroundColor: const Color(0xFF0F0F10),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-                        ),
-                      ),
-                      FilledButton.tonalIcon(
-                        onPressed: () => _showOfferSheet(context, trip),
-                        icon: const Icon(Icons.local_activity_outlined),
-                        label: const Text('Ofertas activas'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFFF97316),
-                          foregroundColor: const Color(0xFF0F0F10),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
                 const Spacer(),
@@ -922,13 +899,8 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
               ),
               const SizedBox(height: 12),
               _MapActionButton(
-                icon: Icons.tune_outlined,
+                icon: Icons.tune_rounded,
                 onTap: () => _showStatusSheet(context, driverState, trip),
-              ),
-              const SizedBox(height: 12),
-              _MapActionButton(
-                icon: Icons.local_activity_outlined,
-                onTap: () => _showOfferSheet(context, trip),
               ),
             ],
           ),
@@ -1055,13 +1027,12 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                     children: [
                       FilledButton.tonalIcon(
                         onPressed: () => _showStatusSheet(context, driverState, trip),
-                        icon: const Icon(Icons.tune_outlined),
+                        icon: const Icon(Icons.tune_rounded),
                         label: const Text('Ver estados'),
-                      ),
-                      FilledButton.tonalIcon(
-                        onPressed: () => _showOfferSheet(context, trip),
-                        icon: const Icon(Icons.local_activity_outlined),
-                        label: const Text('Ver ofertas'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFFF97316),
+                          foregroundColor: const Color(0xFF0F0F10),
+                        ),
                       ),
                     ],
                   ),
@@ -1128,10 +1099,10 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                                 width: 48,
                                 height: 48,
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFF3F3F5),
+                                  color: const Color(0xFF25252B),
                                   borderRadius: BorderRadius.circular(16),
                                 ),
-                                child: Icon(_tripVehicleIcon(trip), color: const Color(0xFFC2410C)),
+                                child: Icon(_tripVehicleIcon(trip), color: const Color(0xFFF97316)),
                               ),
                               const SizedBox(width: 12),
                               Text(
@@ -1139,6 +1110,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                                 style: GoogleFonts.plusJakartaSans(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w800,
+                                  color: const Color(0xFFFFF4EC),
                                 ),
                               ),
                             ],
@@ -1189,44 +1161,46 @@ class _DriverTripsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final trip = ref.watch(offeredTripProvider).value;
+    final historyAsync = ref.watch(driverTripHistoryProvider);
     return DriverPageShell(
       eyebrow: 'Actividad',
       title: 'Tus viajes',
-      child: Column(
-        children: [
-          if (trip == null)
-            const DriverEmptyCard(
+      child: historyAsync.when(
+        loading: () => const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: CircularProgressIndicator(),
+          ),
+        ),
+        error: (error, stackTrace) => DriverEmptyCard(
+          title: 'No pudimos cargar el historial',
+          subtitle: error.toString().replaceFirst('Exception: ', ''),
+        ),
+        data: (history) {
+          final trips = <DriverTrip>[
+            ...?trip == null ? null : [trip],
+            ...history.where((item) => item.id != trip?.id),
+          ];
+
+          if (trips.isEmpty) {
+            return const DriverEmptyCard(
               title: 'Todavia no hay viajes',
               subtitle: 'Activa disponibilidad para empezar a recibir solicitudes reales.',
-            )
-          else
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(30),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Solicitud actual',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _InfoTile(label: 'ID', value: trip.id),
-                    _InfoTile(label: 'Recojo', value: trip.passengerPickup),
-                    _InfoTile(label: 'Destino', value: trip.destination),
-                    _InfoTile(label: 'Estado', value: trip.status),
-                  ],
+            );
+          }
+
+          return Column(
+            children: [
+              for (final item in trips) ...[
+                _DriverHistoryCard(
+                  trip: item,
+                  title: item.id == trip?.id ? 'Viaje actual' : 'Viaje reciente',
                 ),
-              ),
-            ),
-        ],
+                const SizedBox(height: 14),
+              ],
+            ],
+          );
+        },
       ),
     );
   }
@@ -1256,6 +1230,10 @@ class _DriverAccountTab extends ConsumerWidget {
       title: 'Perfil del conductor',
       trailing: IconButton.filledTonal(
         onPressed: onOpenProfile,
+        style: IconButton.styleFrom(
+          backgroundColor: const Color(0xFF1B1B1F),
+          foregroundColor: const Color(0xFFF97316),
+        ),
         icon: const Icon(Icons.edit_outlined),
       ),
       child: Column(
@@ -1263,8 +1241,9 @@ class _DriverAccountTab extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(22),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: const Color(0xFF1B1B1F),
               borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: const Color(0xFF2E2E34)),
             ),
             child: Row(
               children: [
@@ -1272,10 +1251,10 @@ class _DriverAccountTab extends ConsumerWidget {
                   width: 78,
                   height: 78,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF3F3F5),
+                    color: const Color(0xFF25252B),
                     borderRadius: BorderRadius.circular(24),
                   ),
-                  child: const Icon(Icons.person, size: 36),
+                  child: const Icon(Icons.person, size: 36, color: Color(0xFFFFF4EC)),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -1287,13 +1266,14 @@ class _DriverAccountTab extends ConsumerWidget {
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 24,
                           fontWeight: FontWeight.w800,
+                          color: const Color(0xFFFFF4EC),
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         phone,
                         style: const TextStyle(
-                          color: Color(0xFF47464B),
+                          color: Color(0xFFFFC89B),
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -1477,7 +1457,7 @@ class _DriverTripProgressBar extends StatelessWidget {
                   height: 3,
                   margin: const EdgeInsets.symmetric(horizontal: 6),
                   decoration: BoxDecoration(
-                    color: isActive ? const Color(0xFFF97316) : const Color(0xFFE7DDD4),
+                    color: isActive ? const Color(0xFFF97316) : const Color(0x55F97316),
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
@@ -1490,16 +1470,16 @@ class _DriverTripProgressBar extends StatelessWidget {
               width: 24,
               height: 24,
               decoration: BoxDecoration(
-                color: isReached ? const Color(0xFFF97316) : Colors.white,
+                color: isReached ? const Color(0xFFF97316) : const Color(0xFF25252B),
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isReached ? const Color(0xFFF97316) : const Color(0xFFE7DDD4),
+                  color: isReached ? const Color(0xFFF97316) : const Color(0x55F97316),
                 ),
               ),
               child: Icon(
                 isReached ? Icons.check : Icons.circle,
                 size: isReached ? 14 : 8,
-                color: isReached ? const Color(0xFF0F0F10) : const Color(0xFFB7ABA0),
+                color: isReached ? const Color(0xFF0F0F10) : const Color(0xFFFFC89B),
               ),
             );
           }),
@@ -1516,7 +1496,7 @@ class _DriverTripProgressBar extends StatelessWidget {
                 label,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: highlighted ? const Color(0xFF0F0F10) : const Color(0xFF8B7E73),
+                  color: highlighted ? const Color(0xFFFFF4EC) : const Color(0xFFFFC89B),
                   fontSize: 10,
                   fontWeight: highlighted ? FontWeight.w800 : FontWeight.w700,
                 ),
@@ -1526,6 +1506,95 @@ class _DriverTripProgressBar extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+class _DriverHistoryCard extends StatelessWidget {
+  const _DriverHistoryCard({
+    required this.trip,
+    required this.title,
+  });
+
+  final DriverTrip trip;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = _historyAccentColor(trip.status);
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF1B1B1F),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: accent.withValues(alpha: 0.45)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFFFFF4EC),
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    _historyStatusLabel(trip.status),
+                    style: TextStyle(
+                      color: accent,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            _InfoTile(label: 'ID', value: trip.id),
+            _InfoTile(label: 'Recojo', value: trip.passengerPickup),
+            _InfoTile(label: 'Destino', value: trip.destination),
+            _InfoTile(label: 'Tarifa', value: 'Bs ${trip.fareAmount.toStringAsFixed(0)}'),
+            const SizedBox(height: 10),
+            _DriverTripProgressBar(status: trip.status),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _historyAccentColor(String status) {
+    return switch (status) {
+      'completed' => const Color(0xFF22C55E),
+      'cancelled' => const Color(0xFFEF4444),
+      'in_progress' => const Color(0xFF0EA5E9),
+      _ => const Color(0xFFF97316),
+    };
+  }
+
+  String _historyStatusLabel(String status) {
+    return switch (status) {
+      'requested' => 'Solicitado',
+      'searching' => 'Buscando',
+      'accepted' => 'Aceptado',
+      'arriving' => 'En camino',
+      'at_pickup' => 'Llego',
+      'in_progress' => 'En curso',
+      'completed' => 'Finalizado',
+      'cancelled' => 'Cancelado',
+      _ => status,
+    };
   }
 }
 

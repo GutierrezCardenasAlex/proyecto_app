@@ -111,7 +111,7 @@ class AppDrawer extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(999),
                                   ),
                                   child: const Text(
-                                    'MIEMBRO TAXI YA',
+                                    'MIEMBRO FLASH GO',
                                     style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w900,

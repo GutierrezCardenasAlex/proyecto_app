@@ -187,7 +187,7 @@ class _DriverProfilePageState extends ConsumerState<DriverProfilePage> {
                   ),
                   const SizedBox(height: 18),
                   Text(
-                    session.fullName.isEmpty ? 'Conductor Taxi Ya' : session.fullName,
+        session.fullName.isEmpty ? 'Conductor Flash Go' : session.fullName,
                     textAlign: TextAlign.center,
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 24,

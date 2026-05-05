@@ -110,7 +110,7 @@ class NotificationsPage extends StatelessWidget {
       items: [
         ('Viajes', 'Recibe actualizaciones de asignacion, llegada y finalizacion del taxi.'),
         ('Promociones', 'Controla cupones, descuentos y campanas activas.'),
-        ('Novedades', 'Avisos de mantenimiento o nuevas funciones en Taxi Ya.'),
+      ('Novedades', 'Avisos de mantenimiento o nuevas funciones en Flash Go.'),
       ],
     );
   }

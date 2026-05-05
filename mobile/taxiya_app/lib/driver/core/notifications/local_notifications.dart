@@ -32,7 +32,7 @@ class LocalNotifications {
       const NotificationDetails(
         android: AndroidNotificationDetails(
           'taxiya_driver_channel',
-          'Taxi Ya conductor',
+          'Flash Go conductor',
           channelDescription: 'Notificaciones del conductor',
           importance: Importance.high,
           priority: Priority.high,

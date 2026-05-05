@@ -30,16 +30,22 @@ class LocalNotifications {
       id,
       title,
       body,
-      const NotificationDetails(
+      NotificationDetails(
         android: AndroidNotificationDetails(
           'taxiya_passenger_channel',
-          'Taxi Ya pasajero',
+          'Flash Go pasajero',
           channelDescription: 'Notificaciones del pasajero',
           importance: Importance.high,
           priority: Priority.high,
           color: Color(0xFFF97316),
+          colorized: true,
           icon: '@mipmap/ic_launcher',
-          styleInformation: BigTextStyleInformation(''),
+          category: AndroidNotificationCategory.message,
+          styleInformation: BigTextStyleInformation(
+            body,
+            contentTitle: title,
+            summaryText: 'Flash Go',
+          ),
         ),
       ),
     );

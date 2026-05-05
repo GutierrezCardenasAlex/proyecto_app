@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -17,10 +19,56 @@ class PassengerHomePage extends ConsumerStatefulWidget {
   ConsumerState<PassengerHomePage> createState() => _PassengerHomePageState();
 }
 
-class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
+class _PassengerHomePageState extends ConsumerState<PassengerHomePage> with WidgetsBindingObserver {
+  static const _inactivityDuration = Duration(minutes: 5);
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  Timer? _inactivityTimer;
+  DateTime _lastInteractionAt = DateTime.now();
   int _selectedIndex = 0;
   String _activeDrawerItem = 'Configuraciones';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _armInactivityTimer();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _inactivityTimer?.cancel();
+    super.dispose();
+  }
+
+  void _armInactivityTimer() {
+    _inactivityTimer?.cancel();
+    _inactivityTimer = Timer(_inactivityDuration, _handleInactivityTimeout);
+  }
+
+  void _markInteraction() {
+    _lastInteractionAt = DateTime.now();
+    _armInactivityTimer();
+  }
+
+  Future<void> _handleInactivityTimeout() async {
+    final session = ref.read(sessionProvider);
+    if (!session.isAuthenticated) {
+      return;
+    }
+    await ref.read(sessionProvider.notifier).signOut();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      if (DateTime.now().difference(_lastInteractionAt) >= _inactivityDuration) {
+        Future<void>.microtask(_handleInactivityTimeout);
+        return;
+      }
+      _markInteraction();
+    }
+  }
 
   void _handleDrawerSelection(String item) {
     switch (item) {
@@ -96,53 +144,58 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
       ),
     ];
 
-    return Scaffold(
-      key: _scaffoldKey,
-      drawer: AppDrawer(
-        fullName: session.fullName,
-        phone: session.phone,
-        onLogout: () => ref.read(sessionProvider.notifier).signOut(),
-        activeItem: _activeDrawerItem,
-        onSelect: _handleDrawerSelection,
-        onOpenProfile: () {
-          Navigator.pop(context);
-          _openPage(const ProfilePage(), drawerItem: 'Configuraciones');
-        },
-      ),
-      backgroundColor: const Color(0xFF111214),
-      extendBody: true,
-      body: IndexedStack(index: _selectedIndex, children: pages),
-      bottomNavigationBar: Container(
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 18),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1A1D).withValues(alpha: 0.96),
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x22000000),
-              blurRadius: 24,
-              offset: Offset(0, -4),
-            ),
-          ],
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (_) => _markInteraction(),
+      child: Scaffold(
+        key: _scaffoldKey,
+        drawer: AppDrawer(
+          fullName: session.fullName,
+          phone: session.phone,
+          onLogout: () => ref.read(sessionProvider.notifier).signOut(),
+          activeItem: _activeDrawerItem,
+          onSelect: _handleDrawerSelection,
+          onOpenProfile: () {
+            Navigator.pop(context);
+            _openPage(const ProfilePage(), drawerItem: 'Configuraciones');
+          },
         ),
-        child: NavigationBar(
-          height: 74,
-          backgroundColor: Colors.transparent,
-          indicatorColor: const Color(0x22F97316),
-          selectedIndex: _selectedIndex,
-          onDestinationSelected: (value) => setState(() {
-            _selectedIndex = value;
-            _activeDrawerItem = switch (value) {
-              0 => 'Promociones',
-              1 => 'Tus viajes',
-              _ => 'Configuraciones',
-            };
-          }),
-          destinations: const [
-            NavigationDestination(icon: Icon(Icons.directions_car_outlined), selectedIcon: Icon(Icons.directions_car), label: 'Viaje'),
-            NavigationDestination(icon: Icon(Icons.history), selectedIcon: Icon(Icons.history), label: 'Historial'),
-            NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Cuenta'),
-          ],
+        backgroundColor: const Color(0xFF111214),
+        extendBody: true,
+        body: IndexedStack(index: _selectedIndex, children: pages),
+        bottomNavigationBar: Container(
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A1A1D).withValues(alpha: 0.96),
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x22000000),
+                blurRadius: 24,
+                offset: Offset(0, -4),
+              ),
+            ],
+          ),
+          child: NavigationBar(
+            height: 74,
+            backgroundColor: Colors.transparent,
+            indicatorColor: const Color(0x22F97316),
+            selectedIndex: _selectedIndex,
+            onDestinationSelected: (value) => setState(() {
+              _markInteraction();
+              _selectedIndex = value;
+              _activeDrawerItem = switch (value) {
+                0 => 'Promociones',
+                1 => 'Tus viajes',
+                _ => 'Configuraciones',
+              };
+            }),
+            destinations: const [
+              NavigationDestination(icon: Icon(Icons.directions_car_outlined), selectedIcon: Icon(Icons.directions_car), label: 'Viaje'),
+              NavigationDestination(icon: Icon(Icons.history), selectedIcon: Icon(Icons.history), label: 'Historial'),
+              NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Cuenta'),
+            ],
+          ),
         ),
       ),
     );

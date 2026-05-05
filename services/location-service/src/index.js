@@ -26,8 +26,8 @@ const locationSchema = z.object({
 const nearbySchema = z.object({
   lat: z.coerce.number(),
   lng: z.coerce.number(),
-  radiusMeters: z.coerce.number().int().positive().max(5000).default(3000),
-  limit: z.coerce.number().int().positive().max(20).default(10)
+  radiusMeters: z.coerce.number().int().positive().max(20000).default(15000),
+  limit: z.coerce.number().int().positive().max(100).default(50)
 });
 
 function toRadians(value) {
@@ -116,6 +116,7 @@ async function bootstrap() {
     await publish("location.driver.updated", cachePayload);
 
     await emitRealtime("driver:location", `driver:${payload.driverId}`, cachePayload);
+    await emitRealtime("driver:location", "drivers:live", cachePayload);
 
     if (payload.tripId) {
       await emitRealtime("trip:tracking", `trip:${payload.tripId}`, cachePayload);
@@ -166,6 +167,7 @@ async function bootstrap() {
        INNER JOIN latest_locations ll ON ll.driver_id = d.id
        WHERE d.is_available = TRUE
          AND d.status = 'available'
+         AND ll.recorded_at >= NOW() - INTERVAL '5 minutes'
          AND ST_DWithin(
            ll.location,
            ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,

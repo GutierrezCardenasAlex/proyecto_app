@@ -18,7 +18,7 @@ class TaxiYaUnifiedApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Taxi Ya',
+      title: 'Flash Go',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         textTheme: GoogleFonts.manropeTextTheme(),
@@ -182,7 +182,7 @@ class _UnifiedEntryPageState extends ConsumerState<UnifiedEntryPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Bienvenido a Taxi Ya',
+                          'Bienvenido a Flash Go',
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 42,
                             fontWeight: FontWeight.w900,
@@ -322,7 +322,7 @@ class _TaxiYaSplashScreenState extends State<_TaxiYaSplashScreen>
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    'Taxi Ya',
+                    'Flash Go',
                     style: GoogleFonts.plusJakartaSans(
                       color: const Color(0xFFFFF4EC),
                       fontSize: 34,

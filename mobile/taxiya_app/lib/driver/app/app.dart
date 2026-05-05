@@ -9,7 +9,7 @@ class TaxiYaDriverApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Taxi Ya Driver',
+      title: 'Flash Go Driver',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         textTheme: GoogleFonts.manropeTextTheme(),

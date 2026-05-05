@@ -156,14 +156,14 @@ class SimpleMenuTile extends StatelessWidget {
                     Text(
                       subtitle,
                       style: const TextStyle(
-                        color: Color(0xFF47464B),
+                        color: Color(0xFFFFC89B),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right),
+              const Icon(Icons.chevron_right, color: Color(0xFFFFC89B)),
             ],
           ),
         ),

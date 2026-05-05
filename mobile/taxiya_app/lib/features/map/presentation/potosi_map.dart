@@ -96,9 +96,17 @@ class PotosiMap extends StatelessWidget {
                 width: 46,
                 height: 46,
                 child: Container(
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF000003),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF16171A),
                     shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0x66F97316)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFF97316).withValues(alpha: 0.22),
+                        blurRadius: 14,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
                   ),
                   child: Icon(
                     _vehicleIcon(driver.vehicleType),

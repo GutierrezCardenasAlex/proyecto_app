@@ -229,7 +229,7 @@ class _LoginCardState extends ConsumerState<LoginCard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Taxi Ya',
+            'Flash Go',
             style: GoogleFonts.plusJakartaSans(
               fontSize: 16,
               fontWeight: FontWeight.w900,

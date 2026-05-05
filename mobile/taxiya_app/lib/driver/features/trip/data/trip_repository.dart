@@ -13,6 +13,18 @@ final tripRepositoryProvider = Provider<DriverTripRepository>((ref) {
 
 final offeredTripProvider =
     NotifierProvider<DriverTripController, AsyncValue<DriverTrip?>>(DriverTripController.new);
+final driverTripHistoryProvider = FutureProvider<List<DriverTrip>>((ref) async {
+  final session = ref.watch(driverSessionProvider);
+  if (!session.loggedIn || session.driverId.isEmpty || session.token.isEmpty) {
+    return const [];
+  }
+
+  final repository = ref.watch(tripRepositoryProvider);
+  return repository.fetchHistory(
+    token: session.token,
+    driverId: session.driverId,
+  );
+});
 
 class DriverTripRepository {
   const DriverTripRepository();
@@ -74,18 +86,27 @@ class DriverTripRepository {
     }
 
     final item = offers.first;
-    return DriverTrip(
-      id: item['id']?.toString() ?? '',
-      passengerPickup: item['pickup_address']?.toString() ?? 'Recojo',
-      destination: item['destination_address']?.toString() ?? 'Destino',
-      status: item['status']?.toString() ?? 'requested',
-      pickupLat: _toDouble(item['pickup_lat']),
-      pickupLng: _toDouble(item['pickup_lng']),
-      destinationLat: _toDouble(item['destination_lat']),
-      destinationLng: _toDouble(item['destination_lng']),
-      fareAmount: _toDouble(item['fare_amount']),
-      vehicleType: item['vehicle_type']?.toString(),
+    return _mapTrip(item, fallbackStatus: 'requested');
+  }
+
+  Future<List<DriverTrip>> fetchHistory({
+    required String token,
+    required String driverId,
+  }) async {
+    final response = await http.get(
+      Uri.parse('${AppConfig.apiBaseUrl}/trips/history/driver/$driverId'),
+      headers: _headers(token),
     );
+
+    if (response.statusCode >= 400) {
+      throw Exception('No se pudo cargar el historial (${response.statusCode})');
+    }
+
+    final payload = (jsonDecode(response.body) as List<dynamic>? ?? const []);
+    return payload
+        .whereType<Map<String, dynamic>>()
+        .map((item) => _mapTrip(item))
+        .toList(growable: false);
   }
 
   Future<DriverTrip> accept({
@@ -153,6 +174,21 @@ class DriverTripRepository {
         'Authorization': 'Bearer $token',
       };
 
+  static DriverTrip _mapTrip(Map<String, dynamic> item, {String fallbackStatus = 'accepted'}) {
+    return DriverTrip(
+      id: item['id']?.toString() ?? '',
+      passengerPickup: item['pickup_address']?.toString() ?? 'Recojo',
+      destination: item['destination_address']?.toString() ?? 'Destino',
+      status: item['status']?.toString() ?? fallbackStatus,
+      pickupLat: _toDouble(item['pickup_lat']),
+      pickupLng: _toDouble(item['pickup_lng']),
+      destinationLat: _toDouble(item['destination_lat']),
+      destinationLng: _toDouble(item['destination_lng']),
+      fareAmount: _toDouble(item['fare_amount']),
+      vehicleType: item['vehicle_type']?.toString(),
+    );
+  }
+
   static double _toDouble(Object? value) {
     if (value is num) {
       return value.toDouble();
@@ -197,6 +233,7 @@ class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
           driverId: session.driverId,
           trip: current,
         ));
+    ref.invalidate(driverTripHistoryProvider);
   }
 
   Future<void> updateTripStatus(String status) async {
@@ -212,6 +249,7 @@ class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
           trip: current,
           status: status,
         ));
+    ref.invalidate(driverTripHistoryProvider);
   }
 
   Future<void> submitRating({
@@ -231,6 +269,7 @@ class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
       comment: comment,
     );
     state = const AsyncData(null);
+    ref.invalidate(driverTripHistoryProvider);
   }
 
   void setLocalStatus(String status) {

@@ -15,6 +15,7 @@ const searchSchema = z.object({
   tripId: z.string().uuid(),
   pickupLat: z.number(),
   pickupLng: z.number(),
+  dispatchMode: z.enum(["broadcast", "nearby"]).default("broadcast"),
   preferredDriverId: z.string().uuid().optional()
 });
 
@@ -26,8 +27,8 @@ const acceptSchema = z.object({
 const nearbySchema = z.object({
   lat: z.coerce.number(),
   lng: z.coerce.number(),
-  radiusMeters: z.coerce.number().int().positive().max(5000).default(3000),
-  limit: z.coerce.number().int().positive().max(20).default(5)
+  radiusMeters: z.coerce.number().int().positive().max(20000).default(15000),
+  limit: z.coerce.number().int().positive().max(100).default(50)
 });
 
 async function publish(routingKey, payload) {
@@ -60,7 +61,9 @@ async function bootstrap() {
   app.get("/health", async () => ({ status: "ok", service: "dispatch-service" }));
 
   app.post("/search", async (request) => {
-    const { tripId, pickupLat, pickupLng, preferredDriverId } = searchSchema.parse(request.body);
+    const { tripId, pickupLat, pickupLng, dispatchMode, preferredDriverId } = searchSchema.parse(request.body);
+    const radiusMeters = preferredDriverId ? 3000 : dispatchMode === "nearby" ? 3000 : 15000;
+    const limit = preferredDriverId ? 1 : dispatchMode === "nearby" ? 8 : 100;
     await pool.query(
       `UPDATE trips
        SET status = 'searching', updated_at = NOW()
@@ -92,15 +95,16 @@ async function bootstrap() {
        LEFT JOIN vehicles v ON v.driver_id = d.id
        WHERE d.is_available = TRUE
          AND d.status = 'available'
+         AND ll.recorded_at >= NOW() - INTERVAL '5 minutes'
          AND ($3::uuid IS NULL OR d.id = $3)
          AND ST_DWithin(
             ll.location,
             ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
-            3000
+            $4
          )
        ORDER BY distance_meters ASC
-       LIMIT 5`,
-      [pickupLng, pickupLat, preferredDriverId ?? null]
+       LIMIT $5`,
+      [pickupLng, pickupLat, preferredDriverId ?? null, radiusMeters, limit]
     );
 
     const candidates = result.rows;
@@ -202,6 +206,7 @@ async function bootstrap() {
        LEFT JOIN vehicles v ON v.driver_id = d.id
        WHERE d.is_available = TRUE
          AND d.status = 'available'
+         AND ll.recorded_at >= NOW() - INTERVAL '5 minutes'
          AND ST_DWithin(
            ll.location,
            ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,

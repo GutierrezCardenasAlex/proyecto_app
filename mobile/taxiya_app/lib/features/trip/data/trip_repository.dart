@@ -87,7 +87,7 @@ class TripRepository {
     required double lng,
   }) async {
     final dispatchResponse = await http.get(
-      Uri.parse('${AppConfig.apiBaseUrl}/dispatch/nearby?lat=$lat&lng=$lng&radiusMeters=3000&limit=8'),
+      Uri.parse('${AppConfig.apiBaseUrl}/dispatch/nearby?lat=$lat&lng=$lng&radiusMeters=15000&limit=50'),
       headers: _headers(token),
     );
 
@@ -96,7 +96,7 @@ class TripRepository {
     }
 
     final locationResponse = await http.get(
-      Uri.parse('${AppConfig.apiBaseUrl}/locations/nearby?lat=$lat&lng=$lng&radiusMeters=3000&limit=8'),
+      Uri.parse('${AppConfig.apiBaseUrl}/locations/nearby?lat=$lat&lng=$lng&radiusMeters=15000&limit=50'),
       headers: _headers(token),
     );
 
@@ -142,6 +142,7 @@ class TripRepository {
     required LatLng pickup,
     required String pickupAddress,
     required String destinationAddress,
+    required String dispatchMode,
     String? preferredDriverId,
   }) async {
     final destination = _deriveDestinationFromPickup(pickup);
@@ -163,6 +164,7 @@ class TripRepository {
         'estimatedDistanceMeters': distanceMeters,
         'estimatedDurationSeconds': durationSeconds,
         'fareAmount': fareAmount,
+        'dispatchMode': dispatchMode,
         if (preferredDriverId != null && preferredDriverId.isNotEmpty)
           'preferredDriverId': preferredDriverId,
       }),
@@ -366,6 +368,7 @@ class TripController extends Notifier<TripState> {
     required String passengerId,
     required LatLng userLocation,
     required String destinationAddress,
+    required String dispatchMode,
     String? preferredDriverId,
   }) async {
     state = state.copyWith(isRequestingTrip: true, clearError: true);
@@ -376,6 +379,7 @@ class TripController extends Notifier<TripState> {
         pickup: userLocation,
         pickupAddress: 'Mi ubicacion actual',
         destinationAddress: destinationAddress,
+        dispatchMode: dispatchMode,
         preferredDriverId: preferredDriverId,
       );
 
@@ -413,6 +417,18 @@ class TripController extends Notifier<TripState> {
       ),
       clearError: true,
     );
+  }
+
+  void upsertLiveDriver(NearbyDriver driver) {
+    final updated = [...state.nearbyDrivers];
+    final index = updated.indexWhere((item) => item.driverId == driver.driverId);
+    if (index >= 0) {
+      updated[index] = driver;
+    } else {
+      updated.add(driver);
+    }
+    updated.sort((a, b) => a.distanceMeters.compareTo(b.distanceMeters));
+    state = state.copyWith(nearbyDrivers: updated, clearError: true);
   }
 
   Future<void> updateTripStatus({
