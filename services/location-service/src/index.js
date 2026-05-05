@@ -166,8 +166,8 @@ async function bootstrap() {
        FROM drivers d
        INNER JOIN latest_locations ll ON ll.driver_id = d.id
        WHERE d.is_available = TRUE
-         AND d.status = 'available'
-         AND ll.recorded_at >= NOW() - INTERVAL '5 minutes'
+         AND COALESCE(d.status, 'offline') <> 'busy'
+         AND ll.recorded_at >= NOW() - INTERVAL '15 minutes'
          AND ST_DWithin(
            ll.location,
            ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,

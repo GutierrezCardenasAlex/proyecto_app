@@ -62,7 +62,7 @@ async function bootstrap() {
 
   app.post("/search", async (request) => {
     const { tripId, pickupLat, pickupLng, dispatchMode, preferredDriverId } = searchSchema.parse(request.body);
-    const radiusMeters = preferredDriverId ? null : dispatchMode === "nearby" ? 100 : null;
+    const radiusMeters = preferredDriverId ? null : dispatchMode === "nearby" ? 1000 : null;
     const limit = preferredDriverId ? 1 : dispatchMode === "nearby" ? 8 : 1000;
     await pool.query(
       `UPDATE trips
@@ -94,8 +94,8 @@ async function bootstrap() {
        INNER JOIN latest_locations ll ON ll.driver_id = d.id
        LEFT JOIN vehicles v ON v.driver_id = d.id
        WHERE d.is_available = TRUE
-         AND d.status = 'available'
-         AND ll.recorded_at >= NOW() - INTERVAL '5 minutes'
+         AND COALESCE(d.status, 'offline') <> 'busy'
+         AND ll.recorded_at >= NOW() - INTERVAL '15 minutes'
          AND ($3::uuid IS NULL OR d.id = $3)
          AND (
            $4::int IS NULL OR ST_DWithin(
@@ -207,8 +207,8 @@ async function bootstrap() {
        INNER JOIN latest_locations ll ON ll.driver_id = d.id
        LEFT JOIN vehicles v ON v.driver_id = d.id
        WHERE d.is_available = TRUE
-         AND d.status = 'available'
-         AND ll.recorded_at >= NOW() - INTERVAL '5 minutes'
+         AND COALESCE(d.status, 'offline') <> 'busy'
+         AND ll.recorded_at >= NOW() - INTERVAL '15 minutes'
          AND ST_DWithin(
            ll.location,
            ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,

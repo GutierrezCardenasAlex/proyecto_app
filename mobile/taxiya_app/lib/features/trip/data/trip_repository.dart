@@ -111,6 +111,9 @@ class TripRepository {
     final dispatchDrivers = (dispatchPayload['drivers'] as List<dynamic>? ?? const [])
         .whereType<Map<String, dynamic>>()
         .toList(growable: false);
+    final dispatchById = {
+      for (final driver in dispatchDrivers) driver['driver_id']?.toString() ?? '': driver,
+    };
 
     final locationPayload = locationResponse.statusCode < 400
         ? jsonDecode(locationResponse.body) as Map<String, dynamic>
@@ -122,27 +125,39 @@ class TripRepository {
       for (final driver in locationDrivers) driver['driver_id']?.toString() ?? '': driver,
     };
 
-    return dispatchDrivers.map((driver) {
-      final id = driver['driver_id']?.toString() ?? '';
-      final live = locationById[id] ?? driver;
-      final brand = _stringValue(driver['brand'], fallback: 'Taxi');
-      final model = _stringValue(driver['model'], fallback: 'Disponible');
-      final color = _stringValue(driver['color'], fallback: 'Color por confirmar');
-      final plate = _stringValue(driver['plate'], fallback: 'Sin placa');
-      final distanceMeters = _toDouble(driver['distance_meters']);
+    final mergedIds = {
+      ...dispatchById.keys.where((id) => id.isNotEmpty),
+      ...locationById.keys.where((id) => id.isNotEmpty),
+    };
+
+    return mergedIds.map((id) {
+      final dispatchDriver = dispatchById[id] ?? const <String, dynamic>{};
+      final live = locationById[id] ?? dispatchDriver;
+      final brand = _stringValue(dispatchDriver['brand'], fallback: 'Taxi');
+      final model = _stringValue(dispatchDriver['model'], fallback: 'Disponible');
+      final color = _stringValue(dispatchDriver['color'], fallback: 'Color por confirmar');
+      final plate = _stringValue(dispatchDriver['plate'], fallback: 'Sin placa');
+      final distanceMeters = _toDouble(
+        dispatchDriver['distance_meters'] ?? live['distance_meters'],
+      );
       return NearbyDriver(
         driverId: id,
         lat: _toDouble(live['lat']),
         lng: _toDouble(live['lng']),
         distanceMeters: distanceMeters,
-        rating: _toDouble(driver['rating'], fallback: 5),
-        etaMinutes: (driver['eta_minutes'] as num?)?.toInt() ?? max(2, (distanceMeters / 350).round()),
-        vehicleType: _stringValue(driver['vehicle_type'], fallback: _guessVehicleType('$brand $model')),
+        rating: _toDouble(dispatchDriver['rating'] ?? live['rating'], fallback: 5),
+        etaMinutes: (dispatchDriver['eta_minutes'] as num?)?.toInt() ??
+            max(2, (distanceMeters / 350).round()),
+        vehicleType: _stringValue(
+          dispatchDriver['vehicle_type'],
+          fallback: _guessVehicleType('$brand $model'),
+        ),
         vehicleLabel: '$brand $model',
         vehicleDetail: '$color · $plate',
         priceLabel: 'Bs ${(8 + distanceMeters / 300).toStringAsFixed(0)}',
       );
-    }).toList();
+    }).toList()
+      ..sort((a, b) => a.distanceMeters.compareTo(b.distanceMeters));
   }
 
   Future<TripRequest> requestTrip({

@@ -48,7 +48,7 @@ class _RideTabState extends ConsumerState<RideTab> {
   void initState() {
     super.initState();
     Future<void>.microtask(_syncDashboard);
-    _refreshTimer = Timer.periodic(const Duration(seconds: 12), (_) => _syncDashboard());
+    _refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) => _syncDashboard());
     _connectSocket();
     Future<void>.microtask(_requestNotificationPermission);
     _tripSubscription = ref.listenManual<TripState>(tripProvider, (previous, next) {
@@ -188,6 +188,7 @@ class _RideTabState extends ConsumerState<RideTab> {
     final resolvedDestination =
         _rideMode == RideMode.cercano && destination.isEmpty ? 'Abordaje inmediato' : destination;
     final selectedDriverId = _rideMode == RideMode.cercano ? _selectedDriverId : null;
+    final selectedDriver = _findDriverById(ref.read(tripProvider).nearbyDrivers, selectedDriverId);
 
     if (location == null) {
       _showMessage(locationState.errorMessage ?? 'Activa tu ubicacion para pedir un taxi.');
@@ -196,6 +197,15 @@ class _RideTabState extends ConsumerState<RideTab> {
 
     if (resolvedDestination.isEmpty) {
       _showMessage('Ingresa un destino para continuar.');
+      return;
+    }
+
+    if (_rideMode == RideMode.cercano &&
+        selectedDriver != null &&
+        selectedDriver.distanceMeters > 1000) {
+      _showMessage(
+        'Ese auto esta a ${selectedDriver.distanceMeters.toStringAsFixed(0)} m. Para tomar taxi debe estar dentro de 1 km.',
+      );
       return;
     }
 
@@ -215,8 +225,6 @@ class _RideTabState extends ConsumerState<RideTab> {
     }
 
     if (mounted) {
-      final selectedDriver =
-          _findDriverById(ref.read(tripProvider).nearbyDrivers, selectedDriverId);
       _showFloatingNotification(
         selectedDriver == null
             ? 'Solicitud enviada. Estamos buscando un conductor.'
@@ -240,9 +248,17 @@ class _RideTabState extends ConsumerState<RideTab> {
   }
 
   Future<void> _selectNearestTaxi() async {
-    final drivers = _requestableDrivers(ref.read(tripProvider).nearbyDrivers);
+    final nearbyDrivers = ref.read(tripProvider).nearbyDrivers;
+    final drivers = _requestableDrivers(nearbyDrivers);
     if (drivers.isEmpty) {
-      _showMessage('No hay taxis cercanos disponibles en este momento.');
+      if (nearbyDrivers.isNotEmpty) {
+        final nearest = nearbyDrivers.first;
+        _showMessage(
+          'El auto mas cercano esta a ${nearest.distanceMeters.toStringAsFixed(0)} m. Para tomar taxi debe estar dentro de 1 km.',
+        );
+      } else {
+        _showMessage('No hay taxis cercanos disponibles en este momento.');
+      }
       return;
     }
 
@@ -481,7 +497,7 @@ class _RideTabState extends ConsumerState<RideTab> {
   }
 
   List<NearbyDriver> _requestableDrivers(List<NearbyDriver> drivers) {
-    return drivers.where((driver) => driver.distanceMeters <= 100).toList(growable: false);
+    return drivers.where((driver) => driver.distanceMeters <= 1000).toList(growable: false);
   }
 
   NearbyDriver? _findDriverById(List<NearbyDriver> drivers, String? driverId) {
@@ -520,23 +536,34 @@ class _RideTabState extends ConsumerState<RideTab> {
         tripState.request.driverLat != null && tripState.request.driverLng != null
             ? LatLng(tripState.request.driverLat!, tripState.request.driverLng!)
             : null;
-    final requestableDrivers = _requestableDrivers(tripState.nearbyDrivers);
-    final driverPoints = hasActiveTrip
-        ? [
-            if (activeDriverPoint != null)
-              PotosiMapDriverMarker(
-                point: activeDriverPoint,
-                vehicleType: tripState.request.vehicleType,
-              ),
-          ]
-        : tripState.nearbyDrivers
-              .map(
-                (driver) => PotosiMapDriverMarker(
-                  point: LatLng(driver.lat, driver.lng),
-                  vehicleType: driver.vehicleType,
-                ),
-              )
-              .toList(growable: false);
+    final displayNearbyDrivers = _requestableDrivers(tripState.nearbyDrivers);
+    final activeDriverKey = activeDriverPoint == null
+        ? null
+        : '${activeDriverPoint.latitude.toStringAsFixed(6)}:${activeDriverPoint.longitude.toStringAsFixed(6)}';
+    final allDriverPoints = tripState.nearbyDrivers
+        .map(
+          (driver) => PotosiMapDriverMarker(
+            point: LatLng(driver.lat, driver.lng),
+            vehicleType: driver.vehicleType,
+          ),
+        )
+        .toList(growable: true);
+    if (activeDriverPoint != null) {
+      final alreadyIncluded = allDriverPoints.any(
+        (marker) =>
+            '${marker.point.latitude.toStringAsFixed(6)}:${marker.point.longitude.toStringAsFixed(6)}' ==
+            activeDriverKey,
+      );
+      if (!alreadyIncluded) {
+        allDriverPoints.add(
+          PotosiMapDriverMarker(
+            point: activeDriverPoint,
+            vehicleType: tripState.request.vehicleType,
+          ),
+        );
+      }
+    }
+    final driverPoints = allDriverPoints;
 
     return Stack(
       children: [
@@ -925,7 +952,21 @@ class _RideTabState extends ConsumerState<RideTab> {
                       style: const TextStyle(color: Color(0xFFFFC89B), fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 18),
-                    if (_rideMode == RideMode.cercano) ..._buildVehicleCards(requestableDrivers),
+                    if (_rideMode == RideMode.cercano) ...[
+                      if (displayNearbyDrivers.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Text(
+                            'Solo aparecen autos con disponibilidad activa dentro de 1 km.',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFFFFC89B),
+                            ),
+                          ),
+                        ),
+                      ..._buildVehicleCards(displayNearbyDrivers),
+                    ],
                     if (_rideMode == RideMode.destino)
                       Container(
                         width: double.infinity,
