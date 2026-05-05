@@ -47,8 +47,8 @@ class PotosiMap extends StatelessWidget {
               point: LatLng(-19.5836, -65.7531),
               radius: 15000,
               useRadiusInMeter: true,
-              color: Color(0x16006875),
-              borderColor: Color(0x3300E3FD),
+              color: Color(0x1AF97316),
+              borderColor: Color(0x55F97316),
               borderStrokeWidth: 2,
             ),
           ],
@@ -59,7 +59,7 @@ class PotosiMap extends StatelessWidget {
               Polyline(
                 points: [userLocation, routeTarget!],
                 strokeWidth: 4,
-                color: const Color(0xFF00AFC3),
+                color: const Color(0xFFF97316),
               ),
             ],
           ),
@@ -74,13 +74,13 @@ class PotosiMap extends StatelessWidget {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF00E3FD).withValues(alpha: 0.35),
+                      color: const Color(0xFFF97316).withValues(alpha: 0.35),
                       blurRadius: 18,
                       spreadRadius: 2,
                     ),
                   ],
                 ),
-                child: const Icon(Icons.person_pin_circle, color: Color(0xFF001F24), size: 40),
+                child: const Icon(Icons.person_pin_circle, color: Color(0xFFF97316), size: 40),
               ),
             ),
             if (showTargetMarker && routeTarget != null)
@@ -88,7 +88,7 @@ class PotosiMap extends StatelessWidget {
                 point: routeTarget!,
                 width: 54,
                 height: 54,
-                child: const Icon(Icons.place, color: Color(0xFF000003), size: 34),
+                child: const Icon(Icons.place, color: Color(0xFFF97316), size: 34),
               ),
             ...drivers.map(
               (driver) => Marker(
@@ -102,7 +102,7 @@ class PotosiMap extends StatelessWidget {
                   ),
                   child: Icon(
                     _vehicleIcon(driver.vehicleType),
-                    color: const Color(0xFF00E3FD),
+                    color: const Color(0xFFF97316),
                     size: 22,
                   ),
                 ),

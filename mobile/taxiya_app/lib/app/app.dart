@@ -24,40 +24,42 @@ class TaxiYaUnifiedApp extends StatelessWidget {
         textTheme: GoogleFonts.manropeTextTheme(),
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFFF97316),
-          primary: const Color(0xFF0F0F10),
+          brightness: Brightness.dark,
+          primary: const Color(0xFFF97316),
           secondary: const Color(0xFFC2410C),
-          surface: const Color(0xFFFFF7F1),
+          surface: const Color(0xFF151517),
         ),
-        scaffoldBackgroundColor: const Color(0xFFFFF7F1),
+        scaffoldBackgroundColor: const Color(0xFF111214),
         cardTheme: CardThemeData(
           elevation: 0,
-          color: Colors.white,
+          color: const Color(0xFF1B1B1F),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
         ),
         appBarTheme: AppBarTheme(
-          backgroundColor: Colors.transparent,
+          backgroundColor: const Color(0xFF111214),
           elevation: 0,
           titleTextStyle: GoogleFonts.plusJakartaSans(
             fontSize: 22,
             fontWeight: FontWeight.w800,
-            color: const Color(0xFF0F0F10),
+            color: const Color(0xFFFFF4EC),
           ),
+          iconTheme: const IconThemeData(color: Color(0xFFF97316)),
         ),
         navigationBarTheme: NavigationBarThemeData(
-          backgroundColor: Colors.transparent,
-          indicatorColor: const Color(0x22F97316),
+          backgroundColor: const Color(0xFF1A1A1D),
+          indicatorColor: const Color(0xFFF97316),
           labelTextStyle: WidgetStateProperty.resolveWith((states) {
             final selected = states.contains(WidgetState.selected);
             return GoogleFonts.manrope(
               fontSize: 12,
               fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
-              color: selected ? const Color(0xFFC2410C) : const Color(0xFF0F0F10),
+              color: selected ? const Color(0xFF0F0F10) : const Color(0xFFFFC89B),
             );
           }),
           iconTheme: WidgetStateProperty.resolveWith((states) {
             final selected = states.contains(WidgetState.selected);
             return IconThemeData(
-              color: selected ? const Color(0xFFC2410C) : const Color(0xFF0F0F10),
+              color: selected ? const Color(0xFF0F0F10) : const Color(0xFFFFC89B),
             );
           }),
         ),
@@ -139,7 +141,7 @@ class _UnifiedEntryPageState extends ConsumerState<UnifiedEntryPage> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFFF9F9FB), Color(0xFFEAFBFD)],
+            colors: [Color(0xFF111214), Color(0xFF2A1406)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -165,7 +167,7 @@ class _UnifiedEntryPageState extends ConsumerState<UnifiedEntryPage> {
                 width: 280,
                 height: 280,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFC2410C).withValues(alpha: 0.10),
+                  color: const Color(0xFFF97316).withValues(alpha: 0.14),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -184,7 +186,7 @@ class _UnifiedEntryPageState extends ConsumerState<UnifiedEntryPage> {
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 42,
                             fontWeight: FontWeight.w900,
-                            color: const Color(0xFF0F0F10),
+                            color: const Color(0xFFFFF4EC),
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -193,7 +195,7 @@ class _UnifiedEntryPageState extends ConsumerState<UnifiedEntryPage> {
                           style: GoogleFonts.manrope(
                             fontSize: 16,
                             height: 1.5,
-                            color: const Color(0xFF47464B),
+                            color: const Color(0xFFFFC89B),
                           ),
                         ),
                         const SizedBox(height: 28),
@@ -308,9 +310,9 @@ class _TaxiYaSplashScreenState extends State<_TaxiYaSplashScreen>
                     width: 110,
                     height: 110,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.14),
+                      color: const Color(0xFF1A1A1D).withValues(alpha: 0.72),
                       borderRadius: BorderRadius.circular(34),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+                      border: Border.all(color: const Color(0x55F97316)),
                     ),
                     child: const Icon(
                       Icons.directions_car_filled_rounded,
@@ -322,7 +324,7 @@ class _TaxiYaSplashScreenState extends State<_TaxiYaSplashScreen>
                   Text(
                     'Taxi Ya',
                     style: GoogleFonts.plusJakartaSans(
-                      color: Colors.white,
+                      color: const Color(0xFFFFF4EC),
                       fontSize: 34,
                       fontWeight: FontWeight.w900,
                     ),
@@ -331,7 +333,7 @@ class _TaxiYaSplashScreenState extends State<_TaxiYaSplashScreen>
                   Text(
                     'Movilidad segura en una sola app',
                     style: GoogleFonts.manrope(
-                      color: Colors.white.withValues(alpha: 0.82),
+                      color: const Color(0xFFFFC89B),
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                     ),
@@ -368,8 +370,9 @@ class _RoleCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.92),
+        color: const Color(0xFF1B1B1F),
         borderRadius: BorderRadius.circular(32),
+        border: Border.all(color: accent.withValues(alpha: 0.55)),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF0F0F10).withValues(alpha: 0.06),
@@ -389,13 +392,13 @@ class _RoleCard extends StatelessWidget {
               color: accent.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(22),
             ),
-            child: Icon(icon, color: accent, size: 34),
-          ),
+          child: Icon(icon, color: accent, size: 34),
+        ),
           const SizedBox(height: 18),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: const Color(0xFFF3F3F5),
+              color: const Color(0xFF25252B),
               borderRadius: BorderRadius.circular(999),
             ),
             child: Text(
@@ -404,7 +407,7 @@ class _RoleCard extends StatelessWidget {
                 fontSize: 10,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 1.0,
-                color: const Color(0xFF47464B),
+                color: const Color(0xFFFFC89B),
               ),
             ),
           ),
@@ -414,7 +417,7 @@ class _RoleCard extends StatelessWidget {
             style: GoogleFonts.plusJakartaSans(
               fontSize: 28,
               fontWeight: FontWeight.w800,
-              color: const Color(0xFF0F0F10),
+              color: const Color(0xFFFFF4EC),
             ),
           ),
           const SizedBox(height: 10),
@@ -423,7 +426,7 @@ class _RoleCard extends StatelessWidget {
             style: GoogleFonts.manrope(
               fontSize: 15,
               height: 1.5,
-              color: const Color(0xFF47464B),
+              color: const Color(0xFFFFC89B),
             ),
           ),
           const SizedBox(height: 28),

@@ -592,6 +592,36 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
     return driverState.available ? 'Buscando viaje' : 'Desconectado';
   }
 
+  String _driverStatusShortLabel(String status) {
+    return switch (status) {
+      'requested' => 'Solicitud',
+      'searching' => 'Pendiente',
+      'accepted' => 'Aceptado',
+      'arriving' => 'En camino',
+      'at_pickup' => 'Llego',
+      'in_progress' => 'En curso',
+      'completed' => 'Finalizado',
+      _ => 'Activo',
+    };
+  }
+
+  String _driverStatusMiniDetail(DriverTrip trip) {
+    if (trip.passengerPickup.isNotEmpty) {
+      return trip.passengerPickup;
+    }
+    return 'Ver detalle';
+  }
+
+  Color _driverStatusAccentColor(String status) {
+    return switch (status) {
+      'requested' || 'searching' || 'accepted' || 'arriving' => const Color(0xFFF97316),
+      'at_pickup' => const Color(0xFF22C55E),
+      'in_progress' => const Color(0xFF0EA5E9),
+      'completed' => const Color(0xFF9CA3AF),
+      _ => const Color(0xFFF97316),
+    };
+  }
+
   IconData _tripVehicleIcon(DriverTrip? trip) {
     return switch ((trip?.vehicleType ?? '').toLowerCase()) {
       'moto' => Icons.two_wheeler_rounded,
@@ -858,9 +888,31 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
             ),
           ),
         ),
+        if (trip != null)
+          Positioned(
+            right: 20,
+            top: 132,
+            child: _DriverSideStatusChip(
+              title: 'Estado',
+              value: _driverStatusShortLabel(trip.status),
+              subtitle: _driverStatusMiniDetail(trip),
+              accentColor: _driverStatusAccentColor(trip.status),
+              onTap: () => _showStatusSheet(context, driverState, trip),
+            ),
+          ),
+        if (trip != null && trip.status != 'completed')
+          Positioned(
+            right: 20,
+            top: 258,
+            child: _DriverQuickActionChip(
+              label: _driverActionLabel(trip),
+              accentColor: _driverStatusAccentColor(trip.status),
+              onTap: () => _handleDriverPrimaryAction(trip),
+            ),
+          ),
         Positioned(
           right: 20,
-          bottom: 236,
+          bottom: trip != null && trip.status != 'completed' ? 204 : 236,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1473,6 +1525,148 @@ class _DriverTripProgressBar extends StatelessWidget {
           }).toList(),
         ),
       ],
+    );
+  }
+}
+
+class _DriverSideStatusChip extends StatelessWidget {
+  const _DriverSideStatusChip({
+    required this.title,
+    required this.value,
+    required this.subtitle,
+    required this.accentColor,
+    required this.onTap,
+  });
+
+  final String title;
+  final String value;
+  final String subtitle;
+  final Color accentColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: accentColor.withValues(alpha: 0.20),
+      borderRadius: BorderRadius.circular(22),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22),
+        onTap: onTap,
+        child: Container(
+          width: 108,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: accentColor.withValues(alpha: 0.70)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x22000000),
+                blurRadius: 18,
+                offset: Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.timeline_rounded, color: accentColor, size: 20),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Color(0xFFFFC89B),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: GoogleFonts.plusJakartaSans(
+                  color: const Color(0xFFFFF4EC),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFFFFC89B),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DriverQuickActionChip extends StatelessWidget {
+  const _DriverQuickActionChip({
+    required this.label,
+    required this.accentColor,
+    required this.onTap,
+  });
+
+  final String label;
+  final Color accentColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: accentColor,
+      borderRadius: BorderRadius.circular(22),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22),
+        onTap: onTap,
+        child: Container(
+          width: 108,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x22000000),
+                blurRadius: 18,
+                offset: Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.touch_app_rounded, color: Color(0xFF0F0F10), size: 20),
+              const SizedBox(height: 8),
+              const Text(
+                'Accion',
+                style: TextStyle(
+                  color: Color(0xFF3B1B05),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.plusJakartaSans(
+                  color: const Color(0xFF0F0F10),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

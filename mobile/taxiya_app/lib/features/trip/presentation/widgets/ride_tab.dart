@@ -679,6 +679,18 @@ class _RideTabState extends ConsumerState<RideTab> {
             ),
           ),
         ),
+        if (hasActiveTrip)
+          Positioned(
+            right: 20,
+            top: 132,
+            child: _SideStatusChip(
+              title: 'Estado',
+              value: _tripStatusShortLabel(tripState.request.status),
+              subtitle: _tripStatusMiniDetail(tripState.request),
+              accentColor: _tripStatusAccentColor(tripState.request.status),
+              onTap: () => _showTripRequestSheet(tripState),
+            ),
+          ),
         Positioned(
           right: 20,
           bottom: 170,
@@ -951,6 +963,40 @@ class _RideTabState extends ConsumerState<RideTab> {
       _ => Icons.directions_car_filled_rounded,
     };
   }
+
+  String _tripStatusShortLabel(String status) {
+    return switch (status) {
+      'requested' => 'Solicitado',
+      'searching' => 'Buscando',
+      'accepted' => 'Aceptado',
+      'arriving' => 'En camino',
+      'at_pickup' => 'Llego',
+      'in_progress' => 'En curso',
+      'completed' => 'Finalizado',
+      _ => 'Activo',
+    };
+  }
+
+  String _tripStatusMiniDetail(TripRequest request) {
+    if (request.etaMinutes != null &&
+        (request.status == 'accepted' || request.status == 'arriving')) {
+      return '${request.etaMinutes} min';
+    }
+    if ((request.vehicleLabel?.isNotEmpty ?? false)) {
+      return request.vehicleLabel!;
+    }
+    return 'Ver detalle';
+  }
+
+  Color _tripStatusAccentColor(String status) {
+    return switch (status) {
+      'requested' || 'searching' || 'accepted' || 'arriving' => const Color(0xFFF97316),
+      'at_pickup' => const Color(0xFF22C55E),
+      'in_progress' => const Color(0xFF0EA5E9),
+      'completed' => const Color(0xFF9CA3AF),
+      _ => const Color(0xFFF97316),
+    };
+  }
 }
 
 enum RideMode {
@@ -1008,6 +1054,84 @@ class _MapActionButton extends StatelessWidget {
           width: 52,
           height: 52,
           child: Icon(icon, color: const Color(0xFFF97316)),
+        ),
+      ),
+    );
+  }
+}
+
+class _SideStatusChip extends StatelessWidget {
+  const _SideStatusChip({
+    required this.title,
+    required this.value,
+    required this.subtitle,
+    required this.accentColor,
+    required this.onTap,
+  });
+
+  final String title;
+  final String value;
+  final String subtitle;
+  final Color accentColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: accentColor.withValues(alpha: 0.20),
+      borderRadius: BorderRadius.circular(22),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22),
+        onTap: onTap,
+        child: Container(
+          width: 108,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: accentColor.withValues(alpha: 0.70)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x22000000),
+                blurRadius: 18,
+                offset: Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.route_rounded, color: accentColor, size: 20),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Color(0xFFFFE7D1),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: GoogleFonts.plusJakartaSans(
+                  color: const Color(0xFFFFF4EC),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFFFFDCC1),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

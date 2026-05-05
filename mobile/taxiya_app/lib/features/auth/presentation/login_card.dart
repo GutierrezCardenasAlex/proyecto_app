@@ -20,6 +20,7 @@ class _LoginCardState extends ConsumerState<LoginCard> {
   final _otpController = TextEditingController();
   final _passwordController = TextEditingController();
   _AuthMode _mode = _AuthMode.login;
+  String? _fallbackOtpCode;
 
   @override
   void dispose() {
@@ -84,9 +85,27 @@ class _LoginCardState extends ConsumerState<LoginCard> {
     showTopNotice(context, message);
   }
 
+  void _applyOtpFallback(OtpRequestResult result, {required String successMessage}) {
+    if (!mounted) {
+      return;
+    }
+    if (!result.smsDelivered && (result.otp?.isNotEmpty ?? false)) {
+      setState(() => _fallbackOtpCode = result.otp);
+      _otpController.text = result.otp!;
+      showTopNotice(
+        context,
+        'No pudimos enviar SMS, usa el codigo de respaldo ${result.otp}. Ya lo escribimos por ti.',
+        backgroundColor: const Color(0xFFF97316),
+        foregroundColor: const Color(0xFF0F0F10),
+      );
+      return;
+    }
+    setState(() => _fallbackOtpCode = null);
+    _showSuccess(successMessage);
+  }
+
   Future<void> _showResetPasswordDialog() async {
     final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
     final otpController = TextEditingController();
     final newPasswordController = TextEditingController();
     bool otpRequested = false;
@@ -135,14 +154,22 @@ class _LoginCardState extends ConsumerState<LoginCard> {
                           _showInlineError(phoneError);
                           return;
                         }
-                        await ref.read(authRepositoryProvider).requestPasswordResetOtp(_normalizedPhone());
+                        final result = await ref.read(authRepositoryProvider).requestPasswordResetOtp(_normalizedPhone());
+                        if (!context.mounted) {
+                          return;
+                        }
                         setDialogState(() => otpRequested = true);
-                        messenger.showSnackBar(
-                          const SnackBar(
-                            content: Text('OTP enviado para recuperar la contrasena.'),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
+                        if (!result.smsDelivered && (result.otp?.isNotEmpty ?? false)) {
+                          otpController.text = result.otp!;
+                          showTopNotice(
+                            context,
+                            'No pudimos enviar SMS, usa el codigo de respaldo ${result.otp}.',
+                            backgroundColor: const Color(0xFFF97316),
+                            foregroundColor: const Color(0xFF0F0F10),
+                          );
+                        } else {
+                          _showSuccess('OTP enviado para recuperar la contrasena.');
+                        }
                       },
                       child: const Text('Enviar OTP'),
                     )
@@ -161,14 +188,9 @@ class _LoginCardState extends ConsumerState<LoginCard> {
                               phone: _normalizedPhone(),
                               otp: otpController.text.trim(),
                               password: password,
-                            );
-                        navigator.pop();
-                        messenger.showSnackBar(
-                          const SnackBar(
-                            content: Text('Contrasena actualizada. Ya puedes ingresar.'),
-                            behavior: SnackBarBehavior.floating,
-                          ),
                         );
+                        navigator.pop();
+                        _showSuccess('Contrasena actualizada. Ya puedes ingresar.');
                       },
                       child: const Text('Actualizar'),
                     ),
@@ -192,12 +214,12 @@ class _LoginCardState extends ConsumerState<LoginCard> {
     return Container(
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.72),
+        color: const Color(0xFF151517).withValues(alpha: 0.94),
         borderRadius: BorderRadius.circular(36),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.65)),
+        border: Border.all(color: const Color(0xFF2A2A2E)),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x12000003),
+            color: Color(0x33000000),
             blurRadius: 40,
             offset: Offset(0, 22),
           ),
@@ -221,7 +243,7 @@ class _LoginCardState extends ConsumerState<LoginCard> {
             style: GoogleFonts.plusJakartaSans(
               fontSize: 40,
               fontWeight: FontWeight.w900,
-              color: const Color(0xFF0F0F10),
+              color: const Color(0xFFFFF4EC),
             ),
           ),
           const SizedBox(height: 8),
@@ -230,7 +252,7 @@ class _LoginCardState extends ConsumerState<LoginCard> {
                 ? 'Ingresa con tu celular y contrasena. Si el equipo esta autorizado, entras directo.'
                 : 'Registra tu celular, valida con OTP y crea tu contrasena.',
             style: const TextStyle(
-              color: Color(0xFF47464B),
+              color: Color(0xFFFFC89B),
               fontWeight: FontWeight.w600,
               fontSize: 16,
             ),
@@ -252,6 +274,7 @@ class _LoginCardState extends ConsumerState<LoginCard> {
             onSelectionChanged: (selection) {
               setState(() {
                 _mode = selection.first;
+                _fallbackOtpCode = null;
               });
             },
           ),
@@ -307,7 +330,7 @@ class _LoginCardState extends ConsumerState<LoginCard> {
                                 },
                           style: FilledButton.styleFrom(
                             backgroundColor: const Color(0xFFC2410C),
-                            foregroundColor: Colors.white,
+                            foregroundColor: const Color(0xFFFFF4EC),
                             minimumSize: const Size.fromHeight(62),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
                             elevation: 0,
@@ -364,7 +387,7 @@ class _LoginCardState extends ConsumerState<LoginCard> {
                                         _showInlineError(phoneError);
                                         return;
                                       }
-                                      await ref.read(sessionProvider.notifier).requestRegistrationOtp(
+                                      final otpResult = await ref.read(sessionProvider.notifier).requestRegistrationOtp(
                                             _normalizedPhone(),
                                             _firstNameController.text.trim(),
                                           );
@@ -372,13 +395,16 @@ class _LoginCardState extends ConsumerState<LoginCard> {
                                         return;
                                       }
                                       final updated = ref.read(sessionProvider);
-                                      if (updated.otpRequested && updated.errorMessage == null) {
-                                        _showSuccess('Te enviamos un codigo de verificacion para continuar.');
+                                      if (updated.otpRequested && updated.errorMessage == null && otpResult != null) {
+                                        _applyOtpFallback(
+                                          otpResult,
+                                          successMessage: 'Te enviamos un codigo de verificacion para continuar.',
+                                        );
                                       }
                                     },
                               style: FilledButton.styleFrom(
                                 backgroundColor: const Color(0xFFC2410C),
-                                foregroundColor: Colors.white,
+                                foregroundColor: const Color(0xFFFFF4EC),
                                 minimumSize: const Size.fromHeight(62),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
                                 elevation: 0,
@@ -404,6 +430,10 @@ class _LoginCardState extends ConsumerState<LoginCard> {
                             icon: Icons.sms_outlined,
                             helperText: 'Si no llego el mensaje, revisa el numero o vuelve al paso anterior.',
                           ),
+                          if (_fallbackOtpCode != null) ...[
+                            const SizedBox(height: 12),
+                            _OtpFallbackCard(code: _fallbackOtpCode!),
+                          ],
                           const SizedBox(height: 18),
                           const _LabelText('Contrasena'),
                           const SizedBox(height: 8),
@@ -430,6 +460,7 @@ class _LoginCardState extends ConsumerState<LoginCard> {
                                   onPressed: session.isLoading
                                       ? null
                                       : () {
+                                          setState(() => _fallbackOtpCode = null);
                                           ref.read(sessionProvider.notifier).cancelRegistrationOtp();
                                         },
                                   icon: const Icon(Icons.arrow_back_rounded),
@@ -561,10 +592,10 @@ class _StepGuideCard extends StatelessWidget {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.72),
+              color: const Color(0xFFF97316),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(icon, color: const Color(0xFFC2410C)),
+            child: Icon(icon, color: const Color(0xFF0F0F10)),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -576,14 +607,14 @@ class _StepGuideCard extends StatelessWidget {
                   style: GoogleFonts.plusJakartaSans(
                     fontWeight: FontWeight.w800,
                     fontSize: 16,
-                    color: const Color(0xFF0F0F10),
+                    color: const Color(0xFFFFF4EC),
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   message,
                   style: const TextStyle(
-                    color: Color(0xFF47464B),
+                    color: Color(0xFFFFC89B),
                     fontWeight: FontWeight.w600,
                     height: 1.4,
                   ),
@@ -635,16 +666,16 @@ class _StyledField extends StatelessWidget {
       controller: controller,
       obscureText: obscureText,
       decoration: InputDecoration(
-        prefixIcon: Icon(icon, color: const Color(0xFF77767C)),
+        prefixIcon: Icon(icon, color: const Color(0xFFFFC89B)),
         filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.55),
+        fillColor: const Color(0xFF222226),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(22),
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(22),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.7)),
+          borderSide: const BorderSide(color: Color(0xFF303035)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(22),
@@ -652,7 +683,9 @@ class _StyledField extends StatelessWidget {
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
         helperText: helperText,
+        helperStyle: const TextStyle(color: Color(0xFFFFC89B)),
       ),
+      style: const TextStyle(color: Color(0xFFFFF4EC)),
     );
   }
 }
@@ -677,21 +710,21 @@ class _PhoneField extends StatelessWidget {
           child: Text(
             '+591',
             style: TextStyle(
-              color: Color(0xFF0F0F10),
+              color: Color(0xFFFFF4EC),
               fontWeight: FontWeight.w800,
             ),
           ),
         ),
         prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
         filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.55),
+        fillColor: const Color(0xFF222226),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(22),
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(22),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.7)),
+          borderSide: const BorderSide(color: Color(0xFF303035)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(22),
@@ -699,6 +732,57 @@ class _PhoneField extends StatelessWidget {
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
         helperText: helperText,
+        helperStyle: const TextStyle(color: Color(0xFFFFC89B)),
+      ),
+      style: const TextStyle(color: Color(0xFFFFF4EC)),
+    );
+  }
+}
+
+class _OtpFallbackCard extends StatelessWidget {
+  const _OtpFallbackCard({required this.code});
+
+  final String code;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0x33F97316),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0x66F97316)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Codigo de respaldo',
+            style: GoogleFonts.plusJakartaSans(
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFFFFF4EC),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            code,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 2,
+              color: const Color(0xFFF97316),
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Usa este codigo si el SMS no llego. Ya lo dejamos escrito en el campo OTP.',
+            style: TextStyle(
+              color: Color(0xFFFFC89B),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

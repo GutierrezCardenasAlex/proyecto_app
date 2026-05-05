@@ -33,7 +33,13 @@ class DriverAppDrawer extends StatelessWidget {
     return Drawer(
       width: 320,
       child: Container(
-        color: const Color(0xFFF9F9FB),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF111214), Color(0xFF1B1B1F)],
+          ),
+        ),
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
@@ -41,7 +47,7 @@ class DriverAppDrawer extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Material(
-                  color: Colors.white,
+                  color: const Color(0xFF1F1F24),
                   borderRadius: BorderRadius.circular(28),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(28),
@@ -56,10 +62,10 @@ class DriverAppDrawer extends StatelessWidget {
                                 width: 78,
                                 height: 78,
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFF3F3F5),
+                                  color: const Color(0xFF2A2A31),
                                   borderRadius: BorderRadius.circular(22),
                                 ),
-                                child: const Icon(Icons.person, size: 36),
+                                child: const Icon(Icons.person, size: 36, color: Color(0xFFFFF4EC)),
                               ),
                               Positioned(
                                 right: 0,
@@ -67,10 +73,10 @@ class DriverAppDrawer extends StatelessWidget {
                                 child: Container(
                                   padding: const EdgeInsets.all(5),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF00E3FD),
+                                    color: const Color(0xFFF97316),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
-                                  child: const Icon(Icons.verified, size: 16, color: Color(0xFF001F24)),
+                                  child: const Icon(Icons.verified, size: 16, color: Color(0xFF0F0F10)),
                                 ),
                               ),
                             ],
@@ -85,13 +91,14 @@ class DriverAppDrawer extends StatelessWidget {
                                   style: GoogleFonts.plusJakartaSans(
                                     fontSize: 22,
                                     fontWeight: FontWeight.w800,
+                                    color: const Color(0xFFFFF4EC),
                                   ),
                                 ),
                                 const SizedBox(height: 6),
                                 const Text(
                                   'Calificacion 4.97',
                                   style: TextStyle(
-                                    color: Color(0xFF006875),
+                                    color: Color(0xFFFDBA74),
                                     fontWeight: FontWeight.w800,
                                   ),
                                 ),
@@ -99,7 +106,7 @@ class DriverAppDrawer extends StatelessWidget {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                   decoration: BoxDecoration(
-                                    color: const Color(0x1A00E3FD),
+                                    color: const Color(0x33F97316),
                                     borderRadius: BorderRadius.circular(999),
                                   ),
                                   child: const Text(
@@ -108,14 +115,14 @@ class DriverAppDrawer extends StatelessWidget {
                                       fontSize: 10,
                                       fontWeight: FontWeight.w900,
                                       letterSpacing: 1.2,
-                                      color: Color(0xFF00616D),
+                                      color: Color(0xFFFFC89B),
                                     ),
                                   ),
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  phone.isEmpty ? '+591 71111111' : phone,
-                                  style: const TextStyle(color: Color(0xFF47464B)),
+                                  phone,
+                                  style: const TextStyle(color: Color(0xFFFFDCC1)),
                                 ),
                               ],
                             ),
@@ -129,14 +136,17 @@ class DriverAppDrawer extends StatelessWidget {
                 Expanded(
                   child: ListView.separated(
                     itemCount: items.length,
-                    separatorBuilder: (_, index) => const SizedBox(height: 8),
+                    separatorBuilder: (context, index) => const SizedBox(height: 8),
                     itemBuilder: (context, index) {
                       final item = items[index];
                       final active = item.$1 == activeItem;
                       return Container(
                         decoration: BoxDecoration(
-                          color: active ? const Color(0xFF00E3FD) : Colors.transparent,
+                          color: active ? const Color(0xFFF97316) : Colors.transparent,
                           borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: active ? const Color(0xFFF97316) : const Color(0xFF2D2D32),
+                          ),
                         ),
                         child: ListTile(
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
@@ -144,16 +154,19 @@ class DriverAppDrawer extends StatelessWidget {
                             width: 40,
                             height: 40,
                             decoration: BoxDecoration(
-                              color: active ? const Color(0x1A001F24) : const Color(0xFFF3F3F5),
+                              color: active ? const Color(0xFF0F0F10) : const Color(0xFF25252B),
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: Icon(item.$2),
+                            child: Icon(
+                              item.$2,
+                              color: active ? const Color(0xFFF97316) : const Color(0xFFFFC89B),
+                            ),
                           ),
                           title: Text(
                             item.$1,
                             style: TextStyle(
                               fontWeight: active ? FontWeight.w800 : FontWeight.w600,
-                              color: active ? const Color(0xFF001F24) : const Color(0xFF000003),
+                              color: active ? const Color(0xFF0F0F10) : const Color(0xFFFFF4EC),
                             ),
                           ),
                           onTap: () {
@@ -165,15 +178,19 @@ class DriverAppDrawer extends StatelessWidget {
                     },
                   ),
                 ),
-                const Divider(color: Color(0x1AC8C5CC)),
+                const Divider(color: Color(0x33F97316)),
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
-                  child: FilledButton.tonalIcon(
+                  child: FilledButton.icon(
                     onPressed: () {
                       Navigator.pop(context);
                       onLogout();
                     },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFF97316),
+                      foregroundColor: const Color(0xFF0F0F10),
+                    ),
                     icon: const Icon(Icons.logout),
                     label: const Text('Cerrar sesion'),
                   ),

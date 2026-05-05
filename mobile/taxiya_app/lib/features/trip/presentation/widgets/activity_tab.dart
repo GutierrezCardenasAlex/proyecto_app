@@ -52,8 +52,9 @@ class _JourneyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: const Color(0xFF1B1B1F),
         borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: const Color(0xFF2C2C31)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -63,7 +64,7 @@ class _JourneyCard extends StatelessWidget {
             decoration: const BoxDecoration(
               borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
               gradient: LinearGradient(
-                colors: [Color(0xFFEAFBFD), Color(0xFFF3F3F5)],
+                colors: [Color(0xFF2A1406), Color(0xFF2A2A31)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -76,7 +77,7 @@ class _JourneyCard extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF00E3FD),
+                      color: const Color(0xFFF97316),
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
@@ -85,7 +86,7 @@ class _JourneyCard extends StatelessWidget {
                         fontSize: 10,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 1.2,
-                        color: Color(0xFF001F24),
+                        color: Color(0xFF0F0F10),
                       ),
                     ),
                   ),
@@ -93,7 +94,7 @@ class _JourneyCard extends StatelessWidget {
                 const Positioned(
                   right: 24,
                   bottom: 22,
-                  child: Icon(Icons.alt_route, size: 52, color: Color(0x22006875)),
+                  child: Icon(Icons.alt_route, size: 52, color: Color(0x55F97316)),
                 ),
               ],
             ),
@@ -124,7 +125,7 @@ class _JourneyCard extends StatelessWidget {
                             style: GoogleFonts.plusJakartaSans(
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
-                              color: const Color(0xFF000003),
+                              color: const Color(0xFFFFF4EC),
                             ),
                           ),
                         ],
@@ -136,7 +137,7 @@ class _JourneyCard extends StatelessWidget {
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 24,
                         fontWeight: FontWeight.w900,
-                        color: const Color(0xFF000003),
+                        color: const Color(0xFFFFF4EC),
                       ),
                     ),
                   ],
@@ -145,7 +146,7 @@ class _JourneyCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF3F3F5),
+                    color: const Color(0xFF25252B),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
@@ -154,10 +155,10 @@ class _JourneyCard extends StatelessWidget {
                         width: 44,
                         height: 44,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE2E2E4),
+                          color: const Color(0xFF2A2A31),
                           borderRadius: BorderRadius.circular(14),
                         ),
-                        child: const Icon(Icons.person, color: Color(0xFF000003)),
+                        child: const Icon(Icons.person, color: Color(0xFFF97316)),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -178,7 +179,7 @@ class _JourneyCard extends StatelessWidget {
                               passengerName,
                               style: const TextStyle(
                                 fontWeight: FontWeight.w800,
-                                color: Color(0xFF000003),
+                                color: Color(0xFFFFF4EC),
                               ),
                             ),
                           ],
@@ -186,7 +187,7 @@ class _JourneyCard extends StatelessWidget {
                       ),
                       const Row(
                         children: [
-                          Icon(Icons.star, size: 16, color: Color(0xFF00E3FD)),
+                          Icon(Icons.star, size: 16, color: Color(0xFFF97316)),
                           SizedBox(width: 4),
                           Text(
                             '4.9',

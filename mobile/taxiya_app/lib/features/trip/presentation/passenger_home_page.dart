@@ -109,17 +109,17 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
           _openPage(const ProfilePage(), drawerItem: 'Configuraciones');
         },
       ),
-      backgroundColor: const Color(0xFFFFF7F1),
+      backgroundColor: const Color(0xFF111214),
       extendBody: true,
       body: IndexedStack(index: _selectedIndex, children: pages),
       bottomNavigationBar: Container(
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 18),
         decoration: BoxDecoration(
-          color: const Color(0xFFFFF7F1).withValues(alpha: 0.88),
+          color: const Color(0xFF1A1A1D).withValues(alpha: 0.96),
           borderRadius: BorderRadius.circular(28),
           boxShadow: const [
             BoxShadow(
-              color: Color(0x12000003),
+              color: Color(0x22000000),
               blurRadius: 24,
               offset: Offset(0, -4),
             ),
@@ -155,11 +155,11 @@ class _LoginShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9F9FB),
+      backgroundColor: const Color(0xFF111214),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFFF9F9FB), Color(0xFFEAFBFD)],
+            colors: [Color(0xFF111214), Color(0xFF2A1406)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -173,7 +173,7 @@ class _LoginShell extends StatelessWidget {
                 width: 280,
                 height: 280,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF00E3FD).withValues(alpha: 0.12),
+                  color: const Color(0xFFF97316).withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -185,7 +185,7 @@ class _LoginShell extends StatelessWidget {
                 width: 240,
                 height: 240,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF006875).withValues(alpha: 0.10),
+                  color: const Color(0xFFC2410C).withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
               ),

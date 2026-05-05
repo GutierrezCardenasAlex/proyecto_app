@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../../core/ui/top_notice.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../widgets/driver_ui_kit.dart';
 
@@ -95,7 +96,6 @@ class _DriverProfilePageState extends ConsumerState<DriverProfilePage> {
   }
 
   Future<void> _saveProfile() async {
-    final messenger = ScaffoldMessenger.of(context);
     final session = ref.read(driverSessionProvider);
     if (_firstNameController.text.trim().isEmpty ||
         _lastNameController.text.trim().isEmpty ||
@@ -104,8 +104,10 @@ class _DriverProfilePageState extends ConsumerState<DriverProfilePage> {
         _brandController.text.trim().isEmpty ||
         _modelController.text.trim().isEmpty ||
         _colorController.text.trim().isEmpty) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Completa todos los datos obligatorios del conductor y del vehiculo.')),
+      showTopNotice(
+        context,
+        'Completa todos los datos obligatorios del conductor y del vehiculo.',
+        backgroundColor: const Color(0xFF93000A),
       );
       return;
     }
@@ -130,12 +132,19 @@ class _DriverProfilePageState extends ConsumerState<DriverProfilePage> {
 
     final updatedSession = ref.read(driverSessionProvider);
     if (updatedSession.errorMessage != null && updatedSession.errorMessage!.isNotEmpty) {
-      messenger.showSnackBar(SnackBar(content: Text(updatedSession.errorMessage!)));
+      showTopNotice(
+        context,
+        updatedSession.errorMessage!,
+        backgroundColor: const Color(0xFF93000A),
+      );
       return;
     }
 
-    messenger.showSnackBar(
-      const SnackBar(content: Text('Perfil del conductor actualizado correctamente.')),
+    showTopNotice(
+      context,
+      'Actualizaste tus datos correctamente.',
+      backgroundColor: const Color(0xFFF97316),
+      foregroundColor: const Color(0xFF0F0F10),
     );
 
     if (updatedSession.vehicleType != _vehicleType) {
@@ -161,8 +170,9 @@ class _DriverProfilePageState extends ConsumerState<DriverProfilePage> {
             Container(
               padding: const EdgeInsets.all(22),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: const Color(0xFF1B1B1F),
                 borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: const Color(0xFF2C2C31)),
               ),
               child: Column(
                 children: [
@@ -170,10 +180,10 @@ class _DriverProfilePageState extends ConsumerState<DriverProfilePage> {
                     width: 92,
                     height: 92,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF3F3F5),
+                      color: const Color(0xFF2A2A31),
                       borderRadius: BorderRadius.circular(28),
                     ),
-                    child: const Icon(Icons.person, size: 44),
+                    child: const Icon(Icons.person, size: 44, color: Color(0xFFFFF4EC)),
                   ),
                   const SizedBox(height: 18),
                   Text(
@@ -182,13 +192,14 @@ class _DriverProfilePageState extends ConsumerState<DriverProfilePage> {
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 24,
                       fontWeight: FontWeight.w800,
+                      color: const Color(0xFFFFF4EC),
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     session.phone,
                     style: const TextStyle(
-                      color: Color(0xFF47464B),
+                      color: Color(0xFFFFC89B),
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -196,7 +207,7 @@ class _DriverProfilePageState extends ConsumerState<DriverProfilePage> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: const Color(0x1A00E3FD),
+                      color: const Color(0x33F97316),
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: const Text(
@@ -205,7 +216,7 @@ class _DriverProfilePageState extends ConsumerState<DriverProfilePage> {
                         fontSize: 10,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 1.1,
-                        color: Color(0xFF00616D),
+                        color: Color(0xFFFFC89B),
                       ),
                     ),
                   ),
@@ -216,13 +227,16 @@ class _DriverProfilePageState extends ConsumerState<DriverProfilePage> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: const Color(0xFF1B1B1F),
                 borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: const Color(0xFF2C2C31)),
               ),
               child: _isFetching
                   ? const Padding(
                       padding: EdgeInsets.symmetric(vertical: 40),
-                      child: Center(child: CircularProgressIndicator()),
+                      child: Center(
+                        child: CircularProgressIndicator(color: Color(0xFFF97316)),
+                      ),
                     )
                   : Column(
                       children: [
@@ -246,7 +260,7 @@ class _DriverProfilePageState extends ConsumerState<DriverProfilePage> {
                             style: GoogleFonts.manrope(
                               fontSize: 12,
                               fontWeight: FontWeight.w800,
-                              color: const Color(0xFF47464B),
+                              color: const Color(0xFFFFC89B),
                             ),
                           ),
                         ),
@@ -407,13 +421,23 @@ class _ProfileField extends StatelessWidget {
         inputFormatters: inputFormatters,
         decoration: InputDecoration(
           labelText: label,
+          labelStyle: const TextStyle(color: Color(0xFFFFC89B)),
           filled: true,
-          fillColor: const Color(0xFFF7F7F9),
+          fillColor: const Color(0xFF25252B),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(18),
             borderSide: BorderSide.none,
           ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: const BorderSide(color: Color(0xFF303035)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: const BorderSide(color: Color(0xFFF97316), width: 1.4),
+          ),
         ),
+        style: const TextStyle(color: Color(0xFFFFF4EC)),
       ),
     );
   }
@@ -468,11 +492,16 @@ class _DetailScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9F9FB),
+      backgroundColor: const Color(0xFF111214),
       appBar: AppBar(
+        backgroundColor: const Color(0xFF111214),
+        foregroundColor: const Color(0xFFFFF4EC),
         title: Text(
           title,
-          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800),
+          style: GoogleFonts.plusJakartaSans(
+            fontWeight: FontWeight.w800,
+            color: const Color(0xFFFFF4EC),
+          ),
         ),
       ),
       body: child,

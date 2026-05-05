@@ -43,6 +43,18 @@ class DriverAuthResult {
   final bool profileCompleted;
 }
 
+class DriverOtpRequestResult {
+  const DriverOtpRequestResult({
+    required this.smsDelivered,
+    this.otp,
+    this.message,
+  });
+
+  final bool smsDelivered;
+  final String? otp;
+  final String? message;
+}
+
 class DriverProfileDetails {
   const DriverProfileDetails({
     required this.licenseNumber,
@@ -91,7 +103,7 @@ class DriverAuthRepository {
     );
   }
 
-  Future<void> requestRegistrationOtp(String phone, String firstName) async {
+  Future<DriverOtpRequestResult> requestRegistrationOtp(String phone, String firstName) async {
     final response = await http.post(
       Uri.parse('${AppConfig.apiBaseUrl}/auth/register/request-otp'),
       headers: {'Content-Type': 'application/json'},
@@ -102,6 +114,12 @@ class DriverAuthRepository {
       }),
     );
     await _throwIfError(response, fallbackMessage: 'No se pudo solicitar el OTP');
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    return DriverOtpRequestResult(
+      smsDelivered: payload['smsDelivered'] == true,
+      otp: payload['otp']?.toString(),
+      message: payload['message']?.toString(),
+    );
   }
 
   Future<DriverAuthResult> completeRegistration({
@@ -149,13 +167,19 @@ class DriverAuthRepository {
     return _resolveDriverAuth(response.body, fallbackPhone: phone);
   }
 
-  Future<void> requestPasswordResetOtp(String phone) async {
+  Future<DriverOtpRequestResult> requestPasswordResetOtp(String phone) async {
     final response = await http.post(
       Uri.parse('${AppConfig.apiBaseUrl}/auth/password/request-otp'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'phone': phone}),
     );
     await _throwIfError(response, fallbackMessage: 'No se pudo solicitar el OTP de recuperacion');
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    return DriverOtpRequestResult(
+      smsDelivered: payload['smsDelivered'] == true,
+      otp: payload['otp']?.toString(),
+      message: payload['message']?.toString(),
+    );
   }
 
   Future<void> resetPassword({
@@ -330,21 +354,23 @@ class DriverSessionController extends Notifier<DriverSession> {
     return initial;
   }
 
-  Future<void> requestRegistrationOtp(String phone, String firstName) async {
+  Future<DriverOtpRequestResult?> requestRegistrationOtp(String phone, String firstName) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
-      await _repository.requestRegistrationOtp(phone, firstName);
-    state = state.copyWith(
-      phone: phone,
-      firstName: firstName,
-      fullName: firstName,
-      vehicleType: state.vehicleType,
-      otpRequested: true,
+      final result = await _repository.requestRegistrationOtp(phone, firstName);
+      state = state.copyWith(
+        phone: phone,
+        firstName: firstName,
+        fullName: firstName,
+        vehicleType: state.vehicleType,
+        otpRequested: true,
         isLoading: false,
         clearError: true,
       );
+      return result;
     } catch (error) {
       state = state.copyWith(isLoading: false, errorMessage: error.toString().replaceFirst('Exception: ', ''));
+      return null;
     }
   }
 

@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../core/ui/top_notice.dart';
 import '../../../auth/data/auth_repository.dart';
-import '../widgets/ui_kit.dart';
 
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
@@ -15,7 +15,7 @@ class ProfilePage extends ConsumerStatefulWidget {
 class _ProfilePageState extends ConsumerState<ProfilePage> {
   late final TextEditingController _nameController;
   late final TextEditingController _phoneController;
-  final TextEditingController _emailController = TextEditingController(text: 'usuario@taxiya.bo');
+  late final TextEditingController _emailController;
 
   @override
   void initState() {
@@ -23,6 +23,7 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
     final session = ref.read(sessionProvider);
     _nameController = TextEditingController(text: session.fullName);
     _phoneController = TextEditingController(text: session.phone);
+    _emailController = TextEditingController(text: session.email);
   }
 
   @override
@@ -37,13 +38,15 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   Widget build(BuildContext context) {
     return _DetailScaffold(
       title: 'Perfil',
-      child: Column(
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
         children: [
           Container(
             padding: const EdgeInsets.all(22),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: const Color(0xFF1B1B1F),
               borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: const Color(0xFF2C2C31)),
             ),
             child: Column(
               children: [
@@ -51,21 +54,21 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   width: 92,
                   height: 92,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF3F3F5),
+                    color: const Color(0xFF2A2A31),
                     borderRadius: BorderRadius.circular(28),
                   ),
-                  child: const Icon(Icons.person, size: 42),
+                  child: const Icon(Icons.person, size: 42, color: Color(0xFFFFF4EC)),
                 ),
                 const SizedBox(height: 20),
-                _FieldLabel('Nombre completo'),
+                const _FieldLabel('Nombre completo'),
                 const SizedBox(height: 8),
                 _SettingsField(controller: _nameController, icon: Icons.badge_outlined),
                 const SizedBox(height: 16),
-                _FieldLabel('Telefono'),
+                const _FieldLabel('Telefono'),
                 const SizedBox(height: 8),
                 _SettingsField(controller: _phoneController, icon: Icons.phone_outlined),
                 const SizedBox(height: 16),
-                _FieldLabel('Correo'),
+                const _FieldLabel('Correo'),
                 const SizedBox(height: 8),
                 _SettingsField(controller: _emailController, icon: Icons.mail_outline),
                 const SizedBox(height: 20),
@@ -73,10 +76,17 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   width: double.infinity,
                   child: FilledButton(
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Edicion visual lista. Si quieres, el siguiente paso es persistir estos cambios en backend.')),
+                      showTopNotice(
+                        context,
+                        'Actualizaste tus datos visuales correctamente.',
+                        backgroundColor: const Color(0xFFF97316),
+                        foregroundColor: const Color(0xFF0F0F10),
                       );
                     },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFF97316),
+                      foregroundColor: const Color(0xFF0F0F10),
+                    ),
                     child: const Text('Guardar cambios'),
                   ),
                 ),
@@ -99,8 +109,42 @@ class NotificationsPage extends StatelessWidget {
       eyebrow: 'Alertas',
       items: [
         ('Viajes', 'Recibe actualizaciones de asignacion, llegada y finalizacion del taxi.'),
-        ('Promociones', 'Controla cupones, descuentos y campañas activas.'),
+        ('Promociones', 'Controla cupones, descuentos y campanas activas.'),
         ('Novedades', 'Avisos de mantenimiento o nuevas funciones en Taxi Ya.'),
+      ],
+    );
+  }
+}
+
+class PaymentMethodsPage extends StatelessWidget {
+  const PaymentMethodsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const _SimpleInfoPage(
+      title: 'Metodos de pago',
+      eyebrow: 'Pagos',
+      items: [
+        ('Efectivo', 'Configura como quieres manejar viajes en efectivo.'),
+        ('Tarjetas', 'Visualiza las tarjetas o cuentas que quieras registrar.'),
+        ('Comprobantes', 'Revisa tus movimientos y pagos recientes.'),
+      ],
+    );
+  }
+}
+
+class PromotionsPage extends StatelessWidget {
+  const PromotionsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const _SimpleInfoPage(
+      title: 'Promociones',
+      eyebrow: 'Promos',
+      items: [
+        ('Cupones', 'Consulta descuentos activos para tus proximos viajes.'),
+        ('Beneficios', 'Revisa ventajas especiales para clientes frecuentes.'),
+        ('Invitaciones', 'Comparte la app y desbloquea nuevas promociones.'),
       ],
     );
   }
@@ -146,46 +190,12 @@ class SupportPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const _SimpleInfoPage(
-      title: 'Soporte',
+      title: 'Centro de ayuda',
       eyebrow: 'Ayuda',
       items: [
-        ('Centro de ayuda', 'Respuestas rapidas para pagos, viajes y conductores.'),
-        ('Atencion directa', 'Contacta soporte si una solicitud queda atascada.'),
-        ('Emergencias', 'Canales de asistencia en incidentes de seguridad.'),
-      ],
-    );
-  }
-}
-
-class PaymentMethodsPage extends StatelessWidget {
-  const PaymentMethodsPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const _SimpleInfoPage(
-      title: 'Metodos de pago',
-      eyebrow: 'Pagos',
-      items: [
-        ('Efectivo', 'Disponible por defecto para viajes dentro de Potosi.'),
-        ('Tarjetas', 'Prepara tarjetas para una siguiente etapa del producto.'),
-        ('Resumen', 'Consulta cobros y comprobantes recientes.'),
-      ],
-    );
-  }
-}
-
-class PromotionsPage extends StatelessWidget {
-  const PromotionsPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const _SimpleInfoPage(
-      title: 'Promociones',
-      eyebrow: 'Promociones',
-      items: [
-        ('Cupones', 'Descuentos por primer viaje y campañas activas.'),
-        ('Referidos', 'Invita usuarios y gana saldo promocional.'),
-        ('Eventos', 'Ofertas especiales para alta demanda o dias festivos.'),
+        ('Soporte', 'Contacta a soporte para resolver dudas o reportar un problema.'),
+        ('Viajes', 'Consulta informacion sobre pedidos, estados y cobros.'),
+        ('Cuenta', 'Recibe ayuda con acceso, perfil y seguridad.'),
       ],
     );
   }
@@ -206,23 +216,79 @@ class _SimpleInfoPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return _DetailScaffold(
       title: title,
-      child: PageShell(
-        eyebrow: eyebrow,
-        title: title,
-        child: Column(
-          children: items
-              .map(
-                (item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
-                  child: SimpleMenuTile(
-                    icon: Icons.check_circle_outline,
-                    title: item.$1,
-                    subtitle: item.$2,
-                  ),
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
+        children: [
+          Text(
+            eyebrow.toUpperCase(),
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.4,
+              color: Color(0xFFF97316),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 32,
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFFFFF4EC),
+            ),
+          ),
+          const SizedBox(height: 18),
+          ...items.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1B1B1F),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: const Color(0xFF2C2C31)),
                 ),
-              )
-              .toList(),
-        ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2A2A31),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Icon(Icons.check_circle_outline, color: Color(0xFFF97316)),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.$1,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                              color: const Color(0xFFFFF4EC),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            item.$2,
+                            style: const TextStyle(
+                              color: Color(0xFFFFC89B),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -240,11 +306,16 @@ class _DetailScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9F9FB),
+      backgroundColor: const Color(0xFF111214),
       appBar: AppBar(
+        backgroundColor: const Color(0xFF111214),
+        foregroundColor: const Color(0xFFFFF4EC),
         title: Text(
           title,
-          style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800),
+          style: GoogleFonts.plusJakartaSans(
+            fontWeight: FontWeight.w800,
+            color: const Color(0xFFFFF4EC),
+          ),
         ),
       ),
       body: child,
@@ -262,12 +333,11 @@ class _FieldLabel extends StatelessWidget {
     return Align(
       alignment: Alignment.centerLeft,
       child: Text(
-        text.toUpperCase(),
+        text,
         style: const TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 1.2,
-          color: Color(0xFF77767C),
+          color: Color(0xFFFFC89B),
+          fontWeight: FontWeight.w800,
+          fontSize: 12,
         ),
       ),
     );
@@ -288,14 +358,23 @@ class _SettingsField extends StatelessWidget {
     return TextField(
       controller: controller,
       decoration: InputDecoration(
-        prefixIcon: Icon(icon),
+        prefixIcon: Icon(icon, color: const Color(0xFFFFC89B)),
         filled: true,
-        fillColor: const Color(0xFFF3F3F5),
+        fillColor: const Color(0xFF25252B),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide.none,
         ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: Color(0xFF303035)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: Color(0xFFF97316), width: 1.4),
+        ),
       ),
+      style: const TextStyle(color: Color(0xFFFFF4EC)),
     );
   }
 }

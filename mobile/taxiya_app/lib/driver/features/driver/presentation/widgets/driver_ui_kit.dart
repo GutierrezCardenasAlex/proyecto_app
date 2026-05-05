@@ -34,7 +34,7 @@ class DriverPageShell extends StatelessWidget {
                         fontSize: 10,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 1.4,
-                        color: Color(0xFF006875),
+                        color: Color(0xFFF97316),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -43,7 +43,7 @@ class DriverPageShell extends StatelessWidget {
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 34,
                         fontWeight: FontWeight.w800,
-                        color: const Color(0xFF000003),
+                        color: const Color(0xFFFFF4EC),
                       ),
                     ),
                   ],
@@ -78,8 +78,9 @@ class DriverEmptyCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: const Color(0xFF1B1B1F),
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFF2C2C31)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -89,13 +90,14 @@ class DriverEmptyCard extends StatelessWidget {
             style: GoogleFonts.plusJakartaSans(
               fontWeight: FontWeight.w800,
               fontSize: 18,
+              color: const Color(0xFFFFF4EC),
             ),
           ),
           const SizedBox(height: 6),
           Text(
             subtitle,
             style: const TextStyle(
-              color: Color(0xFF47464B),
+              color: Color(0xFFFFC89B),
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -122,7 +124,7 @@ class DriverMenuTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: const Color(0xFF1B1B1F),
       borderRadius: BorderRadius.circular(24),
       child: InkWell(
         borderRadius: BorderRadius.circular(24),
@@ -135,10 +137,10 @@ class DriverMenuTile extends StatelessWidget {
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF3F3F5),
+                  color: const Color(0xFF2A2A31),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(icon, color: const Color(0xFF000003)),
+                child: Icon(icon, color: const Color(0xFFF97316)),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -150,20 +152,21 @@ class DriverMenuTile extends StatelessWidget {
                       style: GoogleFonts.plusJakartaSans(
                         fontWeight: FontWeight.w800,
                         fontSize: 16,
+                        color: const Color(0xFFFFF4EC),
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
                       style: const TextStyle(
-                        color: Color(0xFF47464B),
+                        color: Color(0xFFFFC89B),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right),
+              const Icon(Icons.chevron_right, color: Color(0xFFFFC89B)),
             ],
           ),
         ),

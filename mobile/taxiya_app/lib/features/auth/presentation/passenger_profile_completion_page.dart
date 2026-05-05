@@ -61,8 +61,9 @@ class _PassengerProfileCompletionPageState extends ConsumerState<PassengerProfil
               child: Container(
                 padding: const EdgeInsets.all(28),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: const Color(0xFF1B1B1F),
                   borderRadius: BorderRadius.circular(36),
+                  border: Border.all(color: const Color(0xFF2C2C31)),
                   boxShadow: const [
                     BoxShadow(
                       color: Color(0x12000003),
@@ -79,14 +80,14 @@ class _PassengerProfileCompletionPageState extends ConsumerState<PassengerProfil
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 34,
                         fontWeight: FontWeight.w900,
-                        color: const Color(0xFF0F0F10),
+                        color: const Color(0xFFFFF4EC),
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Tu celular ya esta verificado. Ahora guardemos tus datos para mostrar tu nombre en la cuenta.',
                       style: TextStyle(
-                        color: Colors.grey.shade700,
+                        color: const Color(0xFFFFC89B),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -190,16 +191,22 @@ class _Field extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         filled: true,
-        fillColor: const Color(0xFFF3F3F5),
+        fillColor: const Color(0xFF25252B),
+        labelStyle: const TextStyle(color: Color(0xFFFFC89B)),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: const BorderSide(color: Color(0xFFF97316), width: 1.4),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: Color(0xFF303035)),
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide.none,
         ),
       ),
+      style: const TextStyle(color: Color(0xFFFFF4EC)),
     );
   }
 }
@@ -214,7 +221,7 @@ class _GuideLine extends StatelessWidget {
     return Text(
       text,
       style: const TextStyle(
-        color: Color(0xFF77767C),
+        color: Color(0xFFFFC89B),
         fontSize: 13,
         fontWeight: FontWeight.w600,
         height: 1.35,

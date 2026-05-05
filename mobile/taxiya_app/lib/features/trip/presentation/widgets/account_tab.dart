@@ -38,8 +38,9 @@ class AccountTab extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(22),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: const Color(0xFF1B1B1F),
               borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: const Color(0xFF2C2C31)),
             ),
             child: Row(
               children: [
@@ -47,10 +48,10 @@ class AccountTab extends ConsumerWidget {
                   width: 78,
                   height: 78,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF3F3F5),
+                    color: const Color(0xFF2A2A31),
                     borderRadius: BorderRadius.circular(24),
                   ),
-                  child: const Icon(Icons.person, size: 36, color: Color(0xFF000003)),
+                  child: const Icon(Icons.person, size: 36, color: Color(0xFFFFF4EC)),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -62,14 +63,14 @@ class AccountTab extends ConsumerWidget {
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 24,
                           fontWeight: FontWeight.w800,
-                          color: const Color(0xFF000003),
+                          color: const Color(0xFFFFF4EC),
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         session.phone,
                         style: const TextStyle(
-                          color: Color(0xFF47464B),
+                          color: Color(0xFFFFC89B),
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -77,7 +78,7 @@ class AccountTab extends ConsumerWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
-                          color: const Color(0x1A00E3FD),
+                          color: const Color(0x33F97316),
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: const Text(
@@ -86,7 +87,7 @@ class AccountTab extends ConsumerWidget {
                             fontSize: 10,
                             fontWeight: FontWeight.w900,
                             letterSpacing: 1.1,
-                            color: Color(0xFF00616D),
+                            color: Color(0xFFFFC89B),
                           ),
                         ),
                       ),
@@ -127,8 +128,12 @@ class AccountTab extends ConsumerWidget {
           const SizedBox(height: 18),
           SizedBox(
             width: double.infinity,
-            child: FilledButton.tonalIcon(
+            child: FilledButton.icon(
               onPressed: () => ref.read(sessionProvider.notifier).signOut(),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFF97316),
+                foregroundColor: const Color(0xFF0F0F10),
+              ),
               icon: const Icon(Icons.logout),
               label: const Text('Cerrar sesion'),
             ),

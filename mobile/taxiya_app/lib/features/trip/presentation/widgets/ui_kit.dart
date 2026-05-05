@@ -34,7 +34,7 @@ class PageShell extends StatelessWidget {
                         fontSize: 10,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 1.4,
-                        color: Color(0xFF006875),
+                        color: Color(0xFFF97316),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -43,7 +43,7 @@ class PageShell extends StatelessWidget {
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 36,
                         fontWeight: FontWeight.w800,
-                        color: const Color(0xFF000003),
+                        color: const Color(0xFFFFF4EC),
                       ),
                     ),
                   ],
@@ -78,7 +78,7 @@ class EmptyCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: const Color(0xFF1B1B1F),
         borderRadius: BorderRadius.circular(24),
       ),
       child: Column(
@@ -95,7 +95,7 @@ class EmptyCard extends StatelessWidget {
           Text(
             subtitle,
             style: const TextStyle(
-              color: Color(0xFF47464B),
+              color: Color(0xFFFFC89B),
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -122,7 +122,7 @@ class SimpleMenuTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: const Color(0xFF1B1B1F),
       borderRadius: BorderRadius.circular(24),
       child: InkWell(
         borderRadius: BorderRadius.circular(24),
@@ -135,10 +135,10 @@ class SimpleMenuTile extends StatelessWidget {
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF3F3F5),
+                  color: const Color(0xFF2A2A31),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(icon, color: const Color(0xFF000003)),
+                child: Icon(icon, color: const Color(0xFFF97316)),
               ),
               const SizedBox(width: 14),
               Expanded(

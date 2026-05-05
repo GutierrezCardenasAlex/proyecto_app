@@ -129,7 +129,7 @@ async function sendOtpSms({ phone, otp, contextLabel }) {
       "Content-Type": "application/x-www-form-urlencoded"
     },
     body
-  });
+  }); 
 
   if (!response.ok) {
     const errorText = await response.text();

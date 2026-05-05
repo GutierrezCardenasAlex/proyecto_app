@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class LocalNotifications {
@@ -36,6 +37,9 @@ class LocalNotifications {
           channelDescription: 'Notificaciones del pasajero',
           importance: Importance.high,
           priority: Priority.high,
+          color: Color(0xFFF97316),
+          icon: '@mipmap/ic_launcher',
+          styleInformation: BigTextStyleInformation(''),
         ),
       ),
     );
