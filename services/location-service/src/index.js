@@ -26,8 +26,8 @@ const locationSchema = z.object({
 const nearbySchema = z.object({
   lat: z.coerce.number(),
   lng: z.coerce.number(),
-  radiusMeters: z.coerce.number().int().positive().max(20000).default(15000),
-  limit: z.coerce.number().int().positive().max(100).default(50)
+  radiusMeters: z.coerce.number().int().positive().max(50000).default(50000),
+  limit: z.coerce.number().int().positive().max(300).default(200)
 });
 
 function toRadians(value) {

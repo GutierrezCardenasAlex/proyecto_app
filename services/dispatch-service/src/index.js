@@ -27,8 +27,8 @@ const acceptSchema = z.object({
 const nearbySchema = z.object({
   lat: z.coerce.number(),
   lng: z.coerce.number(),
-  radiusMeters: z.coerce.number().int().positive().max(20000).default(15000),
-  limit: z.coerce.number().int().positive().max(100).default(50)
+  radiusMeters: z.coerce.number().int().positive().max(50000).default(50000),
+  limit: z.coerce.number().int().positive().max(300).default(200)
 });
 
 async function publish(routingKey, payload) {
@@ -62,8 +62,8 @@ async function bootstrap() {
 
   app.post("/search", async (request) => {
     const { tripId, pickupLat, pickupLng, dispatchMode, preferredDriverId } = searchSchema.parse(request.body);
-    const radiusMeters = preferredDriverId ? 3000 : dispatchMode === "nearby" ? 3000 : 15000;
-    const limit = preferredDriverId ? 1 : dispatchMode === "nearby" ? 8 : 100;
+    const radiusMeters = preferredDriverId ? 3000 : dispatchMode === "nearby" ? 3000 : null;
+    const limit = preferredDriverId ? 1 : dispatchMode === "nearby" ? 8 : 1000;
     await pool.query(
       `UPDATE trips
        SET status = 'searching', updated_at = NOW()
@@ -97,10 +97,12 @@ async function bootstrap() {
          AND d.status = 'available'
          AND ll.recorded_at >= NOW() - INTERVAL '5 minutes'
          AND ($3::uuid IS NULL OR d.id = $3)
-         AND ST_DWithin(
-            ll.location,
-            ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
-            $4
+         AND (
+           $4::int IS NULL OR ST_DWithin(
+             ll.location,
+             ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
+             $4
+           )
          )
        ORDER BY distance_meters ASC
        LIMIT $5`,

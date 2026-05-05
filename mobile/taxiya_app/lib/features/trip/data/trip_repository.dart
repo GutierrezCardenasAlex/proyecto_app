@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
 import '../../../core/config/app_config.dart';
+import '../../../core/config/potosi_geo.dart';
 import '../domain/trip_request.dart';
 
 final tripRepositoryProvider = Provider<TripRepository>((ref) {
@@ -86,29 +87,37 @@ class TripRepository {
     required double lat,
     required double lng,
   }) async {
+    if (!PotosiGeo.isInside(lat, lng)) {
+      return const [];
+    }
+
     final dispatchResponse = await http.get(
-      Uri.parse('${AppConfig.apiBaseUrl}/dispatch/nearby?lat=$lat&lng=$lng&radiusMeters=15000&limit=50'),
+      Uri.parse('${AppConfig.apiBaseUrl}/dispatch/nearby?lat=$lat&lng=$lng&radiusMeters=50000&limit=200'),
       headers: _headers(token),
     );
 
-    if (dispatchResponse.statusCode >= 400) {
+    final locationResponse = await http.get(
+      Uri.parse('${AppConfig.apiBaseUrl}/locations/nearby?lat=$lat&lng=$lng&radiusMeters=50000&limit=200'),
+      headers: _headers(token),
+    );
+
+    if (dispatchResponse.statusCode >= 500) {
       throw Exception('No se pudo cargar autos cercanos (${dispatchResponse.statusCode})');
     }
 
-    final locationResponse = await http.get(
-      Uri.parse('${AppConfig.apiBaseUrl}/locations/nearby?lat=$lat&lng=$lng&radiusMeters=15000&limit=50'),
-      headers: _headers(token),
-    );
-
-    final dispatchPayload = jsonDecode(dispatchResponse.body) as Map<String, dynamic>;
+    final dispatchPayload = dispatchResponse.statusCode < 400
+        ? jsonDecode(dispatchResponse.body) as Map<String, dynamic>
+        : <String, dynamic>{};
     final dispatchDrivers = (dispatchPayload['drivers'] as List<dynamic>? ?? const [])
-        .cast<Map<String, dynamic>>();
+        .whereType<Map<String, dynamic>>()
+        .toList(growable: false);
 
     final locationPayload = locationResponse.statusCode < 400
         ? jsonDecode(locationResponse.body) as Map<String, dynamic>
         : <String, dynamic>{};
     final locationDrivers = (locationPayload['drivers'] as List<dynamic>? ?? const [])
-        .cast<Map<String, dynamic>>();
+        .whereType<Map<String, dynamic>>()
+        .toList(growable: false);
     final locationById = {
       for (final driver in locationDrivers) driver['driver_id']?.toString() ?? '': driver,
     };

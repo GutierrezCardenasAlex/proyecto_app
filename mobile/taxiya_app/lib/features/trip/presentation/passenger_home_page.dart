@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -19,56 +17,10 @@ class PassengerHomePage extends ConsumerStatefulWidget {
   ConsumerState<PassengerHomePage> createState() => _PassengerHomePageState();
 }
 
-class _PassengerHomePageState extends ConsumerState<PassengerHomePage> with WidgetsBindingObserver {
-  static const _inactivityDuration = Duration(minutes: 5);
+class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  Timer? _inactivityTimer;
-  DateTime _lastInteractionAt = DateTime.now();
   int _selectedIndex = 0;
   String _activeDrawerItem = 'Configuraciones';
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _armInactivityTimer();
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _inactivityTimer?.cancel();
-    super.dispose();
-  }
-
-  void _armInactivityTimer() {
-    _inactivityTimer?.cancel();
-    _inactivityTimer = Timer(_inactivityDuration, _handleInactivityTimeout);
-  }
-
-  void _markInteraction() {
-    _lastInteractionAt = DateTime.now();
-    _armInactivityTimer();
-  }
-
-  Future<void> _handleInactivityTimeout() async {
-    final session = ref.read(sessionProvider);
-    if (!session.isAuthenticated) {
-      return;
-    }
-    await ref.read(sessionProvider.notifier).signOut();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      if (DateTime.now().difference(_lastInteractionAt) >= _inactivityDuration) {
-        Future<void>.microtask(_handleInactivityTimeout);
-        return;
-      }
-      _markInteraction();
-    }
-  }
 
   void _handleDrawerSelection(String item) {
     switch (item) {
@@ -144,10 +96,7 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> with Widg
       ),
     ];
 
-    return Listener(
-      behavior: HitTestBehavior.translucent,
-      onPointerDown: (_) => _markInteraction(),
-      child: Scaffold(
+    return Scaffold(
         key: _scaffoldKey,
         drawer: AppDrawer(
           fullName: session.fullName,
@@ -182,7 +131,6 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> with Widg
             indicatorColor: const Color(0x22F97316),
             selectedIndex: _selectedIndex,
             onDestinationSelected: (value) => setState(() {
-              _markInteraction();
               _selectedIndex = value;
               _activeDrawerItem = switch (value) {
                 0 => 'Promociones',
@@ -197,8 +145,7 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> with Widg
             ],
           ),
         ),
-      ),
-    );
+      );
   }
 }
 

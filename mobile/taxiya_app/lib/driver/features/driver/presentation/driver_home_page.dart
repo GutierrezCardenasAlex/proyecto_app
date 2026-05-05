@@ -332,7 +332,6 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
     if (driverState.available) {
       await ref.read(driverStateProvider.notifier).toggleAvailability(false);
     }
-    await ref.read(driverSessionProvider.notifier).logout();
   }
 
   @override
