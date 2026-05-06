@@ -111,6 +111,30 @@ chmod +x ./scripts/seed-demo-data.sh ./scripts/simulate-driver-locations.sh
 ./scripts/simulate-driver-locations.sh
 ```
 
+## Offline maps
+
+Flash Go already supports configurable tiles through `MAP_TILES_URL_TEMPLATE`.
+
+- Quick Flutter launch with a custom tile server:
+
+```powershell
+.\scripts\run-flashgo-offline.ps1
+```
+
+- Optional local tile server in Docker:
+
+```powershell
+docker compose --profile offline-maps up -d tileserver
+```
+
+Put your `.mbtiles` file inside `infra/tiles/` first, then open `http://localhost:8082` and use one of the raster style URLs exposed there as `MAP_TILES_URL_TEMPLATE`.
+
+Full guide:
+
+```text
+docs/offline-maps.md
+```
+
 ## Production notes
 
 - All backend services are stateless and horizontally scalable.

@@ -15,6 +15,7 @@ import '../../trip/data/trip_repository.dart';
 import '../../trip/domain/driver_trip.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/notifications/local_notifications.dart';
+import '../../../../core/map/offline_map.dart';
 import '../../../../core/ui/top_notice.dart';
 import 'pages/driver_detail_pages.dart';
 import 'widgets/driver_app_drawer.dart';
@@ -1247,6 +1248,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
     final tripAsync = ref.watch(offeredTripProvider);
     final trip = tripAsync.value;
     final session = ref.watch(driverSessionProvider);
+    final offlineState = ref.watch(offlineMapProvider);
 
     if (session.loggedIn && driverState.available && !tripAsync.isLoading && trip == null) {
       Future<void>.microtask(() => ref.read(offeredTripProvider.notifier).loadOffer());
@@ -1422,6 +1424,12 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
               _MapActionButton(
                 icon: Icons.tune_rounded,
                 onTap: () => _showStatusSheet(context, driverState, trip),
+              ),
+              const SizedBox(height: 12),
+              _MapActionButton(
+                icon: Icons.download_for_offline_rounded,
+                showBadge: !offlineState.isReady,
+                onTap: () => showOfflineMapSheet(context),
               ),
             ],
           ),
@@ -2318,28 +2326,56 @@ class _MapActionButton extends StatelessWidget {
     required this.icon,
     required this.onTap,
     this.accentColor = const Color(0xFFF97316),
+    this.showBadge = false,
   });
 
   final IconData icon;
   final VoidCallback onTap;
   final Color accentColor;
+  final bool showBadge;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: const Color(0xFF1A1A1D),
-      borderRadius: BorderRadius.circular(18),
-      elevation: 6,
-      shadowColor: const Color(0x14000003),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: SizedBox(
-          width: 52,
-          height: 52,
-          child: Icon(icon, color: accentColor),
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Material(
+          color: const Color(0xFF1A1A1D),
+          borderRadius: BorderRadius.circular(18),
+          elevation: 6,
+          shadowColor: const Color(0x14000003),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: onTap,
+            child: SizedBox(
+              width: 52,
+              height: 52,
+              child: Icon(icon, color: accentColor),
+            ),
+          ),
         ),
-      ),
+        if (showBadge)
+          Positioned(
+            top: -2,
+            right: -2,
+            child: Container(
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF97316),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF111214), width: 2),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x33F97316),
+                    blurRadius: 12,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

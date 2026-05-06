@@ -201,5 +201,15 @@ services:
       redis:
         condition: service_started
 
+  tileserver:
+    image: maptiler/tileserver-gl:latest
+    container_name: flashgo-tileserver
+    profiles: ["offline-maps"]
+    ports:
+      - "${TILES_PORT:-8082}:8080"
+    volumes:
+      - ${TILES_DATA_PATH:-./infra/tiles}:/data
+    command: ["--verbose"]
+
 volumes:
   postgres_data:

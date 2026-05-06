@@ -127,10 +127,10 @@ class PotosiMap extends ConsumerWidget {
             ),
           ],
         ),
-        Positioned(
+        const Positioned(
           left: 16,
           bottom: 16,
-          child: const OfflineMapDownloadButton(),
+          child: OfflineMapReadyBadge(),
         ),
       ],
     );
