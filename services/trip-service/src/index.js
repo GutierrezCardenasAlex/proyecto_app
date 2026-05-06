@@ -196,10 +196,20 @@ async function bootstrap() {
   app.get("/history/:passengerId", async (request) => {
     const { passengerId } = request.params;
     const result = await pool.query(
-      `SELECT *
-       FROM trips
-       WHERE passenger_id = $1
-       ORDER BY requested_at DESC
+      `SELECT t.*,
+              v.vehicle_type,
+              v.brand AS vehicle_brand,
+              v.model AS vehicle_model,
+              v.color AS vehicle_color,
+              v.plate AS vehicle_plate,
+              du.full_name AS driver_name,
+              du.phone AS driver_phone
+       FROM trips t
+       LEFT JOIN vehicles v ON v.driver_id = t.driver_id
+       LEFT JOIN drivers d ON d.id = t.driver_id
+       LEFT JOIN users du ON du.id = d.user_id
+       WHERE t.passenger_id = $1
+       ORDER BY COALESCE(t.completed_at, t.cancelled_at, t.updated_at, t.requested_at) DESC
        LIMIT 50`,
       [passengerId]
     );

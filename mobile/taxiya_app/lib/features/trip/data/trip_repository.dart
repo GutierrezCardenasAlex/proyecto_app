@@ -41,6 +41,12 @@ class TripRepository {
             pickupAddress: item['pickup_address']?.toString() ?? 'Origen',
             destinationAddress: item['destination_address']?.toString() ?? 'Destino',
             requestedAt: item['requested_at']?.toString() ?? '',
+            driverName: item['driver_name']?.toString(),
+            driverPhone: item['driver_phone']?.toString(),
+            vehicleType: item['vehicle_type']?.toString(),
+            vehicleLabel: _joinVehicleLabel(item['vehicle_brand'], item['vehicle_model']),
+            vehiclePlate: item['vehicle_plate']?.toString(),
+            vehicleColor: item['vehicle_color']?.toString(),
           ),
         )
         .toList();

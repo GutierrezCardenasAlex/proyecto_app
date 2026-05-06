@@ -992,75 +992,31 @@ class _RideTabState extends ConsumerState<RideTab> {
                 const SizedBox(height: 18),
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF17181B).withValues(alpha: 0.96),
-                      borderRadius: BorderRadius.circular(28),
-                      border: Border.all(color: const Color(0x44F97316)),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x18000000),
-                          blurRadius: 24,
-                          offset: Offset(0, 10),
+                  child: Row(
+                    children: [
+                      _PassengerModeCard(
+                        activeTrip: hasActiveTrip,
+                        rideMode: _rideMode,
+                        status: tripState.request.status,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _PassengerDashboardActionCard(
+                          icon: hasActiveTrip ? Icons.badge_rounded : Icons.directions_car_filled_rounded,
+                          title: hasActiveTrip ? 'Conductor asignado' : 'Solicitud de viaje',
+                          subtitle: hasActiveTrip
+                              ? ((tripState.request.driverName?.isNotEmpty ?? false)
+                                  ? tripState.request.driverName!
+                                  : 'Datos del conductor disponibles')
+                              : (_rideMode == RideMode.destino
+                                  ? 'Envia tu pedido a taxis y motos disponibles'
+                                  : 'Elige el auto mas cercano a tu punto'),
+                          accentColor: hasActiveTrip
+                              ? _tripStatusAccentColor(tripState.request.status)
+                              : const Color(0xFFF97316),
                         ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: hasActiveTrip
-                                ? _tripStatusAccentColor(tripState.request.status).withValues(alpha: 0.24)
-                                : const Color(0x33F97316),
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          child: Icon(
-                            hasActiveTrip
-                                ? _tripStatusIcon(tripState.request.status)
-                                : (_rideMode == RideMode.destino
-                                    ? Icons.route_rounded
-                                    : Icons.local_taxi_rounded),
-                            color: hasActiveTrip
-                                ? _tripStatusAccentColor(tripState.request.status)
-                                : const Color(0xFFF97316),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                hasActiveTrip
-                                    ? _tripStatusShortLabel(tripState.request.status)
-                                    : (_rideMode == RideMode.destino
-                                        ? 'Pedir taxi'
-                                        : 'Tomar taxi'),
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w800,
-                                  color: const Color(0xFFFFF4EC),
-                                ),
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                hasActiveTrip
-                                    ? _tripStatusMiniDetail(tripState.request)
-                                    : 'Potosi, Bolivia',
-                                style: const TextStyle(
-                                  color: Color(0xFFFFC89B),
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
                 if (_floatingNotification != null) ...[
@@ -1105,18 +1061,22 @@ class _RideTabState extends ConsumerState<RideTab> {
             ),
           ),
         ),
-        if (hasActiveTrip)
-          Positioned(
-            right: 20,
-            top: 132,
-            child: _SideStatusChip(
-              title: 'Estado',
-              value: _tripStatusShortLabel(tripState.request.status),
-              subtitle: _tripStatusMiniDetail(tripState.request),
-              accentColor: _tripStatusAccentColor(tripState.request.status),
-              onTap: () => _showTripRequestSheet(tripState),
-            ),
+        Positioned(
+          left: 20,
+          right: hasActiveTrip ? 156 : 92,
+          bottom: 170,
+          child: _PassengerFloatingStatusPill(
+            title: hasActiveTrip
+                ? _tripStatusShortLabel(tripState.request.status)
+                : (_rideMode == RideMode.destino ? 'Pedir taxi' : 'Tomar taxi'),
+            subtitle: hasActiveTrip
+                ? _tripStatusMiniDetail(tripState.request)
+                : 'Potosi, Bolivia',
+            accentColor: hasActiveTrip
+                ? _tripStatusAccentColor(tripState.request.status)
+                : const Color(0xFFF97316),
           ),
+        ),
         Positioned(
           right: 20,
           bottom: 170,
@@ -1127,6 +1087,12 @@ class _RideTabState extends ConsumerState<RideTab> {
                 onTap: _toggleSheet,
               ),
               if (hasActiveTrip) ...[
+                const SizedBox(height: 12),
+                _MapActionButton(
+                  icon: Icons.radar_rounded,
+                  accentColor: _tripStatusAccentColor(tripState.request.status),
+                  onTap: () => _showTripRequestSheet(tripState),
+                ),
                 const SizedBox(height: 12),
                 _MapActionButton(
                   icon: Icons.tune_rounded,
@@ -1443,16 +1409,6 @@ class _RideTabState extends ConsumerState<RideTab> {
     };
   }
 
-  IconData _tripStatusIcon(String status) {
-    return switch (status) {
-      'requested' || 'searching' => Icons.travel_explore_rounded,
-      'accepted' || 'arriving' => Icons.directions_car_filled_rounded,
-      'at_pickup' => Icons.place_rounded,
-      'in_progress' => Icons.alt_route_rounded,
-      'completed' => Icons.verified_rounded,
-      _ => Icons.route_rounded,
-    };
-  }
 }
 
 enum RideMode {
@@ -1489,14 +1445,152 @@ class _GlassIconButton extends StatelessWidget {
   }
 }
 
+class _PassengerModeCard extends StatelessWidget {
+  const _PassengerModeCard({
+    required this.activeTrip,
+    required this.rideMode,
+    required this.status,
+  });
+
+  final bool activeTrip;
+  final RideMode rideMode;
+  final String status;
+
+  @override
+  Widget build(BuildContext context) {
+    final accentColor = activeTrip
+        ? switch (status) {
+            'at_pickup' => const Color(0xFF22C55E),
+            'in_progress' => const Color(0xFF0EA5E9),
+            'completed' => const Color(0xFF9CA3AF),
+            _ => const Color(0xFFF97316),
+          }
+        : const Color(0xFFF97316);
+    final icon = activeTrip
+        ? switch (status) {
+            'accepted' || 'arriving' => Icons.directions_car_filled_rounded,
+            'at_pickup' => Icons.place_rounded,
+            'in_progress' => Icons.alt_route_rounded,
+            'completed' => Icons.verified_rounded,
+            _ => Icons.route_rounded,
+          }
+        : (rideMode == RideMode.destino ? Icons.route_rounded : Icons.local_taxi_rounded);
+    final title = activeTrip ? 'Tu viaje' : (rideMode == RideMode.destino ? 'Pedir' : 'Tomar');
+
+    return Container(
+      width: 96,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF17181B).withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: accentColor.withValues(alpha: 0.28)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: accentColor.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: accentColor),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFFFFF4EC),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PassengerDashboardActionCard extends StatelessWidget {
+  const _PassengerDashboardActionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.accentColor,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color accentColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF17181B).withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: accentColor.withValues(alpha: 0.24)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: accentColor.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(icon, color: accentColor),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFFFFF4EC),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFFFFD8BF),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _MapActionButton extends StatelessWidget {
   const _MapActionButton({
     required this.icon,
     required this.onTap,
+    this.accentColor = const Color(0xFFF97316),
   });
 
   final IconData icon;
   final VoidCallback onTap;
+  final Color accentColor;
 
   @override
   Widget build(BuildContext context) {
@@ -1511,86 +1605,88 @@ class _MapActionButton extends StatelessWidget {
         child: SizedBox(
           width: 52,
           height: 52,
-          child: Icon(icon, color: const Color(0xFFF97316)),
+          child: Icon(icon, color: accentColor),
         ),
       ),
     );
   }
 }
 
-class _SideStatusChip extends StatelessWidget {
-  const _SideStatusChip({
+class _PassengerFloatingStatusPill extends StatelessWidget {
+  const _PassengerFloatingStatusPill({
     required this.title,
-    required this.value,
     required this.subtitle,
     required this.accentColor,
-    required this.onTap,
   });
 
   final String title;
-  final String value;
   final String subtitle;
   final Color accentColor;
-  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: accentColor.withValues(alpha: 0.20),
-      borderRadius: BorderRadius.circular(22),
-      child: InkWell(
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF17181B).withValues(alpha: 0.94),
         borderRadius: BorderRadius.circular(22),
-        onTap: onTap,
-        child: Container(
-          width: 108,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: accentColor.withValues(alpha: 0.70)),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x22000000),
-                blurRadius: 18,
-                offset: Offset(0, 10),
-              ),
-            ],
+        border: Border.all(color: accentColor.withValues(alpha: 0.24)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x22000000),
+            blurRadius: 18,
+            offset: Offset(0, 10),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(Icons.route_rounded, color: accentColor, size: 20),
-              const SizedBox(height: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Color(0xFFFFE7D1),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(
+              color: accentColor,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: accentColor.withValues(alpha: 0.45),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                value,
-                style: GoogleFonts.plusJakartaSans(
-                  color: const Color(0xFFFFF4EC),
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Color(0xFFFFDCC1),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.plusJakartaSans(
+                    color: const Color(0xFFFFF4EC),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFFFFD8BF),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1903,6 +1999,47 @@ class _LargeTripStatusCard extends StatelessWidget {
               ],
             ),
           ],
+          if ((driverName ?? '').isNotEmpty || (driverPhone ?? '').isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.07),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Contacto del conductor',
+                    style: TextStyle(
+                      color: Color(0xFFFFD8BF),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  if ((driverName ?? '').isNotEmpty)
+                    _TripContactRow(
+                      icon: Icons.person_outline_rounded,
+                      label: 'Nombre',
+                      value: driverName!,
+                    ),
+                  if ((driverPhone ?? '').isNotEmpty) ...[
+                    if ((driverName ?? '').isNotEmpty) const SizedBox(height: 10),
+                    _TripContactRow(
+                      icon: Icons.phone_outlined,
+                      label: 'WhatsApp',
+                      value: driverPhone!,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -2043,6 +2180,59 @@ class _TripBadge extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _TripContactRow extends StatelessWidget {
+  const _TripContactRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF97316).withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, size: 18, color: const Color(0xFFF97316)),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Color(0xFFFFD8BF),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

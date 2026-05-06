@@ -603,13 +603,6 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
     return trip != null && const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(trip.status);
   }
 
-  String _driverStatusMiniDetail(DriverTrip trip) {
-    if (trip.passengerPickup.isNotEmpty) {
-      return trip.passengerPickup;
-    }
-    return 'Ver detalle';
-  }
-
   Color _driverStatusAccentColor(String status) {
     return switch (status) {
       'requested' || 'searching' || 'accepted' || 'arriving' => const Color(0xFFF97316),
@@ -1354,78 +1347,13 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                 const SizedBox(height: 18),
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF17181B).withValues(alpha: 0.96),
-                      borderRadius: BorderRadius.circular(28),
-                      border: Border.all(color: const Color(0x44F97316)),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x18000000),
-                          blurRadius: 24,
-                          offset: Offset(0, 10),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: driverState.available
-                                ? const Color(0x33F97316)
-                                : const Color(0xFF25252B),
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          child: Icon(
-                            driverState.available ? Icons.radar_rounded : Icons.pause_circle_outline,
-                            color: driverState.available ? const Color(0xFFF97316) : const Color(0xFFFFC89B),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Wrap(
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            spacing: 10,
-                            runSpacing: 8,
-                            children: [
-                              Text(
-                                driverState.available ? 'Buscando viaje' : 'Fuera de linea',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w800,
-                                  color: const Color(0xFFFFF4EC),
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: const Color(0x22F97316),
-                                  borderRadius: BorderRadius.circular(999),
-                                  border: Border.all(color: const Color(0x44F97316)),
-                                ),
-                                child: Text(
-                                  _statusChipLabel(driverState, trip),
-                                  style: const TextStyle(
-                                    color: Color(0xFFFFC89B),
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                if (driverState.available || _hasManageableTrip(trip)) ...[
-                  const SizedBox(height: 12),
-                  Row(
+                  child: Row(
                     children: [
+                      _DriverAvailabilityCard(
+                        active: driverState.available,
+                        statusLabel: driverState.available ? 'Activo' : 'Inactivo',
+                      ),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: _DriverDashboardActionCard(
                           icon: Icons.assignment_rounded,
@@ -1443,20 +1371,15 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                           ),
                         ),
                       ),
-                      if (_hasLiveTripStatus(trip)) ...[
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _DriverDashboardActionCard(
-                            icon: Icons.radar_rounded,
-                            title: 'Estado actual',
-                            subtitle: _driverStatusMiniDetail(trip!),
-                            accentColor: _driverStatusAccentColor(trip.status),
-                            badgeText: _driverStatusShortLabel(trip.status),
-                            onTap: () => _showStatusSheet(context, driverState, trip),
-                          ),
-                        ),
-                      ],
                     ],
+                  ),
+                ),
+                if (_hasManageableTrip(trip)) ...[
+                  const SizedBox(height: 12),
+                  _DriverPrimaryActionBar(
+                    label: _driverActionLabel(trip),
+                    accentColor: _driverStatusAccentColor(trip!.status),
+                    onTap: () => _handleDriverPrimaryAction(trip),
                   ),
                 ],
                 const Spacer(),
@@ -1464,19 +1387,22 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
             ),
           ),
         ),
-        if (trip != null && trip.status != 'completed')
-          Positioned(
-            right: 20,
-            top: 258,
-            child: _DriverQuickActionChip(
-              label: _driverActionLabel(trip),
-              accentColor: _driverStatusAccentColor(trip.status),
-              onTap: () => _handleDriverPrimaryAction(trip),
+        Positioned(
+          left: 20,
+          right: 92,
+          bottom: 152,
+          child: IgnorePointer(
+            ignoring: false,
+            child: _DriverFloatingStatusPill(
+              title: driverState.available ? 'Buscando viaje' : 'Fuera de linea',
+              subtitle: _statusChipLabel(driverState, trip),
+              active: driverState.available,
             ),
           ),
+        ),
         Positioned(
           right: 20,
-          bottom: trip != null && trip.status != 'completed' ? 176 : 236,
+          bottom: 152,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1484,6 +1410,14 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                 icon: _sheetSize <= 0.08 ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
                 onTap: _toggleSheet,
               ),
+              if (_hasLiveTripStatus(trip)) ...[
+                const SizedBox(height: 12),
+                _MapActionButton(
+                  icon: Icons.radar_rounded,
+                  accentColor: _driverStatusAccentColor(trip!.status),
+                  onTap: () => _showStatusSheet(context, driverState, trip),
+                ),
+              ],
               const SizedBox(height: 12),
               _MapActionButton(
                 icon: Icons.tune_rounded,
@@ -2052,6 +1986,198 @@ class _DriverDashboardActionCard extends StatelessWidget {
   }
 }
 
+class _DriverAvailabilityCard extends StatelessWidget {
+  const _DriverAvailabilityCard({
+    required this.active,
+    required this.statusLabel,
+  });
+
+  final bool active;
+  final String statusLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final accentColor = active ? const Color(0xFF22C55E) : const Color(0xFFEF4444);
+    return Container(
+      width: 92,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF17181B).withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: accentColor.withValues(alpha: 0.32)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: accentColor.withValues(alpha: 0.14),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              active ? Icons.check_rounded : Icons.close_rounded,
+              color: accentColor,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            statusLabel,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFFFFF4EC),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DriverPrimaryActionBar extends StatelessWidget {
+  const _DriverPrimaryActionBar({
+    required this.label,
+    required this.accentColor,
+    required this.onTap,
+  });
+
+  final String label;
+  final Color accentColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: onTap,
+        child: Ink(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                accentColor,
+                accentColor.withValues(alpha: 0.84),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: accentColor.withValues(alpha: 0.28),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.bolt_rounded, color: Color(0xFF0F0F10)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF0F0F10),
+                  ),
+                ),
+              ),
+              const Icon(Icons.arrow_forward_rounded, color: Color(0xFF0F0F10)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DriverFloatingStatusPill extends StatelessWidget {
+  const _DriverFloatingStatusPill({
+    required this.title,
+    required this.subtitle,
+    required this.active,
+  });
+
+  final String title;
+  final String subtitle;
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    final accentColor = active ? const Color(0xFF22C55E) : const Color(0xFFEF4444);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF17181B).withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: accentColor.withValues(alpha: 0.24)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x22000000),
+            blurRadius: 18,
+            offset: Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(
+              color: accentColor,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: accentColor.withValues(alpha: 0.45),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFFFFF4EC),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFFFFD8BF),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _DriverAvailableTripCard extends StatelessWidget {
   const _DriverAvailableTripCard({
     required this.trip,
@@ -2191,10 +2317,12 @@ class _MapActionButton extends StatelessWidget {
   const _MapActionButton({
     required this.icon,
     required this.onTap,
+    this.accentColor = const Color(0xFFF97316),
   });
 
   final IconData icon;
   final VoidCallback onTap;
+  final Color accentColor;
 
   @override
   Widget build(BuildContext context) {
@@ -2209,7 +2337,7 @@ class _MapActionButton extends StatelessWidget {
         child: SizedBox(
           width: 52,
           height: 52,
-          child: Icon(icon, color: const Color(0xFFF97316)),
+          child: Icon(icon, color: accentColor),
         ),
       ),
     );
@@ -2448,70 +2576,6 @@ class _DriverHistoryCard extends StatelessWidget {
       'cancelled' => 'Cancelado',
       _ => status,
     };
-  }
-}
-
-class _DriverQuickActionChip extends StatelessWidget {
-  const _DriverQuickActionChip({
-    required this.label,
-    required this.accentColor,
-    required this.onTap,
-  });
-
-  final String label;
-  final Color accentColor;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: accentColor,
-      borderRadius: BorderRadius.circular(22),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(22),
-        onTap: onTap,
-        child: Container(
-          width: 108,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x22000000),
-                blurRadius: 18,
-                offset: Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(Icons.touch_app_rounded, color: Color(0xFF0F0F10), size: 20),
-              const SizedBox(height: 8),
-              const Text(
-                'Accion',
-                style: TextStyle(
-                  color: Color(0xCC0F0F10),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.plusJakartaSans(
-                  color: const Color(0xFF0F0F10),
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 

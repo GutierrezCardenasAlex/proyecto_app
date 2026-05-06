@@ -86,6 +86,12 @@ class TripHistoryItem {
     required this.pickupAddress,
     required this.destinationAddress,
     required this.requestedAt,
+    this.driverName,
+    this.driverPhone,
+    this.vehicleType,
+    this.vehicleLabel,
+    this.vehiclePlate,
+    this.vehicleColor,
   });
 
   final String id;
@@ -93,6 +99,12 @@ class TripHistoryItem {
   final String pickupAddress;
   final String destinationAddress;
   final String requestedAt;
+  final String? driverName;
+  final String? driverPhone;
+  final String? vehicleType;
+  final String? vehicleLabel;
+  final String? vehiclePlate;
+  final String? vehicleColor;
 }
 
 class NearbyDriver {
