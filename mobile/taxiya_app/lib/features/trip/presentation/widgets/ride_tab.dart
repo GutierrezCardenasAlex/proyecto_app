@@ -310,6 +310,107 @@ class _RideTabState extends ConsumerState<RideTab> {
     }
   }
 
+  void _showPassengerTripOptions(TripState tripState) {
+    final request = tripState.request;
+    final activeTripId = request.activeTripId;
+    if (activeTripId == null || activeTripId.isEmpty) {
+      return;
+    }
+
+    final status = request.status;
+    final session = ref.read(sessionProvider);
+    final canCancel = !const {'completed', 'cancelled'}.contains(status);
+    final canChat = request.driverPhone != null &&
+        request.driverPhone!.trim().isNotEmpty &&
+        const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(status);
+    final canStartTrip = status == 'at_pickup';
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+          decoration: const BoxDecoration(
+            color: Color(0xFF121214),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: const Color(0x55F97316),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Opciones del viaje',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFFFFF4EC),
+                ),
+              ),
+              const SizedBox(height: 14),
+              if (canStartTrip)
+                _TripOptionTile(
+                  icon: Icons.play_arrow_rounded,
+                  title: 'Estoy listo para salir',
+                  subtitle: 'Marca que ya estas listo para iniciar.',
+                  accentColor: const Color(0xFFF97316),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    ref.read(tripProvider.notifier).updateTripStatus(
+                          token: session.token,
+                          tripId: activeTripId,
+                          status: 'in_progress',
+                        );
+                  },
+                ),
+              if (canChat)
+                _TripOptionTile(
+                  icon: Icons.chat_bubble_rounded,
+                  title: 'Hablar por WhatsApp',
+                  subtitle: request.driverPhone ?? 'Numero del conductor',
+                  accentColor: const Color(0xFFF97316),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _openWhatsApp(
+                      phone: request.driverPhone,
+                      message:
+                          'Hola ${request.driverName ?? 'conductor'}, te escribo desde Flash Go sobre mi viaje.',
+                    );
+                  },
+                ),
+              if (canCancel)
+                _TripOptionTile(
+                  icon: Icons.close_rounded,
+                  title: 'Cancelar viaje',
+                  subtitle: 'Cancela esta solicitud o viaje activo.',
+                  accentColor: const Color(0xFFF97316),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    ref.read(tripProvider.notifier).updateTripStatus(
+                          token: session.token,
+                          tripId: activeTripId,
+                          status: 'cancelled',
+                        );
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _showTripRequestSheet(TripState tripState) {
     final request = tripState.request;
     showModalBottomSheet<void>(
@@ -359,10 +460,34 @@ class _RideTabState extends ConsumerState<RideTab> {
                     : 'Aun sin asignar',
               ),
               _TripInfoRow(
+                label: 'Tipo',
+                value: (request.vehicleType?.isNotEmpty ?? false)
+                    ? request.vehicleType!
+                    : 'Por confirmar',
+              ),
+              _TripInfoRow(
+                label: 'Color',
+                value: (request.vehicleColor?.isNotEmpty ?? false)
+                    ? request.vehicleColor!
+                    : 'Por confirmar',
+              ),
+              _TripInfoRow(
                 label: 'Placa',
                 value: (request.vehiclePlate?.isNotEmpty ?? false)
                     ? request.vehiclePlate!
                     : 'Por confirmar',
+              ),
+              _TripInfoRow(
+                label: 'Conductor',
+                value: (request.driverName?.isNotEmpty ?? false)
+                    ? request.driverName!
+                    : 'Pendiente',
+              ),
+              _TripInfoRow(
+                label: 'Telefono',
+                value: (request.driverPhone?.isNotEmpty ?? false)
+                    ? request.driverPhone!
+                    : 'Pendiente',
               ),
               _TripInfoRow(
                 label: 'Llegada',
@@ -506,79 +631,29 @@ class _RideTabState extends ConsumerState<RideTab> {
 
     final request = tripState.request;
     final status = request.status;
-    final session = ref.read(sessionProvider);
-    final canCancel = !const {'completed', 'cancelled'}.contains(status);
-    final canChat = request.driverPhone != null &&
-        request.driverPhone!.trim().isNotEmpty &&
-        const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(status);
-    final canStartTrip = status == 'at_pickup';
+    final hasOptions = !const {'completed', 'cancelled'}.contains(status) ||
+        (request.driverPhone != null &&
+            request.driverPhone!.trim().isNotEmpty &&
+            const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(status));
 
-    if (!canCancel && !canChat && !canStartTrip) {
+    if (!hasOptions) {
       return const SizedBox.shrink();
     }
 
     return Padding(
       padding: const EdgeInsets.only(top: 12),
-      child: Column(
-        children: [
-          if (canStartTrip)
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: FilledButton(
-                onPressed: () => ref.read(tripProvider.notifier).updateTripStatus(
-                      token: session.token,
-                      tripId: activeTripId,
-                      status: 'in_progress',
-                    ),
-                child: const Text('Estoy listo para salir'),
-              ),
-            ),
-          if (canStartTrip) const SizedBox(height: 10),
-          Row(
-            children: [
-              if (canCancel)
-                Expanded(
-                  child: SizedBox(
-                    height: 50,
-                    child: OutlinedButton.icon(
-                      onPressed: () => ref.read(tripProvider.notifier).updateTripStatus(
-                            token: session.token,
-                            tripId: activeTripId,
-                            status: 'cancelled',
-                          ),
-                      icon: const Icon(Icons.close_rounded),
-                      label: const Text('Cancelar'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFFFFB38A),
-                        side: const BorderSide(color: Color(0x55F97316)),
-                      ),
-                    ),
-                  ),
-                ),
-              if (canCancel && canChat) const SizedBox(width: 10),
-              if (canChat)
-                Expanded(
-                  child: SizedBox(
-                    height: 50,
-                    child: FilledButton.icon(
-                      onPressed: () => _openWhatsApp(
-                        phone: request.driverPhone,
-                        message:
-                            'Hola ${request.driverName ?? 'conductor'}, te escribo desde Flash Go sobre mi viaje.',
-                      ),
-                      icon: const Icon(Icons.chat_bubble_rounded),
-                      label: const Text('WhatsApp'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF1E8E5A),
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
+      child: SizedBox(
+        width: double.infinity,
+        height: 52,
+        child: FilledButton.icon(
+          onPressed: () => _showPassengerTripOptions(tripState),
+          icon: const Icon(Icons.tune_rounded),
+          label: const Text('Opciones del viaje'),
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFFF97316),
+            foregroundColor: const Color(0xFF0F0F10),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1020,6 +1095,10 @@ class _RideTabState extends ConsumerState<RideTab> {
                           status: tripState.request.status,
                           vehicleLabel: tripState.request.vehicleLabel,
                           vehiclePlate: tripState.request.vehiclePlate,
+                          vehicleType: tripState.request.vehicleType,
+                          vehicleColor: tripState.request.vehicleColor,
+                          driverName: tripState.request.driverName,
+                          driverPhone: tripState.request.driverPhone,
                           etaMinutes: tripState.request.etaMinutes,
                         ),
                       ),
@@ -1141,7 +1220,6 @@ class _RideTabState extends ConsumerState<RideTab> {
           title: driver.vehicleLabel.isEmpty ? names[index % names.length] : driver.vehicleLabel,
           subtitle: driver.vehicleDetail,
           eta: '${driver.etaMinutes} min',
-          price: driver.priceLabel,
           rating: driver.rating.toStringAsFixed(1),
           distance: '${(driver.distanceMeters / 1000).toStringAsFixed(1)} km',
           icon: _vehicleIcon(driver.vehicleType),
@@ -1386,7 +1464,6 @@ class _VehicleOptionCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.eta,
-    required this.price,
     required this.rating,
     required this.distance,
     required this.icon,
@@ -1397,7 +1474,6 @@ class _VehicleOptionCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final String eta;
-  final String price;
   final String rating;
   final String distance;
   final IconData icon;
@@ -1469,15 +1545,6 @@ class _VehicleOptionCard extends StatelessWidget {
                     const Icon(Icons.check_circle, color: Color(0xFFC2410C), size: 18),
                     const SizedBox(height: 6),
                   ],
-                  Text(
-                    price,
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFFFFF4EC),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
                   Row(
                     children: [
                       const Icon(Icons.star, color: Color(0xFFF97316), size: 16),
@@ -1529,12 +1596,20 @@ class _LargeTripStatusCard extends StatelessWidget {
     required this.status,
     this.vehicleLabel,
     this.vehiclePlate,
+    this.vehicleType,
+    this.vehicleColor,
+    this.driverName,
+    this.driverPhone,
     this.etaMinutes,
   });
 
   final String status;
   final String? vehicleLabel;
   final String? vehiclePlate;
+  final String? vehicleType;
+  final String? vehicleColor;
+  final String? driverName;
+  final String? driverPhone;
   final int? etaMinutes;
 
   String get _title => switch (status) {
@@ -1619,6 +1694,19 @@ class _LargeTripStatusCard extends StatelessWidget {
                   ),
                 if ((vehiclePlate ?? '').isNotEmpty)
                   _TripBadge(icon: Icons.badge_outlined, label: 'Placa $vehiclePlate'),
+                if ((vehicleColor ?? '').isNotEmpty)
+                  _TripBadge(icon: Icons.palette_outlined, label: 'Color ${vehicleColor!}'),
+                if ((vehicleType ?? '').isNotEmpty)
+                  _TripBadge(
+                    icon: (vehicleType ?? '').toLowerCase() == 'moto'
+                        ? Icons.two_wheeler_rounded
+                        : Icons.local_taxi_rounded,
+                    label: 'Tipo ${vehicleType!}',
+                  ),
+                if ((driverName ?? '').isNotEmpty)
+                  _TripBadge(icon: Icons.person_outline_rounded, label: driverName!),
+                if ((driverPhone ?? '').isNotEmpty)
+                  _TripBadge(icon: Icons.phone_outlined, label: driverPhone!),
               ],
             ),
           ],
@@ -1761,6 +1849,82 @@ class _TripBadge extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TripOptionTile extends StatelessWidget {
+  const _TripOptionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.accentColor,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color accentColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: const Color(0xFF1A1A1D),
+        borderRadius: BorderRadius.circular(22),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: const Color(0x44F97316)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: accentColor.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(icon, color: accentColor),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: GoogleFonts.plusJakartaSans(
+                          color: const Color(0xFFFFF4EC),
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          color: Color(0xFFFFC89B),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: accentColor),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

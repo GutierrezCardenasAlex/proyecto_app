@@ -13,6 +13,7 @@ class TripRequest {
     this.vehicleType,
     this.vehicleLabel,
     this.vehiclePlate,
+    this.vehicleColor,
     this.driverName,
     this.driverPhone,
     this.etaMinutes,
@@ -31,6 +32,7 @@ class TripRequest {
   final String? vehicleType;
   final String? vehicleLabel;
   final String? vehiclePlate;
+  final String? vehicleColor;
   final String? driverName;
   final String? driverPhone;
   final int? etaMinutes;
@@ -49,6 +51,7 @@ class TripRequest {
     String? vehicleType,
     String? vehicleLabel,
     String? vehiclePlate,
+    String? vehicleColor,
     String? driverName,
     String? driverPhone,
     int? etaMinutes,
@@ -68,6 +71,7 @@ class TripRequest {
       vehicleType: vehicleType ?? this.vehicleType,
       vehicleLabel: vehicleLabel ?? this.vehicleLabel,
       vehiclePlate: vehiclePlate ?? this.vehiclePlate,
+      vehicleColor: vehicleColor ?? this.vehicleColor,
       driverName: driverName ?? this.driverName,
       driverPhone: driverPhone ?? this.driverPhone,
       etaMinutes: etaMinutes ?? this.etaMinutes,

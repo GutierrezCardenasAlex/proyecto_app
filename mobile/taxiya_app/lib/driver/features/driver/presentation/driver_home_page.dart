@@ -672,6 +672,71 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
     }
   }
 
+  void _showDriverTripOptions(DriverTrip trip) {
+    final canChat = const {'at_pickup', 'in_progress'}.contains(trip.status);
+    final canCancel = !const {'completed', 'cancelled'}.contains(trip.status);
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+          decoration: const BoxDecoration(
+            color: Color(0xFF121214),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: const Color(0x55F97316),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Opciones del viaje',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFFFFF4EC),
+                ),
+              ),
+              const SizedBox(height: 14),
+              if (canChat)
+                _DriverOptionTile(
+                  icon: Icons.chat_bubble_rounded,
+                  title: 'Hablar por WhatsApp',
+                  subtitle: trip.passengerPhone ?? 'Numero del pasajero',
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _openPassengerWhatsApp(trip);
+                  },
+                ),
+              if (canCancel)
+                _DriverOptionTile(
+                  icon: Icons.close_rounded,
+                  title: 'Cancelar viaje',
+                  subtitle: 'Cancela el viaje actual.',
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _cancelDriverTrip(trip);
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _handleDriverPrimaryAction(DriverTrip? trip) async {
     if (trip == null) {
       return;
@@ -961,24 +1026,11 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
           Positioned(
             right: 20,
             top: 332,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                if (const {'at_pickup', 'in_progress'}.contains(trip.status))
-                  _DriverQuickActionChip(
-                    label: 'WhatsApp',
-                    accentColor: const Color(0xFF1E8E5A),
-                    onTap: () => _openPassengerWhatsApp(trip),
-                  ),
-                if (const {'at_pickup', 'in_progress'}.contains(trip.status))
-                  const SizedBox(height: 10),
-                _DriverQuickActionChip(
-                  label: 'Cancelar',
-                  accentColor: const Color(0xFF2A1A16),
-                  onTap: () => _cancelDriverTrip(trip),
-                  textColor: const Color(0xFFFFC89B),
-                ),
-              ],
+            child: _DriverQuickActionChip(
+              label: 'Opciones',
+              accentColor: const Color(0xFF2A1A16),
+              onTap: () => _showDriverTripOptions(trip),
+              textColor: const Color(0xFFFFC89B),
             ),
           ),
         Positioned(
@@ -1213,8 +1265,11 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                           _InfoTile(label: 'Viaje', value: trip.id),
                           _InfoTile(label: 'Recojo', value: trip.passengerPickup),
                           _InfoTile(label: 'Destino', value: trip.destination),
-                          _InfoTile(label: 'Tarifa', value: 'Bs ${trip.fareAmount.toStringAsFixed(0)}'),
                           _InfoTile(label: 'Estado', value: trip.status),
+                          if (trip.passengerName?.isNotEmpty ?? false)
+                            _InfoTile(label: 'Pasajero', value: trip.passengerName!),
+                          if (trip.passengerPhone?.isNotEmpty ?? false)
+                            _InfoTile(label: 'Telefono', value: trip.passengerPhone!),
                           const SizedBox(height: 12),
                           _DriverTripProgressBar(status: trip.status),
                         ],
@@ -1659,7 +1714,10 @@ class _DriverHistoryCard extends StatelessWidget {
             _InfoTile(label: 'ID', value: trip.id),
             _InfoTile(label: 'Recojo', value: trip.passengerPickup),
             _InfoTile(label: 'Destino', value: trip.destination),
-            _InfoTile(label: 'Tarifa', value: 'Bs ${trip.fareAmount.toStringAsFixed(0)}'),
+            if (trip.passengerName?.isNotEmpty ?? false)
+              _InfoTile(label: 'Pasajero', value: trip.passengerName!),
+            if (trip.passengerPhone?.isNotEmpty ?? false)
+              _InfoTile(label: 'Telefono', value: trip.passengerPhone!),
             const SizedBox(height: 10),
             _DriverTripProgressBar(status: trip.status),
           ],
@@ -1829,6 +1887,80 @@ class _DriverQuickActionChip extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DriverOptionTile extends StatelessWidget {
+  const _DriverOptionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: const Color(0xFF1A1A1D),
+        borderRadius: BorderRadius.circular(22),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: const Color(0x44F97316)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0x22F97316),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(icon, color: const Color(0xFFF97316)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: GoogleFonts.plusJakartaSans(
+                          color: const Color(0xFFFFF4EC),
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          color: Color(0xFFFFC89B),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded, color: Color(0xFFF97316)),
+              ],
+            ),
           ),
         ),
       ),
