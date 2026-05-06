@@ -252,6 +252,8 @@ async function bootstrap() {
               v.model AS vehicle_model,
               v.color AS vehicle_color,
               v.plate AS vehicle_plate,
+              du.full_name AS driver_name,
+              du.phone AS driver_phone,
               ll.driver_lat,
               ll.driver_lng,
               CASE
@@ -262,6 +264,8 @@ async function bootstrap() {
                 )
               END AS eta_minutes
        FROM trips t
+       LEFT JOIN drivers d ON d.id = t.driver_id
+       LEFT JOIN users du ON du.id = d.user_id
        LEFT JOIN vehicles v ON v.driver_id = t.driver_id
        LEFT JOIN latest_location ll ON ll.driver_id = t.driver_id
        WHERE t.passenger_id = $1
@@ -286,8 +290,11 @@ async function bootstrap() {
               v.brand AS vehicle_brand,
               v.model AS vehicle_model,
               v.color AS vehicle_color,
-              v.plate AS vehicle_plate
+              v.plate AS vehicle_plate,
+              pu.full_name AS passenger_name,
+              pu.phone AS passenger_phone
        FROM trips t
+       LEFT JOIN users pu ON pu.id = t.passenger_id
        LEFT JOIN vehicles v ON v.driver_id = t.driver_id
        WHERE t.driver_id = $1
          AND t.status IN ('accepted', 'arriving', 'at_pickup', 'in_progress')

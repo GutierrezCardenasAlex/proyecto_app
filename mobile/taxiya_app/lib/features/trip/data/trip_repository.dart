@@ -78,6 +78,8 @@ class TripRepository {
       vehicleType: payload['vehicle_type']?.toString(),
       vehicleLabel: _joinVehicleLabel(payload['vehicle_brand'], payload['vehicle_model']),
       vehiclePlate: payload['vehicle_plate']?.toString(),
+      driverName: payload['driver_name']?.toString(),
+      driverPhone: payload['driver_phone']?.toString(),
       etaMinutes: _toNullableInt(payload['eta_minutes']),
     );
   }
@@ -238,6 +240,8 @@ class TripRepository {
       vehicleType: payload['vehicle_type']?.toString(),
       vehicleLabel: _joinVehicleLabel(payload['vehicle_brand'], payload['vehicle_model']),
       vehiclePlate: payload['vehicle_plate']?.toString(),
+      driverName: payload['driver_name']?.toString(),
+      driverPhone: payload['driver_phone']?.toString(),
       etaMinutes: _toNullableInt(payload['eta_minutes']),
     );
   }

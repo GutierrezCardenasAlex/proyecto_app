@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../auth/data/auth_repository.dart';
 import '../../auth/presentation/driver_login_card.dart';
@@ -500,6 +501,10 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                 _InfoTile(label: 'Viaje', value: trip.id),
                 _InfoTile(label: 'Recojo', value: trip.passengerPickup),
                 _InfoTile(label: 'Estado viaje', value: trip.status),
+                if (trip.passengerName?.isNotEmpty ?? false)
+                  _InfoTile(label: 'Pasajero', value: trip.passengerName!),
+                if (trip.passengerPhone?.isNotEmpty ?? false)
+                  _InfoTile(label: 'Telefono', value: trip.passengerPhone!),
               ],
               const SizedBox(height: 14),
               SwitchListTile(
@@ -608,6 +613,63 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
       'moto' => Icons.two_wheeler_rounded,
       _ => Icons.directions_car_filled_rounded,
     };
+  }
+
+  String? _normalizeWhatsAppPhone(String? rawPhone) {
+    final digits = (rawPhone ?? '').replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) {
+      return null;
+    }
+    if (digits.startsWith('591')) {
+      return digits;
+    }
+    return '591$digits';
+  }
+
+  Future<void> _openPassengerWhatsApp(DriverTrip trip) async {
+    final normalizedPhone = _normalizeWhatsAppPhone(trip.passengerPhone);
+    if (normalizedPhone == null) {
+      if (mounted) {
+        showTopNotice(
+          context,
+          'Todavia no hay numero del pasajero para WhatsApp.',
+          backgroundColor: const Color(0xFFF97316),
+          foregroundColor: const Color(0xFF0F0F10),
+        );
+      }
+      return;
+    }
+
+    final passengerName = trip.passengerName?.trim().isNotEmpty == true
+        ? trip.passengerName!.trim()
+        : 'pasajero';
+    final message = trip.status == 'at_pickup'
+        ? 'Hola $passengerName, ya llegue al punto de recojo en Flash Go.'
+        : 'Hola $passengerName, te escribo por tu viaje de Flash Go.';
+    final uri = Uri.parse(
+      'https://wa.me/$normalizedPhone?text=${Uri.encodeComponent(message)}',
+    );
+
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && mounted) {
+      showTopNotice(
+        context,
+        'No se pudo abrir WhatsApp en este momento.',
+        backgroundColor: const Color(0xFFF97316),
+        foregroundColor: const Color(0xFF0F0F10),
+      );
+    }
+  }
+
+  Future<void> _cancelDriverTrip(DriverTrip trip) async {
+    await ref.read(offeredTripProvider.notifier).updateTripStatus('cancelled');
+    if (mounted) {
+      showTopNotice(
+        context,
+        'Viaje cancelado.',
+        backgroundColor: const Color(0xFFF97316),
+        foregroundColor: const Color(0xFF0F0F10),
+      );
+    }
   }
 
   Future<void> _handleDriverPrimaryAction(DriverTrip? trip) async {
@@ -833,8 +895,10 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                         ),
                         const SizedBox(width: 14),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 10,
+                            runSpacing: 8,
                             children: [
                               Text(
                                 driverState.available ? 'Buscando viaje' : 'Fuera de linea',
@@ -844,12 +908,19 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                                   color: const Color(0xFFFFF4EC),
                                 ),
                               ),
-                              const SizedBox(height: 3),
-                              Text(
-                                _statusChipLabel(driverState, trip),
-                                style: const TextStyle(
-                                  color: Color(0xFFFFC89B),
-                                  fontWeight: FontWeight.w700,
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0x22F97316),
+                                  borderRadius: BorderRadius.circular(999),
+                                  border: Border.all(color: const Color(0x44F97316)),
+                                ),
+                                child: Text(
+                                  _statusChipLabel(driverState, trip),
+                                  style: const TextStyle(
+                                    color: Color(0xFFFFC89B),
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
                             ],
@@ -886,9 +957,33 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
               onTap: () => _handleDriverPrimaryAction(trip),
             ),
           ),
+        if (trip != null && trip.status != 'completed' && trip.status != 'cancelled')
+          Positioned(
+            right: 20,
+            top: 332,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (const {'at_pickup', 'in_progress'}.contains(trip.status))
+                  _DriverQuickActionChip(
+                    label: 'WhatsApp',
+                    accentColor: const Color(0xFF1E8E5A),
+                    onTap: () => _openPassengerWhatsApp(trip),
+                  ),
+                if (const {'at_pickup', 'in_progress'}.contains(trip.status))
+                  const SizedBox(height: 10),
+                _DriverQuickActionChip(
+                  label: 'Cancelar',
+                  accentColor: const Color(0xFF2A1A16),
+                  onTap: () => _cancelDriverTrip(trip),
+                  textColor: const Color(0xFFFFC89B),
+                ),
+              ],
+            ),
+          ),
         Positioned(
           right: 20,
-          bottom: trip != null && trip.status != 'completed' ? 204 : 236,
+          bottom: trip != null && trip.status != 'completed' ? 176 : 236,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1680,11 +1775,13 @@ class _DriverQuickActionChip extends StatelessWidget {
     required this.label,
     required this.accentColor,
     required this.onTap,
+    this.textColor = const Color(0xFF0F0F10),
   });
 
   final String label;
   final Color accentColor;
   final VoidCallback onTap;
+  final Color textColor;
 
   @override
   Widget build(BuildContext context) {
@@ -1710,12 +1807,12 @@ class _DriverQuickActionChip extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.touch_app_rounded, color: Color(0xFF0F0F10), size: 20),
+              Icon(Icons.touch_app_rounded, color: textColor, size: 20),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Accion',
                 style: TextStyle(
-                  color: Color(0xFF3B1B05),
+                  color: textColor.withValues(alpha: 0.82),
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
                 ),
@@ -1726,7 +1823,7 @@ class _DriverQuickActionChip extends StatelessWidget {
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.plusJakartaSans(
-                  color: const Color(0xFF0F0F10),
+                  color: textColor,
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
                 ),

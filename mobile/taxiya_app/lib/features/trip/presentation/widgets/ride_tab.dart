@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../auth/data/auth_repository.dart';
 import '../../../../core/config/app_config.dart';
@@ -280,6 +281,35 @@ class _RideTabState extends ConsumerState<RideTab> {
     );
   }
 
+  String? _normalizeWhatsAppPhone(String? rawPhone) {
+    final digits = (rawPhone ?? '').replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) {
+      return null;
+    }
+    if (digits.startsWith('591')) {
+      return digits;
+    }
+    return '591$digits';
+  }
+
+  Future<void> _openWhatsApp({
+    required String? phone,
+    required String message,
+  }) async {
+    final normalizedPhone = _normalizeWhatsAppPhone(phone);
+    if (normalizedPhone == null) {
+      _showMessage('Todavia no hay un numero disponible para WhatsApp.');
+      return;
+    }
+
+    final uri = Uri.parse(
+      'https://wa.me/$normalizedPhone?text=${Uri.encodeComponent(message)}',
+    );
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && mounted) {
+      _showMessage('No se pudo abrir WhatsApp en este momento.');
+    }
+  }
+
   void _showTripRequestSheet(TripState tripState) {
     final request = tripState.request;
     showModalBottomSheet<void>(
@@ -317,6 +347,7 @@ class _RideTabState extends ConsumerState<RideTab> {
                 message: _tripStatusHeadline(request.status),
                 color: const Color(0xFFFFE6D5),
                 textColor: const Color(0xFFC2410C),
+                icon: Icons.timeline_rounded,
               ),
               const SizedBox(height: 16),
               _TripInfoRow(label: 'Estado', value: request.status),
@@ -473,27 +504,83 @@ class _RideTabState extends ConsumerState<RideTab> {
       return const SizedBox.shrink();
     }
 
-    final status = tripState.request.status;
+    final request = tripState.request;
+    final status = request.status;
     final session = ref.read(sessionProvider);
+    final canCancel = !const {'completed', 'cancelled'}.contains(status);
+    final canChat = request.driverPhone != null &&
+        request.driverPhone!.trim().isNotEmpty &&
+        const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(status);
+    final canStartTrip = status == 'at_pickup';
 
-    if (status == 'at_pickup') {
-      return Padding(
-        padding: const EdgeInsets.only(top: 12),
-        child: SizedBox(
-          height: 52,
-          child: FilledButton(
-            onPressed: () => ref.read(tripProvider.notifier).updateTripStatus(
-                  token: session.token,
-                  tripId: activeTripId,
-                  status: 'in_progress',
-                ),
-            child: const Text('Estoy listo para salir'),
-          ),
-        ),
-      );
+    if (!canCancel && !canChat && !canStartTrip) {
+      return const SizedBox.shrink();
     }
 
-    return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        children: [
+          if (canStartTrip)
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: FilledButton(
+                onPressed: () => ref.read(tripProvider.notifier).updateTripStatus(
+                      token: session.token,
+                      tripId: activeTripId,
+                      status: 'in_progress',
+                    ),
+                child: const Text('Estoy listo para salir'),
+              ),
+            ),
+          if (canStartTrip) const SizedBox(height: 10),
+          Row(
+            children: [
+              if (canCancel)
+                Expanded(
+                  child: SizedBox(
+                    height: 50,
+                    child: OutlinedButton.icon(
+                      onPressed: () => ref.read(tripProvider.notifier).updateTripStatus(
+                            token: session.token,
+                            tripId: activeTripId,
+                            status: 'cancelled',
+                          ),
+                      icon: const Icon(Icons.close_rounded),
+                      label: const Text('Cancelar'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFFFB38A),
+                        side: const BorderSide(color: Color(0x55F97316)),
+                      ),
+                    ),
+                  ),
+                ),
+              if (canCancel && canChat) const SizedBox(width: 10),
+              if (canChat)
+                Expanded(
+                  child: SizedBox(
+                    height: 50,
+                    child: FilledButton.icon(
+                      onPressed: () => _openWhatsApp(
+                        phone: request.driverPhone,
+                        message:
+                            'Hola ${request.driverName ?? 'conductor'}, te escribo desde Flash Go sobre mi viaje.',
+                      ),
+                      icon: const Icon(Icons.chat_bubble_rounded),
+                      label: const Text('WhatsApp'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF1E8E5A),
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   List<NearbyDriver> _requestableDrivers(List<NearbyDriver> drivers) {
@@ -914,6 +1001,7 @@ class _RideTabState extends ConsumerState<RideTab> {
                         message: locationState.errorMessage!,
                         color: const Color(0xFFFFDAD6),
                         textColor: const Color(0xFF93000A),
+                        icon: Icons.location_off_rounded,
                       ),
                     if (tripState.errorMessage != null)
                       Padding(
@@ -922,6 +1010,7 @@ class _RideTabState extends ConsumerState<RideTab> {
                           message: tripState.errorMessage!.replaceFirst('Exception: ', ''),
                           color: const Color(0xFFFFDAD6),
                           textColor: const Color(0xFF93000A),
+                          icon: Icons.error_outline_rounded,
                         ),
                       ),
                     if (tripState.request.activeTripId != null)
@@ -1723,11 +1812,13 @@ class _StatusBanner extends StatelessWidget {
     required this.message,
     required this.color,
     required this.textColor,
+    this.icon = Icons.radar_rounded,
   });
 
   final String message;
   final Color color;
   final Color textColor;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
@@ -1738,12 +1829,20 @@ class _StatusBanner extends StatelessWidget {
         color: color,
         borderRadius: BorderRadius.circular(18),
       ),
-      child: Text(
-        message,
-        style: TextStyle(
-          color: textColor,
-          fontWeight: FontWeight.w700,
-        ),
+      child: Row(
+        children: [
+          Icon(icon, color: textColor, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                color: textColor,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

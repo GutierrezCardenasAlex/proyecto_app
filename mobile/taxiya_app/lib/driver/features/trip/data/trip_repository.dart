@@ -58,6 +58,8 @@ class DriverTripRepository {
       destinationLng: _toDouble(item['destination_lng']),
       fareAmount: _toDouble(item['fare_amount']),
       vehicleType: item['vehicle_type']?.toString(),
+      passengerName: item['passenger_name']?.toString(),
+      passengerPhone: item['passenger_phone']?.toString(),
     );
   }
 
@@ -186,6 +188,8 @@ class DriverTripRepository {
       destinationLng: _toDouble(item['destination_lng']),
       fareAmount: _toDouble(item['fare_amount']),
       vehicleType: item['vehicle_type']?.toString(),
+      passengerName: item['passenger_name']?.toString(),
+      passengerPhone: item['passenger_phone']?.toString(),
     );
   }
 
