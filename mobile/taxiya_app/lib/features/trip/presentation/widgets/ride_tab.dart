@@ -44,6 +44,7 @@ class _RideTabState extends ConsumerState<RideTab> {
   String? _joinedTripId;
   String? _selectedDriverId;
   String? _ratingPromptedTripId;
+  bool _isSyncingDashboard = false;
 
   @override
   void initState() {
@@ -168,17 +169,26 @@ class _RideTabState extends ConsumerState<RideTab> {
   }
 
   Future<void> _syncDashboard() async {
+    if (_isSyncingDashboard) {
+      return;
+    }
+
     final session = ref.read(sessionProvider);
     final location = ref.read(passengerLocationProvider).position;
     if (!mounted || !session.isAuthenticated || location == null) {
       return;
     }
 
-    await ref.read(tripProvider.notifier).loadDashboard(
-          token: session.token,
-          passengerId: session.userId,
-          userLocation: location,
-        );
+    _isSyncingDashboard = true;
+    try {
+      await ref.read(tripProvider.notifier).loadDashboard(
+            token: session.token,
+            passengerId: session.userId,
+            userLocation: location,
+          );
+    } finally {
+      _isSyncingDashboard = false;
+    }
   }
 
   Future<void> _requestRide() async {
@@ -203,9 +213,9 @@ class _RideTabState extends ConsumerState<RideTab> {
 
     if (_rideMode == RideMode.cercano &&
         selectedDriver != null &&
-        selectedDriver.distanceMeters > 200) {
+        selectedDriver.distanceMeters > 1000) {
       _showMessage(
-        'Ese auto esta a ${selectedDriver.distanceMeters.toStringAsFixed(0)} m. Para tomar taxi debe estar dentro de 200 m.',
+        'Ese auto esta a ${selectedDriver.distanceMeters.toStringAsFixed(0)} m. Para tomar taxi debe estar dentro de 1000 m.',
       );
       return;
     }
@@ -255,7 +265,7 @@ class _RideTabState extends ConsumerState<RideTab> {
       if (nearbyDrivers.isNotEmpty) {
         final nearest = nearbyDrivers.first;
         _showMessage(
-          'El auto mas cercano esta a ${nearest.distanceMeters.toStringAsFixed(0)} m. Para tomar taxi debe estar dentro de 200 m.',
+          'El auto mas cercano esta a ${nearest.distanceMeters.toStringAsFixed(0)} m. Para tomar taxi debe estar dentro de 1000 m.',
         );
       } else {
         _showMessage('No hay taxis cercanos disponibles en este momento.');
@@ -823,7 +833,7 @@ class _RideTabState extends ConsumerState<RideTab> {
   }
 
   List<NearbyDriver> _requestableDrivers(List<NearbyDriver> drivers) {
-    return drivers.where((driver) => driver.distanceMeters <= 200).toList(growable: false);
+    return drivers.where((driver) => driver.distanceMeters <= 1000).toList(growable: false);
   }
 
   NearbyDriver? _findDriverById(List<NearbyDriver> drivers, String? driverId) {
@@ -1262,7 +1272,7 @@ class _RideTabState extends ConsumerState<RideTab> {
                         Padding(
                           padding: const EdgeInsets.only(bottom: 12),
                           child: Text(
-                            'Solo aparecen autos con disponibilidad activa dentro de 200 m.',
+                            'Solo aparecen autos con disponibilidad activa dentro de 1000 m.',
                             style: GoogleFonts.plusJakartaSans(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,

@@ -340,6 +340,7 @@ class TripRepository {
 
 class TripController extends Notifier<TripState> {
   late final TripRepository _repository;
+  bool _isLoadingDashboard = false;
 
   @override
   TripState build() {
@@ -364,11 +365,15 @@ class TripController extends Notifier<TripState> {
     required String passengerId,
     required LatLng userLocation,
   }) async {
-    if (token.isEmpty || passengerId.isEmpty) {
+    if (token.isEmpty || passengerId.isEmpty || _isLoadingDashboard) {
       return;
     }
 
-    state = state.copyWith(isLoading: true, clearError: true);
+    _isLoadingDashboard = true;
+    state = state.copyWith(
+      isLoading: true,
+      errorMessage: state.errorMessage,
+    );
     try {
       final results = await Future.wait([
         _repository.fetchHistory(token: token, passengerId: passengerId),
@@ -396,6 +401,8 @@ class TripController extends Notifier<TripState> {
         isLoading: false,
         errorMessage: error.toString(),
       );
+    } finally {
+      _isLoadingDashboard = false;
     }
   }
 

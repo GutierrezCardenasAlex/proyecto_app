@@ -203,6 +203,7 @@ class DriverTripRepository {
 
 class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
   late final DriverTripRepository _repository;
+  bool _isLoadingOffer = false;
 
   @override
   AsyncValue<DriverTrip?> build() {
@@ -216,12 +217,22 @@ class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
       state = const AsyncData(null);
       return;
     }
+    if (_isLoadingOffer) {
+      return;
+    }
 
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(() => _repository.fetchOffer(
-          token: session.token,
-          driverId: session.driverId,
-        ));
+    _isLoadingOffer = true;
+    if (state.value == null) {
+      state = const AsyncLoading();
+    }
+    try {
+      state = await AsyncValue.guard(() => _repository.fetchOffer(
+            token: session.token,
+            driverId: session.driverId,
+          ));
+    } finally {
+      _isLoadingOffer = false;
+    }
   }
 
   Future<void> acceptTrip() async {
