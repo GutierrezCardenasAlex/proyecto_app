@@ -163,8 +163,11 @@ async function bootstrap() {
               ST_X(t.pickup_location::geometry) AS pickup_lng,
               ST_Y(t.destination_location::geometry) AS destination_lat,
               ST_X(t.destination_location::geometry) AS destination_lng,
-              t.fare_amount
+              t.fare_amount,
+              u.full_name AS passenger_name,
+              u.phone AS passenger_phone
        FROM trips t
+       LEFT JOIN users u ON u.id = t.passenger_id
        WHERE t.id = ANY($1::uuid[])
          AND t.status IN ('requested', 'searching')
        ORDER BY t.requested_at DESC`,

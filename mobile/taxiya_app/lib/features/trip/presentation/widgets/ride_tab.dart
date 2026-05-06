@@ -272,6 +272,185 @@ class _RideTabState extends ConsumerState<RideTab> {
     setState(() => _selectedDriverId = driverId);
   }
 
+  String _rideDestinationPreview() {
+    final destination = _destinationController.text.trim();
+    if (_rideMode == RideMode.cercano) {
+      return destination.isEmpty ? 'Abordaje inmediato' : destination;
+    }
+    return destination.isEmpty ? 'Destino por confirmar' : destination;
+  }
+
+  void _showNearbyDriverDetails(NearbyDriver driver) {
+    final isSelected = driver.driverId == (_selectedDriverId ?? '');
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(22, 18, 22, 28),
+          decoration: const BoxDecoration(
+            color: Color(0xFF121214),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: const Color(0x55F97316),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Container(
+                    width: 58,
+                    height: 58,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFF97316), Color(0xFFFFB067)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Icon(
+                      _vehicleIcon(driver.vehicleType),
+                      color: const Color(0xFF0F0F10),
+                      size: 30,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          driver.vehicleLabel,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFFFFF4EC),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          driver.vehicleDetail,
+                          style: const TextStyle(
+                            color: Color(0xFFFFC89B),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _TripBadge(
+                    icon: driver.vehicleType.toLowerCase() == 'moto'
+                        ? Icons.two_wheeler_rounded
+                        : Icons.local_taxi_rounded,
+                    label: driver.vehicleType.toUpperCase(),
+                  ),
+                  _TripBadge(
+                    icon: Icons.place_rounded,
+                    label: '${driver.distanceMeters.toStringAsFixed(0)} m',
+                  ),
+                  _TripBadge(
+                    icon: Icons.schedule_rounded,
+                    label: '${driver.etaMinutes} min',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1D),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: const Color(0x44F97316)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Resumen del viaje',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFFFFF4EC),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _TripInfoRow(label: 'Destino', value: _rideDestinationPreview()),
+                    _TripInfoRow(label: 'Tipo', value: driver.vehicleType),
+                    _TripInfoRow(label: 'Detalle', value: driver.vehicleDetail),
+                    _TripInfoRow(label: 'Llegada', value: '${driver.etaMinutes} min'),
+                    _TripInfoRow(
+                      label: 'Distancia',
+                      value: '${driver.distanceMeters.toStringAsFixed(0)} m',
+                    ),
+                    _TripInfoRow(label: 'Calificacion', value: driver.rating.toStringAsFixed(1)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Revisa bien el auto y luego decide si quieres elegirlo.',
+                style: const TextStyle(
+                  color: Color(0xFFFFC89B),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFFFC89B),
+                        side: const BorderSide(color: Color(0x55F97316)),
+                      ),
+                      child: const Text('Cerrar'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () {
+                        _selectDriver(driver.driverId);
+                        Navigator.of(context).pop();
+                      },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFF97316),
+                        foregroundColor: const Color(0xFF0F0F10),
+                      ),
+                      child: Text(isSelected ? 'Seleccionado' : 'Elegir este'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _showMessage(String message) {
     showTopNotice(
       context,
@@ -640,22 +819,7 @@ class _RideTabState extends ConsumerState<RideTab> {
       return const SizedBox.shrink();
     }
 
-    return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: SizedBox(
-        width: double.infinity,
-        height: 52,
-        child: FilledButton.icon(
-          onPressed: () => _showPassengerTripOptions(tripState),
-          icon: const Icon(Icons.tune_rounded),
-          label: const Text('Opciones del viaje'),
-          style: FilledButton.styleFrom(
-            backgroundColor: const Color(0xFFF97316),
-            foregroundColor: const Color(0xFF0F0F10),
-          ),
-        ),
-      ),
-    );
+    return const SizedBox.shrink();
   }
 
   List<NearbyDriver> _requestableDrivers(List<NearbyDriver> drivers) {
@@ -801,6 +965,13 @@ class _RideTabState extends ConsumerState<RideTab> {
                         await _syncDashboard();
                       },
                     ),
+                    if (hasActiveTrip) ...[
+                      const SizedBox(width: 10),
+                      _GlassIconButton(
+                        icon: Icons.tune_rounded,
+                        onTap: () => _showPassengerTripOptions(tripState),
+                      ),
+                    ],
                     const SizedBox(width: 10),
                     Container(
                       width: 48,
@@ -1224,7 +1395,8 @@ class _RideTabState extends ConsumerState<RideTab> {
           distance: '${(driver.distanceMeters / 1000).toStringAsFixed(1)} km',
           icon: _vehicleIcon(driver.vehicleType),
           highlighted: isSelected,
-          onTap: () => _selectDriver(driver.driverId),
+          selectedLabel: isSelected ? 'Elegido' : 'Ver detalle',
+          onTap: () => _showNearbyDriverDetails(driver),
         ),
       );
     });
@@ -1468,6 +1640,7 @@ class _VehicleOptionCard extends StatelessWidget {
     required this.distance,
     required this.icon,
     required this.highlighted,
+    required this.selectedLabel,
     required this.onTap,
   });
 
@@ -1478,6 +1651,7 @@ class _VehicleOptionCard extends StatelessWidget {
   final String distance;
   final IconData icon;
   final bool highlighted;
+  final String selectedLabel;
   final VoidCallback onTap;
 
   @override
@@ -1557,6 +1731,25 @@ class _VehicleOptionCard extends StatelessWidget {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: highlighted ? const Color(0xFFF97316) : const Color(0xFF25252B),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: highlighted ? const Color(0xFFF97316) : const Color(0x44F97316),
+                      ),
+                    ),
+                    child: Text(
+                      selectedLabel,
+                      style: TextStyle(
+                        color: highlighted ? const Color(0xFF0F0F10) : const Color(0xFFFFC89B),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                      ),
+                    ),
                   ),
                 ],
               ),

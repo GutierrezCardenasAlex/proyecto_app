@@ -591,6 +591,18 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
     };
   }
 
+  bool _hasPendingOffer(DriverTrip? trip) {
+    return trip != null && const {'requested', 'searching'}.contains(trip.status);
+  }
+
+  bool _hasManageableTrip(DriverTrip? trip) {
+    return trip != null && !const {'completed', 'cancelled'}.contains(trip.status);
+  }
+
+  bool _hasLiveTripStatus(DriverTrip? trip) {
+    return trip != null && const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(trip.status);
+  }
+
   String _driverStatusMiniDetail(DriverTrip trip) {
     if (trip.passengerPickup.isNotEmpty) {
       return trip.passengerPickup;
@@ -675,6 +687,9 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
   void _showDriverTripOptions(DriverTrip trip) {
     final canChat = const {'at_pickup', 'in_progress'}.contains(trip.status);
     final canCancel = !const {'completed', 'cancelled'}.contains(trip.status);
+    final accent = _driverStatusAccentColor(trip.status);
+    final passengerName =
+        trip.passengerName?.trim().isNotEmpty == true ? trip.passengerName!.trim() : 'Pasajero';
 
     showModalBottomSheet<void>(
       context: context,
@@ -701,12 +716,79 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                 ),
               ),
               const SizedBox(height: 18),
-              Text(
-                'Opciones del viaje',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFFFFF4EC),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1D),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: const Color(0x44F97316)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [accent, accent.withValues(alpha: 0.75)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Icon(
+                            _tripVehicleIcon(trip),
+                            color: const Color(0xFF0F0F10),
+                            size: 28,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Opciones del viaje',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFFFFF4EC),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                passengerName,
+                                style: const TextStyle(
+                                  color: Color(0xFFFFC89B),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _DriverMiniBadge(icon: Icons.flag_rounded, label: trip.status),
+                        if (trip.passengerPhone?.isNotEmpty ?? false)
+                          _DriverMiniBadge(icon: Icons.phone_outlined, label: trip.passengerPhone!),
+                        _DriverMiniBadge(icon: Icons.place_rounded, label: 'Recojo'),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    _InfoTile(label: 'Recojo', value: trip.passengerPickup),
+                    _InfoTile(label: 'Destino', value: trip.destination),
+                    if (trip.passengerPhone?.isNotEmpty ?? false)
+                      _InfoTile(label: 'Telefono', value: trip.passengerPhone!),
+                  ],
                 ),
               ),
               const SizedBox(height: 14),
@@ -731,6 +813,343 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                   },
                 ),
             ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showAvailableTripsSheet({
+    required AsyncValue<DriverTrip?> tripAsync,
+    required DriverTrip? trip,
+  }) {
+    final pendingOffer = _hasPendingOffer(trip) ? trip : null;
+    final accent = pendingOffer == null
+        ? const Color(0xFFF97316)
+        : _driverStatusAccentColor(pendingOffer.status);
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return FractionallySizedBox(
+          heightFactor: 0.78,
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Color(0xFF111214),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 52,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: const Color(0x33FFF4EC),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            accent.withValues(alpha: 0.22),
+                            const Color(0xFF1A1A1D),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(26),
+                        border: Border.all(color: accent.withValues(alpha: 0.32)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF111214),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: const Icon(
+                              Icons.local_taxi_rounded,
+                              color: Color(0xFFF97316),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Viajes disponibles',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
+                                    color: const Color(0xFFFFF4EC),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  pendingOffer == null
+                                      ? 'Revisa nuevas solicitudes apenas entren.'
+                                      : 'Tienes una solicitud lista para revisar y decidir.',
+                                  style: const TextStyle(
+                                    color: Color(0xFFFFD8BF),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF111214),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(color: accent.withValues(alpha: 0.35)),
+                            ),
+                            child: Text(
+                              pendingOffer == null ? '0' : '1',
+                              style: const TextStyle(
+                                color: Color(0xFFF97316),
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Expanded(
+                      child: tripAsync.when(
+                        loading: () => const Center(child: CircularProgressIndicator()),
+                        error: (error, stackTrace) => DriverEmptyCard(
+                          title: 'No pudimos cargar ofertas',
+                          subtitle: error.toString().replaceFirst('Exception: ', ''),
+                        ),
+                        data: (_) {
+                          if (pendingOffer == null) {
+                            if (_hasLiveTripStatus(trip)) {
+                              return const DriverEmptyCard(
+                                title: 'Ya tienes un viaje en curso',
+                                subtitle: 'Termina o actualiza ese viaje para recibir una nueva solicitud.',
+                              );
+                            }
+                            return const DriverEmptyCard(
+                              title: 'No hay viajes disponibles',
+                              subtitle: 'En cuanto entre una nueva solicitud, la veras aqui.',
+                            );
+                          }
+
+                          return SingleChildScrollView(
+                            child: _DriverAvailableTripCard(
+                              trip: pendingOffer,
+                              accentColor: _driverStatusAccentColor(pendingOffer.status),
+                              onViewDetails: () {
+                                Navigator.of(context).pop();
+                                _showIncomingTripDetail(pendingOffer);
+                              },
+                              onAccept: () async {
+                                Navigator.of(context).pop();
+                                await _handleDriverPrimaryAction(pendingOffer);
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showIncomingTripDetail(DriverTrip trip) {
+    final accent = _driverStatusAccentColor(trip.status);
+    final passengerName =
+        trip.passengerName?.trim().isNotEmpty == true ? trip.passengerName!.trim() : 'Pasajero';
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return FractionallySizedBox(
+          heightFactor: 0.82,
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Color(0xFF111214),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(22, 18, 22, 26),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 52,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: const Color(0x33FFF4EC),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            accent.withValues(alpha: 0.26),
+                            const Color(0xFF1A1A1D),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(28),
+                        border: Border.all(color: accent.withValues(alpha: 0.36)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 54,
+                                height: 54,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF111214),
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                                child: Icon(_tripVehicleIcon(trip), color: accent),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Detalle del viaje',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.w800,
+                                        color: const Color(0xFFFFF4EC),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${(trip.vehicleType ?? 'taxi').toUpperCase()} para $passengerName',
+                                      style: const TextStyle(
+                                        color: Color(0xFFFFD8BF),
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 18),
+                          Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                            children: [
+                              _DriverMiniBadge(icon: Icons.flag_rounded, label: _driverStatusShortLabel(trip.status)),
+                              _DriverMiniBadge(icon: Icons.tag_rounded, label: trip.id),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1A1A1D),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: const Color(0x26F97316)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _InfoTile(label: 'Pasajero', value: passengerName),
+                          if (trip.passengerPhone?.trim().isNotEmpty ?? false)
+                            _InfoTile(label: 'Telefono', value: trip.passengerPhone!.trim()),
+                          _InfoTile(label: 'Recojo', value: trip.passengerPickup),
+                          _InfoTile(label: 'Destino', value: trip.destination),
+                          _InfoTile(
+                            label: 'Vehiculo pedido',
+                            value: (trip.vehicleType ?? 'taxi').toUpperCase(),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFFFFD8BF),
+                              side: const BorderSide(color: Color(0x33F97316)),
+                              minimumSize: const Size.fromHeight(56),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                            ),
+                            child: const Text('Ahora no'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () async {
+                              Navigator.of(context).pop();
+                              await _handleDriverPrimaryAction(trip);
+                            },
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFFF97316),
+                              foregroundColor: const Color(0xFF0F0F10),
+                              minimumSize: const Size.fromHeight(56),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                            ),
+                            child: const Text(
+                              'Aceptar viaje',
+                              style: TextStyle(fontWeight: FontWeight.w800),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         );
       },
@@ -907,6 +1326,14 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                         await ref.read(offeredTripProvider.notifier).loadOffer();
                       },
                     ),
+                    if (_hasManageableTrip(trip)) ...[
+                      const SizedBox(width: 10),
+                      _GlassIconButton(
+                        icon: Icons.tune_rounded,
+                        showBadge: trip?.status == 'at_pickup',
+                        onTap: () => _showDriverTripOptions(trip!),
+                      ),
+                    ],
                     const SizedBox(width: 10),
                     Container(
                       width: 48,
@@ -995,23 +1422,48 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                     ),
                   ),
                 ),
+                if (driverState.available || _hasManageableTrip(trip)) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _DriverDashboardActionCard(
+                          icon: Icons.assignment_rounded,
+                          title: 'Viajes disponibles',
+                          subtitle: _hasPendingOffer(trip)
+                              ? '1 solicitud lista para revisar'
+                              : _hasLiveTripStatus(trip)
+                                  ? 'Tienes un viaje en curso'
+                                  : 'Esperando nuevas solicitudes',
+                          accentColor: const Color(0xFFF97316),
+                          badgeText: _hasPendingOffer(trip) ? '1' : null,
+                          onTap: () => _showAvailableTripsSheet(
+                            tripAsync: tripAsync,
+                            trip: trip,
+                          ),
+                        ),
+                      ),
+                      if (_hasLiveTripStatus(trip)) ...[
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _DriverDashboardActionCard(
+                            icon: Icons.radar_rounded,
+                            title: 'Estado actual',
+                            subtitle: _driverStatusMiniDetail(trip!),
+                            accentColor: _driverStatusAccentColor(trip.status),
+                            badgeText: _driverStatusShortLabel(trip.status),
+                            onTap: () => _showStatusSheet(context, driverState, trip),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
                 const Spacer(),
               ],
             ),
           ),
         ),
-        if (trip != null)
-          Positioned(
-            right: 20,
-            top: 132,
-            child: _DriverSideStatusChip(
-              title: 'Estado',
-              value: _driverStatusShortLabel(trip.status),
-              subtitle: _driverStatusMiniDetail(trip),
-              accentColor: _driverStatusAccentColor(trip.status),
-              onTap: () => _showStatusSheet(context, driverState, trip),
-            ),
-          ),
         if (trip != null && trip.status != 'completed')
           Positioned(
             right: 20,
@@ -1020,17 +1472,6 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
               label: _driverActionLabel(trip),
               accentColor: _driverStatusAccentColor(trip.status),
               onTap: () => _handleDriverPrimaryAction(trip),
-            ),
-          ),
-        if (trip != null && trip.status != 'completed' && trip.status != 'cancelled')
-          Positioned(
-            right: 20,
-            top: 332,
-            child: _DriverQuickActionChip(
-              label: 'Opciones',
-              accentColor: const Color(0xFF2A1A16),
-              onTap: () => _showDriverTripOptions(trip),
-              textColor: const Color(0xFFFFC89B),
             ),
           ),
         Positioned(
@@ -1463,24 +1904,284 @@ class _GlassIconButton extends StatelessWidget {
   const _GlassIconButton({
     required this.icon,
     required this.onTap,
+    this.showBadge = false,
   });
 
   final IconData icon;
   final VoidCallback onTap;
+  final bool showBadge;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Material(
+          color: const Color(0xFF1A1A1D).withValues(alpha: 0.92),
+          borderRadius: BorderRadius.circular(18),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: onTap,
+            child: SizedBox(
+              width: 48,
+              height: 48,
+              child: Icon(icon, color: const Color(0xFFF97316)),
+            ),
+          ),
+        ),
+        if (showBadge)
+          Positioned(
+            top: -2,
+            right: -2,
+            child: Container(
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF97316),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF111214), width: 2),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x33F97316),
+                    blurRadius: 12,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _DriverDashboardActionCard extends StatelessWidget {
+  const _DriverDashboardActionCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.accentColor,
+    required this.onTap,
+    this.badgeText,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color accentColor;
+  final VoidCallback onTap;
+  final String? badgeText;
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: const Color(0xFF1A1A1D).withValues(alpha: 0.92),
-      borderRadius: BorderRadius.circular(18),
+      color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(24),
         onTap: onTap,
-        child: SizedBox(
-          width: 48,
-          height: 48,
-          child: Icon(icon, color: const Color(0xFFF97316)),
+        child: Ink(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF17181B).withValues(alpha: 0.96),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: accentColor.withValues(alpha: 0.24)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: accentColor.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(icon, color: accentColor),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFFFFF4EC),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFFFFD8BF),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (badgeText != null && badgeText!.trim().isNotEmpty)
+                Container(
+                  margin: const EdgeInsets.only(left: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: accentColor.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: accentColor.withValues(alpha: 0.26)),
+                  ),
+                  child: Text(
+                    badgeText!,
+                    style: TextStyle(
+                      color: accentColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+class _DriverAvailableTripCard extends StatelessWidget {
+  const _DriverAvailableTripCard({
+    required this.trip,
+    required this.accentColor,
+    required this.onViewDetails,
+    required this.onAccept,
+  });
+
+  final DriverTrip trip;
+  final Color accentColor;
+  final VoidCallback onViewDetails;
+  final VoidCallback onAccept;
+
+  @override
+  Widget build(BuildContext context) {
+    final passengerName =
+        trip.passengerName?.trim().isNotEmpty == true ? trip.passengerName!.trim() : 'Pasajero';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1D),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: accentColor.withValues(alpha: 0.28)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: accentColor.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Icon(
+                  switch ((trip.vehicleType ?? '').toLowerCase()) {
+                    'moto' => Icons.two_wheeler_rounded,
+                    _ => Icons.local_taxi_rounded,
+                  },
+                  color: accentColor,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      passengerName,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFFFFF4EC),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${(trip.vehicleType ?? 'taxi').toUpperCase()} solicitado',
+                      style: const TextStyle(
+                        color: Color(0xFFFFC89B),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: accentColor.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  'Nuevo',
+                  style: TextStyle(
+                    color: accentColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _InfoTile(label: 'Recojo', value: trip.passengerPickup),
+          _InfoTile(label: 'Destino', value: trip.destination),
+          if (trip.passengerPhone?.trim().isNotEmpty ?? false)
+            _InfoTile(label: 'Telefono', value: trip.passengerPhone!.trim()),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: onViewDetails,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFFFD8BF),
+                    side: BorderSide(color: accentColor.withValues(alpha: 0.3)),
+                    minimumSize: const Size.fromHeight(52),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                  ),
+                  child: const Text('Ver detalle'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  onPressed: onAccept,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFF97316),
+                    foregroundColor: const Color(0xFF0F0F10),
+                    minimumSize: const Size.fromHeight(52),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                  ),
+                  child: const Text(
+                    'Aceptar',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -1750,96 +2451,16 @@ class _DriverHistoryCard extends StatelessWidget {
   }
 }
 
-class _DriverSideStatusChip extends StatelessWidget {
-  const _DriverSideStatusChip({
-    required this.title,
-    required this.value,
-    required this.subtitle,
-    required this.accentColor,
-    required this.onTap,
-  });
-
-  final String title;
-  final String value;
-  final String subtitle;
-  final Color accentColor;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: accentColor.withValues(alpha: 0.20),
-      borderRadius: BorderRadius.circular(22),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(22),
-        onTap: onTap,
-        child: Container(
-          width: 108,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: accentColor.withValues(alpha: 0.70)),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x22000000),
-                blurRadius: 18,
-                offset: Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(Icons.timeline_rounded, color: accentColor, size: 20),
-              const SizedBox(height: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Color(0xFFFFC89B),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                value,
-                style: GoogleFonts.plusJakartaSans(
-                  color: const Color(0xFFFFF4EC),
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Color(0xFFFFC89B),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _DriverQuickActionChip extends StatelessWidget {
   const _DriverQuickActionChip({
     required this.label,
     required this.accentColor,
     required this.onTap,
-    this.textColor = const Color(0xFF0F0F10),
   });
 
   final String label;
   final Color accentColor;
   final VoidCallback onTap;
-  final Color textColor;
 
   @override
   Widget build(BuildContext context) {
@@ -1865,12 +2486,12 @@ class _DriverQuickActionChip extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.touch_app_rounded, color: textColor, size: 20),
+              const Icon(Icons.touch_app_rounded, color: Color(0xFF0F0F10), size: 20),
               const SizedBox(height: 8),
-              Text(
+              const Text(
                 'Accion',
                 style: TextStyle(
-                  color: textColor.withValues(alpha: 0.82),
+                  color: Color(0xCC0F0F10),
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
                 ),
@@ -1881,7 +2502,7 @@ class _DriverQuickActionChip extends StatelessWidget {
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.plusJakartaSans(
-                  color: textColor,
+                  color: const Color(0xFF0F0F10),
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
                 ),
@@ -1963,6 +2584,42 @@ class _DriverOptionTile extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _DriverMiniBadge extends StatelessWidget {
+  const _DriverMiniBadge({
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: const Color(0xFFF97316)),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFFFFF4EC),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }
