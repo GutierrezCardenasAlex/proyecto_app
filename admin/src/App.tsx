@@ -79,6 +79,12 @@ type AdminProfile = {
   fullName?: string
 }
 
+type AdminOtpRequestResponse = {
+  message?: string
+  smsDelivered?: boolean
+  otp?: string
+}
+
 type UserSummary = {
   user_id: string
   phone: string
@@ -105,6 +111,7 @@ function App() {
   const [phone, setPhone] = useState('+59170000001')
   const [otp, setOtp] = useState('123456')
   const [otpRequested, setOtpRequested] = useState(false)
+  const [otpFallback, setOtpFallback] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [token, setToken] = useState(localStorage.getItem('admin_token') ?? '')
@@ -127,6 +134,26 @@ function App() {
     [token],
   )
 
+  async function fetchWithAdminAuth<T>(url: string, init?: RequestInit): Promise<T> {
+    const response = await fetch(url, init)
+    const payload = await response.json()
+
+    if (response.status === 401) {
+      localStorage.removeItem('admin_token')
+      localStorage.removeItem('admin_profile')
+      setToken('')
+      setAdminProfile(null)
+      setOtpRequested(false)
+      throw new Error('Tu sesion de central vencio o ya no es valida. Vuelve a ingresar.')
+    }
+
+    if (!response.ok) {
+      throw new Error(payload.message ?? 'No se pudo completar la solicitud.')
+    }
+
+    return payload as T
+  }
+
   async function loadCentralData() {
     if (!token) {
       return
@@ -134,12 +161,12 @@ function App() {
 
     const [dashboardResponse, driversResponse, tripsResponse, pendingDriversResponse, pendingResponse, devicesResponse] =
       await Promise.all([
-        fetch(`${apiBase}/admin/dashboard`, { headers: authHeaders }).then((res) => res.json()),
-        fetch(`${apiBase}/admin/drivers/live`, { headers: authHeaders }).then((res) => res.json()),
-        fetch(`${apiBase}/admin/active-trips`, { headers: authHeaders }).then((res) => res.json()),
-        fetch(`${apiBase}/admin/drivers/pending-access`, { headers: authHeaders }).then((res) => res.json()),
-        fetch(`${apiBase}/admin/devices/pending`, { headers: authHeaders }).then((res) => res.json()),
-        fetch(`${apiBase}/admin/devices`, { headers: authHeaders }).then((res) => res.json()),
+        fetchWithAdminAuth<Dashboard>(`${apiBase}/admin/dashboard`, { headers: authHeaders }),
+        fetchWithAdminAuth<Driver[]>(`${apiBase}/admin/drivers/live`, { headers: authHeaders }),
+        fetchWithAdminAuth<Trip[]>(`${apiBase}/admin/active-trips`, { headers: authHeaders }),
+        fetchWithAdminAuth<PendingDriverAccessRow[]>(`${apiBase}/admin/drivers/pending-access`, { headers: authHeaders }),
+        fetchWithAdminAuth<DeviceRow[]>(`${apiBase}/admin/devices/pending`, { headers: authHeaders }),
+        fetchWithAdminAuth<DeviceRow[]>(`${apiBase}/admin/devices`, { headers: authHeaders }),
       ])
 
     setDashboard(dashboardResponse)
@@ -155,18 +182,20 @@ function App() {
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch(`${apiBase}/auth/admin/otp/request`, {
+      const payload = await fetchWithAdminAuth<AdminOtpRequestResponse>(`${apiBase}/auth/admin/otp/request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone }),
       })
 
-      const payload = await response.json()
-      if (!response.ok) {
-        throw new Error(payload.message ?? 'No se pudo solicitar OTP')
-      }
-
       setOtpRequested(true)
+      if (!payload.smsDelivered && payload.otp) {
+        setOtp(payload.otp)
+        setOtpFallback(payload.otp)
+        setError(`No se pudo enviar SMS. Usa este OTP de respaldo: ${payload.otp}`)
+      } else {
+        setOtpFallback(null)
+      }
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'No se pudo solicitar OTP')
     } finally {
@@ -178,22 +207,18 @@ function App() {
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch(`${apiBase}/auth/admin/otp/verify`, {
+      const payload = await fetchWithAdminAuth<{ token: string; admin: AdminProfile }>(`${apiBase}/auth/admin/otp/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, otp }),
       })
-
-      const payload = await response.json()
-      if (!response.ok) {
-        throw new Error(payload.message ?? 'No se pudo validar OTP')
-      }
 
       localStorage.setItem('admin_token', payload.token)
       localStorage.setItem('admin_profile', JSON.stringify(payload.admin))
       setToken(payload.token)
       setAdminProfile(payload.admin)
       setOtpRequested(false)
+      setOtpFallback(null)
     } catch (verifyError) {
       setError(verifyError instanceof Error ? verifyError.message : 'No se pudo validar OTP')
     } finally {
@@ -207,6 +232,7 @@ function App() {
     setToken('')
     setAdminProfile(null)
     setOtpRequested(false)
+    setOtpFallback(null)
     setPendingDrivers([])
     setPendingDevices([])
     setAllDevices([])
@@ -220,7 +246,7 @@ function App() {
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch(`${apiBase}/admin/drivers/${driverId}/access`, {
+      await fetchWithAdminAuth(`${apiBase}/admin/drivers/${driverId}/access`, {
         method: 'POST',
         headers: {
           ...authHeaders,
@@ -228,11 +254,6 @@ function App() {
         },
         body: JSON.stringify({ status, note }),
       })
-
-      const payload = await response.json()
-      if (!response.ok) {
-        throw new Error(payload.message ?? 'No se pudo actualizar el acceso del conductor')
-      }
 
       setDriverAccessNote('')
       await loadCentralData()
@@ -251,7 +272,7 @@ function App() {
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch(`${apiBase}/admin/devices/${deviceId}/status`, {
+      await fetchWithAdminAuth(`${apiBase}/admin/devices/${deviceId}/status`, {
         method: 'POST',
         headers: {
           ...authHeaders,
@@ -259,11 +280,6 @@ function App() {
         },
         body: JSON.stringify({ status }),
       })
-
-      const payload = await response.json()
-      if (!response.ok) {
-        throw new Error(payload.message ?? 'No se pudo actualizar el dispositivo')
-      }
 
       await loadCentralData()
     } catch (updateError) {
@@ -281,13 +297,9 @@ function App() {
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch(`${apiBase}/admin/devices/user/${user.user_id}/history`, {
+      const payload = await fetchWithAdminAuth<DeviceRow[]>(`${apiBase}/admin/devices/user/${user.user_id}/history`, {
         headers: authHeaders,
       })
-      const payload = await response.json()
-      if (!response.ok) {
-        throw new Error(payload.message ?? 'No se pudo cargar el historial del usuario')
-      }
 
       setSelectedHistoryUser(user)
       setPhoneDraft(user.phone)
@@ -307,14 +319,10 @@ function App() {
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch(`${apiBase}/admin/devices/${deviceId}/replace`, {
+      await fetchWithAdminAuth(`${apiBase}/admin/devices/${deviceId}/replace`, {
         method: 'POST',
         headers: authHeaders,
       })
-      const payload = await response.json()
-      if (!response.ok) {
-        throw new Error(payload.message ?? 'No se pudo reemplazar el equipo')
-      }
 
       await loadCentralData()
       if (selectedHistoryUser) {
@@ -335,7 +343,7 @@ function App() {
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch(`${apiBase}/admin/users/${selectedHistoryUser.user_id}/change-phone`, {
+      const payload = await fetchWithAdminAuth<{ user: { phone: string } }>(`${apiBase}/admin/users/${selectedHistoryUser.user_id}/change-phone`, {
         method: 'POST',
         headers: {
           ...authHeaders,
@@ -343,10 +351,6 @@ function App() {
         },
         body: JSON.stringify({ phone: phoneDraft.trim() }),
       })
-      const payload = await response.json()
-      if (!response.ok) {
-        throw new Error(payload.message ?? 'No se pudo cambiar el telefono')
-      }
 
       setSelectedHistoryUser({
         ...selectedHistoryUser,
@@ -474,6 +478,8 @@ function App() {
                 <input value={otp} onChange={(event) => setOtp(event.target.value)} />
               </label>
             )}
+
+            {otpFallback && <div className="error-box">OTP de respaldo para central: {otpFallback}</div>}
 
             <button className="primary-button" disabled={loading} onClick={otpRequested ? verifyOtp : requestOtp}>
               {loading ? 'Procesando...' : otpRequested ? 'Ingresar a central' : 'Solicitar OTP'}
