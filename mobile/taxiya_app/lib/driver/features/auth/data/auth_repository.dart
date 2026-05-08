@@ -61,6 +61,8 @@ class DriverProfileDetails {
   const DriverProfileDetails({
     required this.licenseNumber,
     required this.vehicleType,
+    required this.driverId,
+    required this.accessStatus,
     required this.plate,
     required this.brand,
     required this.model,
@@ -70,6 +72,8 @@ class DriverProfileDetails {
 
   final String licenseNumber;
   final String vehicleType;
+  final String driverId;
+  final String accessStatus;
   final String plate;
   final String brand;
   final String model;
@@ -97,6 +101,8 @@ class DriverAuthRepository {
     return DriverProfileDetails(
       licenseNumber: payload['license_number']?.toString() ?? payload['licenseNumber']?.toString() ?? '',
       vehicleType: vehicle['vehicle_type']?.toString() ?? vehicle['type']?.toString() ?? 'taxi',
+      driverId: payload['id']?.toString() ?? '',
+      accessStatus: payload['access_status']?.toString() ?? 'AUTORIZADO',
       plate: vehicle['plate']?.toString() ?? '',
       brand: vehicle['brand']?.toString() ?? '',
       model: vehicle['model']?.toString() ?? '',
@@ -501,6 +507,37 @@ class DriverSessionController extends Notifier<DriverSession> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('driver_session_driver_id', driverId);
     state = state.copyWith(driverId: driverId, clearError: true);
+  }
+
+  Future<void> refreshAccessStatus() async {
+    if (!state.loggedIn || state.token.isEmpty || state.userId.isEmpty) {
+      return;
+    }
+
+    try {
+      final profile = await _repository.fetchDriverProfile(
+        token: state.token,
+        userId: state.userId,
+      );
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('driver_session_access_status', profile.accessStatus);
+      if (profile.driverId.isNotEmpty) {
+        await prefs.setString('driver_session_driver_id', profile.driverId);
+      }
+      if (profile.vehicleType.isNotEmpty) {
+        await prefs.setString('driver_session_vehicle_type', profile.vehicleType);
+      }
+      state = state.copyWith(
+        accessStatus: profile.accessStatus,
+        driverId: profile.driverId.isNotEmpty ? profile.driverId : state.driverId,
+        vehicleType: profile.vehicleType.isNotEmpty ? profile.vehicleType : state.vehicleType,
+        clearError: true,
+      );
+    } catch (error) {
+      state = state.copyWith(
+        errorMessage: error.toString().replaceFirst('Exception: ', ''),
+      );
+    }
   }
 
   Future<void> _persistSession(DriverAuthResult result) async {

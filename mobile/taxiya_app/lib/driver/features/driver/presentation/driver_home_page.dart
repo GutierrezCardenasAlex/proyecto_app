@@ -47,6 +47,7 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
   bool _bootstrappedExperience = false;
   bool _isPreparingExperience = false;
   bool _offlineSheetQueued = false;
+  bool _isRefreshingAuthorization = false;
 
   void _handleDrawerSelection(String item) {
     switch (item) {
@@ -230,6 +231,10 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
     if (!_bootstrappedExperience) {
       _bootstrappedExperience = true;
       Future<void>.microtask(_prepareDriverExperience);
+    }
+
+    if (session.accessStatus != 'AUTORIZADO') {
+      Future<void>.microtask(_refreshAuthorizationStatus);
     }
 
     if (session.accessStatus == 'AUTORIZADO' &&
@@ -466,6 +471,18 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
       await ref.read(offeredTripProvider.notifier).loadOffer();
     } catch (_) {
       // Avoid surfacing lifecycle restoration failures as app-breaking errors.
+    }
+  }
+
+  Future<void> _refreshAuthorizationStatus() async {
+    if (_isRefreshingAuthorization) {
+      return;
+    }
+    _isRefreshingAuthorization = true;
+    try {
+      await ref.read(driverSessionProvider.notifier).refreshAccessStatus();
+    } finally {
+      _isRefreshingAuthorization = false;
     }
   }
 }
@@ -1459,9 +1476,6 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
         Positioned.fill(
           child: RepaintBoundary(
             child: DriverMap(
-              key: ValueKey(
-                'driver-map-${trip?.status}-${trip?.pickupLat}-${trip?.pickupLng}-${driverState.lat}-${driverState.lng}',
-              ),
               available: driverState.available,
               tripAccepted: const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(trip?.status),
               driverLat: driverState.lat,
@@ -1472,6 +1486,8 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
               tripStatus: trip?.status,
               pickupLat: trip?.pickupLat,
               pickupLng: trip?.pickupLng,
+              destinationLat: trip?.destinationLat,
+              destinationLng: trip?.destinationLng,
             ),
           ),
         ),

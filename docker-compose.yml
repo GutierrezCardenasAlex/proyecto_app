@@ -213,5 +213,59 @@ services:
       - ${TILES_DATA_PATH:-./infra/tiles}:/data
     command: ["--verbose"]
 
+  osrm-extract:
+    image: osrm/osrm-backend:latest
+    container_name: flashgo-osrm-extract
+    profiles: ["routing"]
+    volumes:
+      - ${ROUTING_DATA_PATH:-./infra/routing}:/data
+    command:
+      [
+        "osrm-extract",
+        "-p",
+        "/opt/car.lua",
+        "/data/${ROUTING_PBF_FILE:-potosi-city.osm.pbf}"
+      ]
+
+  osrm-partition:
+    image: osrm/osrm-backend:latest
+    container_name: flashgo-osrm-partition
+    profiles: ["routing"]
+    volumes:
+      - ${ROUTING_DATA_PATH:-./infra/routing}:/data
+    command:
+      [
+        "osrm-partition",
+        "/data/${ROUTING_PBF_FILE:-potosi-city.osm.pbf}"
+      ]
+
+  osrm-customize:
+    image: osrm/osrm-backend:latest
+    container_name: flashgo-osrm-customize
+    profiles: ["routing"]
+    volumes:
+      - ${ROUTING_DATA_PATH:-./infra/routing}:/data
+    command:
+      [
+        "osrm-customize",
+        "/data/${ROUTING_PBF_FILE:-potosi-city.osm.pbf}"
+      ]
+
+  routing-service:
+    image: osrm/osrm-backend:latest
+    container_name: flashgo-routing
+    profiles: ["routing"]
+    ports:
+      - "${ROUTING_PORT:-5005}:5000"
+    volumes:
+      - ${ROUTING_DATA_PATH:-./infra/routing}:/data
+    command:
+      [
+        "osrm-routed",
+        "--algorithm",
+        "mld",
+        "/data/${ROUTING_PBF_FILE:-potosi-city.osm.pbf}"
+      ]
+
 volumes:
   postgres_data:

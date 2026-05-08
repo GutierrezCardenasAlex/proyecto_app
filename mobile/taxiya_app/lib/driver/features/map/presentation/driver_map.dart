@@ -5,8 +5,9 @@ import 'package:latlong2/latlong.dart';
 
 import '../../../../../core/config/app_config.dart';
 import '../../../../../core/map/offline_map.dart';
+import '../../../../../core/map/route_service.dart';
 
-class DriverMap extends ConsumerWidget {
+class DriverMap extends ConsumerStatefulWidget {
   const DriverMap({
     super.key,
     required this.available,
@@ -17,6 +18,8 @@ class DriverMap extends ConsumerWidget {
     this.tripStatus,
     this.pickupLat,
     this.pickupLng,
+    this.destinationLat,
+    this.destinationLng,
   });
 
   final bool available;
@@ -27,23 +30,159 @@ class DriverMap extends ConsumerWidget {
   final String? tripStatus;
   final double? pickupLat;
   final double? pickupLng;
+  final double? destinationLat;
+  final double? destinationLng;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final offlineState = ref.watch(offlineMapProvider);
-    final driverPoint = LatLng(driverLat, driverLng);
-    final pickupPoint = pickupLat != null && pickupLng != null ? LatLng(pickupLat!, pickupLng!) : null;
-    final isOnPickupStage = const {'accepted', 'arriving', 'at_pickup'}.contains(tripStatus);
-    final initialCenter = tripAccepted && pickupPoint != null ? pickupPoint : driverPoint;
+  ConsumerState<DriverMap> createState() => _DriverMapState();
+}
+
+class _DriverMapState extends ConsumerState<DriverMap> {
+  static const double _rerouteDistanceMeters = 55;
+  static const double _rerouteTargetShiftMeters = 80;
+  List<LatLng>? _routePoints;
+  String? _routeKey;
+  LatLng? _lastRouteEnd;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshRoute();
+  }
+
+  @override
+  void didUpdateWidget(covariant DriverMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_shouldRefreshRoute(oldWidget)) {
+      _refreshRoute();
+    }
+  }
+
+  bool _shouldRefreshRoute(DriverMap oldWidget) {
+    if (oldWidget.tripStatus != widget.tripStatus) {
+      return true;
+    }
+
+    final currentTarget = _currentRouteTarget();
+    final oldTarget = _targetFor(
+      tripStatus: oldWidget.tripStatus,
+      pickupLat: oldWidget.pickupLat,
+      pickupLng: oldWidget.pickupLng,
+      destinationLat: oldWidget.destinationLat,
+      destinationLng: oldWidget.destinationLng,
+    );
+
+    if (_routePoints == null || _routePoints!.length < 2) {
+      return oldWidget.driverLat != widget.driverLat ||
+          oldWidget.driverLng != widget.driverLng ||
+          oldTarget != currentTarget;
+    }
+
+    if (currentTarget == null) {
+      return oldTarget != null;
+    }
+
+    final routeService = ref.read(routeServiceProvider);
+    final offRouteDistance = routeService.distanceToRoute(
+      point: LatLng(widget.driverLat, widget.driverLng),
+      route: _routePoints!,
+    );
+    final targetShift = _lastRouteEnd == null
+        ? double.infinity
+        : routeService.pointDistance(_lastRouteEnd!, currentTarget);
+    return offRouteDistance > _rerouteDistanceMeters || targetShift > _rerouteTargetShiftMeters;
+  }
+
+  Future<void> _refreshRoute() async {
+    final driverPoint = LatLng(widget.driverLat, widget.driverLng);
+    final destinationPoint = _currentRouteTarget();
+    if (destinationPoint == null) {
+      if (mounted) {
+        setState(() {
+          _routePoints = null;
+          _routeKey = null;
+        });
+      }
+      return;
+    }
+
+    final nextKey = '${driverPoint.latitude.toStringAsFixed(5)},${driverPoint.longitude.toStringAsFixed(5)}>'
+        '${destinationPoint.latitude.toStringAsFixed(5)},${destinationPoint.longitude.toStringAsFixed(5)}';
+    if (_routeKey == nextKey && _routePoints != null) {
+      return;
+    }
+
+    try {
+      final points = await ref.read(routeServiceProvider).fetchRoute(
+            start: driverPoint,
+            end: destinationPoint,
+          );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _routePoints = points;
+        _routeKey = nextKey;
+        _lastRouteEnd = destinationPoint;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _routePoints = [driverPoint, destinationPoint];
+        _routeKey = nextKey;
+        _lastRouteEnd = destinationPoint;
+      });
+    }
+  }
+
+  LatLng? _currentRouteTarget() {
+    return _targetFor(
+      tripStatus: widget.tripStatus,
+      pickupLat: widget.pickupLat,
+      pickupLng: widget.pickupLng,
+      destinationLat: widget.destinationLat,
+      destinationLng: widget.destinationLng,
+    );
+  }
+
+  LatLng? _targetFor({
+    required String? tripStatus,
+    required double? pickupLat,
+    required double? pickupLng,
+    required double? destinationLat,
+    required double? destinationLng,
+  }) {
+    final pickupPoint = pickupLat != null && pickupLng != null
+        ? LatLng(pickupLat, pickupLng)
+        : null;
+    final destinationPoint = destinationLat != null && destinationLng != null
+        ? LatLng(destinationLat, destinationLng)
+        : null;
+    return tripStatus == 'in_progress' ? destinationPoint : pickupPoint;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ref.watch(offlineMapProvider);
+    final driverPoint = LatLng(widget.driverLat, widget.driverLng);
+    final pickupPoint = widget.pickupLat != null && widget.pickupLng != null
+        ? LatLng(widget.pickupLat!, widget.pickupLng!)
+        : null;
+    final destinationPoint = widget.destinationLat != null && widget.destinationLng != null
+        ? LatLng(widget.destinationLat!, widget.destinationLng!)
+        : null;
+    final isOnPickupStage = const {'accepted', 'arriving', 'at_pickup'}.contains(widget.tripStatus);
+    final isOnDestinationStage = widget.tripStatus == 'in_progress';
+    final routePoint = isOnDestinationStage ? destinationPoint : pickupPoint;
+    final initialCenter = widget.tripAccepted && routePoint != null ? routePoint : driverPoint;
     final offlineMap = ref.read(offlineMapProvider.notifier);
     final viewBounds = AppConfig.potosiViewBounds;
 
     return Stack(
       children: [
         FlutterMap(
-          key: ValueKey(
-            'driver-map-${offlineState.isReady}-${offlineState.isDownloading}-${offlineState.downloadedTiles}-$tripStatus-$driverLat-$driverLng',
-          ),
           options: MapOptions(
             initialCenter: initialCenter,
             initialZoom: AppConfig.mapInitialZoom,
@@ -70,12 +209,15 @@ class DriverMap extends ConsumerWidget {
                 ),
               ],
             ),
-            if (tripAccepted && pickupPoint != null && isOnPickupStage)
+            if (widget.tripAccepted &&
+                routePoint != null &&
+                (isOnPickupStage || isOnDestinationStage) &&
+                (_routePoints?.length ?? 0) >= 2)
               PolylineLayer(
                 polylines: [
                   Polyline(
-                    points: [driverPoint, pickupPoint],
-                    strokeWidth: 4,
+                    points: _routePoints!,
+                    strokeWidth: 5,
                     color: Color(0xFFF97316),
                   ),
                 ],
@@ -88,14 +230,14 @@ class DriverMap extends ConsumerWidget {
                   height: 56,
                   child: Container(
                     decoration: BoxDecoration(
-                      color: available ? const Color(0xFF17181B) : const Color(0xFF3A3A41),
+                      color: widget.available ? const Color(0xFF17181B) : const Color(0xFF3A3A41),
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: available ? const Color(0x66F97316) : const Color(0xFF55555E),
+                        color: widget.available ? const Color(0x66F97316) : const Color(0xFF55555E),
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: (available ? const Color(0xFFF97316) : const Color(0xFF0F0F10))
+                          color: (widget.available ? const Color(0xFFF97316) : const Color(0xFF0F0F10))
                               .withValues(alpha: 0.20),
                           blurRadius: 14,
                           offset: const Offset(0, 6),
@@ -103,17 +245,21 @@ class DriverMap extends ConsumerWidget {
                       ],
                     ),
                     child: Icon(
-                      _vehicleIcon(vehicleType),
-                      color: available ? const Color(0xFFF97316) : const Color(0xFFFFF4EC),
+                      _vehicleIcon(widget.vehicleType),
+                      color: widget.available ? const Color(0xFFF97316) : const Color(0xFFFFF4EC),
                     ),
                   ),
                 ),
-                if (tripAccepted && pickupPoint != null)
+                if (widget.tripAccepted && routePoint != null)
                   Marker(
-                    point: pickupPoint,
+                    point: routePoint,
                     width: 54,
                     height: 54,
-                    child: const Icon(Icons.place, color: Color(0xFFF97316), size: 34),
+                    child: Icon(
+                      isOnDestinationStage ? Icons.flag_rounded : Icons.place,
+                      color: const Color(0xFFF97316),
+                      size: 34,
+                    ),
                   ),
               ],
             ),

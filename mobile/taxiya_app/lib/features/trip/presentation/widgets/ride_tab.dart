@@ -9,6 +9,7 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../../auth/data/auth_repository.dart';
 import '../../../../core/config/app_config.dart';
+import '../../../../core/config/potosi_places.dart';
 import '../../../../core/map/offline_map.dart';
 import '../../../../core/notifications/local_notifications.dart';
 import '../../../../core/ui/top_notice.dart';
@@ -42,6 +43,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
   String? _joinedTripId;
   String? _selectedDriverId;
   String? _ratingPromptedTripId;
+  PotosiPlace? _selectedDestinationPlace;
   bool _isSyncingDashboard = false;
   bool _isPreparingExperience = false;
   bool _offlineSheetQueued = false;
@@ -328,6 +330,45 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     }
   }
 
+  List<PotosiPlace> _destinationSuggestions() {
+    final query = _destinationController.text.trim();
+    if (query.isEmpty) {
+      return PotosiPlaces.search('', limit: 5);
+    }
+    return PotosiPlaces.search(query, limit: 6);
+  }
+
+  void _handleDestinationChanged(String value) {
+    final selected = _selectedDestinationPlace;
+    if (selected == null) {
+      setState(() {});
+      return;
+    }
+
+    if (value.trim().toLowerCase() != selected.name.toLowerCase()) {
+      setState(() {
+        _selectedDestinationPlace = null;
+      });
+      return;
+    }
+
+    setState(() {});
+  }
+
+  void _selectDestinationPlace(PotosiPlace place) {
+    _destinationController.value = TextEditingValue(
+      text: place.name,
+      selection: TextSelection.collapsed(offset: place.name.length),
+    );
+    setState(() {
+      _selectedDestinationPlace = place;
+    });
+  }
+
+  PotosiPlace? _resolveDestinationPlace() {
+    return _selectedDestinationPlace ?? PotosiPlaces.findExact(_destinationController.text.trim());
+  }
+
   Future<void> _requestRide() async {
     final session = ref.read(sessionProvider);
     final locationState = ref.read(passengerLocationProvider);
@@ -341,6 +382,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     final destination = _destinationController.text.trim();
     final resolvedDestination =
         _rideMode == RideMode.cercano && destination.isEmpty ? 'Abordaje inmediato' : destination;
+    final resolvedDestinationPlace = _resolveDestinationPlace();
     final selectedDriverId = _rideMode == RideMode.cercano ? _selectedDriverId : null;
     final selectedDriver = _findDriverById(ref.read(tripProvider).nearbyDrivers, selectedDriverId);
 
@@ -351,6 +393,11 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
 
     if (resolvedDestination.isEmpty) {
       _showMessage('Ingresa un destino para continuar.');
+      return;
+    }
+
+    if (_rideMode == RideMode.destino && resolvedDestinationPlace == null) {
+      _showMessage('Selecciona un lugar sugerido para guardar un destino exacto en el viaje.');
       return;
     }
 
@@ -369,6 +416,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
           userLocation: location,
           destinationAddress: resolvedDestination,
           dispatchMode: _rideMode == RideMode.destino ? 'broadcast' : 'nearby',
+          destinationLocation: resolvedDestinationPlace?.point,
           preferredDriverId: selectedDriverId,
         );
 
@@ -911,6 +959,11 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
         tripState.request.driverLat != null && tripState.request.driverLng != null
             ? LatLng(tripState.request.driverLat!, tripState.request.driverLng!)
             : null;
+    final selectedDestinationPoint = _resolveDestinationPlace()?.point;
+    final mapRouteTarget = hasActiveTrip ? activeDriverPoint : selectedDestinationPoint;
+    final shouldDrawPreviewRoute = hasActiveTrip
+        ? activeDriverPoint != null
+        : _rideMode == RideMode.destino && selectedDestinationPoint != null;
     final displayNearbyDrivers = _requestableDrivers(tripState.nearbyDrivers);
     final activeDriverKey = activeDriverPoint == null
         ? null
@@ -953,14 +1006,11 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                 ),
               ),
               child: PotosiMap(
-                key: ValueKey(
-                  'passenger-map-${tripState.request.status}-${activeDriverPoint?.latitude}-${activeDriverPoint?.longitude}',
-                ),
                 drivers: driverPoints,
                 userLocation: userLocation,
-                routeTarget: activeDriverPoint,
-                showRoute: hasActiveTrip && activeDriverPoint != null,
-                showTargetMarker: false,
+                routeTarget: mapRouteTarget,
+                showRoute: shouldDrawPreviewRoute,
+                showTargetMarker: !hasActiveTrip,
               ),
             ),
           ),
@@ -1126,6 +1176,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                                 onTap: () => setState(() {
                                   _rideMode = RideMode.destino;
                                   _selectedDriverId = null;
+                                  _selectedDestinationPlace = null;
                                 }),
                               ),
                             ),
@@ -1134,7 +1185,9 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                               child: _ModeButton(
                                 label: 'Tomar taxi',
                                 selected: _rideMode == RideMode.cercano,
-                                onTap: () => setState(() => _rideMode = RideMode.cercano),
+                                onTap: () => setState(() {
+                                  _rideMode = RideMode.cercano;
+                                }),
                               ),
                             ),
                           ],
@@ -1155,6 +1208,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                             Expanded(
                               child: TextField(
                                 controller: _destinationController,
+                                onChanged: _handleDestinationChanged,
                                 decoration: const InputDecoration(
                                   hintText: '¿A dónde quieres ir?',
                                   border: InputBorder.none,
@@ -1172,6 +1226,85 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                           ],
                         ),
                       ),
+                    if (!rideLocked && _rideMode == RideMode.destino) ...[
+                      const SizedBox(height: 12),
+                      if (_selectedDestinationPlace != null)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF17181B),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: const Color(0x33F97316)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.place_rounded,
+                                color: Color(0xFFF97316),
+                                size: 20,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _selectedDestinationPlace!.name,
+                                      style: GoogleFonts.plusJakartaSans(
+                                        color: const Color(0xFFFFF4EC),
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Destino exacto listo para la ruta del conductor',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        color: const Color(0xFFFFC89B),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: () {
+                                  _destinationController.clear();
+                                  setState(() => _selectedDestinationPlace = null);
+                                },
+                                icon: const Icon(Icons.close_rounded, color: Color(0xFFFFF4EC)),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _destinationSuggestions()
+                              .map(
+                                (place) => ActionChip(
+                                  onPressed: () => _selectDestinationPlace(place),
+                                  avatar: const Icon(
+                                    Icons.near_me_rounded,
+                                    size: 18,
+                                    color: Color(0xFFF97316),
+                                  ),
+                                  backgroundColor: const Color(0xFF1A1B1F),
+                                  side: const BorderSide(color: Color(0x26F97316)),
+                                  label: Text(
+                                    place.name,
+                                    style: GoogleFonts.plusJakartaSans(
+                                      color: const Color(0xFFFFF4EC),
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              )
+                              .toList(growable: false),
+                        ),
+                    ],
                     if (!rideLocked && _rideMode == RideMode.destino) const SizedBox(height: 18),
                     if (locationState.errorMessage != null)
                       _StatusBanner(

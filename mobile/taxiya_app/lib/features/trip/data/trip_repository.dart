@@ -176,9 +176,10 @@ class TripRepository {
     required String pickupAddress,
     required String destinationAddress,
     required String dispatchMode,
+    LatLng? destinationLocation,
     String? preferredDriverId,
   }) async {
-    final destination = _deriveDestinationFromPickup(pickup);
+    final destination = destinationLocation ?? _deriveDestinationFromPickup(pickup);
     final distanceMeters = _estimateDistanceMeters(pickup, destination);
     final durationSeconds = max(300, (distanceMeters / 5.5).round());
     final fareAmount = max(10, (distanceMeters / 700).ceil() * 3).toDouble();
@@ -213,6 +214,10 @@ class TripRepository {
       destinationAddress: destinationAddress,
       status: payload['status']?.toString() ?? 'requested',
       activeTripId: payload['id']?.toString(),
+      pickupLat: pickup.latitude,
+      pickupLng: pickup.longitude,
+      destinationLat: destination.latitude,
+      destinationLng: destination.longitude,
       etaMinutes: _toNullableInt(payload['eta_minutes']),
     );
   }
@@ -412,6 +417,7 @@ class TripController extends Notifier<TripState> {
     required LatLng userLocation,
     required String destinationAddress,
     required String dispatchMode,
+    LatLng? destinationLocation,
     String? preferredDriverId,
   }) async {
     state = state.copyWith(isRequestingTrip: true, clearError: true);
@@ -423,6 +429,7 @@ class TripController extends Notifier<TripState> {
         pickupAddress: 'Mi ubicacion actual',
         destinationAddress: destinationAddress,
         dispatchMode: dispatchMode,
+        destinationLocation: destinationLocation,
         preferredDriverId: preferredDriverId,
       );
 

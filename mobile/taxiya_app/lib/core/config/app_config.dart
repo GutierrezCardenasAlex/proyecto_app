@@ -22,11 +22,31 @@ class AppConfig {
     'MAP_OFFLINE_TILES_ATTRIBUTION',
     defaultValue: '',
   );
+  static const _mapRoutingUrlBase = String.fromEnvironment(
+    'MAP_ROUTING_URL_BASE',
+    defaultValue: '',
+  );
+  static const routingScheme = String.fromEnvironment('ROUTING_SCHEME', defaultValue: serverScheme);
+  static const routingHost = String.fromEnvironment('ROUTING_HOST', defaultValue: serverHost);
+  static const routingPort = String.fromEnvironment('ROUTING_PORT', defaultValue: '5005');
+  static const routingPath = String.fromEnvironment(
+    'ROUTING_PATH',
+    defaultValue: '/route/v1/driving',
+  );
 
   static String get apiBaseUrl => '$serverScheme://$serverHost:$gatewayPort/api';
   static String get websocketUrl => '$serverScheme://$serverHost:$websocketPort';
 
   static bool get hasDedicatedOfflineTileSource => mapOfflineTilesUrlTemplate.trim().isNotEmpty;
+  static String get mapRoutingUrlBase {
+    final explicit = _mapRoutingUrlBase.trim();
+    if (explicit.isNotEmpty) {
+      return explicit;
+    }
+    return '$routingScheme://$routingHost:$routingPort$routingPath';
+  }
+
+  static bool get hasRoutingSource => mapRoutingUrlBase.trim().isNotEmpty;
 
   static const offlineRegionName = 'Potosi ciudad';
 
@@ -40,7 +60,7 @@ class AppConfig {
         const LatLng(-19.5350, -65.6950),
       );
 
-  static const mapMinZoom = 13.2;
-  static const mapInitialZoom = 14.4;
-  static const mapMaxZoom = 15.8;
+  static const mapMinZoom = 13.4;
+  static const mapInitialZoom = 14.8;
+  static const mapMaxZoom = 16.0;
 }
