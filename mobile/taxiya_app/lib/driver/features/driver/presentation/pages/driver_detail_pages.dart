@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../../core/map/offline_map.dart';
 import '../../../../../core/ui/top_notice.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../widgets/driver_ui_kit.dart';
@@ -329,14 +330,66 @@ class DriverSettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const _SimpleDriverPage(
+    return _DetailScaffold(
       title: 'Configuraciones',
-      eyebrow: 'Preferencias',
-      items: [
-        ('Navegacion', 'Ajusta el comportamiento del mapa y seguimiento de ruta.'),
-        ('Alertas', 'Controla sonido y avisos de nuevos viajes.'),
-        ('Cuenta', 'Revisa tus datos, vehiculo y documentos.'),
-      ],
+      child: DriverPageShell(
+        eyebrow: 'Preferencias',
+        title: 'Configuraciones',
+        child: Column(
+          children: [
+            const _DriverSettingsInfoCard(
+              title: 'Navegacion',
+              subtitle: 'Ajusta el comportamiento del mapa y seguimiento de ruta.',
+            ),
+            const _DriverSettingsInfoCard(
+              title: 'Alertas',
+              subtitle: 'Controla sonido y avisos de nuevos viajes.',
+            ),
+            const _DriverSettingsInfoCard(
+              title: 'Cuenta',
+              subtitle: 'Revisa tus datos, vehiculo y documentos.',
+            ),
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1B1B1F),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFF2C2C31)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Mapa offline',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFFFFF4EC),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Descarga o actualiza Potosi ciudad para mantener el mapa listo aun con señal baja.',
+                    style: TextStyle(
+                      color: Color(0xFFFFD8BF),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () => showOfflineMapSheet(context),
+                      icon: const Icon(Icons.download_for_offline_rounded),
+                      label: const Text('Abrir mapa offline'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -438,6 +491,68 @@ class _ProfileField extends StatelessWidget {
           ),
         ),
         style: const TextStyle(color: Color(0xFFFFF4EC)),
+      ),
+    );
+  }
+}
+
+class _DriverSettingsInfoCard extends StatelessWidget {
+  const _DriverSettingsInfoCard({
+    required this.title,
+    required this.subtitle,
+  });
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1B1B1F),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFF2C2C31)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: const Color(0xFF2A2A31),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(Icons.check_circle_outline, color: Color(0xFFF97316)),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFFFFF4EC),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: Color(0xFFFFD8BF),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

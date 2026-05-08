@@ -74,7 +74,7 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
     if (ref.read(driverSessionProvider).otpRequested) {
       return 'Aqui va el codigo SMS y luego la contrasena que usara el conductor para volver a entrar.';
     }
-    return 'Aqui escribe el nombre del conductor y el celular real donde enviaremos el codigo de activacion.';
+    return 'Aqui escribe el nombre del conductor y el celular real donde enviaremos el codigo de activacion. Despues quedara pendiente de autorizacion por central.';
   }
 
   void _showInlineError(String message) {
@@ -265,8 +265,8 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
           const SizedBox(height: 8),
           Text(
             _mode == _DriverAuthMode.login
-                ? 'Entra con celular y contrasena. El equipo registrado entra sin volver a pedir OTP.'
-                : 'Registra tu numero, valida con OTP y crea tu contrasena para empezar.',
+                ? 'Entra con celular y contrasena. Si la central ya te autorizo, podras usar el panel sin volver a pedir OTP.'
+                : 'Registra tu numero, valida con OTP y crea tu contrasena. Luego la central debe autorizar tu cuenta de conductor.',
             style: const TextStyle(
               color: Color(0xFFFFC89B),
               fontWeight: FontWeight.w600,

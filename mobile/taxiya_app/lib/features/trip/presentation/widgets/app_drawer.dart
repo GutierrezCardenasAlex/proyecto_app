@@ -22,7 +22,9 @@ class AppDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = const [
+      ('Inicio', Icons.home_rounded),
       ('Tus viajes', Icons.history),
+      ('Cuenta', Icons.person_outline_rounded),
       ('Metodos de pago', Icons.payments),
       ('Promociones', Icons.sell),
       ('Seguridad', Icons.shield),

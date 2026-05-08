@@ -20,6 +20,7 @@ class DriverAuthResult {
     required this.userId,
     required this.driverId,
     required this.vehicleType,
+    required this.accessStatus,
     required this.phone,
     required this.fullName,
     required this.firstName,
@@ -33,6 +34,7 @@ class DriverAuthResult {
   final String userId;
   final String driverId;
   final String vehicleType;
+  final String accessStatus;
   final String phone;
   final String fullName;
   final String firstName;
@@ -255,10 +257,13 @@ class DriverAuthRepository {
 
     final payload = jsonDecode(authProfileResponse.body) as Map<String, dynamic>;
     final user = payload['user'] as Map<String, dynamic>? ?? const {};
+    final driverPayload = jsonDecode(driverProfileResponse.body) as Map<String, dynamic>;
+    final driver = driverPayload['driver'] as Map<String, dynamic>? ?? const {};
     return DriverAuthResult(
       userId: user['id']?.toString() ?? userId,
       driverId: driverId,
       vehicleType: vehicleType,
+      accessStatus: driver['access_status']?.toString() ?? 'AUTORIZADO',
       phone: user['phone']?.toString() ?? phone,
       fullName: user['fullName']?.toString() ?? '$firstName $lastName'.trim(),
       firstName: user['firstName']?.toString() ?? firstName,
@@ -291,6 +296,11 @@ class DriverAuthRepository {
     final user = payload['user'] as Map<String, dynamic>? ?? const {};
     final token = payload['token']?.toString() ?? '';
     final userId = user['id']?.toString() ?? '';
+    final role = user['role']?.toString() ?? '';
+
+    if (role.isNotEmpty && role != 'driver') {
+      throw Exception('Este numero ya esta registrado con rol de pasajero. La central debe habilitar un conductor aparte.');
+    }
 
     final ensureProfile = await http.post(
       Uri.parse('${AppConfig.apiBaseUrl}/drivers/ensure-profile'),
@@ -314,6 +324,7 @@ class DriverAuthRepository {
       userId: userId,
       driverId: driver['id']?.toString() ?? '',
       vehicleType: vehicle['vehicle_type']?.toString() ?? vehicle['type']?.toString() ?? 'taxi',
+      accessStatus: driver['access_status']?.toString() ?? 'AUTORIZADO',
       phone: user['phone']?.toString() ?? fallbackPhone,
       fullName: user['fullName']?.toString() ?? 'Conductor Flash Go',
       firstName: user['firstName']?.toString() ?? '',
@@ -336,6 +347,7 @@ class DriverSessionController extends Notifier<DriverSession> {
       userId: '',
       driverId: '',
       vehicleType: 'taxi',
+      accessStatus: 'AUTORIZADO',
       phone: '',
       fullName: 'Conductor Flash Go',
       firstName: '',
@@ -363,6 +375,7 @@ class DriverSessionController extends Notifier<DriverSession> {
         firstName: firstName,
         fullName: firstName,
         vehicleType: state.vehicleType,
+        accessStatus: state.accessStatus,
         otpRequested: true,
         isLoading: false,
         clearError: true,
@@ -452,6 +465,7 @@ class DriverSessionController extends Notifier<DriverSession> {
     await prefs.remove('driver_session_user_id');
     await prefs.remove('driver_session_driver_id');
     await prefs.remove('driver_session_vehicle_type');
+    await prefs.remove('driver_session_access_status');
     await prefs.remove('driver_session_phone');
     await prefs.remove('driver_session_full_name');
     await prefs.remove('driver_session_first_name');
@@ -466,6 +480,7 @@ class DriverSessionController extends Notifier<DriverSession> {
       userId: '',
       driverId: '',
       vehicleType: 'taxi',
+      accessStatus: 'AUTORIZADO',
       phone: '',
       fullName: 'Conductor Flash Go',
       firstName: '',
@@ -494,6 +509,7 @@ class DriverSessionController extends Notifier<DriverSession> {
     await prefs.setString('driver_session_user_id', result.userId);
     await prefs.setString('driver_session_driver_id', result.driverId);
     await prefs.setString('driver_session_vehicle_type', result.vehicleType);
+    await prefs.setString('driver_session_access_status', result.accessStatus);
     await prefs.setString('driver_session_phone', result.phone);
     await prefs.setString('driver_session_full_name', result.fullName);
     await prefs.setString('driver_session_first_name', result.firstName);
@@ -507,6 +523,7 @@ class DriverSessionController extends Notifier<DriverSession> {
       userId: result.userId,
       driverId: result.driverId,
       vehicleType: result.vehicleType,
+      accessStatus: result.accessStatus,
       phone: result.phone,
       fullName: result.fullName,
       firstName: result.firstName,
@@ -514,7 +531,7 @@ class DriverSessionController extends Notifier<DriverSession> {
       email: result.email,
       address: result.address,
       token: result.token,
-      otpRequested: true,
+      otpRequested: false,
       loggedIn: true,
       profileCompleted: result.profileCompleted,
       isLoading: false,
@@ -529,6 +546,7 @@ class DriverSessionController extends Notifier<DriverSession> {
       userId: prefs.getString('driver_session_user_id') ?? '',
       driverId: prefs.getString('driver_session_driver_id') ?? '',
       vehicleType: prefs.getString('driver_session_vehicle_type') ?? 'taxi',
+      accessStatus: prefs.getString('driver_session_access_status') ?? 'AUTORIZADO',
       phone: prefs.getString('driver_session_phone') ?? '',
       fullName: prefs.getString('driver_session_full_name') ?? 'Conductor Flash Go',
       firstName: prefs.getString('driver_session_first_name') ?? '',

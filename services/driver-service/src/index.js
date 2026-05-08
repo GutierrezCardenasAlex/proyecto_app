@@ -34,6 +34,11 @@ const ensureProfileSchema = z.object({
   phone: z.string().min(8).optional()
 });
 
+const driverAccessSchema = z.object({
+  status: z.enum(["AUTORIZADO", "RECHAZADO"]),
+  note: z.string().max(500).optional()
+});
+
 async function publish(routingKey, payload) {
   const connection = await amqp.connect(process.env.RABBITMQ_URL);
   const channel = await connection.createChannel();
@@ -48,6 +53,13 @@ async function bootstrap() {
   await pool.query(`
     ALTER TABLE vehicles
     ADD COLUMN IF NOT EXISTS vehicle_type VARCHAR(16) NOT NULL DEFAULT 'taxi'
+  `);
+
+  await pool.query(`
+    ALTER TABLE drivers
+      ADD COLUMN IF NOT EXISTS access_status VARCHAR(20) NOT NULL DEFAULT 'AUTORIZADO',
+      ADD COLUMN IF NOT EXISTS access_note TEXT,
+      ADD COLUMN IF NOT EXISTS access_granted_at TIMESTAMPTZ
   `);
 
   app.get("/health", async () => ({ status: "ok", service: "driver-service" }));
@@ -108,11 +120,19 @@ async function bootstrap() {
       `UPDATE drivers
        SET is_available = $2, status = $3, updated_at = NOW()
        WHERE id = $1
+         AND access_status = 'AUTORIZADO'
        RETURNING *`,
       [driverId, isAvailable, status]
     );
 
     if (!result.rows.length) {
+      const accessCheck = await pool.query(
+        `SELECT id, access_status FROM drivers WHERE id = $1`,
+        [driverId]
+      );
+      if (accessCheck.rows.length && accessCheck.rows[0].access_status !== "AUTORIZADO") {
+        return reply.code(403).send({ message: "Tu cuenta de conductor aun no fue autorizada por central." });
+      }
       return reply.code(404).send({ message: "Driver not found" });
     }
 
@@ -146,8 +166,8 @@ async function bootstrap() {
       }
 
       const driverResult = await client.query(
-        `INSERT INTO drivers (user_id, license_number, status, is_available)
-         VALUES ($1, $2, 'offline', FALSE)
+        `INSERT INTO drivers (user_id, license_number, status, is_available, access_status)
+         VALUES ($1, $2, 'offline', FALSE, 'PENDIENTE')
          RETURNING *`,
         [userId, `TEMP-${String(userId).slice(0, 8).toUpperCase()}`]
       );
@@ -211,6 +231,32 @@ async function bootstrap() {
     }
 
     reply.send(result.rows[0]);
+  });
+
+  app.post("/:driverId/access", async (request, reply) => {
+    const { driverId } = request.params;
+    const { status, note } = driverAccessSchema.parse(request.body);
+    const result = await pool.query(
+      `UPDATE drivers
+       SET access_status = $2,
+           access_note = $3,
+           access_granted_at = CASE WHEN $2 = 'AUTORIZADO' THEN NOW() ELSE access_granted_at END,
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [driverId, status, note ?? null]
+    );
+
+    if (!result.rows.length) {
+      return reply.code(404).send({ message: "Driver not found" });
+    }
+
+    await publish("driver.access.updated", {
+      driverId,
+      status,
+    });
+
+    reply.send({ driver: result.rows[0] });
   });
 
   await app.listen({ port, host: "0.0.0.0" });

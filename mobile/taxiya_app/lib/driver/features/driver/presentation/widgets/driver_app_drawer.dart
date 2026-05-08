@@ -23,7 +23,9 @@ class DriverAppDrawer extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = const [
       ('Panel de viaje', Icons.local_taxi),
+      ('Viajes disponibles', Icons.assignment_rounded),
       ('Historial', Icons.history),
+      ('Cuenta', Icons.person_outline_rounded),
       ('Ganancias', Icons.payments),
       ('Seguridad', Icons.shield),
       ('Centro de ayuda', Icons.help),

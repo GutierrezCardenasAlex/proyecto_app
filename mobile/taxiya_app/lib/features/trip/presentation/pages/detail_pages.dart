@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../core/map/offline_map.dart';
 import '../../../../core/ui/top_notice.dart';
 import '../../../auth/data/auth_repository.dart';
 
@@ -172,14 +173,89 @@ class SettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const _SimpleInfoPage(
+    return _DetailScaffold(
       title: 'Configuraciones',
-      eyebrow: 'Preferencias',
-      items: [
-        ('Mapa', 'Ajusta visualizacion y comportamiento del mapa.'),
-        ('Idioma', 'Personaliza textos y formato de la aplicacion.'),
-        ('Cuenta', 'Administra tus datos y sesiones activas.'),
-      ],
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
+        children: [
+          const Text(
+            'PREFERENCIAS',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.4,
+              color: Color(0xFFF97316),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Configuraciones',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 32,
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFFFFF4EC),
+            ),
+          ),
+          const SizedBox(height: 18),
+          const _SettingsInfoCard(
+            title: 'Mapa',
+            subtitle: 'Ajusta visualizacion y comportamiento del mapa.',
+          ),
+          const _SettingsInfoCard(
+            title: 'Idioma',
+            subtitle: 'Personaliza textos y formato de la aplicacion.',
+          ),
+          const _SettingsInfoCard(
+            title: 'Cuenta',
+            subtitle: 'Administra tus datos y sesiones activas.',
+          ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1B1B1F),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFF2C2C31)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Mapa offline',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFFFFF4EC),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Descarga o actualiza Potosi ciudad para seguir usando el mapa cuando la señal baje.',
+                    style: TextStyle(
+                      color: Color(0xFFFFD8BF),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () => showOfflineMapSheet(context),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFF97316),
+                        foregroundColor: const Color(0xFF0F0F10),
+                      ),
+                      icon: const Icon(Icons.download_for_offline_rounded),
+                      label: const Text('Abrir mapa offline'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -289,6 +365,68 @@ class _SimpleInfoPage extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SettingsInfoCard extends StatelessWidget {
+  const _SettingsInfoCard({
+    required this.title,
+    required this.subtitle,
+  });
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1B1B1F),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFF2C2C31)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: const Color(0xFF2A2A31),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(Icons.check_circle_outline, color: Color(0xFFF97316)),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFFFFF4EC),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: Color(0xFFFFD8BF),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

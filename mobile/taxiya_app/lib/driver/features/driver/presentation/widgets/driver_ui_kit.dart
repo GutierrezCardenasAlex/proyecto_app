@@ -7,12 +7,14 @@ class DriverPageShell extends StatelessWidget {
     required this.eyebrow,
     required this.title,
     required this.child,
+    this.leading,
     this.trailing,
   });
 
   final String eyebrow;
   final String title;
   final Widget child;
+  final Widget? leading;
   final Widget? trailing;
 
   @override
@@ -24,6 +26,10 @@ class DriverPageShell extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (leading != null) ...[
+                leading!,
+                const SizedBox(width: 12),
+              ],
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

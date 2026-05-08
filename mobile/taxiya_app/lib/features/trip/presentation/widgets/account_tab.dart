@@ -8,6 +8,7 @@ import 'ui_kit.dart';
 class AccountTab extends ConsumerWidget {
   const AccountTab({
     super.key,
+    this.onBack,
     required this.onOpenProfile,
     required this.onOpenNotifications,
     required this.onOpenSecurity,
@@ -15,6 +16,7 @@ class AccountTab extends ConsumerWidget {
     required this.onOpenSupport,
   });
 
+  final VoidCallback? onBack;
   final VoidCallback onOpenProfile;
   final VoidCallback onOpenNotifications;
   final VoidCallback onOpenSecurity;
@@ -28,6 +30,12 @@ class AccountTab extends ConsumerWidget {
     return PageShell(
       eyebrow: 'Account',
       title: 'Perfil',
+      leading: onBack == null
+          ? null
+          : IconButton.filledTonal(
+              onPressed: onBack,
+              icon: const Icon(Icons.arrow_back_rounded),
+            ),
       trailing: IconButton.filledTonal(
         onPressed: onOpenProfile,
         icon: const Icon(Icons.edit_outlined),

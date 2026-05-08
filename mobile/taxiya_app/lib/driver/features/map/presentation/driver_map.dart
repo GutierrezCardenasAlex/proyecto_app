@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../../../core/config/app_config.dart';
 import '../../../../../core/map/offline_map.dart';
 
 class DriverMap extends ConsumerWidget {
@@ -29,20 +30,29 @@ class DriverMap extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final offlineState = ref.watch(offlineMapProvider);
     final driverPoint = LatLng(driverLat, driverLng);
     final pickupPoint = pickupLat != null && pickupLng != null ? LatLng(pickupLat!, pickupLng!) : null;
     final isOnPickupStage = const {'accepted', 'arriving', 'at_pickup'}.contains(tripStatus);
     final initialCenter = tripAccepted && pickupPoint != null ? pickupPoint : driverPoint;
     final offlineMap = ref.read(offlineMapProvider.notifier);
+    final viewBounds = AppConfig.potosiViewBounds;
 
     return Stack(
       children: [
         FlutterMap(
+          key: ValueKey(
+            'driver-map-${offlineState.isReady}-${offlineState.isDownloading}-${offlineState.downloadedTiles}-$tripStatus-$driverLat-$driverLng',
+          ),
           options: MapOptions(
             initialCenter: initialCenter,
-            initialZoom: 14.2,
-            minZoom: 12,
-            maxZoom: 16,
+            initialZoom: AppConfig.mapInitialZoom,
+            minZoom: AppConfig.mapMinZoom,
+            maxZoom: AppConfig.mapMaxZoom,
+            cameraConstraint: CameraConstraint.contain(bounds: viewBounds),
+            interactionOptions: const InteractionOptions(
+              flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+            ),
           ),
           children: [
             offlineMap.buildTileLayer(

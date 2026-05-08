@@ -150,27 +150,6 @@ class DriverTripRepository {
     return trip.copyWith(status: status);
   }
 
-  Future<void> submitRating({
-    required String token,
-    required String tripId,
-    required int score,
-    String? comment,
-  }) async {
-    final response = await http.post(
-      Uri.parse('${AppConfig.apiBaseUrl}/trips/$tripId/rating'),
-      headers: _headers(token),
-      body: jsonEncode({
-        'fromRole': 'driver',
-        'score': score,
-        if (comment != null && comment.trim().isNotEmpty) 'comment': comment.trim(),
-      }),
-    );
-
-    if (response.statusCode >= 400) {
-      throw Exception('No se pudo enviar la calificacion (${response.statusCode})');
-    }
-  }
-
   static Map<String, String> _headers(String token) => {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
@@ -264,26 +243,6 @@ class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
           trip: current,
           status: status,
         ));
-    ref.invalidate(driverTripHistoryProvider);
-  }
-
-  Future<void> submitRating({
-    required int score,
-    String? comment,
-  }) async {
-    final session = ref.read(driverSessionProvider);
-    final current = state.value;
-    if (current == null || session.token.isEmpty) {
-      return;
-    }
-
-    await _repository.submitRating(
-      token: session.token,
-      tripId: current.id,
-      score: score,
-      comment: comment,
-    );
-    state = const AsyncData(null);
     ref.invalidate(driverTripHistoryProvider);
   }
 

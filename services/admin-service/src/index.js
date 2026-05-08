@@ -14,6 +14,35 @@ const changeDeviceStatusSchema = z.object({
   status: z.enum(["AUTORIZADO", "RECHAZADO"])
 });
 
+const changeDriverAccessSchema = z.object({
+  status: z.enum(["AUTORIZADO", "RECHAZADO"]),
+  note: z.string().max(500).optional()
+});
+
+const changeUserPhoneSchema = z.object({
+  phone: z.string().min(8)
+});
+
+function normalizePhone(rawPhone) {
+  const digits = String(rawPhone || "").replace(/\D/g, "");
+  if (digits.length === 8) {
+    return `+591${digits}`;
+  }
+  if (digits.length === 11 && digits.startsWith("591")) {
+    return `+${digits}`;
+  }
+  return String(rawPhone || "").replace(/\s+/g, "");
+}
+
+async function ensureAdminSchema() {
+  await pool.query(`
+    ALTER TABLE drivers
+      ADD COLUMN IF NOT EXISTS access_status VARCHAR(20) NOT NULL DEFAULT 'AUTORIZADO',
+      ADD COLUMN IF NOT EXISTS access_note TEXT,
+      ADD COLUMN IF NOT EXISTS access_granted_at TIMESTAMPTZ
+  `);
+}
+
 async function ensureAdmin(request, reply) {
   try {
     await request.jwtVerify();
@@ -31,6 +60,7 @@ async function ensureAdmin(request, reply) {
 async function bootstrap() {
   await app.register(cors, { origin: true, credentials: true });
   await app.register(jwt, { secret: process.env.JWT_SECRET || "super-secret" });
+  await ensureAdminSchema();
 
   app.get("/health", async () => ({ status: "ok", service: "admin-service" }));
 
@@ -87,6 +117,28 @@ async function bootstrap() {
     );
 
     return liveDrivers;
+  });
+
+  app.get("/drivers/pending-access", { preHandler: ensureAdmin }, async () => {
+    const result = await pool.query(
+      `SELECT d.id,
+              d.user_id,
+              d.license_number,
+              d.access_status,
+              d.access_note,
+              d.created_at,
+              d.updated_at,
+              u.phone,
+              u.full_name,
+              u.first_name,
+              u.last_name
+       FROM drivers d
+       INNER JOIN users u ON u.id = d.user_id
+       WHERE d.access_status = 'PENDIENTE'
+       ORDER BY d.created_at ASC`
+    );
+
+    return result.rows;
   });
 
   app.get("/devices/pending", { preHandler: ensureAdmin }, async () => {
@@ -251,6 +303,67 @@ async function bootstrap() {
     } finally {
       client.release();
     }
+  });
+
+  app.post("/drivers/:driverId/access", { preHandler: ensureAdmin }, async (request, reply) => {
+    const { driverId } = request.params;
+    const { status, note } = changeDriverAccessSchema.parse(request.body);
+
+    const result = await pool.query(
+      `UPDATE drivers
+       SET access_status = $2,
+           access_note = $3,
+           access_granted_at = CASE WHEN $2 = 'AUTORIZADO' THEN NOW() ELSE access_granted_at END,
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [driverId, status, note ?? null]
+    );
+
+    if (!result.rows.length) {
+      return reply.code(404).send({ message: "Conductor no encontrado" });
+    }
+
+    return {
+      message: status === "AUTORIZADO" ? "Conductor autorizado por central" : "Conductor rechazado por central",
+      driver: result.rows[0]
+    };
+  });
+
+  app.post("/users/:userId/change-phone", { preHandler: ensureAdmin }, async (request, reply) => {
+    const { userId } = request.params;
+    const parsed = changeUserPhoneSchema.parse(request.body);
+    const normalizedPhone = normalizePhone(parsed.phone);
+
+    const conflict = await pool.query(
+      `SELECT id, role
+       FROM users
+       WHERE phone = $1
+         AND id <> $2`,
+      [normalizedPhone, userId]
+    );
+
+    if (conflict.rows.length) {
+      return reply.code(409).send({ message: "Ese numero ya pertenece a otra cuenta." });
+    }
+
+    const result = await pool.query(
+      `UPDATE users
+       SET phone = $2,
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING id, phone, role, full_name`,
+      [userId, normalizedPhone]
+    );
+
+    if (!result.rows.length) {
+      return reply.code(404).send({ message: "Usuario no encontrado" });
+    }
+
+    return {
+      message: "Telefono actualizado por central",
+      user: result.rows[0]
+    };
   });
 
   await app.listen({ port, host: "0.0.0.0" });

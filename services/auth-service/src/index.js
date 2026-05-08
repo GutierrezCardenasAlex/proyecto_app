@@ -312,6 +312,10 @@ function sendDeviceStatus(reply, status) {
   return null;
 }
 
+function roleLabel(role) {
+  return role === "driver" ? "conductor" : "pasajero";
+}
+
 async function bootstrap() {
   await app.register(cors, { origin: true, credentials: true });
   await app.register(jwt, { secret: process.env.JWT_SECRET || "super-secret" });
@@ -332,9 +336,27 @@ async function bootstrap() {
     const phone = normalizePhone(request.body.phone);
     assertValidPhone(phone);
     const existingUser = await pool.query(
-      `SELECT id, password_hash FROM users WHERE phone = $1`,
+      `SELECT id, role, password_hash FROM users WHERE phone = $1`,
       [phone]
     );
+
+    if (existingUser.rows.length &&
+        existingUser.rows[0].password_hash &&
+        existingUser.rows[0].role &&
+        existingUser.rows[0].role !== role) {
+      return reply.code(409).send({
+        message: `Este numero ya pertenece a una cuenta de ${roleLabel(existingUser.rows[0].role)}. Cada telefono solo puede tener un rol.`
+      });
+    }
+
+    if (existingUser.rows.length &&
+        !existingUser.rows[0].password_hash &&
+        existingUser.rows[0].role &&
+        existingUser.rows[0].role !== role) {
+      return reply.code(409).send({
+        message: `Este numero ya inicio un registro como ${roleLabel(existingUser.rows[0].role)}.`
+      });
+    }
 
     if (existingUser.rows.length && existingUser.rows[0].password_hash) {
       return reply.code(409).send({ message: "El usuario ya existe. Inicia sesion con tu contrasena." });
@@ -395,6 +417,12 @@ async function bootstrap() {
     const user = userResult.rows[0];
     if (user.password_hash) {
       return reply.code(409).send({ message: "El usuario ya existe. Inicia sesion con tu contrasena." });
+    }
+
+    if (user.role && user.role !== parsed.role) {
+      return reply.code(409).send({
+        message: `Este numero ya esta reservado para ${roleLabel(user.role)}. Cada telefono solo puede tener un rol.`
+      });
     }
 
     const cachedOtp = await redis.get(`otp:${phone}`);

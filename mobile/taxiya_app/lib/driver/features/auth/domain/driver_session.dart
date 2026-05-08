@@ -3,6 +3,7 @@ class DriverSession {
     required this.userId,
     required this.driverId,
     required this.vehicleType,
+    required this.accessStatus,
     required this.phone,
     required this.fullName,
     required this.firstName,
@@ -21,6 +22,7 @@ class DriverSession {
   final String userId;
   final String driverId;
   final String vehicleType;
+  final String accessStatus;
   final String phone;
   final String fullName;
   final String firstName;
@@ -39,6 +41,7 @@ class DriverSession {
     String? userId,
     String? driverId,
     String? vehicleType,
+    String? accessStatus,
     String? phone,
     String? fullName,
     String? firstName,
@@ -58,6 +61,7 @@ class DriverSession {
       userId: userId ?? this.userId,
       driverId: driverId ?? this.driverId,
       vehicleType: vehicleType ?? this.vehicleType,
+      accessStatus: accessStatus ?? this.accessStatus,
       phone: phone ?? this.phone,
       fullName: fullName ?? this.fullName,
       firstName: firstName ?? this.firstName,

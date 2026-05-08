@@ -14,15 +14,33 @@ class AppConfig {
     'MAP_TILES_ATTRIBUTION',
     defaultValue: '',
   );
+  static const mapOfflineTilesUrlTemplate = String.fromEnvironment(
+    'MAP_OFFLINE_TILES_URL_TEMPLATE',
+    defaultValue: '',
+  );
+  static const mapOfflineTilesAttribution = String.fromEnvironment(
+    'MAP_OFFLINE_TILES_ATTRIBUTION',
+    defaultValue: '',
+  );
 
   static String get apiBaseUrl => '$serverScheme://$serverHost:$gatewayPort/api';
   static String get websocketUrl => '$serverScheme://$serverHost:$websocketPort';
 
-  static bool get canBulkDownloadTiles =>
-      !mapTilesUrlTemplate.toLowerCase().contains('tile.openstreetmap.org');
+  static bool get hasDedicatedOfflineTileSource => mapOfflineTilesUrlTemplate.trim().isNotEmpty;
+
+  static const offlineRegionName = 'Potosi ciudad';
 
   static LatLngBounds get potosiOfflineBounds => LatLngBounds(
-        const LatLng(-19.4400, -65.9200),
-        const LatLng(-19.7300, -65.5900),
+        const LatLng(-19.6350, -65.8050),
+        const LatLng(-19.5450, -65.7050),
       );
+
+  static LatLngBounds get potosiViewBounds => LatLngBounds(
+        const LatLng(-19.6450, -65.8150),
+        const LatLng(-19.5350, -65.6950),
+      );
+
+  static const mapMinZoom = 13.2;
+  static const mapInitialZoom = 14.4;
+  static const mapMaxZoom = 15.8;
 }

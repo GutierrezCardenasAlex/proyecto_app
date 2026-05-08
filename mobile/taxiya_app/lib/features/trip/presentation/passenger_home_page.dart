@@ -20,14 +20,26 @@ class PassengerHomePage extends ConsumerStatefulWidget {
 class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _selectedIndex = 0;
-  String _activeDrawerItem = 'Configuraciones';
+  String _activeDrawerItem = 'Inicio';
 
   void _handleDrawerSelection(String item) {
     switch (item) {
+      case 'Inicio':
+        setState(() {
+          _activeDrawerItem = item;
+          _selectedIndex = 0;
+        });
+        break;
       case 'Tus viajes':
         setState(() {
           _activeDrawerItem = item;
           _selectedIndex = 1;
+        });
+        break;
+      case 'Cuenta':
+        setState(() {
+          _activeDrawerItem = item;
+          _selectedIndex = 2;
         });
         break;
       case 'Metodos de pago':
@@ -65,6 +77,13 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
     );
   }
 
+  void _goHomeFromSection() {
+    setState(() {
+      _activeDrawerItem = 'Inicio';
+      _selectedIndex = 0;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(sessionProvider);
@@ -84,10 +103,12 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
     final pages = [
       RideTab(
         onMenuTap: () => _scaffoldKey.currentState?.openDrawer(),
-        onProfileTap: () => _openPage(const ProfilePage(), drawerItem: 'Configuraciones'),
       ),
-      const ActivityTab(),
+      ActivityTab(
+        onBack: _goHomeFromSection,
+      ),
       AccountTab(
+        onBack: _goHomeFromSection,
         onOpenProfile: () => _openPage(const ProfilePage(), drawerItem: 'Configuraciones'),
         onOpenNotifications: () => _openPage(const NotificationsPage(), drawerItem: 'Configuraciones'),
         onOpenSecurity: () => _openPage(const SecurityPage(), drawerItem: 'Seguridad'),
@@ -112,39 +133,6 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
         backgroundColor: const Color(0xFF111214),
         extendBody: true,
         body: IndexedStack(index: _selectedIndex, children: pages),
-        bottomNavigationBar: Container(
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 18),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1A1A1D).withValues(alpha: 0.96),
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x22000000),
-                blurRadius: 24,
-                offset: Offset(0, -4),
-              ),
-            ],
-          ),
-          child: NavigationBar(
-            height: 74,
-            backgroundColor: Colors.transparent,
-            indicatorColor: const Color(0x22F97316),
-            selectedIndex: _selectedIndex,
-            onDestinationSelected: (value) => setState(() {
-              _selectedIndex = value;
-              _activeDrawerItem = switch (value) {
-                0 => 'Promociones',
-                1 => 'Tus viajes',
-                _ => 'Configuraciones',
-              };
-            }),
-            destinations: const [
-              NavigationDestination(icon: Icon(Icons.directions_car_outlined), selectedIcon: Icon(Icons.directions_car), label: 'Viaje'),
-              NavigationDestination(icon: Icon(Icons.history), selectedIcon: Icon(Icons.history), label: 'Historial'),
-              NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Cuenta'),
-            ],
-          ),
-        ),
       );
   }
 }

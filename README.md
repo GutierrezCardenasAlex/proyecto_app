@@ -115,6 +115,9 @@ chmod +x ./scripts/seed-demo-data.sh ./scripts/simulate-driver-locations.sh
 
 Flash Go already supports configurable tiles through `MAP_TILES_URL_TEMPLATE`.
 
+- `MAP_TILES_URL_TEMPLATE` keeps the normal online map source.
+- `MAP_OFFLINE_TILES_URL_TEMPLATE` enables the dedicated offline cache source.
+
 - Quick Flutter launch with a custom tile server:
 
 ```powershell

@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../../core/config/app_config.dart';
 import '../../../../core/map/offline_map.dart';
 
 class PotosiMapDriverMarker {
@@ -33,16 +34,25 @@ class PotosiMap extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final offlineState = ref.watch(offlineMapProvider);
     final initialCenter = routeTarget ?? userLocation;
     final offlineMap = ref.read(offlineMapProvider.notifier);
+    final viewBounds = AppConfig.potosiViewBounds;
     return Stack(
       children: [
         FlutterMap(
+          key: ValueKey(
+            'potosi-map-${offlineState.isReady}-${offlineState.isDownloading}-${offlineState.downloadedTiles}',
+          ),
           options: MapOptions(
             initialCenter: initialCenter,
-            initialZoom: 14.2,
-            minZoom: 12,
-            maxZoom: 16,
+            initialZoom: AppConfig.mapInitialZoom,
+            minZoom: AppConfig.mapMinZoom,
+            maxZoom: AppConfig.mapMaxZoom,
+            cameraConstraint: CameraConstraint.contain(bounds: viewBounds),
+            interactionOptions: const InteractionOptions(
+              flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+            ),
           ),
           children: [
             offlineMap.buildTileLayer(
