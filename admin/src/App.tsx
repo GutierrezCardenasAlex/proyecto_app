@@ -43,6 +43,20 @@ type Dashboard = {
   pendingDevices: number
 }
 
+type PendingDriverAccessRow = {
+  id: string
+  user_id: string
+  license_number: string
+  access_status: 'PENDIENTE' | 'AUTORIZADO' | 'RECHAZADO'
+  access_note?: string | null
+  created_at: string
+  updated_at: string
+  phone: string
+  full_name?: string | null
+  first_name?: string | null
+  last_name?: string | null
+}
+
 type DeviceRow = {
   id: number
   user_id: string
@@ -65,6 +79,13 @@ type AdminProfile = {
   fullName?: string
 }
 
+type UserSummary = {
+  user_id: string
+  phone: string
+  full_name?: string | null
+  role?: string
+}
+
 function App() {
   const mapRef = useRef<HTMLDivElement | null>(null)
   const mapInstanceRef = useRef<any>(null)
@@ -78,6 +99,7 @@ function App() {
   })
   const [drivers, setDrivers] = useState<Driver[]>([])
   const [trips, setTrips] = useState<Trip[]>([])
+  const [pendingDrivers, setPendingDrivers] = useState<PendingDriverAccessRow[]>([])
   const [pendingDevices, setPendingDevices] = useState<DeviceRow[]>([])
   const [allDevices, setAllDevices] = useState<DeviceRow[]>([])
   const [phone, setPhone] = useState('+59170000001')
@@ -86,8 +108,10 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [token, setToken] = useState(localStorage.getItem('admin_token') ?? '')
-  const [selectedHistoryUser, setSelectedHistoryUser] = useState<DeviceRow | null>(null)
+  const [selectedHistoryUser, setSelectedHistoryUser] = useState<UserSummary | null>(null)
   const [userHistory, setUserHistory] = useState<DeviceRow[]>([])
+  const [phoneDraft, setPhoneDraft] = useState('')
+  const [driverAccessNote, setDriverAccessNote] = useState('')
   const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(() => {
     const raw = localStorage.getItem('admin_profile')
     return raw ? (JSON.parse(raw) as AdminProfile) : null
@@ -108,11 +132,12 @@ function App() {
       return
     }
 
-    const [dashboardResponse, driversResponse, tripsResponse, pendingResponse, devicesResponse] =
+    const [dashboardResponse, driversResponse, tripsResponse, pendingDriversResponse, pendingResponse, devicesResponse] =
       await Promise.all([
         fetch(`${apiBase}/admin/dashboard`, { headers: authHeaders }).then((res) => res.json()),
         fetch(`${apiBase}/admin/drivers/live`, { headers: authHeaders }).then((res) => res.json()),
         fetch(`${apiBase}/admin/active-trips`, { headers: authHeaders }).then((res) => res.json()),
+        fetch(`${apiBase}/admin/drivers/pending-access`, { headers: authHeaders }).then((res) => res.json()),
         fetch(`${apiBase}/admin/devices/pending`, { headers: authHeaders }).then((res) => res.json()),
         fetch(`${apiBase}/admin/devices`, { headers: authHeaders }).then((res) => res.json()),
       ])
@@ -120,6 +145,7 @@ function App() {
     setDashboard(dashboardResponse)
     setDrivers(driversResponse)
     setTrips(tripsResponse)
+    setPendingDrivers(pendingDriversResponse)
     setPendingDevices(pendingResponse)
     setAllDevices(devicesResponse)
     setLastUpdatedAt(new Date().toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
@@ -181,8 +207,40 @@ function App() {
     setToken('')
     setAdminProfile(null)
     setOtpRequested(false)
+    setPendingDrivers([])
     setPendingDevices([])
     setAllDevices([])
+  }
+
+  async function updateDriverAccess(driverId: string, status: 'AUTORIZADO' | 'RECHAZADO', note?: string) {
+    if (!token) {
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    try {
+      const response = await fetch(`${apiBase}/admin/drivers/${driverId}/access`, {
+        method: 'POST',
+        headers: {
+          ...authHeaders,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status, note }),
+      })
+
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(payload.message ?? 'No se pudo actualizar el acceso del conductor')
+      }
+
+      setDriverAccessNote('')
+      await loadCentralData()
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : 'No se pudo actualizar el acceso del conductor')
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function updateDeviceStatus(deviceId: number, status: 'AUTORIZADO' | 'RECHAZADO') {
@@ -215,7 +273,7 @@ function App() {
     }
   }
 
-  async function loadUserHistory(device: DeviceRow) {
+  async function loadUserHistory(user: UserSummary) {
     if (!token) {
       return
     }
@@ -223,7 +281,7 @@ function App() {
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch(`${apiBase}/admin/devices/user/${device.user_id}/history`, {
+      const response = await fetch(`${apiBase}/admin/devices/user/${user.user_id}/history`, {
         headers: authHeaders,
       })
       const payload = await response.json()
@@ -231,7 +289,8 @@ function App() {
         throw new Error(payload.message ?? 'No se pudo cargar el historial del usuario')
       }
 
-      setSelectedHistoryUser(device)
+      setSelectedHistoryUser(user)
+      setPhoneDraft(user.phone)
       setUserHistory(payload)
     } catch (historyError) {
       setError(historyError instanceof Error ? historyError.message : 'No se pudo cargar el historial del usuario')
@@ -263,6 +322,43 @@ function App() {
       }
     } catch (replaceError) {
       setError(replaceError instanceof Error ? replaceError.message : 'No se pudo reemplazar el equipo')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function changeUserPhone() {
+    if (!token || !selectedHistoryUser || !phoneDraft.trim()) {
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    try {
+      const response = await fetch(`${apiBase}/admin/users/${selectedHistoryUser.user_id}/change-phone`, {
+        method: 'POST',
+        headers: {
+          ...authHeaders,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ phone: phoneDraft.trim() }),
+      })
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(payload.message ?? 'No se pudo cambiar el telefono')
+      }
+
+      setSelectedHistoryUser({
+        ...selectedHistoryUser,
+        phone: payload.user.phone,
+      })
+      await loadCentralData()
+      await loadUserHistory({
+        ...selectedHistoryUser,
+        phone: payload.user.phone,
+      })
+    } catch (changeError) {
+      setError(changeError instanceof Error ? changeError.message : 'No se pudo cambiar el telefono')
     } finally {
       setLoading(false)
     }
@@ -360,7 +456,7 @@ function App() {
       <main className="layout auth-layout">
         <section className="hero-panel auth-card">
           <div>
-            <p className="eyebrow">Central Taxi Ya</p>
+            <p className="eyebrow">Central Flash Go</p>
             <h1>Autoriza dispositivos y controla accesos desde oficina.</h1>
             <p className="subtitle">
               Solo la central puede liberar un nuevo telefono para pasajero o conductor.
@@ -400,7 +496,7 @@ function App() {
     <main className="layout">
       <section className="hero-panel">
         <div>
-          <p className="eyebrow">Central Taxi Ya / Potosi</p>
+          <p className="eyebrow">Central Flash Go / Potosi</p>
           <h1>Despacho, control de dispositivos y monitoreo operativo en tiempo real.</h1>
           <p className="subtitle">
             La central valida nuevos equipos, sigue la flota y mantiene el servicio bajo control.
@@ -420,8 +516,8 @@ function App() {
             <strong>{dashboard.activeTrips}</strong>
           </article>
           <article>
-            <span>Pendientes</span>
-            <strong>{dashboard.pendingDevices}</strong>
+            <span>Pendientes central</span>
+            <strong>{dashboard.pendingDevices + pendingDrivers.length}</strong>
           </article>
         </div>
       </section>
@@ -462,6 +558,62 @@ function App() {
         <div className="side-column">
           <div className="panel">
             <div className="panel-header">
+              <h2>Conductores por autorizar</h2>
+              <span>{pendingDrivers.length} pendientes</span>
+            </div>
+            <div className="list">
+              {pendingDrivers.length === 0 && <article className="list-card">Sin conductores pendientes.</article>}
+              {pendingDrivers.map((driver) => (
+                <article key={driver.id} className="list-card stack-card">
+                  <div>
+                    <strong>{driver.full_name || driver.phone}</strong>
+                    <p>conductor · {driver.phone}</p>
+                    <p>Licencia: {driver.license_number}</p>
+                    <p>Estado: {driver.access_status}</p>
+                    {driver.access_note && <p>Nota actual: {driver.access_note}</p>}
+                  </div>
+                  <div className="stack-actions">
+                    <textarea
+                      value={driverAccessNote}
+                      onChange={(event) => setDriverAccessNote(event.target.value)}
+                      placeholder="Nota opcional para central"
+                      className="note-input"
+                    />
+                    <div className="action-row">
+                      <button
+                        className="primary-button"
+                        onClick={() => updateDriverAccess(driver.id, 'AUTORIZADO', driverAccessNote)}
+                      >
+                        Autorizar conductor
+                      </button>
+                      <button
+                        className="danger-button"
+                        onClick={() => updateDriverAccess(driver.id, 'RECHAZADO', driverAccessNote)}
+                      >
+                        Rechazar
+                      </button>
+                      <button
+                        className="secondary-button"
+                        onClick={() =>
+                          loadUserHistory({
+                            user_id: driver.user_id,
+                            phone: driver.phone,
+                            full_name: driver.full_name,
+                            role: 'driver',
+                          })
+                        }
+                      >
+                        Ver usuario
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+
+          <div className="panel">
+            <div className="panel-header">
               <h2>Solicitudes de dispositivos</h2>
               <span>{pendingDevices.length} pendientes</span>
             </div>
@@ -482,7 +634,17 @@ function App() {
                     <button className="danger-button" onClick={() => updateDeviceStatus(device.id, 'RECHAZADO')}>
                       Rechazar
                     </button>
-                    <button className="secondary-button" onClick={() => loadUserHistory(device)}>
+                    <button
+                      className="secondary-button"
+                      onClick={() =>
+                        loadUserHistory({
+                          user_id: device.user_id,
+                          phone: device.phone,
+                          full_name: device.full_name,
+                          role: device.role,
+                        })
+                      }
+                    >
                       Ver historial
                     </button>
                   </div>
@@ -544,7 +706,17 @@ function App() {
                   <td>{device.approved_by_name || 'Sin accion'}</td>
                   <td>
                     <div className="action-row compact">
-                      <button className="secondary-button" onClick={() => loadUserHistory(device)}>
+                      <button
+                        className="secondary-button"
+                        onClick={() =>
+                          loadUserHistory({
+                            user_id: device.user_id,
+                            phone: device.phone,
+                            full_name: device.full_name,
+                            role: device.role,
+                          })
+                        }
+                      >
                         Historial
                       </button>
                       <button className="secondary-button" onClick={() => updateDeviceStatus(device.id, 'AUTORIZADO')}>
@@ -572,6 +744,25 @@ function App() {
             <span>
               {selectedHistoryUser.full_name || selectedHistoryUser.phone} · {selectedHistoryUser.phone}
             </span>
+          </div>
+          <div className="phone-change-card">
+            <div>
+              <strong>Cambiar telefono autorizado</strong>
+              <p>
+                La central puede mover esta cuenta a un nuevo numero. El numero viejo queda libre y la cuenta se
+                mantiene.
+              </p>
+            </div>
+            <div className="phone-change-form">
+              <input
+                value={phoneDraft}
+                onChange={(event) => setPhoneDraft(event.target.value)}
+                placeholder="+591..."
+              />
+              <button className="primary-button" onClick={changeUserPhone} disabled={loading}>
+                Guardar telefono
+              </button>
+            </div>
           </div>
           <div className="list">
             {userHistory.map((device) => (

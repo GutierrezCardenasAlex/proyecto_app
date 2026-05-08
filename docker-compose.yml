@@ -11,6 +11,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/postgres/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./infra/postgres/seed_admin_accounts.sql:/docker-entrypoint-initdb.d/02-seed-admin.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U taxiya -d taxiya"]
       interval: 10s

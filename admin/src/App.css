@@ -1,15 +1,16 @@
 body {
   margin: 0;
+  background: #08090b;
 }
 
 .layout {
   min-height: 100vh;
   padding: 32px;
   background:
-    radial-gradient(circle at top left, rgba(236, 106, 54, 0.22), transparent 25%),
-    radial-gradient(circle at bottom right, rgba(17, 64, 96, 0.32), transparent 30%),
-    #f3eee7;
-  color: #142634;
+    radial-gradient(circle at top left, rgba(249, 115, 22, 0.18), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(194, 65, 12, 0.12), transparent 26%),
+    linear-gradient(180deg, #090a0d 0%, #121316 100%);
+  color: #fff4ec;
 }
 
 .auth-layout {
@@ -20,10 +21,10 @@ body {
 .hero-panel,
 .panel,
 .map-card {
-  background: rgba(255, 250, 243, 0.88);
-  border: 1px solid rgba(20, 38, 52, 0.1);
+  background: rgba(19, 20, 24, 0.92);
+  border: 1px solid rgba(249, 115, 22, 0.12);
   border-radius: 28px;
-  box-shadow: 0 20px 60px rgba(20, 38, 52, 0.08);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(12px);
 }
 
@@ -43,19 +44,19 @@ body {
   margin: 0 0 12px;
   text-transform: uppercase;
   letter-spacing: 0.16em;
-  color: #c15225;
+  color: #f97316;
   font-size: 0.82rem;
 }
 
 .hero-panel h1,
 .panel h2 {
   margin: 0;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: "Segoe UI", "Helvetica Neue", sans-serif;
 }
 
 .subtitle {
   max-width: 62ch;
-  color: #466072;
+  color: #ffcfaa;
 }
 
 .stats {
@@ -66,16 +67,16 @@ body {
 
 .stats article,
 .list-card {
-  background: #fffdfa;
+  background: #111216;
   border-radius: 20px;
   padding: 18px;
-  border: 1px solid rgba(20, 38, 52, 0.08);
+  border: 1px solid rgba(249, 115, 22, 0.08);
 }
 
 .stats span,
 .list-card p,
 .panel-header span {
-  color: #6d7e8a;
+  color: #ffcfaa;
 }
 
 .stats strong {
@@ -100,7 +101,7 @@ body {
 
 .toolbar span {
   display: block;
-  color: #6d7e8a;
+  color: #ffcfaa;
   margin-top: 4px;
 }
 
@@ -137,17 +138,34 @@ body {
 }
 
 .auth-form span {
-  color: #466072;
+  color: #fff4ec;
   font-weight: 700;
 }
 
 .auth-form input {
-  border: 1px solid rgba(20, 38, 52, 0.12);
+  border: 1px solid rgba(249, 115, 22, 0.14);
   border-radius: 16px;
   padding: 14px 16px;
-  background: #fffdfa;
-  color: #142634;
+  background: #0f1013;
+  color: #fff4ec;
   font: inherit;
+}
+
+.note-input,
+.phone-change-form input {
+  border: 1px solid rgba(249, 115, 22, 0.14);
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: #0f1013;
+  color: #fff4ec;
+  font: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.note-input {
+  min-height: 84px;
+  resize: vertical;
 }
 
 .primary-button,
@@ -162,27 +180,27 @@ body {
 }
 
 .primary-button {
-  background: #142634;
-  color: #fffdfa;
+  background: linear-gradient(135deg, #f97316, #fb923c);
+  color: #0f0f10;
 }
 
 .secondary-button {
-  background: #fffdfa;
-  color: #142634;
-  border: 1px solid rgba(20, 38, 52, 0.12);
+  background: #15171b;
+  color: #fff4ec;
+  border: 1px solid rgba(249, 115, 22, 0.14);
 }
 
 .danger-button {
-  background: #8f2d1a;
-  color: #fffdfa;
+  background: #3a1814;
+  color: #ffd4cc;
 }
 
 .error-box {
   margin-bottom: 20px;
   padding: 14px 16px;
   border-radius: 16px;
-  background: #ffe0db;
-  color: #7f2010;
+  background: #2a1616;
+  color: #ffb4a8;
   font-weight: 700;
 }
 
@@ -196,6 +214,11 @@ body {
 .stack-card {
   display: grid;
   gap: 14px;
+}
+
+.stack-actions {
+  display: grid;
+  gap: 12px;
 }
 
 .action-row {
@@ -212,6 +235,12 @@ body {
   margin-top: 24px;
 }
 
+.phone-change-form {
+  display: grid;
+  gap: 10px;
+  min-width: min(360px, 100%);
+}
+
 .table-wrapper {
   overflow: auto;
 }
@@ -225,12 +254,12 @@ body {
 .devices-table td {
   text-align: left;
   padding: 14px 12px;
-  border-bottom: 1px solid rgba(20, 38, 52, 0.08);
+  border-bottom: 1px solid rgba(249, 115, 22, 0.08);
   vertical-align: top;
 }
 
 .devices-table th {
-  color: #6d7e8a;
+  color: #ffcfaa;
   font-size: 0.82rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -248,11 +277,27 @@ body {
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: #142634;
+  background: #111216;
   color: #fffdfa;
-  border: 3px solid #ec6a36;
+  border: 3px solid #f97316;
   font-size: 0.7rem;
   font-weight: 700;
+}
+
+.phone-change-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px;
+  margin-bottom: 16px;
+  border-radius: 22px;
+  background: #111216;
+  border: 1px solid rgba(249, 115, 22, 0.08);
+}
+
+.phone-change-card p {
+  margin: 8px 0 0;
+  color: #ffcfaa;
 }
 
 @media (max-width: 960px) {
@@ -263,6 +308,10 @@ body {
   .hero-panel,
   .content-grid {
     grid-template-columns: 1fr;
+  }
+
+  .phone-change-card {
+    flex-direction: column;
   }
 
   .map {
