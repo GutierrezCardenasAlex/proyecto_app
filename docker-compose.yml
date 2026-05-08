@@ -171,6 +171,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql://taxiya:taxiya@postgres:5432/taxiya}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://taxiya:taxiya@rabbitmq:5672}
+      JWT_SECRET: ${JWT_SECRET:-super-secret}
     depends_on:
       postgres:
         condition: service_healthy
