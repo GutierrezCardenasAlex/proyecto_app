@@ -221,11 +221,11 @@ async function bootstrap() {
 
     const result = await pool.query(
       `UPDATE user_devices
-       SET status = $2,
+       SET status = $2::varchar,
            approved_by = $3,
            approved_at = NOW(),
            updated_at = NOW(),
-           last_login_at = CASE WHEN $2 = 'AUTORIZADO' THEN NOW() ELSE last_login_at END
+           last_login_at = CASE WHEN $2::varchar = 'AUTORIZADO' THEN NOW() ELSE last_login_at END
        WHERE id = $1
        RETURNING *`,
       [deviceId, status, adminId]
@@ -311,9 +311,9 @@ async function bootstrap() {
 
     const result = await pool.query(
       `UPDATE drivers
-       SET access_status = $2,
+       SET access_status = $2::varchar,
            access_note = $3,
-           access_granted_at = CASE WHEN $2 = 'AUTORIZADO' THEN NOW() ELSE access_granted_at END,
+           access_granted_at = CASE WHEN $2::varchar = 'AUTORIZADO' THEN NOW() ELSE access_granted_at END,
            updated_at = NOW()
        WHERE id = $1
        RETURNING *`,
