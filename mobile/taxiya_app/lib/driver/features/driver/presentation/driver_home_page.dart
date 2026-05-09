@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'package:url_launcher/url_launcher.dart';
@@ -139,6 +141,7 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
     });
     _socket?.on('driver:trip_offer', (_) {
       ref.read(offeredTripProvider.notifier).loadOffer();
+      ref.read(driverOffersProvider.notifier).loadOffers();
       LocalNotifications.show(
         id: 2001,
         title: 'Nueva oferta',
@@ -178,6 +181,13 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
           );
         }
       }
+    });
+    _socket?.on('driver:trip_rejected', (_) {
+      ref.read(driverOffersProvider.notifier).loadOffers();
+    });
+    _socket?.on('driver:trip_accepted', (_) {
+      ref.read(driverOffersProvider.notifier).loadOffers();
+      ref.read(offeredTripProvider.notifier).loadOffer();
     });
     _socket?.connect();
   }
@@ -469,6 +479,7 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
     try {
       await ref.read(driverStateProvider.notifier).restoreOperationalState();
       await ref.read(offeredTripProvider.notifier).loadOffer();
+      await ref.read(driverOffersProvider.notifier).loadOffers();
     } catch (_) {
       // Avoid surfacing lifecycle restoration failures as app-breaking errors.
     }
@@ -667,6 +678,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
   double _sheetSize = 0.36;
   DateTime? _lastOfferRefreshAt;
   bool _isRefreshingOffer = false;
+  int _mapFocusSignal = 0;
 
   @override
   void dispose() {
@@ -694,12 +706,39 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
     _isRefreshingOffer = true;
     _lastOfferRefreshAt = now;
     try {
-      await ref.read(offeredTripProvider.notifier).loadOffer();
+      await Future.wait([
+        ref.read(offeredTripProvider.notifier).loadOffer(),
+        ref.read(driverOffersProvider.notifier).loadOffers(),
+      ]);
     } catch (_) {
       // Ignore transient polling failures to keep dashboard smooth.
     } finally {
       _isRefreshingOffer = false;
     }
+  }
+
+  LatLngBounds? _buildDriverFocusBounds({
+    required double driverLat,
+    required double driverLng,
+    DriverTrip? trip,
+  }) {
+    if (trip == null) {
+      return null;
+    }
+    final driverPoint = LatLng(driverLat, driverLng);
+    if (trip.status == 'in_progress') {
+      return LatLngBounds.fromPoints([
+        driverPoint,
+        LatLng(trip.destinationLat, trip.destinationLng),
+      ]);
+    }
+    if (const {'accepted', 'arriving', 'at_pickup'}.contains(trip.status)) {
+      return LatLngBounds.fromPoints([
+        driverPoint,
+        LatLng(trip.pickupLat, trip.pickupLng),
+      ]);
+    }
+    return null;
   }
 
   void _showStatusSheet(BuildContext context, DriverState driverState, DriverTrip? trip) {
@@ -865,7 +904,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                                     icon: const Icon(Icons.chat_bubble_rounded),
                                     label: Text(trip.status == 'at_pickup' ? 'Avisar llegada' : 'WhatsApp'),
                                   ),
-                                if (_canManageTrip(trip))
+                                if (_canCancelDriverTrip(trip))
                                   FilledButton.tonalIcon(
                                     onPressed: () => _cancelDriverTripFromDashboard(trip),
                                     style: FilledButton.styleFrom(
@@ -965,6 +1004,10 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
 
   bool _canManageTrip(DriverTrip? trip) {
     return trip != null && !const {'completed', 'cancelled'}.contains(trip.status);
+  }
+
+  bool _canCancelDriverTrip(DriverTrip? trip) {
+    return trip != null && const {'accepted', 'arriving', 'at_pickup'}.contains(trip.status);
   }
 
   String? _normalizeWhatsAppPhone(String? rawPhone) {
@@ -1090,11 +1133,13 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
   void _showAvailableTripsSheet({
     required AsyncValue<DriverTrip?> tripAsync,
     required DriverTrip? trip,
+    required AsyncValue<List<DriverTrip>> offersAsync,
   }) {
-    final pendingOffer = _hasPendingOffer(trip) ? trip : null;
-    final accent = pendingOffer == null
+    final offers = offersAsync.value ?? const <DriverTrip>[];
+    final pendingOffers = offers.where((item) => _hasPendingOffer(item)).toList(growable: false);
+    final accent = pendingOffers.isEmpty
         ? const Color(0xFFF97316)
-        : _driverStatusAccentColor(pendingOffer.status);
+        : _driverStatusAccentColor(pendingOffers.first.status);
 
     showModalBottomSheet<void>(
       context: context,
@@ -1170,9 +1215,9 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  pendingOffer == null
+                                  pendingOffers.isEmpty
                                       ? 'Revisa nuevas solicitudes apenas entren.'
-                                      : 'Tienes una solicitud lista para revisar y decidir.',
+                                      : 'Tienes ${pendingOffers.length} solicitudes listas para revisar y decidir.',
                                   style: const TextStyle(
                                     color: Color(0xFFFFD8BF),
                                     fontWeight: FontWeight.w600,
@@ -1189,7 +1234,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                               border: Border.all(color: accent.withValues(alpha: 0.35)),
                             ),
                             child: Text(
-                              pendingOffer == null ? '0' : '1',
+                              '${pendingOffers.length}',
                               style: const TextStyle(
                                 color: Color(0xFFF97316),
                                 fontWeight: FontWeight.w800,
@@ -1201,14 +1246,14 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                     ),
                     const SizedBox(height: 18),
                     Expanded(
-                      child: tripAsync.when(
+                      child: offersAsync.when(
                         loading: () => const Center(child: CircularProgressIndicator()),
                         error: (error, stackTrace) => DriverEmptyCard(
                           title: 'No pudimos cargar ofertas',
                           subtitle: error.toString().replaceFirst('Exception: ', ''),
                         ),
                         data: (_) {
-                          if (pendingOffer == null) {
+                          if (pendingOffers.isEmpty) {
                             if (_hasLiveTripStatus(trip)) {
                               return const DriverEmptyCard(
                                 title: 'Ya tienes un viaje en curso',
@@ -1221,19 +1266,27 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                             );
                           }
 
-                          return SingleChildScrollView(
-                            child: _DriverAvailableTripCard(
-                              trip: pendingOffer,
-                              accentColor: _driverStatusAccentColor(pendingOffer.status),
-                              onViewDetails: () {
-                                Navigator.of(context).pop();
-                                _showIncomingTripDetail(pendingOffer);
-                              },
-                              onAccept: () async {
-                                Navigator.of(context).pop();
-                                await _handleDriverPrimaryAction(pendingOffer);
-                              },
-                            ),
+                          return ListView.separated(
+                            itemCount: pendingOffers.length,
+                            separatorBuilder: (_, _) => const SizedBox(height: 14),
+                            itemBuilder: (context, index) {
+                              final pendingOffer = pendingOffers[index];
+                              return _DriverAvailableTripCard(
+                                trip: pendingOffer,
+                                accentColor: _driverStatusAccentColor(pendingOffer.status),
+                                onViewDetails: () {
+                                  Navigator.of(context).pop();
+                                  _showIncomingTripDetail(pendingOffer);
+                                },
+                                onAccept: () async {
+                                  Navigator.of(context).pop();
+                                  await _handleDriverPrimaryAction(pendingOffer);
+                                },
+                                onReject: () async {
+                                  await ref.read(driverOffersProvider.notifier).rejectOffer(pendingOffer.id);
+                                },
+                              );
+                            },
                           );
                         },
                       ),
@@ -1379,16 +1432,19 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                       children: [
                         Expanded(
                           child: OutlinedButton(
-                            onPressed: () => Navigator.of(context).pop(),
+                            onPressed: () async {
+                              Navigator.of(context).pop();
+                              await ref.read(driverOffersProvider.notifier).rejectOffer(trip.id);
+                            },
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFFFFD8BF),
-                              side: const BorderSide(color: Color(0x33F97316)),
+                              foregroundColor: const Color(0xFFFFC9C9),
+                              side: const BorderSide(color: Color(0x44EF4444)),
                               minimumSize: const Size.fromHeight(56),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(20),
                               ),
                             ),
-                            child: const Text('Ahora no'),
+                            child: const Text('Rechazar'),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -1430,7 +1486,8 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
     }
 
     if (trip.status == 'requested' || trip.status == 'searching') {
-      await ref.read(offeredTripProvider.notifier).acceptTrip();
+      await ref.read(offeredTripProvider.notifier).acceptTrip(trip);
+      await ref.read(driverOffersProvider.notifier).loadOffers();
       return;
     }
     if (trip.status == 'accepted') {
@@ -1447,6 +1504,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
     }
     if (trip.status == 'in_progress') {
       await ref.read(offeredTripProvider.notifier).updateTripStatus('completed');
+      await ref.read(driverOffersProvider.notifier).loadOffers();
       return;
     }
   }
@@ -1455,7 +1513,18 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
   Widget build(BuildContext context) {
     final driverState = ref.watch(driverStateProvider);
     final tripAsync = ref.watch(offeredTripProvider);
+    final offersAsync = ref.watch(driverOffersProvider);
+    final offers = offersAsync.value ?? const <DriverTrip>[];
+    final availableOffersCount = offers.where((item) => _hasPendingOffer(item)).length;
     final trip = tripAsync.value;
+    final routeColor = trip?.status == 'in_progress'
+        ? const Color(0xFF0EA5E9)
+        : const Color(0xFFF97316);
+    final focusBounds = _buildDriverFocusBounds(
+      driverLat: driverState.lat,
+      driverLng: driverState.lng,
+      trip: trip,
+    );
     final session = ref.watch(driverSessionProvider);
     if (widget.openOffersFromDrawer) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1463,7 +1532,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
           return;
         }
         widget.onOffersDrawerHandled();
-        _showAvailableTripsSheet(tripAsync: tripAsync, trip: trip);
+        _showAvailableTripsSheet(tripAsync: tripAsync, trip: trip, offersAsync: offersAsync);
       });
     }
 
@@ -1488,6 +1557,9 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
               pickupLng: trip?.pickupLng,
               destinationLat: trip?.destinationLat,
               destinationLng: trip?.destinationLng,
+              routeColor: routeColor,
+              focusBounds: focusBounds,
+              focusSignal: _mapFocusSignal,
             ),
           ),
         ),
@@ -1524,6 +1596,10 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                       onTap: () async {
                         await ref.read(driverStateProvider.notifier).restoreOperationalState();
                         await ref.read(offeredTripProvider.notifier).loadOffer();
+                        await ref.read(driverOffersProvider.notifier).loadOffers();
+                        if (mounted) {
+                          setState(() => _mapFocusSignal++);
+                        }
                       },
                     ),
                     const SizedBox(width: 10),
@@ -1533,12 +1609,39 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                       onTap: () => _showStatusSheet(context, driverState, trip),
                     ),
                     const SizedBox(width: 10),
-                    _GlassIconButton(
-                      icon: Icons.assignment_rounded,
-                      onTap: () => _showAvailableTripsSheet(
-                        tripAsync: tripAsync,
-                        trip: trip,
-                      ),
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        _GlassIconButton(
+                          icon: availableOffersCount > 0 ? Icons.notifications_active_rounded : Icons.assignment_rounded,
+                          onTap: () => _showAvailableTripsSheet(
+                            tripAsync: tripAsync,
+                            trip: trip,
+                            offersAsync: offersAsync,
+                          ),
+                        ),
+                        if (availableOffersCount > 0)
+                          Positioned(
+                            right: -4,
+                            top: -4,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEF4444),
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(color: const Color(0xFF111214), width: 2),
+                              ),
+                              child: Text(
+                                availableOffersCount > 9 ? '9+' : '$availableOffersCount',
+                                style: const TextStyle(
+                                  color: Color(0xFFFFF4EC),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ],
                 ),
@@ -1797,7 +1900,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                   ],
                   const SizedBox(height: 18),
                   Text(
-                    'Viaje entrante',
+                    'Viajes entrantes',
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 24,
                       fontWeight: FontWeight.w800,
@@ -1806,25 +1909,48 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    _tripDescription(trip),
+                    availableOffersCount > 0
+                        ? 'Tienes $availableOffersCount viajes disponibles para revisar.'
+                        : _tripDescription(trip),
                     style: const TextStyle(
                       color: Color(0xFFFFD8BF),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 18),
-                  if (tripAsync.isLoading)
+                  if (offersAsync.isLoading && offers.isEmpty && trip == null)
                     const Center(child: Padding(
                       padding: EdgeInsets.all(24),
                       child: CircularProgressIndicator(),
                     ))
-                  else if (trip == null)
+                  else if (availableOffersCount == 0 && trip == null)
                     const DriverEmptyCard(
                       title: 'Sin ofertas activas',
                       subtitle: 'Cuando un pasajero solicite un taxi cercano, aparecera aqui.',
                     )
+                  else if (availableOffersCount > 0)
+                    Column(
+                      children: offers
+                          .where((item) => _hasPendingOffer(item))
+                          .map(
+                            (offer) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _DriverAvailableTripCard(
+                                trip: offer,
+                                accentColor: _driverStatusAccentColor(offer.status),
+                                onViewDetails: () => _showIncomingTripDetail(offer),
+                                onAccept: () async => _handleDriverPrimaryAction(offer),
+                                onReject: () async => ref.read(driverOffersProvider.notifier).rejectOffer(offer.id),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    )
                   else
-                    Container(
+                    Builder(
+                      builder: (context) {
+                        final activeTrip = trip!;
+                        return Container(
                       padding: const EdgeInsets.all(18),
                       decoration: BoxDecoration(
                         color: const Color(0xFF1B1B1E),
@@ -1843,11 +1969,11 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                                   color: const Color(0xFF25252B),
                                   borderRadius: BorderRadius.circular(16),
                                 ),
-                                child: Icon(_tripVehicleIcon(trip), color: const Color(0xFFF97316)),
+                                child: Icon(_tripVehicleIcon(activeTrip), color: const Color(0xFFF97316)),
                               ),
                               const SizedBox(width: 12),
                               Text(
-                                (trip.vehicleType ?? 'taxi').toUpperCase(),
+                                (activeTrip.vehicleType ?? 'taxi').toUpperCase(),
                                 style: GoogleFonts.plusJakartaSans(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w800,
@@ -1857,18 +1983,20 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                             ],
                           ),
                           const SizedBox(height: 14),
-                          _InfoTile(label: 'Viaje', value: trip.id),
-                          _InfoTile(label: 'Recojo', value: trip.passengerPickup),
-                          _InfoTile(label: 'Destino', value: trip.destination),
-                          _InfoTile(label: 'Estado', value: trip.status),
-                          if (trip.passengerName?.isNotEmpty ?? false)
-                            _InfoTile(label: 'Pasajero', value: trip.passengerName!),
-                          if (trip.passengerPhone?.isNotEmpty ?? false)
-                            _InfoTile(label: 'Telefono', value: trip.passengerPhone!),
+                          _InfoTile(label: 'Viaje', value: activeTrip.id),
+                          _InfoTile(label: 'Recojo', value: activeTrip.passengerPickup),
+                          _InfoTile(label: 'Destino', value: activeTrip.destination),
+                          _InfoTile(label: 'Estado', value: activeTrip.status),
+                          if (activeTrip.passengerName?.isNotEmpty ?? false)
+                            _InfoTile(label: 'Pasajero', value: activeTrip.passengerName!),
+                          if (activeTrip.passengerPhone?.isNotEmpty ?? false)
+                            _InfoTile(label: 'Telefono', value: activeTrip.passengerPhone!),
                           const SizedBox(height: 12),
-                          _DriverTripProgressBar(status: trip.status),
+                          _DriverTripProgressBar(status: activeTrip.status),
                         ],
                       ),
+                    );
+                      },
                     ),
                   const SizedBox(height: 18),
                   SizedBox(
@@ -2166,12 +2294,14 @@ class _DriverAvailableTripCard extends StatelessWidget {
     required this.accentColor,
     required this.onViewDetails,
     required this.onAccept,
+    required this.onReject,
   });
 
   final DriverTrip trip;
   final Color accentColor;
   final VoidCallback onViewDetails;
   final VoidCallback onAccept;
+  final VoidCallback onReject;
 
   @override
   Widget build(BuildContext context) {
@@ -2267,6 +2397,21 @@ class _DriverAvailableTripCard extends StatelessWidget {
                     ),
                   ),
                   child: const Text('Ver detalle'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: onReject,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFFFC9C9),
+                    side: const BorderSide(color: Color(0x44EF4444)),
+                    minimumSize: const Size.fromHeight(52),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                  ),
+                  child: const Text('Rechazar'),
                 ),
               ),
               const SizedBox(width: 12),
@@ -2486,7 +2631,7 @@ class _DriverHistoryCard extends ConsumerWidget {
 
   bool get _canCancel {
     return isCurrentTrip &&
-        const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(trip.status);
+        const {'accepted', 'arriving', 'at_pickup'}.contains(trip.status);
   }
 
   String? _normalizeWhatsAppPhone(String? rawPhone) {

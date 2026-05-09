@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
@@ -44,6 +45,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
   String? _selectedDriverId;
   String? _ratingPromptedTripId;
   PotosiPlace? _selectedDestinationPlace;
+  int _mapFocusSignal = 0;
   bool _isSyncingDashboard = false;
   bool _isPreparingExperience = false;
   bool _offlineSheetQueued = false;
@@ -933,6 +935,21 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     return null;
   }
 
+  LatLngBounds? _buildPassengerFocusBounds({
+    required LatLng userLocation,
+    LatLng? activeDriverPoint,
+    LatLng? activeDestinationPoint,
+    required bool isRideInProgress,
+  }) {
+    if (isRideInProgress && activeDriverPoint != null && activeDestinationPoint != null) {
+      return LatLngBounds.fromPoints([activeDriverPoint, activeDestinationPoint]);
+    }
+    if (activeDriverPoint != null) {
+      return LatLngBounds.fromPoints([userLocation, activeDriverPoint]);
+    }
+    return null;
+  }
+
   String _primaryActionLabel(TripState tripState) {
     if (tripState.isRequestingTrip) {
       return 'Enviando solicitud...';
@@ -960,9 +977,27 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
             ? LatLng(tripState.request.driverLat!, tripState.request.driverLng!)
             : null;
     final selectedDestinationPoint = _resolveDestinationPlace()?.point;
-    final mapRouteTarget = hasActiveTrip ? activeDriverPoint : selectedDestinationPoint;
+    final activeDestinationPoint =
+        tripState.request.destinationLat != null && tripState.request.destinationLng != null
+            ? LatLng(tripState.request.destinationLat!, tripState.request.destinationLng!)
+            : selectedDestinationPoint;
+    final activeStatus = tripState.request.status;
+    final isRideInProgress = activeStatus == 'in_progress';
+    final focusBounds = _buildPassengerFocusBounds(
+      userLocation: userLocation,
+      activeDriverPoint: activeDriverPoint,
+      activeDestinationPoint: activeDestinationPoint,
+      isRideInProgress: isRideInProgress,
+    );
+    final mapRouteColor = hasActiveTrip
+        ? (isRideInProgress ? const Color(0xFF0EA5E9) : const Color(0xFFF97316))
+        : const Color(0xFFF97316);
+    final mapRouteStart = hasActiveTrip && isRideInProgress ? activeDriverPoint : null;
+    final mapRouteTarget = hasActiveTrip
+        ? (isRideInProgress ? activeDestinationPoint : activeDriverPoint)
+        : selectedDestinationPoint;
     final shouldDrawPreviewRoute = hasActiveTrip
-        ? activeDriverPoint != null
+        ? (isRideInProgress ? (mapRouteStart != null && mapRouteTarget != null) : activeDriverPoint != null)
         : _rideMode == RideMode.destino && selectedDestinationPoint != null;
     final displayNearbyDrivers = _requestableDrivers(tripState.nearbyDrivers);
     final activeDriverKey = activeDriverPoint == null
@@ -1008,9 +1043,13 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
               child: PotosiMap(
                 drivers: driverPoints,
                 userLocation: userLocation,
+                routeStart: mapRouteStart,
                 routeTarget: mapRouteTarget,
                 showRoute: shouldDrawPreviewRoute,
-                showTargetMarker: !hasActiveTrip,
+                showTargetMarker: mapRouteTarget != null,
+                routeColor: mapRouteColor,
+                focusBounds: focusBounds,
+                focusSignal: _mapFocusSignal,
               ),
             ),
           ),
@@ -1051,6 +1090,9 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                       onTap: () async {
                         await ref.read(passengerLocationProvider.notifier).loadCurrentLocation();
                         await _syncDashboard();
+                        if (mounted) {
+                          setState(() => _mapFocusSignal++);
+                        }
                       },
                     ),
                     if (hasActiveTrip) ...[

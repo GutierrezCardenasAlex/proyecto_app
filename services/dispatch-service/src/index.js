@@ -24,6 +24,11 @@ const acceptSchema = z.object({
   driverId: z.string().uuid()
 });
 
+const rejectSchema = z.object({
+  tripId: z.string().uuid(),
+  driverId: z.string().uuid()
+});
+
 const nearbySchema = z.object({
   lat: z.coerce.number(),
   lng: z.coerce.number(),
@@ -319,6 +324,16 @@ async function bootstrap() {
       client.release();
       await redis.del(lockKey);
     }
+  });
+
+  app.post("/reject", async (request, reply) => {
+    const { tripId, driverId } = rejectSchema.parse(request.body);
+    await redis.srem(`driver:${driverId}:offers`, tripId);
+    await emitRealtime("driver:trip_rejected", `driver:${driverId}`, {
+      tripId,
+      driverId
+    });
+    reply.send({ ok: true });
   });
 
   await app.listen({ port, host: "0.0.0.0" });

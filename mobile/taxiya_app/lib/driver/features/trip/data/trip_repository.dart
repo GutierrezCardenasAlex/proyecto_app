@@ -13,6 +13,8 @@ final tripRepositoryProvider = Provider<DriverTripRepository>((ref) {
 
 final offeredTripProvider =
     NotifierProvider<DriverTripController, AsyncValue<DriverTrip?>>(DriverTripController.new);
+final driverOffersProvider =
+    NotifierProvider<DriverOffersController, AsyncValue<List<DriverTrip>>>(DriverOffersController.new);
 final driverTripHistoryProvider = FutureProvider<List<DriverTrip>>((ref) async {
   final session = ref.watch(driverSessionProvider);
   if (!session.loggedIn || session.driverId.isEmpty || session.token.isEmpty) {
@@ -91,6 +93,27 @@ class DriverTripRepository {
     return _mapTrip(item, fallbackStatus: 'requested');
   }
 
+  Future<List<DriverTrip>> fetchOffers({
+    required String token,
+    required String driverId,
+  }) async {
+    final response = await http.get(
+      Uri.parse('${AppConfig.apiBaseUrl}/dispatch/offers/$driverId'),
+      headers: _headers(token),
+    );
+
+    if (response.statusCode >= 400) {
+      throw Exception('No se pudieron cargar ofertas (${response.statusCode})');
+    }
+
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    final offers = (payload['offers'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map((item) => _mapTrip(item, fallbackStatus: 'requested'))
+        .toList(growable: false);
+    return offers;
+  }
+
   Future<List<DriverTrip>> fetchHistory({
     required String token,
     required String driverId,
@@ -130,6 +153,25 @@ class DriverTripRepository {
     }
 
     return trip.copyWith(status: 'accepted');
+  }
+
+  Future<void> reject({
+    required String token,
+    required String driverId,
+    required String tripId,
+  }) async {
+    final response = await http.post(
+      Uri.parse('${AppConfig.apiBaseUrl}/dispatch/reject'),
+      headers: _headers(token),
+      body: jsonEncode({
+        'tripId': tripId,
+        'driverId': driverId,
+      }),
+    );
+
+    if (response.statusCode >= 400) {
+      throw Exception('No se pudo rechazar el viaje (${response.statusCode})');
+    }
   }
 
   Future<DriverTrip> updateStatus({
@@ -214,9 +256,9 @@ class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
     }
   }
 
-  Future<void> acceptTrip() async {
+  Future<void> acceptTrip([DriverTrip? trip]) async {
     final session = ref.read(driverSessionProvider);
-    final current = state.value;
+    final current = trip ?? state.value;
     if (current == null || session.driverId.isEmpty || session.token.isEmpty) {
       return;
     }
@@ -228,6 +270,7 @@ class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
           trip: current,
         ));
     ref.invalidate(driverTripHistoryProvider);
+    ref.invalidate(driverOffersProvider);
   }
 
   Future<void> updateTripStatus(String status) async {
@@ -252,5 +295,60 @@ class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
       return;
     }
     state = AsyncData(current.copyWith(status: status));
+  }
+}
+
+class DriverOffersController extends Notifier<AsyncValue<List<DriverTrip>>> {
+  late final DriverTripRepository _repository;
+  bool _isLoadingOffers = false;
+
+  @override
+  AsyncValue<List<DriverTrip>> build() {
+    _repository = ref.watch(tripRepositoryProvider);
+    return const AsyncData([]);
+  }
+
+  Future<void> loadOffers() async {
+    final session = ref.read(driverSessionProvider);
+    if (!session.loggedIn || session.driverId.isEmpty || session.token.isEmpty) {
+      state = const AsyncData([]);
+      return;
+    }
+    if (_isLoadingOffers) {
+      return;
+    }
+
+    _isLoadingOffers = true;
+    if ((state.value ?? const <DriverTrip>[]).isEmpty) {
+      state = const AsyncLoading();
+    }
+    try {
+      state = await AsyncValue.guard(() => _repository.fetchOffers(
+            token: session.token,
+            driverId: session.driverId,
+          ));
+    } finally {
+      _isLoadingOffers = false;
+    }
+  }
+
+  Future<void> rejectOffer(String tripId) async {
+    final session = ref.read(driverSessionProvider);
+    if (!session.loggedIn || session.driverId.isEmpty || session.token.isEmpty) {
+      return;
+    }
+    try {
+      await _repository.reject(
+        token: session.token,
+        driverId: session.driverId,
+        tripId: tripId,
+      );
+      final current = [...(state.value ?? const <DriverTrip>[])];
+      current.removeWhere((trip) => trip.id == tripId);
+      state = AsyncData(current);
+      ref.invalidate(driverTripHistoryProvider);
+    } catch (error, stackTrace) {
+      state = AsyncError(error, stackTrace);
+    }
   }
 }

@@ -20,6 +20,9 @@ class DriverMap extends ConsumerStatefulWidget {
     this.pickupLng,
     this.destinationLat,
     this.destinationLng,
+    this.routeColor = const Color(0xFFF97316),
+    this.focusBounds,
+    this.focusSignal = 0,
   });
 
   final bool available;
@@ -32,6 +35,9 @@ class DriverMap extends ConsumerStatefulWidget {
   final double? pickupLng;
   final double? destinationLat;
   final double? destinationLng;
+  final Color routeColor;
+  final LatLngBounds? focusBounds;
+  final int focusSignal;
 
   @override
   ConsumerState<DriverMap> createState() => _DriverMapState();
@@ -40,6 +46,7 @@ class DriverMap extends ConsumerStatefulWidget {
 class _DriverMapState extends ConsumerState<DriverMap> {
   static const double _rerouteDistanceMeters = 55;
   static const double _rerouteTargetShiftMeters = 80;
+  final MapController _mapController = MapController();
   List<LatLng>? _routePoints;
   String? _routeKey;
   LatLng? _lastRouteEnd;
@@ -56,6 +63,26 @@ class _DriverMapState extends ConsumerState<DriverMap> {
     if (_shouldRefreshRoute(oldWidget)) {
       _refreshRoute();
     }
+    if (oldWidget.focusSignal != widget.focusSignal) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _applyFocus());
+    }
+  }
+
+  void _applyFocus() {
+    if (!mounted) {
+      return;
+    }
+    final bounds = widget.focusBounds;
+    if (bounds != null) {
+      _mapController.fitCamera(
+        CameraFit.bounds(
+          bounds: bounds,
+          padding: const EdgeInsets.fromLTRB(56, 120, 56, 220),
+        ),
+      );
+      return;
+    }
+    _mapController.move(_currentRouteTarget() ?? LatLng(widget.driverLat, widget.driverLng), AppConfig.mapInitialZoom);
   }
 
   bool _shouldRefreshRoute(DriverMap oldWidget) {
@@ -183,6 +210,7 @@ class _DriverMapState extends ConsumerState<DriverMap> {
     return Stack(
       children: [
         FlutterMap(
+          mapController: _mapController,
           options: MapOptions(
             initialCenter: initialCenter,
             initialZoom: AppConfig.mapInitialZoom,
@@ -218,7 +246,7 @@ class _DriverMapState extends ConsumerState<DriverMap> {
                   Polyline(
                     points: _routePoints!,
                     strokeWidth: 5,
-                    color: Color(0xFFF97316),
+                    color: widget.routeColor,
                   ),
                 ],
               ),

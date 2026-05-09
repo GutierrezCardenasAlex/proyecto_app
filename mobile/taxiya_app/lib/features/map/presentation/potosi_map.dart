@@ -22,16 +22,24 @@ class PotosiMap extends ConsumerStatefulWidget {
     super.key,
     required this.drivers,
     required this.userLocation,
+    this.routeStart,
     this.routeTarget,
     this.showRoute = false,
     this.showTargetMarker = true,
+    this.routeColor = const Color(0xFFF97316),
+    this.focusBounds,
+    this.focusSignal = 0,
   });
 
   final List<PotosiMapDriverMarker> drivers;
   final LatLng userLocation;
+  final LatLng? routeStart;
   final LatLng? routeTarget;
   final bool showRoute;
   final bool showTargetMarker;
+  final Color routeColor;
+  final LatLngBounds? focusBounds;
+  final int focusSignal;
 
   @override
   ConsumerState<PotosiMap> createState() => _PotosiMapState();
@@ -40,6 +48,7 @@ class PotosiMap extends ConsumerStatefulWidget {
 class _PotosiMapState extends ConsumerState<PotosiMap> {
   static const double _rerouteDistanceMeters = 60;
   static const double _rerouteTargetShiftMeters = 90;
+  final MapController _mapController = MapController();
   List<LatLng>? _routePoints;
   String? _routeKey;
   LatLng? _lastRouteEnd;
@@ -56,6 +65,26 @@ class _PotosiMapState extends ConsumerState<PotosiMap> {
     if (_shouldRefreshRoute(oldWidget)) {
       _refreshRoute();
     }
+    if (oldWidget.focusSignal != widget.focusSignal) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _applyFocus());
+    }
+  }
+
+  void _applyFocus() {
+    if (!mounted) {
+      return;
+    }
+    final bounds = widget.focusBounds;
+    if (bounds != null) {
+      _mapController.fitCamera(
+        CameraFit.bounds(
+          bounds: bounds,
+          padding: const EdgeInsets.fromLTRB(56, 120, 56, 220),
+        ),
+      );
+      return;
+    }
+    _mapController.move(widget.routeTarget ?? widget.userLocation, AppConfig.mapInitialZoom);
   }
 
   bool _shouldRefreshRoute(PotosiMap oldWidget) {
@@ -63,13 +92,16 @@ class _PotosiMapState extends ConsumerState<PotosiMap> {
       return true;
     }
     final target = widget.routeTarget;
+    final start = widget.routeStart ?? widget.userLocation;
     if (!widget.showRoute || target == null || _routePoints == null || _routePoints!.length < 2) {
-      return oldWidget.userLocation != widget.userLocation || oldWidget.routeTarget != widget.routeTarget;
+      return oldWidget.userLocation != widget.userLocation ||
+          oldWidget.routeStart != widget.routeStart ||
+          oldWidget.routeTarget != widget.routeTarget;
     }
 
     final routeService = ref.read(routeServiceProvider);
     final offRouteDistance = routeService.distanceToRoute(
-      point: widget.userLocation,
+      point: start,
       route: _routePoints!,
     );
     final targetShift = _lastRouteEnd == null
@@ -90,8 +122,9 @@ class _PotosiMapState extends ConsumerState<PotosiMap> {
       return;
     }
 
-    final nextKey = '${widget.userLocation.latitude.toStringAsFixed(5)},'
-        '${widget.userLocation.longitude.toStringAsFixed(5)}>'
+    final start = widget.routeStart ?? widget.userLocation;
+    final nextKey = '${start.latitude.toStringAsFixed(5)},'
+        '${start.longitude.toStringAsFixed(5)}>'
         '${target.latitude.toStringAsFixed(5)},${target.longitude.toStringAsFixed(5)}';
     if (_routeKey == nextKey && _routePoints != null) {
       return;
@@ -99,7 +132,7 @@ class _PotosiMapState extends ConsumerState<PotosiMap> {
 
     try {
       final points = await ref.read(routeServiceProvider).fetchRoute(
-            start: widget.userLocation,
+            start: start,
             end: target,
           );
       if (!mounted) {
@@ -115,7 +148,7 @@ class _PotosiMapState extends ConsumerState<PotosiMap> {
         return;
       }
       setState(() {
-        _routePoints = [widget.userLocation, target];
+        _routePoints = [start, target];
         _routeKey = nextKey;
         _lastRouteEnd = target;
       });
@@ -125,12 +158,13 @@ class _PotosiMapState extends ConsumerState<PotosiMap> {
   @override
   Widget build(BuildContext context) {
     ref.watch(offlineMapProvider);
-    final initialCenter = widget.routeTarget ?? widget.userLocation;
+    final initialCenter = widget.routeTarget ?? widget.routeStart ?? widget.userLocation;
     final offlineMap = ref.read(offlineMapProvider.notifier);
     final viewBounds = AppConfig.potosiViewBounds;
     return Stack(
       children: [
         FlutterMap(
+          mapController: _mapController,
           options: MapOptions(
             initialCenter: initialCenter,
             initialZoom: AppConfig.mapInitialZoom,
@@ -163,7 +197,7 @@ class _PotosiMapState extends ConsumerState<PotosiMap> {
                   Polyline(
                     points: _routePoints!,
                     strokeWidth: 5,
-                    color: const Color(0xFFF97316),
+                    color: widget.routeColor,
                   ),
                 ],
               ),

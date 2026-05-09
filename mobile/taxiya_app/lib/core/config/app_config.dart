@@ -43,7 +43,13 @@ class AppConfig {
     if (explicit.isNotEmpty) {
       return explicit;
     }
-    return '$routingScheme://$routingHost:$routingPort$routingPath';
+    const defaultPublicRouting = 'https://router.project-osrm.org/route/v1/driving';
+    final usesCustomRoutingHost =
+        routingHost.trim().isNotEmpty && routingHost.trim() != serverHost.trim();
+    if (usesCustomRoutingHost) {
+      return '$routingScheme://$routingHost:$routingPort$routingPath';
+    }
+    return defaultPublicRouting;
   }
 
   static bool get hasRoutingSource => mapRoutingUrlBase.trim().isNotEmpty;
