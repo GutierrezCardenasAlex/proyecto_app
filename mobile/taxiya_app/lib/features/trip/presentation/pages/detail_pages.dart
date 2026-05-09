@@ -134,19 +134,181 @@ class PaymentMethodsPage extends StatelessWidget {
   }
 }
 
-class PromotionsPage extends StatelessWidget {
+class PromotionsPage extends ConsumerWidget {
   const PromotionsPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return const _SimpleInfoPage(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(sessionProvider);
+    final progress = session.completedTripCount % 5;
+    final progressValue = progress / 5;
+    final hasFreeTrip = session.freeTripCredits > 0;
+
+    return _DetailScaffold(
       title: 'Promociones',
-      eyebrow: 'Promos',
-      items: [
-        ('Cupones', 'Consulta descuentos activos para tus proximos viajes.'),
-        ('Beneficios', 'Revisa ventajas especiales para clientes frecuentes.'),
-        ('Invitaciones', 'Comparte la app y desbloquea nuevas promociones.'),
-      ],
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
+        children: [
+          const Text(
+            'PROMOS',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.4,
+              color: Color(0xFFF97316),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Tu avance',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 32,
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFFFFF4EC),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Container(
+            padding: const EdgeInsets.all(22),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFF97316), Color(0xFFC2410C)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x33F97316),
+                  blurRadius: 24,
+                  offset: Offset(0, 12),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 54,
+                      height: 54,
+                      decoration: BoxDecoration(
+                        color: const Color(0x22FFFFFF),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: const Icon(Icons.card_giftcard_rounded, color: Color(0xFFFFF4EC)),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            hasFreeTrip ? 'Ya tienes viaje gratis' : 'Te acercas a un viaje gratis',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFFFFF4EC),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            hasFreeTrip
+                                ? 'Puedes usarlo en tu siguiente viaje a donde sea.'
+                                : 'Cada 5 viajes completados desbloqueas 1 viaje gratis.',
+                            style: const TextStyle(
+                              color: Color(0xFFFFE3D0),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0x1AFFFFFF),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
+                        '$progress/5',
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: const Color(0xFFFFF4EC),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(999),
+                          child: LinearProgressIndicator(
+                            value: hasFreeTrip ? 1 : progressValue,
+                            minHeight: 10,
+                            backgroundColor: const Color(0x33FFFFFF),
+                            valueColor: const AlwaysStoppedAnimation(Color(0xFFFFF4EC)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  hasFreeTrip
+                      ? 'Tienes ${session.freeTripCredits} viaje(s) gratis disponible(s).'
+                      : 'Te faltan ${5 - progress} viaje(s) para ganar el proximo gratis.',
+                  style: const TextStyle(
+                    color: Color(0xFFFFF4EC),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1B1B1F),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0xFF2C2C31)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Resumen de promocion',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFFFFF4EC),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _PromoMetricRow(label: 'Viajes completados', value: '${session.completedTripCount}'),
+                _PromoMetricRow(label: 'Viajes gratis disponibles', value: '${session.freeTripCredits}'),
+                _PromoMetricRow(label: 'Meta actual', value: '$progress/5'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          const _SettingsInfoCard(
+            title: 'Como funciona',
+            subtitle: 'Cada 5 viajes completados desbloqueas 1 viaje gratis para usarlo en tu siguiente pedido.',
+          ),
+          const _SettingsInfoCard(
+            title: 'Notificacion',
+            subtitle: 'Cuando consigas el beneficio, Flash Go te avisara automaticamente en la app.',
+          ),
+        ],
+      ),
     );
   }
 }
@@ -427,6 +589,43 @@ class _SettingsInfoCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _PromoMetricRow extends StatelessWidget {
+  const _PromoMetricRow({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFFFFD8BF),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Text(
+            value,
+            style: GoogleFonts.plusJakartaSans(
+              color: const Color(0xFFFFF4EC),
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
       ),
     );
   }
