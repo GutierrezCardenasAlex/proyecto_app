@@ -150,7 +150,9 @@ function mapUser(user) {
     lastName: user.last_name,
     email: user.email,
     address: user.address,
-    profileCompleted: Boolean(user.profile_completed)
+    profileCompleted: Boolean(user.profile_completed),
+    completedTripCount: Number(user.completed_trip_count || 0),
+    freeTripCredits: Number(user.free_trip_credits || 0)
   };
 }
 
@@ -203,7 +205,9 @@ async function ensureSchema() {
       ADD COLUMN IF NOT EXISTS email VARCHAR(160),
       ADD COLUMN IF NOT EXISTS address TEXT,
       ADD COLUMN IF NOT EXISTS password_hash TEXT,
-      ADD COLUMN IF NOT EXISTS profile_completed BOOLEAN NOT NULL DEFAULT FALSE
+      ADD COLUMN IF NOT EXISTS profile_completed BOOLEAN NOT NULL DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS completed_trip_count INTEGER NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS free_trip_credits INTEGER NOT NULL DEFAULT 0
   `);
 
   await pool.query(`
@@ -629,6 +633,43 @@ async function bootstrap() {
     );
 
     reply.send({ user: mapUser(result.rows[0]) });
+  });
+
+  app.get("/session-status", { preHandler: [app.authenticate] }, async (request, reply) => {
+    const deviceIdentifier = String(request.query?.deviceIdentifier || "").trim();
+    if (!deviceIdentifier) {
+      return reply.code(400).send({ message: "deviceIdentifier es obligatorio." });
+    }
+
+    const userResult = await pool.query(
+      `SELECT id, phone, role, full_name, first_name, last_name, email, address,
+              profile_completed, completed_trip_count, free_trip_credits
+       FROM users
+       WHERE id = $1`,
+      [request.user.sub]
+    );
+
+    if (!userResult.rows.length) {
+      return reply.code(404).send({ message: "Usuario no encontrado." });
+    }
+
+    const deviceResult = await pool.query(
+      `SELECT id, status, approved_at, updated_at
+       FROM user_devices
+       WHERE user_id = $1 AND device_identifier = $2
+       ORDER BY updated_at DESC
+       LIMIT 1`,
+      [request.user.sub, deviceIdentifier]
+    );
+
+    const device = deviceResult.rows[0] ?? null;
+    reply.send({
+      user: mapUser(userResult.rows[0]),
+      deviceStatus: device?.status || "PENDIENTE",
+      deviceId: device?.id ?? null,
+      approvedAt: device?.approved_at ?? null,
+      updatedAt: device?.updated_at ?? null
+    });
   });
 
   app.post("/admin/otp/request", async (request, reply) => {

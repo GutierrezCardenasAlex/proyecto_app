@@ -14,6 +14,7 @@ class DriverSession {
     required this.otpRequested,
     required this.loggedIn,
     required this.profileCompleted,
+    required this.deviceStatus,
     required this.isLoading,
     required this.errorMessage,
     required this.isRestoring,
@@ -33,6 +34,7 @@ class DriverSession {
   final bool otpRequested;
   final bool loggedIn;
   final bool profileCompleted;
+  final String deviceStatus;
   final bool isLoading;
   final String? errorMessage;
   final bool isRestoring;
@@ -52,6 +54,7 @@ class DriverSession {
     bool? otpRequested,
     bool? loggedIn,
     bool? profileCompleted,
+    String? deviceStatus,
     bool? isLoading,
     String? errorMessage,
     bool? isRestoring,
@@ -72,6 +75,7 @@ class DriverSession {
       otpRequested: otpRequested ?? this.otpRequested,
       loggedIn: loggedIn ?? this.loggedIn,
       profileCompleted: profileCompleted ?? this.profileCompleted,
+      deviceStatus: deviceStatus ?? this.deviceStatus,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
       isRestoring: isRestoring ?? this.isRestoring,

@@ -11,6 +11,9 @@ class Session {
     required this.otpRequested,
     required this.isAuthenticated,
     required this.profileCompleted,
+    required this.deviceStatus,
+    required this.completedTripCount,
+    required this.freeTripCredits,
     required this.isLoading,
     required this.errorMessage,
     required this.isRestoring,
@@ -27,6 +30,9 @@ class Session {
   final bool otpRequested;
   final bool isAuthenticated;
   final bool profileCompleted;
+  final String deviceStatus;
+  final int completedTripCount;
+  final int freeTripCredits;
   final bool isLoading;
   final String? errorMessage;
   final bool isRestoring;
@@ -43,6 +49,9 @@ class Session {
     bool? otpRequested,
     bool? isAuthenticated,
     bool? profileCompleted,
+    String? deviceStatus,
+    int? completedTripCount,
+    int? freeTripCredits,
     bool? isLoading,
     String? errorMessage,
     bool? isRestoring,
@@ -60,6 +69,9 @@ class Session {
       otpRequested: otpRequested ?? this.otpRequested,
       isAuthenticated: isAuthenticated ?? this.isAuthenticated,
       profileCompleted: profileCompleted ?? this.profileCompleted,
+      deviceStatus: deviceStatus ?? this.deviceStatus,
+      completedTripCount: completedTripCount ?? this.completedTripCount,
+      freeTripCredits: freeTripCredits ?? this.freeTripCredits,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
       isRestoring: isRestoring ?? this.isRestoring,

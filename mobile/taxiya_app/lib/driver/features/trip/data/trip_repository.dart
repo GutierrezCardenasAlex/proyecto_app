@@ -223,12 +223,12 @@ class DriverTripRepository {
 }
 
 class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
-  late final DriverTripRepository _repository;
   bool _isLoadingOffer = false;
+
+  DriverTripRepository get _repository => ref.read(tripRepositoryProvider);
 
   @override
   AsyncValue<DriverTrip?> build() {
-    _repository = ref.watch(tripRepositoryProvider);
     return const AsyncData(null);
   }
 
@@ -263,12 +263,16 @@ class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
       return;
     }
 
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(() => _repository.accept(
-          token: session.token,
-          driverId: session.driverId,
-          trip: current,
-        ));
+    try {
+      final acceptedTrip = await _repository.accept(
+        token: session.token,
+        driverId: session.driverId,
+        trip: current,
+      );
+      state = AsyncData(acceptedTrip);
+    } catch (error, stackTrace) {
+      state = AsyncError(error, stackTrace);
+    }
     ref.invalidate(driverTripHistoryProvider);
     ref.invalidate(driverOffersProvider);
   }
@@ -280,12 +284,16 @@ class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
       return;
     }
 
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(() => _repository.updateStatus(
-          token: session.token,
-          trip: current,
-          status: status,
-        ));
+    try {
+      final updatedTrip = await _repository.updateStatus(
+        token: session.token,
+        trip: current,
+        status: status,
+      );
+      state = AsyncData(updatedTrip);
+    } catch (error, stackTrace) {
+      state = AsyncError(error, stackTrace);
+    }
     ref.invalidate(driverTripHistoryProvider);
   }
 
@@ -299,12 +307,12 @@ class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
 }
 
 class DriverOffersController extends Notifier<AsyncValue<List<DriverTrip>>> {
-  late final DriverTripRepository _repository;
   bool _isLoadingOffers = false;
+
+  DriverTripRepository get _repository => ref.read(tripRepositoryProvider);
 
   @override
   AsyncValue<List<DriverTrip>> build() {
-    _repository = ref.watch(tripRepositoryProvider);
     return const AsyncData([]);
   }
 
@@ -350,5 +358,11 @@ class DriverOffersController extends Notifier<AsyncValue<List<DriverTrip>>> {
     } catch (error, stackTrace) {
       state = AsyncError(error, stackTrace);
     }
+  }
+
+  void removeOfferLocally(String tripId) {
+    final current = [...(state.value ?? const <DriverTrip>[])];
+    current.removeWhere((trip) => trip.id == tripId);
+    state = AsyncData(current);
   }
 }

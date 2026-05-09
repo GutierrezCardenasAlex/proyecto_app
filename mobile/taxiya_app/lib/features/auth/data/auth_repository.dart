@@ -25,6 +25,9 @@ class AuthResult {
     required this.address,
     required this.token,
     required this.profileCompleted,
+    required this.deviceStatus,
+    required this.completedTripCount,
+    required this.freeTripCredits,
   });
 
   final String userId;
@@ -36,6 +39,33 @@ class AuthResult {
   final String address;
   final String token;
   final bool profileCompleted;
+  final String deviceStatus;
+  final int completedTripCount;
+  final int freeTripCredits;
+}
+
+class SessionStatusResult {
+  const SessionStatusResult({
+    required this.deviceStatus,
+    required this.profileCompleted,
+    required this.fullName,
+    required this.firstName,
+    required this.lastName,
+    required this.email,
+    required this.address,
+    required this.completedTripCount,
+    required this.freeTripCredits,
+  });
+
+  final String deviceStatus;
+  final bool profileCompleted;
+  final String fullName;
+  final String firstName;
+  final String lastName;
+  final String email;
+  final String address;
+  final int completedTripCount;
+  final int freeTripCredits;
 }
 
 class OtpRequestResult {
@@ -183,6 +213,36 @@ class AuthRepository {
       address: user['address']?.toString() ?? address,
       token: token,
       profileCompleted: user['profileCompleted'] == true,
+      deviceStatus: 'AUTORIZADO',
+      completedTripCount: user['completedTripCount'] is num ? (user['completedTripCount'] as num).toInt() : 0,
+      freeTripCredits: user['freeTripCredits'] is num ? (user['freeTripCredits'] as num).toInt() : 0,
+    );
+  }
+
+  Future<SessionStatusResult> fetchSessionStatus({
+    required String token,
+  }) async {
+    final device = await DeviceIdentityService.load();
+    final response = await http.get(
+      Uri.parse('${AppConfig.apiBaseUrl}/auth/session-status?deviceIdentifier=${Uri.encodeQueryComponent(device.identifier)}'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+    await _throwIfError(response, fallbackMessage: 'No se pudo revisar el estado de la sesion');
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    final user = payload['user'] as Map<String, dynamic>? ?? const {};
+    return SessionStatusResult(
+      deviceStatus: payload['deviceStatus']?.toString() ?? 'PENDIENTE',
+      profileCompleted: user['profileCompleted'] == true,
+      fullName: user['fullName']?.toString() ?? 'Pasajero Flash Go',
+      firstName: user['firstName']?.toString() ?? '',
+      lastName: user['lastName']?.toString() ?? '',
+      email: user['email']?.toString() ?? '',
+      address: user['address']?.toString() ?? '',
+      completedTripCount: user['completedTripCount'] is num ? (user['completedTripCount'] as num).toInt() : 0,
+      freeTripCredits: user['freeTripCredits'] is num ? (user['freeTripCredits'] as num).toInt() : 0,
     );
   }
 
@@ -216,6 +276,9 @@ class AuthRepository {
       address: user['address']?.toString() ?? '',
       token: payload['token']?.toString() ?? '',
       profileCompleted: user['profileCompleted'] == true,
+      deviceStatus: payload['status']?.toString() ?? 'AUTORIZADO',
+      completedTripCount: user['completedTripCount'] is num ? (user['completedTripCount'] as num).toInt() : 0,
+      freeTripCredits: user['freeTripCredits'] is num ? (user['freeTripCredits'] as num).toInt() : 0,
     );
   }
 }
@@ -238,6 +301,9 @@ class SessionController extends Notifier<Session> {
       otpRequested: false,
       isAuthenticated: false,
       profileCompleted: false,
+      deviceStatus: 'AUTORIZADO',
+      completedTripCount: 0,
+      freeTripCredits: 0,
       isLoading: false,
       errorMessage: null,
       isRestoring: true,
@@ -332,6 +398,9 @@ class SessionController extends Notifier<Session> {
     await prefs.remove('session_address');
     await prefs.remove('session_token');
     await prefs.remove('session_profile_completed');
+    await prefs.remove('session_device_status');
+    await prefs.remove('session_completed_trip_count');
+    await prefs.remove('session_free_trip_credits');
     state = const Session(
       userId: '',
       phone: '',
@@ -344,6 +413,9 @@ class SessionController extends Notifier<Session> {
       otpRequested: false,
       isAuthenticated: false,
       profileCompleted: false,
+      deviceStatus: 'AUTORIZADO',
+      completedTripCount: 0,
+      freeTripCredits: 0,
       isLoading: false,
       errorMessage: null,
       isRestoring: false,
@@ -362,6 +434,9 @@ class SessionController extends Notifier<Session> {
     await prefs.setString('session_address', result.address);
     await prefs.setString('session_token', result.token);
     await prefs.setBool('session_profile_completed', result.profileCompleted);
+    await prefs.setString('session_device_status', result.deviceStatus);
+    await prefs.setInt('session_completed_trip_count', result.completedTripCount);
+    await prefs.setInt('session_free_trip_credits', result.freeTripCredits);
     state = state.copyWith(
       userId: result.userId,
       phone: result.phone,
@@ -374,6 +449,9 @@ class SessionController extends Notifier<Session> {
       isAuthenticated: true,
       otpRequested: true,
       profileCompleted: result.profileCompleted,
+      deviceStatus: result.deviceStatus,
+      completedTripCount: result.completedTripCount,
+      freeTripCredits: result.freeTripCredits,
       isLoading: false,
       clearError: true,
     );
@@ -395,8 +473,48 @@ class SessionController extends Notifier<Session> {
       otpRequested: false,
       isAuthenticated: authenticated,
       profileCompleted: prefs.getBool('session_profile_completed') ?? false,
+      deviceStatus: prefs.getString('session_device_status') ?? 'AUTORIZADO',
+      completedTripCount: prefs.getInt('session_completed_trip_count') ?? 0,
+      freeTripCredits: prefs.getInt('session_free_trip_credits') ?? 0,
       isRestoring: false,
       clearError: true,
     );
+  }
+
+  Future<bool> refreshSessionStatus() async {
+    if (!state.isAuthenticated || state.token.isEmpty) {
+      return false;
+    }
+
+    try {
+      final status = await _repository.fetchSessionStatus(token: state.token);
+      final previousCredits = state.freeTripCredits;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('session_device_status', status.deviceStatus);
+      await prefs.setBool('session_profile_completed', status.profileCompleted);
+      await prefs.setString('session_full_name', status.fullName);
+      await prefs.setString('session_first_name', status.firstName);
+      await prefs.setString('session_last_name', status.lastName);
+      await prefs.setString('session_email', status.email);
+      await prefs.setString('session_address', status.address);
+      await prefs.setInt('session_completed_trip_count', status.completedTripCount);
+      await prefs.setInt('session_free_trip_credits', status.freeTripCredits);
+      state = state.copyWith(
+        deviceStatus: status.deviceStatus,
+        profileCompleted: status.profileCompleted,
+        fullName: status.fullName,
+        firstName: status.firstName,
+        lastName: status.lastName,
+        email: status.email,
+        address: status.address,
+        completedTripCount: status.completedTripCount,
+        freeTripCredits: status.freeTripCredits,
+        clearError: true,
+      );
+      return status.freeTripCredits > previousCredits;
+    } catch (error) {
+      state = state.copyWith(errorMessage: error.toString().replaceFirst('Exception: ', ''));
+      return false;
+    }
   }
 }

@@ -90,6 +90,11 @@ async function ensureSchema() {
     END $$;
   `);
   await pool.query(`
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS completed_trip_count INTEGER NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS free_trip_credits INTEGER NOT NULL DEFAULT 0
+  `);
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS trip_ratings (
       id BIGSERIAL PRIMARY KEY,
       trip_id UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
@@ -142,8 +147,34 @@ async function bootstrap() {
       });
     }
 
-    const result = await pool.query(
-      `INSERT INTO trips (
+    const client = await pool.connect();
+    let trip;
+    let rewardApplied = false;
+    try {
+      await client.query("BEGIN");
+      let effectiveFare = input.fareAmount;
+      const creditsResult = await client.query(
+        `SELECT free_trip_credits
+         FROM users
+         WHERE id = $1
+         FOR UPDATE`,
+        [input.passengerId]
+      );
+      const credits = Number(creditsResult.rows[0]?.free_trip_credits || 0);
+      if (credits > 0) {
+        rewardApplied = true;
+        effectiveFare = 0;
+        await client.query(
+          `UPDATE users
+           SET free_trip_credits = GREATEST(free_trip_credits - 1, 0),
+               updated_at = NOW()
+           WHERE id = $1`,
+          [input.passengerId]
+        );
+      }
+
+      const result = await client.query(
+        `INSERT INTO trips (
          passenger_id,
          pickup_address,
          destination_address,
@@ -160,21 +191,28 @@ async function bootstrap() {
          $8, $9, $10, 'requested'
        )
        RETURNING *`,
-      [
-        input.passengerId,
-        input.pickupAddress,
-        input.destinationAddress,
-        input.pickupLng,
-        input.pickupLat,
-        input.destinationLng,
-        input.destinationLat,
-        input.estimatedDistanceMeters,
-        input.estimatedDurationSeconds,
-        input.fareAmount
-      ]
-    );
+        [
+          input.passengerId,
+          input.pickupAddress,
+          input.destinationAddress,
+          input.pickupLng,
+          input.pickupLat,
+          input.destinationLng,
+          input.destinationLat,
+          input.estimatedDistanceMeters,
+          input.estimatedDurationSeconds,
+          effectiveFare
+        ]
+      );
+      trip = result.rows[0];
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
 
-    const trip = result.rows[0];
     await redis.set(`trip:${trip.id}:status`, trip.status, "EX", 3600);
     await publish("trip.requested", { tripId: trip.id, passengerId: input.passengerId });
 
@@ -190,7 +228,10 @@ async function bootstrap() {
       app.log.warn({ err: error, tripId: trip.id }, "dispatch search failed after trip creation");
     }
 
-    reply.code(201).send(trip);
+    reply.code(201).send({
+      ...trip,
+      reward_applied: rewardApplied
+    });
   });
 
   app.get("/history/:passengerId", async (request) => {
@@ -362,6 +403,18 @@ async function bootstrap() {
          SET status = 'available', is_available = TRUE, current_trip_id = NULL, updated_at = NOW()
          WHERE id = $1`,
         [trip.driver_id]
+      );
+    }
+
+    if (status === "completed" && trip.passenger_id) {
+      await pool.query(
+        `UPDATE users
+         SET completed_trip_count = completed_trip_count + 1,
+             free_trip_credits = free_trip_credits +
+               CASE WHEN MOD(completed_trip_count + 1, 5) = 0 THEN 1 ELSE 0 END,
+             updated_at = NOW()
+         WHERE id = $1`,
+        [trip.passenger_id]
       );
     }
 

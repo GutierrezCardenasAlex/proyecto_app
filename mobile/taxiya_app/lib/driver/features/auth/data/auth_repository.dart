@@ -29,6 +29,7 @@ class DriverAuthResult {
     required this.address,
     required this.token,
     required this.profileCompleted,
+    required this.deviceStatus,
   });
 
   final String userId;
@@ -43,6 +44,7 @@ class DriverAuthResult {
   final String address;
   final String token;
   final bool profileCompleted;
+  final String deviceStatus;
 }
 
 class DriverOtpRequestResult {
@@ -79,6 +81,26 @@ class DriverProfileDetails {
   final String model;
   final String color;
   final int? year;
+}
+
+class DriverSessionStatusResult {
+  const DriverSessionStatusResult({
+    required this.deviceStatus,
+    required this.profileCompleted,
+    required this.fullName,
+    required this.firstName,
+    required this.lastName,
+    required this.email,
+    required this.address,
+  });
+
+  final String deviceStatus;
+  final bool profileCompleted;
+  final String fullName;
+  final String firstName;
+  final String lastName;
+  final String email;
+  final String address;
 }
 
 class DriverAuthRepository {
@@ -278,6 +300,32 @@ class DriverAuthRepository {
       address: user['address']?.toString() ?? address,
       token: token,
       profileCompleted: user['profileCompleted'] == true,
+      deviceStatus: 'AUTORIZADO',
+    );
+  }
+
+  Future<DriverSessionStatusResult> fetchSessionStatus({
+    required String token,
+  }) async {
+    final device = await DeviceIdentityService.load();
+    final response = await http.get(
+      Uri.parse('${AppConfig.apiBaseUrl}/auth/session-status?deviceIdentifier=${Uri.encodeQueryComponent(device.identifier)}'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+    await _throwIfError(response, fallbackMessage: 'No se pudo revisar el estado del conductor');
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    final user = payload['user'] as Map<String, dynamic>? ?? const {};
+    return DriverSessionStatusResult(
+      deviceStatus: payload['deviceStatus']?.toString() ?? 'PENDIENTE',
+      profileCompleted: user['profileCompleted'] == true,
+      fullName: user['fullName']?.toString() ?? 'Conductor Flash Go',
+      firstName: user['firstName']?.toString() ?? '',
+      lastName: user['lastName']?.toString() ?? '',
+      email: user['email']?.toString() ?? '',
+      address: user['address']?.toString() ?? '',
     );
   }
 
@@ -339,6 +387,7 @@ class DriverAuthRepository {
       address: user['address']?.toString() ?? '',
       token: token,
       profileCompleted: user['profileCompleted'] == true,
+      deviceStatus: ensurePayload['status']?.toString() ?? 'AUTORIZADO',
     );
   }
 }
@@ -364,6 +413,7 @@ class DriverSessionController extends Notifier<DriverSession> {
       otpRequested: false,
       loggedIn: false,
       profileCompleted: false,
+      deviceStatus: 'AUTORIZADO',
       isLoading: false,
       errorMessage: null,
       isRestoring: true,
@@ -480,6 +530,7 @@ class DriverSessionController extends Notifier<DriverSession> {
     await prefs.remove('driver_session_address');
     await prefs.remove('driver_session_token');
     await prefs.remove('driver_session_profile_completed');
+    await prefs.remove('driver_session_device_status');
     await prefs.remove('driver_desired_availability');
 
     state = const DriverSession(
@@ -497,6 +548,7 @@ class DriverSessionController extends Notifier<DriverSession> {
       otpRequested: false,
       loggedIn: false,
       profileCompleted: false,
+      deviceStatus: 'AUTORIZADO',
       isLoading: false,
       errorMessage: null,
       isRestoring: false,
@@ -555,6 +607,7 @@ class DriverSessionController extends Notifier<DriverSession> {
     await prefs.setString('driver_session_address', result.address);
     await prefs.setString('driver_session_token', result.token);
     await prefs.setBool('driver_session_profile_completed', result.profileCompleted);
+    await prefs.setString('driver_session_device_status', result.deviceStatus);
 
     state = state.copyWith(
       userId: result.userId,
@@ -571,6 +624,7 @@ class DriverSessionController extends Notifier<DriverSession> {
       otpRequested: false,
       loggedIn: true,
       profileCompleted: result.profileCompleted,
+      deviceStatus: result.deviceStatus,
       isLoading: false,
       clearError: true,
     );
@@ -594,8 +648,39 @@ class DriverSessionController extends Notifier<DriverSession> {
       otpRequested: false,
       loggedIn: loggedIn,
       profileCompleted: prefs.getBool('driver_session_profile_completed') ?? false,
+      deviceStatus: prefs.getString('driver_session_device_status') ?? 'AUTORIZADO',
       isRestoring: false,
       clearError: true,
     );
+  }
+
+  Future<void> refreshSessionStatus() async {
+    if (!state.loggedIn || state.token.isEmpty) {
+      return;
+    }
+
+    try {
+      final status = await _repository.fetchSessionStatus(token: state.token);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('driver_session_device_status', status.deviceStatus);
+      await prefs.setBool('driver_session_profile_completed', status.profileCompleted);
+      await prefs.setString('driver_session_full_name', status.fullName);
+      await prefs.setString('driver_session_first_name', status.firstName);
+      await prefs.setString('driver_session_last_name', status.lastName);
+      await prefs.setString('driver_session_email', status.email);
+      await prefs.setString('driver_session_address', status.address);
+      state = state.copyWith(
+        deviceStatus: status.deviceStatus,
+        profileCompleted: status.profileCompleted,
+        fullName: status.fullName,
+        firstName: status.firstName,
+        lastName: status.lastName,
+        email: status.email,
+        address: status.address,
+        clearError: true,
+      );
+    } catch (error) {
+      state = state.copyWith(errorMessage: error.toString().replaceFirst('Exception: ', ''));
+    }
   }
 }

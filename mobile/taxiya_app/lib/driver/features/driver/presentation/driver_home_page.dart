@@ -50,6 +50,7 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
   bool _isPreparingExperience = false;
   bool _offlineSheetQueued = false;
   bool _isRefreshingAuthorization = false;
+  Timer? _sessionRefreshTimer;
 
   void _handleDrawerSelection(String item) {
     switch (item) {
@@ -219,6 +220,7 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
     WidgetsBinding.instance.removeObserver(this);
     _socket?.dispose();
     _inactivityTimer?.cancel();
+    _sessionRefreshTimer?.cancel();
     super.dispose();
   }
 
@@ -232,6 +234,10 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
 
     if (!session.loggedIn) {
       return const _DriverLoginShell();
+    }
+
+    if (session.deviceStatus != 'AUTORIZADO') {
+      return _DriverDeviceAccessPendingShell(deviceStatus: session.deviceStatus);
     }
 
     if (!session.profileCompleted) {
@@ -325,6 +331,10 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _armInactivityTimer();
+    _sessionRefreshTimer = Timer.periodic(
+      const Duration(seconds: 12),
+      (_) => Future<void>.microtask(_refreshDriverAccessState),
+    );
   }
 
   Future<void> _prepareDriverExperience() async {
@@ -492,9 +502,29 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
     _isRefreshingAuthorization = true;
     try {
       await ref.read(driverSessionProvider.notifier).refreshAccessStatus();
+      final updatedSession = ref.read(driverSessionProvider);
+      if (updatedSession.accessStatus != 'AUTORIZADO') {
+        final driverState = ref.read(driverStateProvider);
+        if (driverState.available) {
+          await ref.read(driverStateProvider.notifier).toggleAvailability(false);
+        }
+      }
     } finally {
       _isRefreshingAuthorization = false;
     }
+  }
+
+  Future<void> _refreshDriverAccessState() async {
+    await ref.read(driverSessionProvider.notifier).refreshSessionStatus();
+    final updatedSession = ref.read(driverSessionProvider);
+    if (updatedSession.deviceStatus != 'AUTORIZADO') {
+      final driverState = ref.read(driverStateProvider);
+      if (driverState.available) {
+        await ref.read(driverStateProvider.notifier).toggleAvailability(false);
+      }
+      return;
+    }
+    await _refreshAuthorizationStatus();
   }
 }
 
@@ -586,6 +616,69 @@ class _DriverAuthorizationPendingShell extends StatelessWidget {
                             ),
                           ),
                         ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DriverDeviceAccessPendingShell extends StatelessWidget {
+  const _DriverDeviceAccessPendingShell({
+    required this.deviceStatus,
+  });
+
+  final String deviceStatus;
+
+  @override
+  Widget build(BuildContext context) {
+    final rejected = deviceStatus == 'RECHAZADO';
+    return Scaffold(
+      backgroundColor: const Color(0xFF111214),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Container(
+                padding: const EdgeInsets.all(28),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF151517).withValues(alpha: 0.96),
+                  borderRadius: BorderRadius.circular(34),
+                  border: Border.all(color: const Color(0xFF2A2A2E)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      rejected ? Icons.block_rounded : Icons.phone_android_rounded,
+                      color: rejected ? const Color(0xFFEF4444) : const Color(0xFFF97316),
+                      size: 40,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      rejected ? 'Equipo bloqueado' : 'Equipo pendiente',
+                      style: const TextStyle(
+                        color: Color(0xFFFFF4EC),
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      rejected
+                          ? 'La central bloqueo este dispositivo. Si lo vuelven a autorizar, la app del conductor se habilitara sola.'
+                          : 'La central aun no autoriza este dispositivo. Apenas lo hagan, la app del conductor seguira sola.',
+                      style: const TextStyle(
+                        color: Color(0xFFFFD8BF),
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
@@ -1487,7 +1580,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
 
     if (trip.status == 'requested' || trip.status == 'searching') {
       await ref.read(offeredTripProvider.notifier).acceptTrip(trip);
-      await ref.read(driverOffersProvider.notifier).loadOffers();
+      ref.read(driverOffersProvider.notifier).removeOfferLocally(trip.id);
       return;
     }
     if (trip.status == 'accepted') {
