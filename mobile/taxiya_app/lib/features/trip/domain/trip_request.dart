@@ -17,6 +17,7 @@ class TripRequest {
     this.driverName,
     this.driverPhone,
     this.etaMinutes,
+    this.isPromotional = false,
   });
 
   final String pickupAddress;
@@ -36,6 +37,7 @@ class TripRequest {
   final String? driverName;
   final String? driverPhone;
   final int? etaMinutes;
+  final bool isPromotional;
 
   TripRequest copyWith({
     String? pickupAddress,
@@ -55,6 +57,7 @@ class TripRequest {
     String? driverName,
     String? driverPhone,
     int? etaMinutes,
+    bool? isPromotional,
     bool clearTripId = false,
   }) {
     return TripRequest(
@@ -75,6 +78,7 @@ class TripRequest {
       driverName: driverName ?? this.driverName,
       driverPhone: driverPhone ?? this.driverPhone,
       etaMinutes: etaMinutes ?? this.etaMinutes,
+      isPromotional: isPromotional ?? this.isPromotional,
     );
   }
 }
@@ -92,6 +96,7 @@ class TripHistoryItem {
     this.vehicleLabel,
     this.vehiclePlate,
     this.vehicleColor,
+    this.isPromotional = false,
   });
 
   final String id;
@@ -105,6 +110,7 @@ class TripHistoryItem {
   final String? vehicleLabel;
   final String? vehiclePlate;
   final String? vehicleColor;
+  final bool isPromotional;
 }
 
 class NearbyDriver {

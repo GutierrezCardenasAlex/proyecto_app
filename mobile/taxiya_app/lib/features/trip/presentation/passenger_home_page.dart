@@ -159,6 +159,8 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
           onLogout: () => ref.read(sessionProvider.notifier).signOut(),
           activeItem: _activeDrawerItem,
           onSelect: _handleDrawerSelection,
+          promoProgress: session.completedTripCount,
+          freeTripCredits: session.freeTripCredits,
           onOpenProfile: () {
             Navigator.pop(context);
             _openPage(const ProfilePage(), drawerItem: 'Configuraciones');

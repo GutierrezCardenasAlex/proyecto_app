@@ -12,6 +12,7 @@ class DriverTrip {
     this.vehicleType,
     this.passengerName,
     this.passengerPhone,
+    this.isPromotional = false,
   });
 
   final String id;
@@ -26,6 +27,7 @@ class DriverTrip {
   final String? vehicleType;
   final String? passengerName;
   final String? passengerPhone;
+  final bool isPromotional;
 
   DriverTrip copyWith({
     String? id,
@@ -40,6 +42,7 @@ class DriverTrip {
     String? vehicleType,
     String? passengerName,
     String? passengerPhone,
+    bool? isPromotional,
   }) {
     return DriverTrip(
       id: id ?? this.id,
@@ -54,6 +57,7 @@ class DriverTrip {
       vehicleType: vehicleType ?? this.vehicleType,
       passengerName: passengerName ?? this.passengerName,
       passengerPhone: passengerPhone ?? this.passengerPhone,
+      isPromotional: isPromotional ?? this.isPromotional,
     );
   }
 }

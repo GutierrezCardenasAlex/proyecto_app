@@ -721,8 +721,19 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                 textColor: const Color(0xFFC2410C),
                 icon: Icons.timeline_rounded,
               ),
+              if (request.isPromotional) ...[
+                const SizedBox(height: 10),
+                const _StatusBanner(
+                  message: 'Viaje gratis activo',
+                  color: Color(0x1422C55E),
+                  textColor: Color(0xFF86EFAC),
+                  icon: Icons.card_giftcard_rounded,
+                ),
+              ],
               const SizedBox(height: 16),
               _TripInfoRow(label: 'Estado', value: request.status),
+              if (request.isPromotional)
+                const _TripInfoRow(label: 'Promo', value: 'Este viaje no se cobra al pasajero'),
               _TripInfoRow(label: 'Recojo', value: request.pickupAddress),
               _TripInfoRow(
                 label: 'Taxi',
@@ -1394,6 +1405,23 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                           'Tu conductor ya acepto el viaje. Ahora solo puedes ver sus datos, el progreso y esperar la llegada.',
                           style: TextStyle(
                             color: Color(0xFFFFC89B),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      )
+                    else if (tripState.request.isPromotional)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: const Color(0x1416A34A),
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(color: const Color(0x3322C55E)),
+                        ),
+                        child: const Text(
+                          'Este pedido usara tu viaje gratis por promocion.',
+                          style: TextStyle(
+                            color: Color(0xFFDCFCE7),
                             fontWeight: FontWeight.w700,
                           ),
                         ),

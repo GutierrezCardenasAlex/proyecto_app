@@ -151,7 +151,7 @@ function mapUser(user) {
     email: user.email,
     address: user.address,
     profileCompleted: Boolean(user.profile_completed),
-    completedTripCount: Number(user.completed_trip_count || 0),
+    completedTripCount: Number(user.promo_progress_count || 0),
     freeTripCredits: Number(user.free_trip_credits || 0)
   };
 }
@@ -207,6 +207,7 @@ async function ensureSchema() {
       ADD COLUMN IF NOT EXISTS password_hash TEXT,
       ADD COLUMN IF NOT EXISTS profile_completed BOOLEAN NOT NULL DEFAULT FALSE,
       ADD COLUMN IF NOT EXISTS completed_trip_count INTEGER NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS promo_progress_count INTEGER NOT NULL DEFAULT 0,
       ADD COLUMN IF NOT EXISTS free_trip_credits INTEGER NOT NULL DEFAULT 0
   `);
 
@@ -643,7 +644,7 @@ async function bootstrap() {
 
     const userResult = await pool.query(
       `SELECT id, phone, role, full_name, first_name, last_name, email, address,
-              profile_completed, completed_trip_count, free_trip_credits
+              profile_completed, completed_trip_count, promo_progress_count, free_trip_credits
        FROM users
        WHERE id = $1`,
       [request.user.sub]

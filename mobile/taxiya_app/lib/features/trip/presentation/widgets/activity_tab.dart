@@ -104,6 +104,8 @@ class _JourneyCard extends ConsumerWidget {
     return const {'requested', 'searching', 'accepted', 'arriving', 'at_pickup'}.contains(trip.status);
   }
 
+  String get _promoLabel => trip.status == 'completed' ? 'Viaje gratis aplicado' : 'Viaje promocional activo';
+
   String? _normalizeWhatsAppPhone(String? rawPhone) {
     final digits = (rawPhone ?? '').replaceAll(RegExp(r'[^0-9]'), '');
     if (digits.isEmpty) {
@@ -197,6 +199,14 @@ class _JourneyCard extends ConsumerWidget {
                         color: const Color(0xFFFFF4EC),
                       ),
                     ),
+                    if (trip.isPromotional) ...[
+                      const SizedBox(height: 12),
+                      _HistoryBadge(
+                        icon: Icons.card_giftcard_rounded,
+                        label: _promoLabel,
+                        color: const Color(0xFF22C55E),
+                      ),
+                    ],
                     const SizedBox(height: 14),
                     _HistoryRouteRow(
                       icon: Icons.radio_button_checked_rounded,
@@ -330,6 +340,14 @@ class _JourneyCard extends ConsumerWidget {
                           ),
                         ),
                       ),
+                      if (trip.isPromotional) ...[
+                        const SizedBox(height: 10),
+                        const _HistoryBadge(
+                          icon: Icons.card_giftcard_rounded,
+                          label: 'PROMO GRATIS',
+                          color: Color(0xFF22C55E),
+                        ),
+                      ],
                       const SizedBox(height: 10),
                       Text(
                         trip.requestedAt.isEmpty ? 'Fecha no disponible' : trip.requestedAt,
@@ -462,29 +480,31 @@ class _HistoryBadge extends StatelessWidget {
   const _HistoryBadge({
     required this.icon,
     required this.label,
+    this.color = const Color(0xFFF97316),
   });
 
   final IconData icon;
   final String label;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF25252B),
+        color: color.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0xFF323239)),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: const Color(0xFFF97316)),
+          Icon(icon, size: 16, color: color),
           const SizedBox(width: 8),
           Text(
             label,
-            style: const TextStyle(
-              color: Color(0xFFFFF4EC),
+            style: TextStyle(
+              color: color == const Color(0xFFF97316) ? const Color(0xFFFFF4EC) : color,
               fontWeight: FontWeight.w700,
             ),
           ),

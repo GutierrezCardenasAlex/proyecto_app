@@ -92,7 +92,12 @@ async function ensureSchema() {
   await pool.query(`
     ALTER TABLE users
       ADD COLUMN IF NOT EXISTS completed_trip_count INTEGER NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS promo_progress_count INTEGER NOT NULL DEFAULT 0,
       ADD COLUMN IF NOT EXISTS free_trip_credits INTEGER NOT NULL DEFAULT 0
+  `);
+  await pool.query(`
+    ALTER TABLE trips
+      ADD COLUMN IF NOT EXISTS promotional_trip BOOLEAN NOT NULL DEFAULT FALSE
   `);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS trip_ratings (
@@ -183,12 +188,13 @@ async function bootstrap() {
          estimated_distance_meters,
          estimated_duration_seconds,
          fare_amount,
+         promotional_trip,
          status
        ) VALUES (
          $1, $2, $3,
          ST_SetSRID(ST_MakePoint($4, $5), 4326)::geography,
          ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography,
-         $8, $9, $10, 'requested'
+        $8, $9, $10, $11, 'requested'
        )
        RETURNING *`,
         [
@@ -201,7 +207,8 @@ async function bootstrap() {
           input.destinationLat,
           input.estimatedDistanceMeters,
           input.estimatedDurationSeconds,
-          effectiveFare
+          effectiveFare,
+          rewardApplied
         ]
       );
       trip = result.rows[0];
@@ -244,7 +251,8 @@ async function bootstrap() {
               v.color AS vehicle_color,
               v.plate AS vehicle_plate,
               du.full_name AS driver_name,
-              du.phone AS driver_phone
+              du.phone AS driver_phone,
+              t.promotional_trip
        FROM trips t
        LEFT JOIN vehicles v ON v.driver_id = t.driver_id
        LEFT JOIN drivers d ON d.id = t.driver_id
@@ -269,7 +277,8 @@ async function bootstrap() {
               v.brand AS vehicle_brand,
               v.model AS vehicle_model,
               v.color AS vehicle_color,
-              v.plate AS vehicle_plate
+              v.plate AS vehicle_plate,
+              t.promotional_trip
        FROM trips t
        LEFT JOIN vehicles v ON v.driver_id = t.driver_id
        WHERE t.driver_id = $1
@@ -307,6 +316,7 @@ async function bootstrap() {
               du.phone AS driver_phone,
               ll.driver_lat,
               ll.driver_lng,
+              t.promotional_trip,
               CASE
                 WHEN ll.location IS NULL THEN NULL
                 ELSE GREATEST(
@@ -343,7 +353,8 @@ async function bootstrap() {
               v.color AS vehicle_color,
               v.plate AS vehicle_plate,
               pu.full_name AS passenger_name,
-              pu.phone AS passenger_phone
+              pu.phone AS passenger_phone,
+              t.promotional_trip
        FROM trips t
        LEFT JOIN users pu ON pu.id = t.passenger_id
        LEFT JOIN vehicles v ON v.driver_id = t.driver_id
@@ -409,12 +420,17 @@ async function bootstrap() {
     if (status === "completed" && trip.passenger_id) {
       await pool.query(
         `UPDATE users
-         SET completed_trip_count = completed_trip_count + 1,
+         SET completed_trip_count = completed_trip_count + CASE WHEN $2 THEN 0 ELSE 1 END,
+             promo_progress_count = CASE
+               WHEN $2 THEN promo_progress_count
+               WHEN promo_progress_count + 1 >= 5 THEN 0
+               ELSE promo_progress_count + 1
+             END,
              free_trip_credits = free_trip_credits +
-               CASE WHEN MOD(completed_trip_count + 1, 5) = 0 THEN 1 ELSE 0 END,
+               CASE WHEN NOT $2 AND promo_progress_count + 1 >= 5 THEN 1 ELSE 0 END,
              updated_at = NOW()
          WHERE id = $1`,
-        [trip.passenger_id]
+        [trip.passenger_id, trip.promotional_trip === true]
       );
     }
 

@@ -169,6 +169,7 @@ async function bootstrap() {
               ST_Y(t.destination_location::geometry) AS destination_lat,
               ST_X(t.destination_location::geometry) AS destination_lng,
               t.fare_amount,
+              t.promotional_trip,
               u.full_name AS passenger_name,
               u.phone AS passenger_phone
        FROM trips t

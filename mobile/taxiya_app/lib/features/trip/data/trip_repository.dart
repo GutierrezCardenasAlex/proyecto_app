@@ -47,6 +47,7 @@ class TripRepository {
             vehicleLabel: _joinVehicleLabel(item['vehicle_brand'], item['vehicle_model']),
             vehiclePlate: item['vehicle_plate']?.toString(),
             vehicleColor: item['vehicle_color']?.toString(),
+            isPromotional: item['promotional_trip'] == true,
           ),
         )
         .toList();
@@ -88,6 +89,7 @@ class TripRepository {
       driverName: payload['driver_name']?.toString(),
       driverPhone: payload['driver_phone']?.toString(),
       etaMinutes: _toNullableInt(payload['eta_minutes']),
+      isPromotional: payload['promotional_trip'] == true,
     );
   }
 
@@ -219,6 +221,7 @@ class TripRepository {
       destinationLat: destination.latitude,
       destinationLng: destination.longitude,
       etaMinutes: _toNullableInt(payload['eta_minutes']),
+      isPromotional: payload['reward_applied'] == true || payload['promotional_trip'] == true,
     );
   }
 
@@ -256,6 +259,7 @@ class TripRepository {
       driverName: payload['driver_name']?.toString(),
       driverPhone: payload['driver_phone']?.toString(),
       etaMinutes: _toNullableInt(payload['eta_minutes']),
+      isPromotional: payload['promotional_trip'] == true,
     );
   }
 

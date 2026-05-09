@@ -1479,6 +1479,10 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
+                                    if (trip.isPromotional) ...[
+                                      const SizedBox(height: 10),
+                                      const _DriverPromoChip(label: 'PASAJERO CON VIAJE GRATIS'),
+                                    ],
                                   ],
                                 ),
                               ),
@@ -1490,6 +1494,11 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                             runSpacing: 10,
                             children: [
                               _DriverMiniBadge(icon: Icons.flag_rounded, label: _driverStatusShortLabel(trip.status)),
+                              if (trip.isPromotional)
+                                const _DriverMiniBadge(
+                                  icon: Icons.card_giftcard_rounded,
+                                  label: 'PROMO GRATIS',
+                                ),
                               _DriverMiniBadge(icon: Icons.tag_rounded, label: trip.id),
                             ],
                           ),
@@ -1517,6 +1526,11 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                             label: 'Vehiculo pedido',
                             value: (trip.vehicleType ?? 'taxi').toUpperCase(),
                           ),
+                          if (trip.isPromotional)
+                            const _InfoTile(
+                              label: 'Promocion',
+                              value: 'Este pasajero esta usando un viaje gratis promocional',
+                            ),
                         ],
                       ),
                     ),
@@ -1581,6 +1595,14 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
     if (trip.status == 'requested' || trip.status == 'searching') {
       await ref.read(offeredTripProvider.notifier).acceptTrip(trip);
       ref.read(driverOffersProvider.notifier).removeOfferLocally(trip.id);
+      if (trip.isPromotional && mounted) {
+        showTopNotice(
+          context,
+          'El pasajero gano y esta usando su viaje gratis.',
+          backgroundColor: const Color(0xFF22C55E),
+          foregroundColor: const Color(0xFF0F0F10),
+        );
+      }
       return;
     }
     if (trip.status == 'accepted') {
@@ -2450,6 +2472,10 @@ class _DriverAvailableTripCard extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
+                    if (trip.isPromotional) ...[
+                      const SizedBox(height: 8),
+                      const _DriverPromoChip(label: 'VIAJE GRATIS'),
+                    ],
                   ],
                 ),
               ),
@@ -2526,6 +2552,42 @@ class _DriverAvailableTripCard extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DriverPromoChip extends StatelessWidget {
+  const _DriverPromoChip({
+    required this.label,
+  });
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: const Color(0x1F22C55E),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0x3322C55E)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.card_giftcard_rounded, size: 15, color: Color(0xFF86EFAC)),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF86EFAC),
+              fontWeight: FontWeight.w900,
+              fontSize: 10,
+              letterSpacing: 0.8,
+            ),
           ),
         ],
       ),

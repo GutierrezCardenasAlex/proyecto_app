@@ -62,6 +62,7 @@ class DriverTripRepository {
       vehicleType: item['vehicle_type']?.toString(),
       passengerName: item['passenger_name']?.toString(),
       passengerPhone: item['passenger_phone']?.toString(),
+      isPromotional: item['promotional_trip'] == true,
     );
   }
 
@@ -211,6 +212,7 @@ class DriverTripRepository {
       vehicleType: item['vehicle_type']?.toString(),
       passengerName: item['passenger_name']?.toString(),
       passengerPhone: item['passenger_phone']?.toString(),
+      isPromotional: item['promotional_trip'] == true,
     );
   }
 

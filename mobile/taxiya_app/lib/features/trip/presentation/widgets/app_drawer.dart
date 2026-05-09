@@ -10,6 +10,8 @@ class AppDrawer extends StatelessWidget {
     required this.activeItem,
     required this.onSelect,
     required this.onOpenProfile,
+    required this.promoProgress,
+    required this.freeTripCredits,
   });
 
   final String fullName;
@@ -18,9 +20,16 @@ class AppDrawer extends StatelessWidget {
   final String activeItem;
   final ValueChanged<String> onSelect;
   final VoidCallback onOpenProfile;
+  final int promoProgress;
+  final int freeTripCredits;
 
   @override
   Widget build(BuildContext context) {
+    final normalizedProgress = promoProgress.clamp(0, 5).toInt();
+    final progressValue = normalizedProgress / 5.0;
+    final promoCaption = freeTripCredits > 0
+        ? '$freeTripCredits viaje gratis disponible'
+        : '$normalizedProgress/5 para tu proximo viaje gratis';
     final items = const [
       ('Inicio', Icons.home_rounded),
       ('Tus viajes', Icons.history),
@@ -136,6 +145,91 @@ class AppDrawer extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 18),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF17181B),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: const Color(0x26F97316)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: const Color(0x33F97316),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Icon(Icons.card_giftcard_rounded, color: Color(0xFFF97316)),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Promocion activa',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    color: const Color(0xFFFFF4EC),
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  promoCaption,
+                                  style: const TextStyle(
+                                    color: Color(0xFFFFD8BF),
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                            decoration: BoxDecoration(
+                              color: freeTripCredits > 0
+                                  ? const Color(0x1F22C55E)
+                                  : const Color(0xFF0F0F10),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              freeTripCredits > 0 ? 'Gratis' : '$normalizedProgress/5',
+                              style: TextStyle(
+                                color: freeTripCredits > 0
+                                    ? const Color(0xFF86EFAC)
+                                    : const Color(0xFFF97316),
+                                fontWeight: FontWeight.w900,
+                                fontSize: 11,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(999),
+                        child: LinearProgressIndicator(
+                          minHeight: 8,
+                          value: freeTripCredits > 0 ? 1 : progressValue,
+                          backgroundColor: const Color(0xFF25252B),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            freeTripCredits > 0 ? const Color(0xFF22C55E) : const Color(0xFFF97316),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
                 Expanded(
                   child: ListView.separated(
                     itemCount: items.length,
@@ -143,6 +237,7 @@ class AppDrawer extends StatelessWidget {
                     itemBuilder: (context, index) {
                       final item = items[index];
                       final active = item.$1 == activeItem;
+                      final isPromotions = item.$1 == 'Promociones';
                       return Container(
                         decoration: BoxDecoration(
                           color: active ? const Color(0xFFF97316) : Colors.transparent,
@@ -173,6 +268,31 @@ class AppDrawer extends StatelessWidget {
                               color: active ? const Color(0xFF0F0F10) : const Color(0xFFFFF4EC),
                             ),
                           ),
+                          trailing: isPromotions
+                              ? Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: active
+                                        ? const Color(0x220F0F10)
+                                        : freeTripCredits > 0
+                                            ? const Color(0x1F22C55E)
+                                            : const Color(0xFF25252B),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Text(
+                                    freeTripCredits > 0 ? 'Gratis' : '$normalizedProgress/5',
+                                    style: TextStyle(
+                                      color: active
+                                          ? const Color(0xFF0F0F10)
+                                          : freeTripCredits > 0
+                                              ? const Color(0xFF86EFAC)
+                                              : const Color(0xFFF97316),
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                )
+                              : null,
                           onTap: () {
                             Navigator.pop(context);
                             onSelect(item.$1);

@@ -140,8 +140,8 @@ class PromotionsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
-    final progress = session.completedTripCount % 5;
-    final progressValue = progress / 5;
+    final progress = session.completedTripCount.clamp(0, 5).toInt();
+    final progressValue = progress / 5.0;
     final hasFreeTrip = session.freeTripCredits > 0;
 
     return _DetailScaffold(
@@ -237,7 +237,7 @@ class PromotionsPage extends ConsumerWidget {
                   child: Row(
                     children: [
                       Text(
-                        '$progress/5',
+                        hasFreeTrip ? 'Gratis listo' : '$progress/5',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 24,
                           fontWeight: FontWeight.w900,
