@@ -74,30 +74,29 @@ class AccountTab extends ConsumerWidget {
                           color: const Color(0xFFFFF4EC),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        session.phone,
-                        style: const TextStyle(
-                          color: Color(0xFFFFC89B),
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: const Color(0x33F97316),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: const Text(
-                          'POTOSI · ACTIVO',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1.1,
-                            color: Color(0xFFFFC89B),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          ...List.generate(
+                            5,
+                            (index) => const Padding(
+                              padding: EdgeInsets.only(right: 2),
+                              child: Icon(
+                                Icons.star_rounded,
+                                size: 17,
+                                color: Color(0xFFFDBA74),
+                              ),
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            '4.95',
+                            style: TextStyle(
+                              color: Color(0xFFFDBA74),
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),

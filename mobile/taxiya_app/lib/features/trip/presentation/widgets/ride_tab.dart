@@ -376,9 +376,10 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     final locationState = ref.read(passengerLocationProvider);
     final location = locationState.position;
     final request = ref.read(tripProvider).request;
-    if (const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(request.status) &&
+    if (const {'requested', 'searching', 'accepted', 'arriving', 'at_pickup', 'in_progress'}
+            .contains(request.status) &&
         (request.activeTripId?.isNotEmpty ?? false)) {
-      _showMessage('Ya tienes un conductor asignado. Ahora solo puedes seguir el viaje activo.');
+      _showMessage('Ya tienes un pedido activo. Ahora solo puedes seguir ese viaje hasta que termine o se cancele.');
       return;
     }
     final destination = _destinationController.text.trim();
@@ -721,7 +722,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                 textColor: const Color(0xFFC2410C),
                 icon: Icons.timeline_rounded,
               ),
-              if (request.isPromotional) ...[
+              if (request.isPromotional && request.status == 'in_progress') ...[
                 const SizedBox(height: 10),
                 const _StatusBanner(
                   message: 'Viaje gratis activo',
@@ -732,8 +733,28 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
               ],
               const SizedBox(height: 16),
               _TripInfoRow(label: 'Estado', value: request.status),
-              if (request.isPromotional)
+              if (request.isPromotional && request.status == 'in_progress') ...[
                 const _TripInfoRow(label: 'Promo', value: 'Este viaje no se cobra al pasajero'),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.tonalIcon(
+                    onPressed: () => _showPassengerPromoNotice(request),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0x1F22C55E),
+                      foregroundColor: const Color(0xFFE9FFF0),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                    ),
+                    icon: const Icon(Icons.card_giftcard_rounded),
+                    label: const Text(
+                      'Ver aviso de viaje gratis',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ),
+              ],
               _TripInfoRow(label: 'Recojo', value: request.pickupAddress),
               _TripInfoRow(
                 label: 'Taxi',
@@ -781,6 +802,107 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                     ? 'Aun no disponible'
                     : '${request.driverLat!.toStringAsFixed(5)}, ${request.driverLng!.toStringAsFixed(5)}',
               ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showPassengerPromoNotice(TripRequest request) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return SafeArea(
+          top: false,
+          child: FractionallySizedBox(
+            heightFactor: 0.74,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+              decoration: const BoxDecoration(
+                color: Color(0xFF121214),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 44,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: const Color(0x5522C55E),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            color: const Color(0x1F22C55E),
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: const Icon(Icons.card_giftcard_rounded, color: Color(0xFF86EFAC)),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Text(
+                            'Tu viaje gratis',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFFFFF4EC),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1A1A1D),
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(color: const Color(0x3322C55E)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _TripInfoRow(label: 'Destino', value: request.destinationAddress),
+                          _TripInfoRow(label: 'Conductor', value: request.driverName?.isNotEmpty == true ? request.driverName! : 'Pendiente'),
+                          _TripInfoRow(label: 'Vehiculo', value: request.vehicleLabel?.isNotEmpty == true ? request.vehicleLabel! : 'Pendiente'),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: const Color(0x1F22C55E),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: const Color(0x3322C55E)),
+                      ),
+                      child: const Text(
+                        'AVISO FLASH GO - VIAJE PREMIADO\n\nTu viaje gratis por promocion es valido solo para ti como cliente registrado en la app Flash Go.\n\nNota importante: El beneficio cubre solamente a una (1) persona. Si viajas con acompañantes, el conductor podra realizar el cobro normal correspondiente por ellos. Gracias por usar Flash Go y disfrutar tu premio.',
+                        style: TextStyle(
+                          color: Color(0xFFE9FFF0),
+                          fontWeight: FontWeight.w700,
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -981,8 +1103,9 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     }
     final userLocation = locationState.position ?? const LatLng(-19.5836, -65.7531);
     final hasActiveTrip = activeTripId != null && activeTripId.isNotEmpty;
-    final rideLocked = hasActiveTrip &&
-        const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(tripState.request.status);
+      final rideLocked = hasActiveTrip &&
+          const {'requested', 'searching', 'accepted', 'arriving', 'at_pickup', 'in_progress'}
+              .contains(tripState.request.status);
     final activeDriverPoint =
         tripState.request.driverLat != null && tripState.request.driverLng != null
             ? LatLng(tripState.request.driverLat!, tripState.request.driverLng!)

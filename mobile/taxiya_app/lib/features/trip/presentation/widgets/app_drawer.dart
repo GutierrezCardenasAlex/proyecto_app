@@ -26,10 +26,11 @@ class AppDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final normalizedProgress = promoProgress.clamp(0, 5).toInt();
-    final progressValue = normalizedProgress / 5.0;
+    final cycleProgress = freeTripCredits > 0 ? 0 : normalizedProgress;
+    final progressValue = cycleProgress / 5.0;
     final promoCaption = freeTripCredits > 0
-        ? '$freeTripCredits viaje gratis disponible'
-        : '$normalizedProgress/5 para tu proximo viaje gratis';
+        ? 'Tu proximo viaje ya es gratis y el contador volvio a 0.'
+        : '$cycleProgress/5 para tu proximo viaje gratis';
     final items = const [
       ('Inicio', Icons.home_rounded),
       ('Tus viajes', Icons.history),
@@ -107,34 +108,28 @@ class AppDrawer extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(height: 6),
-                                const Text(
-                                  'Calificacion 4.95',
-                                  style: TextStyle(
-                                    color: Color(0xFFFDBA74),
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0x33F97316),
-                                    borderRadius: BorderRadius.circular(999),
-                                  ),
-                                  child: const Text(
-                                    'MIEMBRO FLASH GO',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 1.2,
-                                      color: Color(0xFFFFC89B),
+                                Row(
+                                  children: [
+                                    ...List.generate(
+                                      5,
+                                      (index) => const Padding(
+                                        padding: EdgeInsets.only(right: 2),
+                                        child: Icon(
+                                          Icons.star_rounded,
+                                          size: 16,
+                                          color: Color(0xFFFDBA74),
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  phone,
-                                  style: const TextStyle(color: Color(0xFFFFDCC1)),
+                                    const SizedBox(width: 6),
+                                    const Text(
+                                      '4.95',
+                                      style: TextStyle(
+                                        color: Color(0xFFFDBA74),
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -200,8 +195,8 @@ class AppDrawer extends StatelessWidget {
                                   : const Color(0xFF0F0F10),
                               borderRadius: BorderRadius.circular(999),
                             ),
-                            child: Text(
-                              freeTripCredits > 0 ? 'Gratis' : '$normalizedProgress/5',
+                              child: Text(
+                              freeTripCredits > 0 ? 'Gratis' : '$cycleProgress/5',
                               style: TextStyle(
                                 color: freeTripCredits > 0
                                     ? const Color(0xFF86EFAC)
@@ -280,7 +275,7 @@ class AppDrawer extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(999),
                                   ),
                                   child: Text(
-                                    freeTripCredits > 0 ? 'Gratis' : '$normalizedProgress/5',
+                                    freeTripCredits > 0 ? 'Gratis' : '$cycleProgress/5',
                                     style: TextStyle(
                                       color: active
                                           ? const Color(0xFF0F0F10)
@@ -302,22 +297,7 @@ class AppDrawer extends StatelessWidget {
                     },
                   ),
                 ),
-                const Divider(color: Color(0x33F97316)),
-                const SizedBox(height: 10),
-                const Text(
-                  'LEGAL',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1.3,
-                    color: Color(0xFFFFC89B),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                const Text('Politica de privacidad', style: TextStyle(color: Color(0xFFFFDCC1))),
-                const SizedBox(height: 6),
-                const Text('Terminos del servicio', style: TextStyle(color: Color(0xFFFFDCC1))),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(

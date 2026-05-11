@@ -157,6 +157,26 @@ async function bootstrap() {
     let rewardApplied = false;
     try {
       await client.query("BEGIN");
+      const existingTripResult = await client.query(
+        `SELECT id, status
+         FROM trips
+         WHERE passenger_id = $1
+           AND status IN ('requested', 'searching', 'accepted', 'arriving', 'at_pickup', 'in_progress')
+         ORDER BY updated_at DESC
+         LIMIT 1
+         FOR UPDATE`,
+        [input.passengerId]
+      );
+
+      if (existingTripResult.rows.length) {
+        await client.query("ROLLBACK");
+        return reply.code(409).send({
+          message: "Ya tienes un pedido activo. Debes finalizarlo o cancelarlo antes de solicitar otro.",
+          activeTripId: existingTripResult.rows[0].id,
+          activeTripStatus: existingTripResult.rows[0].status
+        });
+      }
+
       let effectiveFare = input.fareAmount;
       const creditsResult = await client.query(
         `SELECT free_trip_credits

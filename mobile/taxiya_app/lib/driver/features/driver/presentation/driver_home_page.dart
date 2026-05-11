@@ -1479,10 +1479,6 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
-                                    if (trip.isPromotional) ...[
-                                      const SizedBox(height: 10),
-                                      const _DriverPromoChip(label: 'PASAJERO CON VIAJE GRATIS'),
-                                    ],
                                   ],
                                 ),
                               ),
@@ -1494,11 +1490,6 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                             runSpacing: 10,
                             children: [
                               _DriverMiniBadge(icon: Icons.flag_rounded, label: _driverStatusShortLabel(trip.status)),
-                              if (trip.isPromotional)
-                                const _DriverMiniBadge(
-                                  icon: Icons.card_giftcard_rounded,
-                                  label: 'PROMO GRATIS',
-                                ),
                               _DriverMiniBadge(icon: Icons.tag_rounded, label: trip.id),
                             ],
                           ),
@@ -1526,11 +1517,6 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                             label: 'Vehiculo pedido',
                             value: (trip.vehicleType ?? 'taxi').toUpperCase(),
                           ),
-                          if (trip.isPromotional)
-                            const _InfoTile(
-                              label: 'Promocion',
-                              value: 'Este pasajero esta usando un viaje gratis promocional',
-                            ),
                         ],
                       ),
                     ),
@@ -1595,14 +1581,6 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
     if (trip.status == 'requested' || trip.status == 'searching') {
       await ref.read(offeredTripProvider.notifier).acceptTrip(trip);
       ref.read(driverOffersProvider.notifier).removeOfferLocally(trip.id);
-      if (trip.isPromotional && mounted) {
-        showTopNotice(
-          context,
-          'El pasajero gano y esta usando su viaje gratis.',
-          backgroundColor: const Color(0xFF22C55E),
-          foregroundColor: const Color(0xFF0F0F10),
-        );
-      }
       return;
     }
     if (trip.status == 'accepted') {
@@ -1615,6 +1593,14 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
     }
     if (trip.status == 'at_pickup') {
       await ref.read(offeredTripProvider.notifier).updateTripStatus('in_progress');
+      if (trip.isPromotional && mounted) {
+        showTopNotice(
+          context,
+          'Este viaje es gratis. El pasajero se gano la promocion.',
+          backgroundColor: const Color(0xFF22C55E),
+          foregroundColor: const Color(0xFF0F0F10),
+        );
+      }
       return;
     }
     if (trip.status == 'in_progress') {
@@ -1622,6 +1608,113 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
       await ref.read(driverOffersProvider.notifier).loadOffers();
       return;
     }
+  }
+
+  void _showDriverPromoNotice(DriverTrip trip) {
+    final passengerName =
+        trip.passengerName?.trim().isNotEmpty == true ? trip.passengerName!.trim() : 'Pasajero Flash Go';
+    final passengerPhone = trip.passengerPhone?.trim();
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return SafeArea(
+          top: false,
+          child: FractionallySizedBox(
+            heightFactor: 0.78,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+              decoration: const BoxDecoration(
+                color: Color(0xFF121214),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 44,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: const Color(0x5522C55E),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            color: const Color(0x1F22C55E),
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: const Icon(Icons.card_giftcard_rounded, color: Color(0xFF86EFAC)),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Text(
+                            'Viaje gratis activo',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFFFFF4EC),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1A1A1D),
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(color: const Color(0x3322C55E)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _InfoTile(label: 'Pasajero', value: passengerName),
+                          if (passengerPhone?.isNotEmpty ?? false)
+                            _InfoTile(label: 'Telefono', value: passengerPhone!),
+                          _InfoTile(label: 'Recojo', value: trip.passengerPickup),
+                          _InfoTile(label: 'Destino', value: trip.destination),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: const Color(0x1F22C55E),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: const Color(0x3322C55E)),
+                      ),
+                      child: const Text(
+                        'AVISO FLASH GO - VIAJE PREMIADO\n\nCompañeros conductores, se les informa que el portador de este mensaje es el unico ganador de un viaje de cortesia.\n\nNota importante: El beneficio es valido solo para una (1) persona. En caso de que el cliente se presente con acompañantes, se debera proceder al cobro normal de la carrera. Favor de brindar una excelente atencion al usuario premiado. ¡Buen viaje!',
+                        style: TextStyle(
+                          color: Color(0xFFE9FFF0),
+                          fontWeight: FontWeight.w700,
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -1723,6 +1816,14 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                       iconColor: driverState.available ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
                       onTap: () => _showStatusSheet(context, driverState, trip),
                     ),
+                    if (trip?.isPromotional == true && trip?.status == 'in_progress') ...[
+                      const SizedBox(width: 10),
+                      _GlassIconButton(
+                        icon: Icons.card_giftcard_rounded,
+                        iconColor: const Color(0xFF22C55E),
+                        onTap: () => _showDriverPromoNotice(trip!),
+                      ),
+                    ],
                     const SizedBox(width: 10),
                     Stack(
                       clipBehavior: Clip.none,
@@ -2095,8 +2196,43 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                                   color: const Color(0xFFFFF4EC),
                                 ),
                               ),
+                              if (activeTrip.isPromotional && activeTrip.status == 'in_progress') ...[
+                                const SizedBox(width: 10),
+                                const Icon(
+                                  Icons.card_giftcard_rounded,
+                                  color: Color(0xFF86EFAC),
+                                  size: 18,
+                                ),
+                              ],
                             ],
                           ),
+                          if (activeTrip.isPromotional && activeTrip.status == 'in_progress') ...[
+                            const SizedBox(height: 12),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: const Color(0x1F22C55E),
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(color: const Color(0x3322C55E)),
+                              ),
+                              child: const Row(
+                                children: [
+                                  Icon(Icons.card_giftcard_rounded, color: Color(0xFF86EFAC)),
+                                  SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      'Viaje gratis activo para este pasajero',
+                                      style: TextStyle(
+                                        color: Color(0xFFE9FFF0),
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 14),
                           _InfoTile(label: 'Viaje', value: activeTrip.id),
                           _InfoTile(label: 'Recojo', value: activeTrip.passengerPickup),
@@ -2472,10 +2608,6 @@ class _DriverAvailableTripCard extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    if (trip.isPromotional) ...[
-                      const SizedBox(height: 8),
-                      const _DriverPromoChip(label: 'VIAJE GRATIS'),
-                    ],
                   ],
                 ),
               ),
@@ -2486,9 +2618,9 @@ class _DriverAvailableTripCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  'Nuevo',
+                  trip.isPromotional ? 'Promo' : 'Nuevo',
                   style: TextStyle(
-                    color: accentColor,
+                    color: trip.isPromotional ? const Color(0xFF86EFAC) : accentColor,
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                   ),
@@ -2552,42 +2684,6 @@ class _DriverAvailableTripCard extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DriverPromoChip extends StatelessWidget {
-  const _DriverPromoChip({
-    required this.label,
-  });
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: const Color(0x1F22C55E),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0x3322C55E)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.card_giftcard_rounded, size: 15, color: Color(0xFF86EFAC)),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Color(0xFF86EFAC),
-              fontWeight: FontWeight.w900,
-              fontSize: 10,
-              letterSpacing: 0.8,
-            ),
           ),
         ],
       ),

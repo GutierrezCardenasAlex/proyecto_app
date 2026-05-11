@@ -206,6 +206,14 @@ class TripRepository {
       }),
     );
 
+    if (response.statusCode == 409) {
+      final payload = jsonDecode(response.body) as Map<String, dynamic>;
+      final message =
+          payload['message']?.toString() ??
+          'Ya tienes un pedido activo y no puedes solicitar otro por ahora.';
+      throw Exception(message);
+    }
+
     if (response.statusCode >= 400) {
       throw Exception('No se pudo solicitar el viaje (${response.statusCode})');
     }

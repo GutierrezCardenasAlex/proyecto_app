@@ -141,8 +141,10 @@ class PromotionsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
     final progress = session.completedTripCount.clamp(0, 5).toInt();
-    final progressValue = progress / 5.0;
     final hasFreeTrip = session.freeTripCredits > 0;
+    final cycleProgress = hasFreeTrip ? 0 : progress;
+    final progressValue = cycleProgress / 5.0;
+    final nextCycleTarget = hasFreeTrip ? '0/5' : '$cycleProgress/5';
 
     return _DetailScaffold(
       title: 'Promociones',
@@ -215,7 +217,7 @@ class PromotionsPage extends ConsumerWidget {
                           const SizedBox(height: 4),
                           Text(
                             hasFreeTrip
-                                ? 'Puedes usarlo en tu siguiente viaje a donde sea.'
+                                ? 'Tu sexto viaje es gratis y el contador ya se reinicio para el siguiente ciclo.'
                                 : 'Cada 5 viajes completados desbloqueas 1 viaje gratis.',
                             style: const TextStyle(
                               color: Color(0xFFFFE3D0),
@@ -237,7 +239,7 @@ class PromotionsPage extends ConsumerWidget {
                   child: Row(
                     children: [
                       Text(
-                        hasFreeTrip ? 'Gratis listo' : '$progress/5',
+                        hasFreeTrip ? 'Gratis listo' : nextCycleTarget,
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 24,
                           fontWeight: FontWeight.w900,
@@ -262,8 +264,8 @@ class PromotionsPage extends ConsumerWidget {
                 const SizedBox(height: 14),
                 Text(
                   hasFreeTrip
-                      ? 'Tienes ${session.freeTripCredits} viaje(s) gratis disponible(s).'
-                      : 'Te faltan ${5 - progress} viaje(s) para ganar el proximo gratis.',
+                      ? 'Tienes ${session.freeTripCredits} viaje(s) gratis disponible(s) y tu siguiente ciclo comenzo en 0/5.'
+                      : 'Te faltan ${5 - cycleProgress} viaje(s) para ganar el proximo gratis.',
                   style: const TextStyle(
                     color: Color(0xFFFFF4EC),
                     fontWeight: FontWeight.w700,
@@ -292,9 +294,10 @@ class PromotionsPage extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                _PromoMetricRow(label: 'Viajes completados', value: '${session.completedTripCount}'),
+                _PromoMetricRow(label: 'Viajes completados del ciclo actual', value: '$cycleProgress'),
                 _PromoMetricRow(label: 'Viajes gratis disponibles', value: '${session.freeTripCredits}'),
-                _PromoMetricRow(label: 'Meta actual', value: '$progress/5'),
+                _PromoMetricRow(label: 'Meta actual', value: nextCycleTarget),
+                _PromoMetricRow(label: 'Regla del beneficio', value: '5 viajes pagados = 1 gratis'),
               ],
             ),
           ),
@@ -302,6 +305,14 @@ class PromotionsPage extends ConsumerWidget {
           const _SettingsInfoCard(
             title: 'Como funciona',
             subtitle: 'Cada 5 viajes completados desbloqueas 1 viaje gratis para usarlo en tu siguiente pedido.',
+          ),
+          const _SettingsInfoCard(
+            title: 'Uso del viaje premiado',
+            subtitle: 'El beneficio es valido solo para el cliente registrado en Flash Go que gano la promocion. El sexto viaje se usa gratis y luego el contador vuelve a cero.',
+          ),
+          const _SettingsInfoCard(
+            title: 'Acompanantes',
+            subtitle: 'La promocion no cubre acompanantes. Si viajas con otra persona, el conductor puede realizar el cobro normal correspondiente por ese pasajero adicional.',
           ),
           const _SettingsInfoCard(
             title: 'Notificacion',
