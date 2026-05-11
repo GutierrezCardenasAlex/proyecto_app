@@ -59,7 +59,11 @@ class DriverTripRepository {
       destinationLat: _toDouble(item['destination_lat']),
       destinationLng: _toDouble(item['destination_lng']),
       fareAmount: _toDouble(item['fare_amount']),
+      requestedAt: item['requested_at']?.toString(),
       vehicleType: item['vehicle_type']?.toString(),
+      vehicleLabel: _joinVehicleLabel(item['vehicle_brand'], item['vehicle_model']),
+      vehiclePlate: item['vehicle_plate']?.toString(),
+      vehicleColor: item['vehicle_color']?.toString(),
       passengerName: item['passenger_name']?.toString(),
       passengerPhone: item['passenger_phone']?.toString(),
       isPromotional: item['promotional_trip'] == true,
@@ -209,7 +213,11 @@ class DriverTripRepository {
       destinationLat: _toDouble(item['destination_lat']),
       destinationLng: _toDouble(item['destination_lng']),
       fareAmount: _toDouble(item['fare_amount']),
+      requestedAt: item['requested_at']?.toString(),
       vehicleType: item['vehicle_type']?.toString(),
+      vehicleLabel: _joinVehicleLabel(item['vehicle_brand'], item['vehicle_model']),
+      vehiclePlate: item['vehicle_plate']?.toString(),
+      vehicleColor: item['vehicle_color']?.toString(),
       passengerName: item['passenger_name']?.toString(),
       passengerPhone: item['passenger_phone']?.toString(),
       isPromotional: item['promotional_trip'] == true,
@@ -221,6 +229,13 @@ class DriverTripRepository {
       return value.toDouble();
     }
     return double.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  static String? _joinVehicleLabel(Object? brand, Object? model) {
+    final brandText = brand?.toString().trim() ?? '';
+    final modelText = model?.toString().trim() ?? '';
+    final value = '$brandText $modelText'.trim();
+    return value.isEmpty ? null : value;
   }
 }
 

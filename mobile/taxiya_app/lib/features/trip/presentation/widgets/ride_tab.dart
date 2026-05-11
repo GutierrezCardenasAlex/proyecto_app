@@ -376,10 +376,12 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     final locationState = ref.read(passengerLocationProvider);
     final location = locationState.position;
     final request = ref.read(tripProvider).request;
-    if (const {'requested', 'searching', 'accepted', 'arriving', 'at_pickup', 'in_progress'}
-            .contains(request.status) &&
+    final isRetryingRequest =
+        (request.activeTripId?.isNotEmpty ?? false) &&
+        const {'requested', 'searching'}.contains(request.status);
+    if (const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(request.status) &&
         (request.activeTripId?.isNotEmpty ?? false)) {
-      _showMessage('Ya tienes un pedido activo. Ahora solo puedes seguir ese viaje hasta que termine o se cancele.');
+      _showMessage('Ya tienes un conductor asignado. Ahora solo puedes seguir ese viaje activo.');
       return;
     }
     final destination = _destinationController.text.trim();
@@ -430,11 +432,15 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     }
 
     if (mounted) {
-      _showFloatingNotification(
-        selectedDriver == null
-            ? 'Solicitud enviada. Estamos buscando un conductor.'
-            : 'Solicitud enviada a ${selectedDriver.vehicleLabel}. Esperando respuesta.',
-      );
+      if (isRetryingRequest) {
+        _showFloatingNotification('Solicitud reenviada. Seguimos buscando un conductor para ti.');
+      } else {
+        _showFloatingNotification(
+          selectedDriver == null
+              ? 'Solicitud enviada. Estamos buscando un conductor.'
+              : 'Solicitud enviada a ${selectedDriver.vehicleLabel}. Esperando respuesta.',
+        );
+      }
     }
   }
 
@@ -1087,6 +1093,10 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     if (tripState.isRequestingTrip) {
       return 'Enviando solicitud...';
     }
+    if ((tripState.request.activeTripId?.isNotEmpty ?? false) &&
+        const {'requested', 'searching'}.contains(tripState.request.status)) {
+      return 'Volver a enviar solicitud';
+    }
     if (_rideMode == RideMode.cercano) {
       return _selectedDriverId == null ? 'Elegir taxi mas cercano' : 'Solicitar este taxi';
     }
@@ -1104,7 +1114,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     final userLocation = locationState.position ?? const LatLng(-19.5836, -65.7531);
     final hasActiveTrip = activeTripId != null && activeTripId.isNotEmpty;
       final rideLocked = hasActiveTrip &&
-          const {'requested', 'searching', 'accepted', 'arriving', 'at_pickup', 'in_progress'}
+          const {'accepted', 'arriving', 'at_pickup', 'in_progress'}
               .contains(tripState.request.status);
     final activeDriverPoint =
         tripState.request.driverLat != null && tripState.request.driverLng != null

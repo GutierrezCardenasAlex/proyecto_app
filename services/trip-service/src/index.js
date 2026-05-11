@@ -155,10 +155,11 @@ async function bootstrap() {
     const client = await pool.connect();
     let trip;
     let rewardApplied = false;
+    let shouldTriggerDispatch = false;
     try {
       await client.query("BEGIN");
       const existingTripResult = await client.query(
-        `SELECT id, status
+        `SELECT id, status, promotional_trip, fare_amount
          FROM trips
          WHERE passenger_id = $1
            AND status IN ('requested', 'searching', 'accepted', 'arriving', 'at_pickup', 'in_progress')
@@ -169,70 +170,81 @@ async function bootstrap() {
       );
 
       if (existingTripResult.rows.length) {
-        await client.query("ROLLBACK");
-        return reply.code(409).send({
-          message: "Ya tienes un pedido activo. Debes finalizarlo o cancelarlo antes de solicitar otro.",
-          activeTripId: existingTripResult.rows[0].id,
-          activeTripStatus: existingTripResult.rows[0].status
-        });
+        const existingTrip = existingTripResult.rows[0];
+        if (["requested", "searching"].includes(existingTrip.status)) {
+          trip = existingTrip;
+          rewardApplied = existingTrip.promotional_trip === true;
+          shouldTriggerDispatch = true;
+          await client.query("COMMIT");
+        } else {
+          await client.query("ROLLBACK");
+          return reply.code(409).send({
+            message: "Ya tienes un pedido activo. Debes finalizarlo o cancelarlo antes de solicitar otro.",
+            activeTripId: existingTrip.id,
+            activeTripStatus: existingTrip.status
+          });
+        }
       }
 
-      let effectiveFare = input.fareAmount;
-      const creditsResult = await client.query(
-        `SELECT free_trip_credits
-         FROM users
-         WHERE id = $1
-         FOR UPDATE`,
-        [input.passengerId]
-      );
-      const credits = Number(creditsResult.rows[0]?.free_trip_credits || 0);
-      if (credits > 0) {
-        rewardApplied = true;
-        effectiveFare = 0;
-        await client.query(
-          `UPDATE users
-           SET free_trip_credits = GREATEST(free_trip_credits - 1, 0),
-               updated_at = NOW()
-           WHERE id = $1`,
+      if (!trip) {
+        shouldTriggerDispatch = true;
+        let effectiveFare = input.fareAmount;
+        const creditsResult = await client.query(
+          `SELECT free_trip_credits
+           FROM users
+           WHERE id = $1
+           FOR UPDATE`,
           [input.passengerId]
         );
-      }
+        const credits = Number(creditsResult.rows[0]?.free_trip_credits || 0);
+        if (credits > 0) {
+          rewardApplied = true;
+          effectiveFare = 0;
+          await client.query(
+            `UPDATE users
+             SET free_trip_credits = GREATEST(free_trip_credits - 1, 0),
+                 updated_at = NOW()
+             WHERE id = $1`,
+            [input.passengerId]
+          );
+        }
 
-      const result = await client.query(
-        `INSERT INTO trips (
-         passenger_id,
-         pickup_address,
-         destination_address,
-         pickup_location,
-         destination_location,
-         estimated_distance_meters,
-         estimated_duration_seconds,
-         fare_amount,
-         promotional_trip,
-         status
-       ) VALUES (
-         $1, $2, $3,
-         ST_SetSRID(ST_MakePoint($4, $5), 4326)::geography,
-         ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography,
-        $8, $9, $10, $11, 'requested'
-       )
-       RETURNING *`,
-        [
-          input.passengerId,
-          input.pickupAddress,
-          input.destinationAddress,
-          input.pickupLng,
-          input.pickupLat,
-          input.destinationLng,
-          input.destinationLat,
-          input.estimatedDistanceMeters,
-          input.estimatedDurationSeconds,
-          effectiveFare,
-          rewardApplied
-        ]
-      );
-      trip = result.rows[0];
-      await client.query("COMMIT");
+        const result = await client.query(
+          `INSERT INTO trips (
+           passenger_id,
+           pickup_address,
+           destination_address,
+           pickup_location,
+           destination_location,
+           estimated_distance_meters,
+           estimated_duration_seconds,
+           fare_amount,
+           promotional_trip,
+           status
+         ) VALUES (
+           $1, $2, $3,
+           ST_SetSRID(ST_MakePoint($4, $5), 4326)::geography,
+           ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography,
+          $8, $9, $10, $11, 'requested'
+         )
+         RETURNING *`,
+          [
+            input.passengerId,
+            input.pickupAddress,
+            input.destinationAddress,
+            input.pickupLng,
+            input.pickupLat,
+            input.destinationLng,
+            input.destinationLat,
+            input.estimatedDistanceMeters,
+            input.estimatedDurationSeconds,
+            effectiveFare,
+            rewardApplied
+          ]
+        );
+        trip = result.rows[0];
+        await client.query("COMMIT");
+      }
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;
@@ -241,18 +253,22 @@ async function bootstrap() {
     }
 
     await redis.set(`trip:${trip.id}:status`, trip.status, "EX", 3600);
-    await publish("trip.requested", { tripId: trip.id, passengerId: input.passengerId });
+    if (trip.status === "requested") {
+      await publish("trip.requested", { tripId: trip.id, passengerId: input.passengerId });
+    }
 
-    try {
-      await axios.post(`${process.env.DISPATCH_SERVICE_URL}/search`, {
-        tripId: trip.id,
-        pickupLat: input.pickupLat,
-        pickupLng: input.pickupLng,
-        dispatchMode: input.dispatchMode,
-        preferredDriverId: input.preferredDriverId
-      });
-    } catch (error) {
-      app.log.warn({ err: error, tripId: trip.id }, "dispatch search failed after trip creation");
+    if (shouldTriggerDispatch) {
+      try {
+        await axios.post(`${process.env.DISPATCH_SERVICE_URL}/search`, {
+          tripId: trip.id,
+          pickupLat: input.pickupLat,
+          pickupLng: input.pickupLng,
+          dispatchMode: input.dispatchMode,
+          preferredDriverId: input.preferredDriverId
+        });
+      } catch (error) {
+        app.log.warn({ err: error, tripId: trip.id }, "dispatch search failed after trip creation");
+      }
     }
 
     reply.code(201).send({
@@ -298,9 +314,12 @@ async function bootstrap() {
               v.model AS vehicle_model,
               v.color AS vehicle_color,
               v.plate AS vehicle_plate,
+              pu.full_name AS passenger_name,
+              pu.phone AS passenger_phone,
               t.promotional_trip
        FROM trips t
        LEFT JOIN vehicles v ON v.driver_id = t.driver_id
+       LEFT JOIN users pu ON pu.id = t.passenger_id
        WHERE t.driver_id = $1
        ORDER BY COALESCE(t.completed_at, t.cancelled_at, t.updated_at, t.requested_at) DESC
        LIMIT 50`,

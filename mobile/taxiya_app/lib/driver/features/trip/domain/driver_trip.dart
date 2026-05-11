@@ -9,7 +9,11 @@ class DriverTrip {
     required this.destinationLat,
     required this.destinationLng,
     required this.fareAmount,
+    this.requestedAt,
     this.vehicleType,
+    this.vehicleLabel,
+    this.vehiclePlate,
+    this.vehicleColor,
     this.passengerName,
     this.passengerPhone,
     this.isPromotional = false,
@@ -24,7 +28,11 @@ class DriverTrip {
   final double destinationLat;
   final double destinationLng;
   final double fareAmount;
+  final String? requestedAt;
   final String? vehicleType;
+  final String? vehicleLabel;
+  final String? vehiclePlate;
+  final String? vehicleColor;
   final String? passengerName;
   final String? passengerPhone;
   final bool isPromotional;
@@ -39,7 +47,11 @@ class DriverTrip {
     double? destinationLat,
     double? destinationLng,
     double? fareAmount,
+    String? requestedAt,
     String? vehicleType,
+    String? vehicleLabel,
+    String? vehiclePlate,
+    String? vehicleColor,
     String? passengerName,
     String? passengerPhone,
     bool? isPromotional,
@@ -54,7 +66,11 @@ class DriverTrip {
       destinationLat: destinationLat ?? this.destinationLat,
       destinationLng: destinationLng ?? this.destinationLng,
       fareAmount: fareAmount ?? this.fareAmount,
+      requestedAt: requestedAt ?? this.requestedAt,
       vehicleType: vehicleType ?? this.vehicleType,
+      vehicleLabel: vehicleLabel ?? this.vehicleLabel,
+      vehiclePlate: vehiclePlate ?? this.vehiclePlate,
+      vehicleColor: vehicleColor ?? this.vehicleColor,
       passengerName: passengerName ?? this.passengerName,
       passengerPhone: passengerPhone ?? this.passengerPhone,
       isPromotional: isPromotional ?? this.isPromotional,

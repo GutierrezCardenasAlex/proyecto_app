@@ -2933,6 +2933,9 @@ class _DriverHistoryCard extends ConsumerWidget {
   }
 
   void _showDetails(BuildContext context) {
+    final passengerName =
+        trip.passengerName?.trim().isNotEmpty == true ? trip.passengerName!.trim() : 'Pasajero';
+
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -2972,15 +2975,62 @@ class _DriverHistoryCard extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 14),
+                    if (trip.isPromotional) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0x1F22C55E),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0x3322C55E)),
+                        ),
+                        child: const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.card_giftcard_rounded, color: Color(0xFF86EFAC)),
+                                SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'Viaje promocional',
+                                    style: TextStyle(
+                                      color: Color(0xFFE9FFF0),
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              'Este viaje se realizo con el beneficio promocional del pasajero y la promo aplicaba solo para el cliente registrado.',
+                              style: TextStyle(
+                                color: Color(0xFFCFF7DB),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+                    _InfoTile(label: 'Pasajero', value: passengerName),
                     _InfoTile(label: 'Estado', value: _historyStatusLabel(trip.status)),
                     _InfoTile(label: 'Recojo', value: trip.passengerPickup),
                     _InfoTile(label: 'Destino', value: trip.destination),
-                    if (trip.passengerName?.isNotEmpty ?? false)
-                      _InfoTile(label: 'Pasajero', value: trip.passengerName!),
                     if (trip.passengerPhone?.isNotEmpty ?? false)
                       _InfoTile(label: 'Telefono', value: trip.passengerPhone!),
                     if (trip.vehicleType?.isNotEmpty ?? false)
-                      _InfoTile(label: 'Vehiculo', value: trip.vehicleType!),
+                      _InfoTile(label: 'Tipo de vehiculo', value: trip.vehicleType!.toUpperCase()),
+                    if (trip.vehicleLabel?.isNotEmpty ?? false)
+                      _InfoTile(label: 'Vehiculo', value: trip.vehicleLabel!),
+                    if (trip.vehicleColor?.isNotEmpty ?? false)
+                      _InfoTile(label: 'Color', value: trip.vehicleColor!),
+                    if (trip.vehiclePlate?.isNotEmpty ?? false)
+                      _InfoTile(label: 'Placa', value: trip.vehiclePlate!),
+                    if (trip.requestedAt?.isNotEmpty ?? false)
+                      _InfoTile(label: 'Fecha del pedido', value: trip.requestedAt!),
                   ],
                 ),
               ),
@@ -2994,6 +3044,8 @@ class _DriverHistoryCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final accent = _historyAccentColor(trip.status);
+    final passengerName =
+        trip.passengerName?.trim().isNotEmpty == true ? trip.passengerName!.trim() : 'Pasajero';
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF1B1B1F),
@@ -3009,7 +3061,7 @@ class _DriverHistoryCard extends ConsumerWidget {
               children: [
                 Expanded(
                   child: Text(
-                    title,
+                    passengerName,
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 20,
                       fontWeight: FontWeight.w800,
@@ -3017,6 +3069,32 @@ class _DriverHistoryCard extends ConsumerWidget {
                     ),
                   ),
                 ),
+                if (trip.isPromotional) ...[
+                  Container(
+                    margin: const EdgeInsets.only(right: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0x1F22C55E),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: const Color(0x3322C55E)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.card_giftcard_rounded, size: 14, color: Color(0xFF86EFAC)),
+                        SizedBox(width: 6),
+                        Text(
+                          'Promo',
+                          style: TextStyle(
+                            color: Color(0xFF86EFAC),
+                            fontWeight: FontWeight.w800,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
@@ -3035,13 +3113,28 @@ class _DriverHistoryCard extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 14),
+            Text(
+              title,
+              style: const TextStyle(
+                color: Color(0xFFFFC89B),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 10),
             _InfoTile(label: 'ID', value: trip.id),
+            if (trip.requestedAt?.isNotEmpty ?? false)
+              _InfoTile(label: 'Fecha', value: trip.requestedAt!),
             _InfoTile(label: 'Recojo', value: trip.passengerPickup),
             _InfoTile(label: 'Destino', value: trip.destination),
-            if (trip.passengerName?.isNotEmpty ?? false)
-              _InfoTile(label: 'Pasajero', value: trip.passengerName!),
+            _InfoTile(label: 'Pasajero', value: passengerName),
             if (trip.passengerPhone?.isNotEmpty ?? false)
               _InfoTile(label: 'Telefono', value: trip.passengerPhone!),
+            if (trip.vehicleType?.isNotEmpty ?? false)
+              _InfoTile(label: 'Tipo', value: trip.vehicleType!.toUpperCase()),
+            if (trip.vehicleLabel?.isNotEmpty ?? false)
+              _InfoTile(label: 'Vehiculo', value: trip.vehicleLabel!),
+            if (trip.vehiclePlate?.isNotEmpty ?? false)
+              _InfoTile(label: 'Placa', value: trip.vehiclePlate!),
             const SizedBox(height: 10),
             _DriverTripProgressBar(status: trip.status),
             const SizedBox(height: 14),
