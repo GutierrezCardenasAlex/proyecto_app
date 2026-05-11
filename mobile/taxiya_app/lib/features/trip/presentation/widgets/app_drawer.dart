@@ -11,7 +11,10 @@ class AppDrawer extends StatelessWidget {
     required this.onSelect,
     required this.onOpenProfile,
     required this.promoProgress,
+    required this.totalTrips,
     required this.freeTripCredits,
+    required this.promoEnabled,
+    required this.promoCycleLength,
   });
 
   final String fullName;
@@ -21,16 +24,22 @@ class AppDrawer extends StatelessWidget {
   final ValueChanged<String> onSelect;
   final VoidCallback onOpenProfile;
   final int promoProgress;
+  final int totalTrips;
   final int freeTripCredits;
+  final bool promoEnabled;
+  final int promoCycleLength;
 
   @override
   Widget build(BuildContext context) {
-    final normalizedProgress = promoProgress.clamp(0, 5).toInt();
+    final safeCycleLength = promoCycleLength <= 0 ? 5 : promoCycleLength;
+    final normalizedProgress = promoProgress.clamp(0, safeCycleLength).toInt();
     final cycleProgress = freeTripCredits > 0 ? 0 : normalizedProgress;
-    final progressValue = cycleProgress / 5.0;
-    final promoCaption = freeTripCredits > 0
-        ? 'Tu proximo viaje ya es gratis y el contador volvio a 0.'
-        : '$cycleProgress/5 para tu proximo viaje gratis';
+    final progressValue = safeCycleLength == 0 ? 0.0 : cycleProgress / safeCycleLength;
+    final promoCaption = !promoEnabled
+        ? 'La central pauso esta promocion por ahora.'
+        : freeTripCredits > 0
+            ? 'Tu siguiente viaje ya es gratis y el ciclo actual volvio a 0/$safeCycleLength.'
+            : '$cycleProgress/$safeCycleLength para tu proximo viaje gratis';
     final items = const [
       ('Inicio', Icons.home_rounded),
       ('Tus viajes', Icons.history),
@@ -168,7 +177,7 @@ class AppDrawer extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Promocion activa',
+                                  promoEnabled ? 'Promocion activa' : 'Promocion pausada',
                                   style: GoogleFonts.plusJakartaSans(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w800,
@@ -200,7 +209,9 @@ class AppDrawer extends StatelessWidget {
                               style: TextStyle(
                                 color: freeTripCredits > 0
                                     ? const Color(0xFF86EFAC)
-                                    : const Color(0xFFF97316),
+                                    : promoEnabled
+                                        ? const Color(0xFFF97316)
+                                        : const Color(0xFFFFD8BF),
                                 fontWeight: FontWeight.w900,
                                 fontSize: 11,
                                 letterSpacing: 0.8,
@@ -214,12 +225,31 @@ class AppDrawer extends StatelessWidget {
                         borderRadius: BorderRadius.circular(999),
                         child: LinearProgressIndicator(
                           minHeight: 8,
-                          value: freeTripCredits > 0 ? 1 : progressValue,
+                          value: promoEnabled ? (freeTripCredits > 0 ? 1 : progressValue) : 0,
                           backgroundColor: const Color(0xFF25252B),
                           valueColor: AlwaysStoppedAnimation<Color>(
-                            freeTripCredits > 0 ? const Color(0xFF22C55E) : const Color(0xFFF97316),
+                            !promoEnabled
+                                ? const Color(0xFF52525B)
+                                : freeTripCredits > 0
+                                    ? const Color(0xFF22C55E)
+                                    : const Color(0xFFF97316),
                           ),
                         ),
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          const Icon(Icons.route_rounded, size: 16, color: Color(0xFFFFD8BF)),
+                          const SizedBox(width: 8),
+                          Text(
+                            '$totalTrips viajes completados en total',
+                            style: const TextStyle(
+                              color: Color(0xFFFFD8BF),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -269,17 +299,25 @@ class AppDrawer extends StatelessWidget {
                                   decoration: BoxDecoration(
                                     color: active
                                         ? const Color(0x220F0F10)
-                                        : freeTripCredits > 0
+                                        : !promoEnabled
+                                            ? const Color(0xFF25252B)
+                                            : freeTripCredits > 0
                                             ? const Color(0x1F22C55E)
                                             : const Color(0xFF25252B),
                                     borderRadius: BorderRadius.circular(999),
                                   ),
                                   child: Text(
-                                    freeTripCredits > 0 ? 'Gratis' : '$cycleProgress/5',
+                                    !promoEnabled
+                                        ? 'Pausada'
+                                        : freeTripCredits > 0
+                                            ? 'Gratis'
+                                            : '$cycleProgress/$safeCycleLength',
                                     style: TextStyle(
                                       color: active
                                           ? const Color(0xFF0F0F10)
-                                          : freeTripCredits > 0
+                                          : !promoEnabled
+                                              ? const Color(0xFFFFD8BF)
+                                              : freeTripCredits > 0
                                               ? const Color(0xFF86EFAC)
                                               : const Color(0xFFF97316),
                                       fontWeight: FontWeight.w800,

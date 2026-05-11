@@ -13,7 +13,10 @@ class Session {
     required this.profileCompleted,
     required this.deviceStatus,
     required this.completedTripCount,
+    required this.promoProgressCount,
     required this.freeTripCredits,
+    required this.promoEnabled,
+    required this.promoCycleLength,
     required this.isLoading,
     required this.errorMessage,
     required this.isRestoring,
@@ -32,7 +35,10 @@ class Session {
   final bool profileCompleted;
   final String deviceStatus;
   final int completedTripCount;
+  final int promoProgressCount;
   final int freeTripCredits;
+  final bool promoEnabled;
+  final int promoCycleLength;
   final bool isLoading;
   final String? errorMessage;
   final bool isRestoring;
@@ -51,7 +57,10 @@ class Session {
     bool? profileCompleted,
     String? deviceStatus,
     int? completedTripCount,
+    int? promoProgressCount,
     int? freeTripCredits,
+    bool? promoEnabled,
+    int? promoCycleLength,
     bool? isLoading,
     String? errorMessage,
     bool? isRestoring,
@@ -71,7 +80,10 @@ class Session {
       profileCompleted: profileCompleted ?? this.profileCompleted,
       deviceStatus: deviceStatus ?? this.deviceStatus,
       completedTripCount: completedTripCount ?? this.completedTripCount,
+      promoProgressCount: promoProgressCount ?? this.promoProgressCount,
       freeTripCredits: freeTripCredits ?? this.freeTripCredits,
+      promoEnabled: promoEnabled ?? this.promoEnabled,
+      promoCycleLength: promoCycleLength ?? this.promoCycleLength,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
       isRestoring: isRestoring ?? this.isRestoring,

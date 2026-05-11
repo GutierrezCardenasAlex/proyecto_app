@@ -43,6 +43,13 @@ type Dashboard = {
   pendingDevices: number
 }
 
+type PromoSettings = {
+  enabled: boolean
+  cycleLength: number
+  rewardCredits: number
+  updatedAt?: string | null
+}
+
 type PendingDriverAccessRow = {
   id: string
   user_id: string
@@ -108,6 +115,12 @@ function App() {
   const [pendingDrivers, setPendingDrivers] = useState<PendingDriverAccessRow[]>([])
   const [pendingDevices, setPendingDevices] = useState<DeviceRow[]>([])
   const [allDevices, setAllDevices] = useState<DeviceRow[]>([])
+  const [promoSettings, setPromoSettings] = useState<PromoSettings>({
+    enabled: true,
+    cycleLength: 5,
+    rewardCredits: 1,
+    updatedAt: null,
+  })
   const [phone, setPhone] = useState('+59170000001')
   const [otp, setOtp] = useState('123456')
   const [otpRequested, setOtpRequested] = useState(false)
@@ -159,7 +172,7 @@ function App() {
       return
     }
 
-    const [dashboardResponse, driversResponse, tripsResponse, pendingDriversResponse, pendingResponse, devicesResponse] =
+    const [dashboardResponse, driversResponse, tripsResponse, pendingDriversResponse, pendingResponse, devicesResponse, promoResponse] =
       await Promise.all([
         fetchWithAdminAuth<Dashboard>(`${apiBase}/admin/dashboard`, { headers: authHeaders }),
         fetchWithAdminAuth<Driver[]>(`${apiBase}/admin/drivers/live`, { headers: authHeaders }),
@@ -167,6 +180,7 @@ function App() {
         fetchWithAdminAuth<PendingDriverAccessRow[]>(`${apiBase}/admin/drivers/pending-access`, { headers: authHeaders }),
         fetchWithAdminAuth<DeviceRow[]>(`${apiBase}/admin/devices/pending`, { headers: authHeaders }),
         fetchWithAdminAuth<DeviceRow[]>(`${apiBase}/admin/devices`, { headers: authHeaders }),
+        fetchWithAdminAuth<PromoSettings>(`${apiBase}/admin/promotions/settings`, { headers: authHeaders }),
       ])
 
     setDashboard(dashboardResponse)
@@ -175,6 +189,7 @@ function App() {
     setPendingDrivers(pendingDriversResponse)
     setPendingDevices(pendingResponse)
     setAllDevices(devicesResponse)
+    setPromoSettings(promoResponse)
     setLastUpdatedAt(new Date().toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
   }
 
@@ -284,6 +299,36 @@ function App() {
       await loadCentralData()
     } catch (updateError) {
       setError(updateError instanceof Error ? updateError.message : 'No se pudo actualizar el dispositivo')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function updatePromoStatus(enabled: boolean) {
+    if (!token) {
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    try {
+      const payload = await fetchWithAdminAuth<{ message: string; settings: PromoSettings }>(`${apiBase}/admin/promotions/settings`, {
+        method: 'POST',
+        headers: {
+          ...authHeaders,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          enabled,
+          cycleLength: promoSettings.cycleLength,
+          rewardCredits: promoSettings.rewardCredits,
+        }),
+      })
+
+      setPromoSettings(payload.settings)
+      await loadCentralData()
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : 'No se pudo actualizar la promocion')
     } finally {
       setLoading(false)
     }
@@ -562,6 +607,36 @@ function App() {
         </div>
 
         <div className="side-column">
+          <div className="panel">
+            <div className="panel-header">
+              <h2>Promociones Flash Go</h2>
+              <span>{promoSettings.enabled ? 'Activa' : 'Pausada'}</span>
+            </div>
+            <article className="list-card stack-card promo-card">
+              <div>
+                <strong>{promoSettings.enabled ? 'Promo habilitada' : 'Promo detenida'}</strong>
+                <p>Cada {promoSettings.cycleLength} viajes pagados desbloquean {promoSettings.rewardCredits} viaje gratis.</p>
+                <p>La app del pasajero y del conductor toma este cambio en el siguiente refresh de sesion.</p>
+              </div>
+              <div className="action-row">
+                <button
+                  className="primary-button"
+                  disabled={loading || promoSettings.enabled}
+                  onClick={() => updatePromoStatus(true)}
+                >
+                  Activar promo
+                </button>
+                <button
+                  className="secondary-button"
+                  disabled={loading || !promoSettings.enabled}
+                  onClick={() => updatePromoStatus(false)}
+                >
+                  Pausar promo
+                </button>
+              </div>
+            </article>
+          </div>
+
           <div className="panel">
             <div className="panel-header">
               <h2>Conductores por autorizar</h2>

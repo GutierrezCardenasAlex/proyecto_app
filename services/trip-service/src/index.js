@@ -113,6 +113,34 @@ async function ensureSchema() {
       UNIQUE (trip_id, from_role)
     )
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS promo_settings (
+      id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+      enabled BOOLEAN NOT NULL DEFAULT TRUE,
+      cycle_length INTEGER NOT NULL DEFAULT 5,
+      reward_credits INTEGER NOT NULL DEFAULT 1,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    INSERT INTO promo_settings (id, enabled, cycle_length, reward_credits)
+    VALUES (1, TRUE, 5, 1)
+    ON CONFLICT (id) DO NOTHING
+  `);
+}
+
+async function getPromoSettings(client = pool) {
+  const result = await client.query(
+    `SELECT enabled, cycle_length, reward_credits
+     FROM promo_settings
+     WHERE id = 1
+     LIMIT 1`
+  );
+  return {
+    enabled: result.rows[0]?.enabled !== false,
+    cycleLength: Number(result.rows[0]?.cycle_length || 5),
+    rewardCredits: Number(result.rows[0]?.reward_credits || 1)
+  };
 }
 
 function mapTrip(row) {
@@ -189,6 +217,7 @@ async function bootstrap() {
       if (!trip) {
         shouldTriggerDispatch = true;
         let effectiveFare = input.fareAmount;
+        const promoSettings = await getPromoSettings(client);
         const creditsResult = await client.query(
           `SELECT free_trip_credits
            FROM users
@@ -197,7 +226,7 @@ async function bootstrap() {
           [input.passengerId]
         );
         const credits = Number(creditsResult.rows[0]?.free_trip_credits || 0);
-        if (credits > 0) {
+        if (promoSettings.enabled && credits > 0) {
           rewardApplied = true;
           effectiveFare = 0;
           await client.query(
@@ -457,19 +486,27 @@ async function bootstrap() {
     }
 
     if (status === "completed" && trip.passenger_id) {
+      const promoSettings = await getPromoSettings();
       await pool.query(
         `UPDATE users
-         SET completed_trip_count = completed_trip_count + CASE WHEN $2 THEN 0 ELSE 1 END,
+         SET completed_trip_count = completed_trip_count + 1,
              promo_progress_count = CASE
+               WHEN NOT $3 THEN promo_progress_count
                WHEN $2 THEN promo_progress_count
-               WHEN promo_progress_count + 1 >= 5 THEN 0
+               WHEN promo_progress_count + 1 >= $4 THEN 0
                ELSE promo_progress_count + 1
              END,
              free_trip_credits = free_trip_credits +
-               CASE WHEN NOT $2 AND promo_progress_count + 1 >= 5 THEN 1 ELSE 0 END,
+               CASE WHEN $3 AND NOT $2 AND promo_progress_count + 1 >= $4 THEN $5 ELSE 0 END,
              updated_at = NOW()
          WHERE id = $1`,
-        [trip.passenger_id, trip.promotional_trip === true]
+        [
+          trip.passenger_id,
+          trip.promotional_trip === true,
+          promoSettings.enabled,
+          promoSettings.cycleLength,
+          promoSettings.rewardCredits
+        ]
       );
     }
 

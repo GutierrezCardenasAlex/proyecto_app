@@ -140,11 +140,14 @@ class PromotionsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
-    final progress = session.completedTripCount.clamp(0, 5).toInt();
+    final safeCycleLength = session.promoCycleLength <= 0 ? 5 : session.promoCycleLength;
+    final progress = session.promoProgressCount.clamp(0, safeCycleLength).toInt();
     final hasFreeTrip = session.freeTripCredits > 0;
+    final promoEnabled = session.promoEnabled;
     final cycleProgress = hasFreeTrip ? 0 : progress;
-    final progressValue = cycleProgress / 5.0;
-    final nextCycleTarget = hasFreeTrip ? '0/5' : '$cycleProgress/5';
+    final progressValue = safeCycleLength == 0 ? 0.0 : cycleProgress / safeCycleLength;
+    final nextCycleTarget = hasFreeTrip ? '0/$safeCycleLength' : '$cycleProgress/$safeCycleLength';
+    final totalTrips = session.completedTripCount;
 
     return _DetailScaffold(
       title: 'Promociones',
@@ -203,11 +206,15 @@ class PromotionsPage extends ConsumerWidget {
                     ),
                     const SizedBox(width: 14),
                     Expanded(
-                      child: Column(
+                          child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            hasFreeTrip ? 'Ya tienes viaje gratis' : 'Te acercas a un viaje gratis',
+                            !promoEnabled
+                                ? 'Promocion pausada por central'
+                                : hasFreeTrip
+                                    ? 'Ya tienes viaje gratis'
+                                    : 'Te acercas a un viaje gratis',
                             style: GoogleFonts.plusJakartaSans(
                               fontSize: 20,
                               fontWeight: FontWeight.w800,
@@ -216,9 +223,11 @@ class PromotionsPage extends ConsumerWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            hasFreeTrip
-                                ? 'Tu sexto viaje es gratis y el contador ya se reinicio para el siguiente ciclo.'
-                                : 'Cada 5 viajes completados desbloqueas 1 viaje gratis.',
+                            !promoEnabled
+                                ? 'La promo esta desactivada por ahora. Tu historial de viajes se sigue guardando normal.'
+                                : hasFreeTrip
+                                    ? 'Tu viaje gratis ya esta listo y el nuevo ciclo comenzo desde 0/$safeCycleLength.'
+                                    : 'Cada $safeCycleLength viajes pagados desbloqueas 1 viaje gratis.',
                             style: const TextStyle(
                               color: Color(0xFFFFE3D0),
                               fontWeight: FontWeight.w600,
@@ -239,7 +248,7 @@ class PromotionsPage extends ConsumerWidget {
                   child: Row(
                     children: [
                       Text(
-                        hasFreeTrip ? 'Gratis listo' : nextCycleTarget,
+                        !promoEnabled ? 'Pausada' : hasFreeTrip ? 'Gratis listo' : nextCycleTarget,
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 24,
                           fontWeight: FontWeight.w900,
@@ -251,10 +260,12 @@ class PromotionsPage extends ConsumerWidget {
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(999),
                           child: LinearProgressIndicator(
-                            value: hasFreeTrip ? 1 : progressValue,
+                            value: promoEnabled ? (hasFreeTrip ? 1 : progressValue) : 0,
                             minHeight: 10,
                             backgroundColor: const Color(0x33FFFFFF),
-                            valueColor: const AlwaysStoppedAnimation(Color(0xFFFFF4EC)),
+                            valueColor: AlwaysStoppedAnimation(
+                              promoEnabled ? const Color(0xFFFFF4EC) : const Color(0xFFFFE3D0),
+                            ),
                           ),
                         ),
                       ),
@@ -263,9 +274,11 @@ class PromotionsPage extends ConsumerWidget {
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  hasFreeTrip
-                      ? 'Tienes ${session.freeTripCredits} viaje(s) gratis disponible(s) y tu siguiente ciclo comenzo en 0/5.'
-                      : 'Te faltan ${5 - cycleProgress} viaje(s) para ganar el proximo gratis.',
+                  !promoEnabled
+                      ? 'Cuando la central reactive la promo, tu progreso volvera a mostrarse aqui.'
+                      : hasFreeTrip
+                          ? 'Tienes ${session.freeTripCredits} viaje(s) gratis disponible(s) y tu siguiente ciclo comenzo en 0/$safeCycleLength.'
+                          : 'Te faltan ${safeCycleLength - cycleProgress} viaje(s) para ganar el proximo gratis.',
                   style: const TextStyle(
                     color: Color(0xFFFFF4EC),
                     fontWeight: FontWeight.w700,
@@ -294,10 +307,11 @@ class PromotionsPage extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                _PromoMetricRow(label: 'Viajes completados del ciclo actual', value: '$cycleProgress'),
+                _PromoMetricRow(label: 'Viajes completados en total', value: '$totalTrips'),
+                _PromoMetricRow(label: 'Avance del ciclo actual', value: nextCycleTarget),
                 _PromoMetricRow(label: 'Viajes gratis disponibles', value: '${session.freeTripCredits}'),
-                _PromoMetricRow(label: 'Meta actual', value: nextCycleTarget),
-                _PromoMetricRow(label: 'Regla del beneficio', value: '5 viajes pagados = 1 gratis'),
+                _PromoMetricRow(label: 'Estado de la promo', value: promoEnabled ? 'Activa' : 'Pausada'),
+                _PromoMetricRow(label: 'Regla del beneficio', value: '$safeCycleLength viajes pagados = 1 gratis'),
               ],
             ),
           ),
@@ -308,7 +322,7 @@ class PromotionsPage extends ConsumerWidget {
           ),
           const _SettingsInfoCard(
             title: 'Uso del viaje premiado',
-            subtitle: 'El beneficio es valido solo para el cliente registrado en Flash Go que gano la promocion. El sexto viaje se usa gratis y luego el contador vuelve a cero.',
+            subtitle: 'El beneficio es valido solo para el cliente registrado en Flash Go que gano la promocion. Cuando usas el viaje gratis, el ciclo vuelve a 0/5 y el conteo total sigue acumulando normal.',
           ),
           const _SettingsInfoCard(
             title: 'Acompanantes',

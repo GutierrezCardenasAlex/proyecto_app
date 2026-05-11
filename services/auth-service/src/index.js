@@ -151,8 +151,24 @@ function mapUser(user) {
     email: user.email,
     address: user.address,
     profileCompleted: Boolean(user.profile_completed),
-    completedTripCount: Number(user.promo_progress_count || 0),
+    completedTripCount: Number(user.completed_trip_count || 0),
+    promoProgressCount: Number(user.promo_progress_count || 0),
     freeTripCredits: Number(user.free_trip_credits || 0)
+  };
+}
+
+async function getPromoSettings(client = pool) {
+  const result = await client.query(
+    `SELECT enabled, cycle_length, reward_credits
+     FROM promo_settings
+     WHERE id = 1
+     LIMIT 1`
+  );
+
+  return {
+    enabled: result.rows[0]?.enabled !== false,
+    cycleLength: Number(result.rows[0]?.cycle_length || 5),
+    rewardCredits: Number(result.rows[0]?.reward_credits || 1)
   };
 }
 
@@ -209,6 +225,22 @@ async function ensureSchema() {
       ADD COLUMN IF NOT EXISTS completed_trip_count INTEGER NOT NULL DEFAULT 0,
       ADD COLUMN IF NOT EXISTS promo_progress_count INTEGER NOT NULL DEFAULT 0,
       ADD COLUMN IF NOT EXISTS free_trip_credits INTEGER NOT NULL DEFAULT 0
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS promo_settings (
+      id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+      enabled BOOLEAN NOT NULL DEFAULT TRUE,
+      cycle_length INTEGER NOT NULL DEFAULT 5,
+      reward_credits INTEGER NOT NULL DEFAULT 1,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    INSERT INTO promo_settings (id, enabled, cycle_length, reward_credits)
+    VALUES (1, TRUE, 5, 1)
+    ON CONFLICT (id) DO NOTHING
   `);
 
   await pool.query(`
@@ -449,7 +481,8 @@ async function bootstrap() {
            profile_completed = FALSE,
            updated_at = NOW()
        WHERE id = $1
-       RETURNING id, phone, role, full_name, first_name, last_name, email, address, profile_completed`,
+       RETURNING id, phone, role, full_name, first_name, last_name, email, address,
+                 profile_completed, completed_trip_count, promo_progress_count, free_trip_credits`,
       [user.id, passwordHash, parsed.role, parsed.firstName, parsed.firstName]
     );
     await redis.del(`otp:${phone}`);
@@ -468,11 +501,13 @@ async function bootstrap() {
 
     const updatedUser = updatedUserResult.rows[0];
     const token = await issueUserToken({ ...updatedUser, role: parsed.role });
+    const promo = await getPromoSettings();
 
     reply.send({
       token,
       status: "AUTORIZADO",
-      user: mapUser({ ...updatedUser, role: parsed.role })
+      user: mapUser({ ...updatedUser, role: parsed.role }),
+      promo
     });
   });
 
@@ -483,7 +518,7 @@ async function bootstrap() {
 
     const userResult = await pool.query(
       `SELECT id, phone, role, full_name, first_name, last_name, email, address,
-              password_hash, profile_completed
+              password_hash, profile_completed, completed_trip_count, promo_progress_count, free_trip_credits
        FROM users
        WHERE phone = $1`,
       [phone]
@@ -521,10 +556,12 @@ async function bootstrap() {
     }
 
     const token = await issueUserToken(user);
+    const promo = await getPromoSettings();
     reply.send({
       token,
       status: "AUTORIZADO",
-      user: mapUser(user)
+      user: mapUser(user),
+      promo
     });
   });
 
@@ -621,7 +658,8 @@ async function bootstrap() {
            profile_completed = $7,
            updated_at = NOW()
        WHERE id = $1
-       RETURNING id, phone, role, full_name, first_name, last_name, email, address, profile_completed`,
+       RETURNING id, phone, role, full_name, first_name, last_name, email, address,
+                 profile_completed, completed_trip_count, promo_progress_count, free_trip_credits`,
       [
         userId,
         payload.firstName,
@@ -633,7 +671,8 @@ async function bootstrap() {
       ]
     );
 
-    reply.send({ user: mapUser(result.rows[0]) });
+    const promo = await getPromoSettings();
+    reply.send({ user: mapUser(result.rows[0]), promo });
   });
 
   app.get("/session-status", { preHandler: [app.authenticate] }, async (request, reply) => {
@@ -664,8 +703,10 @@ async function bootstrap() {
     );
 
     const device = deviceResult.rows[0] ?? null;
+    const promo = await getPromoSettings();
     reply.send({
       user: mapUser(userResult.rows[0]),
+      promo,
       deviceStatus: device?.status || "PENDIENTE",
       deviceId: device?.id ?? null,
       approvedAt: device?.approved_at ?? null,

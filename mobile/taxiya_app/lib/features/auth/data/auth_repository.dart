@@ -27,7 +27,10 @@ class AuthResult {
     required this.profileCompleted,
     required this.deviceStatus,
     required this.completedTripCount,
+    required this.promoProgressCount,
     required this.freeTripCredits,
+    required this.promoEnabled,
+    required this.promoCycleLength,
   });
 
   final String userId;
@@ -41,7 +44,10 @@ class AuthResult {
   final bool profileCompleted;
   final String deviceStatus;
   final int completedTripCount;
+  final int promoProgressCount;
   final int freeTripCredits;
+  final bool promoEnabled;
+  final int promoCycleLength;
 }
 
 class SessionStatusResult {
@@ -54,7 +60,10 @@ class SessionStatusResult {
     required this.email,
     required this.address,
     required this.completedTripCount,
+    required this.promoProgressCount,
     required this.freeTripCredits,
+    required this.promoEnabled,
+    required this.promoCycleLength,
   });
 
   final String deviceStatus;
@@ -65,7 +74,10 @@ class SessionStatusResult {
   final String email;
   final String address;
   final int completedTripCount;
+  final int promoProgressCount;
   final int freeTripCredits;
+  final bool promoEnabled;
+  final int promoCycleLength;
 }
 
 class OtpRequestResult {
@@ -82,6 +94,17 @@ class OtpRequestResult {
 
 class AuthRepository {
   const AuthRepository();
+
+  bool _readPromoEnabled(Map<String, dynamic> payload) {
+    final promo = payload['promo'] as Map<String, dynamic>?;
+    return promo?['enabled'] != false;
+  }
+
+  int _readPromoCycleLength(Map<String, dynamic> payload) {
+    final promo = payload['promo'] as Map<String, dynamic>?;
+    final value = promo?['cycleLength'];
+    return value is num ? value.toInt() : 5;
+  }
 
   Future<OtpRequestResult> requestRegistrationOtp(String phone, String firstName) async {
     final response = await http.post(
@@ -215,7 +238,10 @@ class AuthRepository {
       profileCompleted: user['profileCompleted'] == true,
       deviceStatus: 'AUTORIZADO',
       completedTripCount: user['completedTripCount'] is num ? (user['completedTripCount'] as num).toInt() : 0,
+      promoProgressCount: user['promoProgressCount'] is num ? (user['promoProgressCount'] as num).toInt() : 0,
       freeTripCredits: user['freeTripCredits'] is num ? (user['freeTripCredits'] as num).toInt() : 0,
+      promoEnabled: _readPromoEnabled(payload),
+      promoCycleLength: _readPromoCycleLength(payload),
     );
   }
 
@@ -242,7 +268,10 @@ class AuthRepository {
       email: user['email']?.toString() ?? '',
       address: user['address']?.toString() ?? '',
       completedTripCount: user['completedTripCount'] is num ? (user['completedTripCount'] as num).toInt() : 0,
+      promoProgressCount: user['promoProgressCount'] is num ? (user['promoProgressCount'] as num).toInt() : 0,
       freeTripCredits: user['freeTripCredits'] is num ? (user['freeTripCredits'] as num).toInt() : 0,
+      promoEnabled: _readPromoEnabled(payload),
+      promoCycleLength: _readPromoCycleLength(payload),
     );
   }
 
@@ -278,7 +307,10 @@ class AuthRepository {
       profileCompleted: user['profileCompleted'] == true,
       deviceStatus: payload['status']?.toString() ?? 'AUTORIZADO',
       completedTripCount: user['completedTripCount'] is num ? (user['completedTripCount'] as num).toInt() : 0,
+      promoProgressCount: user['promoProgressCount'] is num ? (user['promoProgressCount'] as num).toInt() : 0,
       freeTripCredits: user['freeTripCredits'] is num ? (user['freeTripCredits'] as num).toInt() : 0,
+      promoEnabled: _readPromoEnabled(payload),
+      promoCycleLength: _readPromoCycleLength(payload),
     );
   }
 }
@@ -303,7 +335,10 @@ class SessionController extends Notifier<Session> {
       profileCompleted: false,
       deviceStatus: 'AUTORIZADO',
       completedTripCount: 0,
+      promoProgressCount: 0,
       freeTripCredits: 0,
+      promoEnabled: true,
+      promoCycleLength: 5,
       isLoading: false,
       errorMessage: null,
       isRestoring: true,
@@ -400,7 +435,10 @@ class SessionController extends Notifier<Session> {
     await prefs.remove('session_profile_completed');
     await prefs.remove('session_device_status');
     await prefs.remove('session_completed_trip_count');
+    await prefs.remove('session_promo_progress_count');
     await prefs.remove('session_free_trip_credits');
+    await prefs.remove('session_promo_enabled');
+    await prefs.remove('session_promo_cycle_length');
     state = const Session(
       userId: '',
       phone: '',
@@ -415,7 +453,10 @@ class SessionController extends Notifier<Session> {
       profileCompleted: false,
       deviceStatus: 'AUTORIZADO',
       completedTripCount: 0,
+      promoProgressCount: 0,
       freeTripCredits: 0,
+      promoEnabled: true,
+      promoCycleLength: 5,
       isLoading: false,
       errorMessage: null,
       isRestoring: false,
@@ -436,7 +477,10 @@ class SessionController extends Notifier<Session> {
     await prefs.setBool('session_profile_completed', result.profileCompleted);
     await prefs.setString('session_device_status', result.deviceStatus);
     await prefs.setInt('session_completed_trip_count', result.completedTripCount);
+    await prefs.setInt('session_promo_progress_count', result.promoProgressCount);
     await prefs.setInt('session_free_trip_credits', result.freeTripCredits);
+    await prefs.setBool('session_promo_enabled', result.promoEnabled);
+    await prefs.setInt('session_promo_cycle_length', result.promoCycleLength);
     state = state.copyWith(
       userId: result.userId,
       phone: result.phone,
@@ -451,7 +495,10 @@ class SessionController extends Notifier<Session> {
       profileCompleted: result.profileCompleted,
       deviceStatus: result.deviceStatus,
       completedTripCount: result.completedTripCount,
+      promoProgressCount: result.promoProgressCount,
       freeTripCredits: result.freeTripCredits,
+      promoEnabled: result.promoEnabled,
+      promoCycleLength: result.promoCycleLength,
       isLoading: false,
       clearError: true,
     );
@@ -475,7 +522,10 @@ class SessionController extends Notifier<Session> {
       profileCompleted: prefs.getBool('session_profile_completed') ?? false,
       deviceStatus: prefs.getString('session_device_status') ?? 'AUTORIZADO',
       completedTripCount: prefs.getInt('session_completed_trip_count') ?? 0,
+      promoProgressCount: prefs.getInt('session_promo_progress_count') ?? 0,
       freeTripCredits: prefs.getInt('session_free_trip_credits') ?? 0,
+      promoEnabled: prefs.getBool('session_promo_enabled') ?? true,
+      promoCycleLength: prefs.getInt('session_promo_cycle_length') ?? 5,
       isRestoring: false,
       clearError: true,
     );
@@ -498,7 +548,10 @@ class SessionController extends Notifier<Session> {
       await prefs.setString('session_email', status.email);
       await prefs.setString('session_address', status.address);
       await prefs.setInt('session_completed_trip_count', status.completedTripCount);
+      await prefs.setInt('session_promo_progress_count', status.promoProgressCount);
       await prefs.setInt('session_free_trip_credits', status.freeTripCredits);
+      await prefs.setBool('session_promo_enabled', status.promoEnabled);
+      await prefs.setInt('session_promo_cycle_length', status.promoCycleLength);
       state = state.copyWith(
         deviceStatus: status.deviceStatus,
         profileCompleted: status.profileCompleted,
@@ -508,7 +561,10 @@ class SessionController extends Notifier<Session> {
         email: status.email,
         address: status.address,
         completedTripCount: status.completedTripCount,
+        promoProgressCount: status.promoProgressCount,
         freeTripCredits: status.freeTripCredits,
+        promoEnabled: status.promoEnabled,
+        promoCycleLength: status.promoCycleLength,
         clearError: true,
       );
       return status.freeTripCredits > previousCredits;

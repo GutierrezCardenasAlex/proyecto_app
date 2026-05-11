@@ -10,7 +10,6 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../auth/data/auth_repository.dart';
-import '../../auth/domain/driver_session.dart';
 import '../../auth/presentation/driver_login_card.dart';
 import '../../auth/presentation/driver_profile_completion_page.dart';
 import '../../map/presentation/driver_map.dart';
@@ -143,6 +142,7 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
     _socket?.on('driver:trip_offer', (_) {
       ref.read(offeredTripProvider.notifier).loadOffer();
       ref.read(driverOffersProvider.notifier).loadOffers();
+      ref.invalidate(driverTripHistoryProvider);
       LocalNotifications.show(
         id: 2001,
         title: 'Nueva oferta',
@@ -181,14 +181,17 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
             foregroundColor: const Color(0xFF0F0F10),
           );
         }
+        ref.invalidate(driverTripHistoryProvider);
       }
     });
     _socket?.on('driver:trip_rejected', (_) {
       ref.read(driverOffersProvider.notifier).loadOffers();
+      ref.invalidate(driverTripHistoryProvider);
     });
     _socket?.on('driver:trip_accepted', (_) {
       ref.read(driverOffersProvider.notifier).loadOffers();
       ref.read(offeredTripProvider.notifier).loadOffer();
+      ref.invalidate(driverTripHistoryProvider);
     });
     _socket?.connect();
   }
@@ -769,8 +772,6 @@ class _DriverDashboard extends ConsumerStatefulWidget {
 class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
   final DraggableScrollableController _sheetController = DraggableScrollableController();
   double _sheetSize = 0.36;
-  DateTime? _lastOfferRefreshAt;
-  bool _isRefreshingOffer = false;
   int _mapFocusSignal = 0;
 
   @override
@@ -786,28 +787,6 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
       duration: const Duration(milliseconds: 260),
       curve: Curves.easeOutCubic,
     );
-  }
-
-  Future<void> _maybeRefreshOffer(DriverSession session, DriverState driverState, AsyncValue<DriverTrip?> tripAsync) async {
-    if (!session.loggedIn || !driverState.available || tripAsync.isLoading || _isRefreshingOffer) {
-      return;
-    }
-    final now = DateTime.now();
-    if (_lastOfferRefreshAt != null && now.difference(_lastOfferRefreshAt!) < const Duration(seconds: 8)) {
-      return;
-    }
-    _isRefreshingOffer = true;
-    _lastOfferRefreshAt = now;
-    try {
-      await Future.wait([
-        ref.read(offeredTripProvider.notifier).loadOffer(),
-        ref.read(driverOffersProvider.notifier).loadOffers(),
-      ]);
-    } catch (_) {
-      // Ignore transient polling failures to keep dashboard smooth.
-    } finally {
-      _isRefreshingOffer = false;
-    }
   }
 
   LatLngBounds? _buildDriverFocusBounds({
@@ -1744,10 +1723,6 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
       });
     }
 
-    if (session.loggedIn && driverState.available && trip == null) {
-      Future<void>.microtask(() => _maybeRefreshOffer(session, driverState, tripAsync));
-    }
-
     return Stack(
       children: [
         Positioned.fill(
@@ -2287,7 +2262,6 @@ class _DriverTripsTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final trip = ref.watch(offeredTripProvider).value;
     final historyAsync = ref.watch(driverTripHistoryProvider);
     return DriverPageShell(
       eyebrow: 'Actividad',
@@ -2310,12 +2284,7 @@ class _DriverTripsTab extends ConsumerWidget {
           subtitle: error.toString().replaceFirst('Exception: ', ''),
         ),
         data: (history) {
-          final trips = <DriverTrip>[
-            ...?trip == null ? null : [trip],
-            ...history.where((item) => item.id != trip?.id),
-          ];
-
-          if (trips.isEmpty) {
+          if (history.isEmpty) {
             return const DriverEmptyCard(
               title: 'Todavia no hay viajes',
               subtitle: 'Activa disponibilidad para empezar a recibir solicitudes reales.',
@@ -2324,11 +2293,13 @@ class _DriverTripsTab extends ConsumerWidget {
 
           return Column(
             children: [
-              for (final item in trips) ...[
+              for (final item in history) ...[
                 _DriverHistoryCard(
                   trip: item,
-                  title: item.id == trip?.id ? 'Viaje actual' : 'Viaje reciente',
-                  isCurrentTrip: item.id == trip?.id,
+                  title: const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(item.status)
+                      ? 'Viaje actual'
+                      : 'Viaje realizado',
+                  isCurrentTrip: const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(item.status),
                 ),
                 const SizedBox(height: 14),
               ],
@@ -2881,8 +2852,7 @@ class _DriverHistoryCard extends ConsumerWidget {
   }
 
   bool get _canCancel {
-    return isCurrentTrip &&
-        const {'accepted', 'arriving', 'at_pickup'}.contains(trip.status);
+    return const {'accepted', 'arriving', 'at_pickup'}.contains(trip.status);
   }
 
   String? _normalizeWhatsAppPhone(String? rawPhone) {
@@ -3046,6 +3016,7 @@ class _DriverHistoryCard extends ConsumerWidget {
     final accent = _historyAccentColor(trip.status);
     final passengerName =
         trip.passengerName?.trim().isNotEmpty == true ? trip.passengerName!.trim() : 'Pasajero';
+    final vehicleSummary = (trip.vehicleLabel ?? trip.vehicleType ?? '').trim();
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF1B1B1F),
@@ -3113,29 +3084,60 @@ class _DriverHistoryCard extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 14),
-            Text(
-              title,
-              style: const TextStyle(
-                color: Color(0xFFFFC89B),
-                fontWeight: FontWeight.w700,
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _DriverMiniBadge(icon: Icons.badge_outlined, label: title),
+                if (trip.requestedAt?.isNotEmpty ?? false)
+                  _DriverMiniBadge(icon: Icons.schedule_rounded, label: trip.requestedAt!),
+                if (vehicleSummary.isNotEmpty)
+                  _DriverMiniBadge(
+                    icon: (trip.vehicleType ?? '').toLowerCase() == 'moto'
+                        ? Icons.two_wheeler_rounded
+                        : Icons.local_taxi_rounded,
+                    label: vehicleSummary,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF25252B),
+                borderRadius: BorderRadius.circular(22),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Resumen del viaje',
+                    style: TextStyle(
+                      color: Color(0xFFFFD8BF),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _DriverCompactInfoRow(
+                    icon: Icons.radio_button_checked_rounded,
+                    label: 'Recojo',
+                    value: trip.passengerPickup,
+                    iconColor: const Color(0xFFF97316),
+                  ),
+                  const SizedBox(height: 10),
+                  _DriverCompactInfoRow(
+                    icon: Icons.location_on_rounded,
+                    label: 'Destino',
+                    value: trip.destination,
+                    iconColor: const Color(0xFF22C55E),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 10),
-            _InfoTile(label: 'ID', value: trip.id),
-            if (trip.requestedAt?.isNotEmpty ?? false)
-              _InfoTile(label: 'Fecha', value: trip.requestedAt!),
-            _InfoTile(label: 'Recojo', value: trip.passengerPickup),
-            _InfoTile(label: 'Destino', value: trip.destination),
-            _InfoTile(label: 'Pasajero', value: passengerName),
-            if (trip.passengerPhone?.isNotEmpty ?? false)
-              _InfoTile(label: 'Telefono', value: trip.passengerPhone!),
-            if (trip.vehicleType?.isNotEmpty ?? false)
-              _InfoTile(label: 'Tipo', value: trip.vehicleType!.toUpperCase()),
-            if (trip.vehicleLabel?.isNotEmpty ?? false)
-              _InfoTile(label: 'Vehiculo', value: trip.vehicleLabel!),
-            if (trip.vehiclePlate?.isNotEmpty ?? false)
-              _InfoTile(label: 'Placa', value: trip.vehiclePlate!),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             _DriverTripProgressBar(status: trip.status),
             const SizedBox(height: 14),
             Wrap(

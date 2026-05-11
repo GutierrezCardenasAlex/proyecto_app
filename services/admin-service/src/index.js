@@ -23,6 +23,12 @@ const changeUserPhoneSchema = z.object({
   phone: z.string().min(8)
 });
 
+const promoSettingsSchema = z.object({
+  enabled: z.boolean(),
+  cycleLength: z.number().int().min(1).max(20).optional(),
+  rewardCredits: z.number().int().min(1).max(10).optional()
+});
+
 function normalizePhone(rawPhone) {
   const digits = String(rawPhone || "").replace(/\D/g, "");
   if (digits.length === 8) {
@@ -40,6 +46,22 @@ async function ensureAdminSchema() {
       ADD COLUMN IF NOT EXISTS access_status VARCHAR(20) NOT NULL DEFAULT 'AUTORIZADO',
       ADD COLUMN IF NOT EXISTS access_note TEXT,
       ADD COLUMN IF NOT EXISTS access_granted_at TIMESTAMPTZ
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS promo_settings (
+      id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+      enabled BOOLEAN NOT NULL DEFAULT TRUE,
+      cycle_length INTEGER NOT NULL DEFAULT 5,
+      reward_credits INTEGER NOT NULL DEFAULT 1,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    INSERT INTO promo_settings (id, enabled, cycle_length, reward_credits)
+    VALUES (1, TRUE, 5, 1)
+    ON CONFLICT (id) DO NOTHING
   `);
 }
 
@@ -184,6 +206,46 @@ async function bootstrap() {
     );
 
     return result.rows;
+  });
+
+  app.get("/promotions/settings", { preHandler: ensureAdmin }, async () => {
+    const result = await pool.query(
+      `SELECT enabled, cycle_length, reward_credits, updated_at
+       FROM promo_settings
+       WHERE id = 1
+       LIMIT 1`
+    );
+
+    return {
+      enabled: result.rows[0]?.enabled !== false,
+      cycleLength: Number(result.rows[0]?.cycle_length || 5),
+      rewardCredits: Number(result.rows[0]?.reward_credits || 1),
+      updatedAt: result.rows[0]?.updated_at ?? null
+    };
+  });
+
+  app.post("/promotions/settings", { preHandler: ensureAdmin }, async (request) => {
+    const payload = promoSettingsSchema.parse(request.body);
+    const result = await pool.query(
+      `UPDATE promo_settings
+       SET enabled = $1,
+           cycle_length = COALESCE($2, cycle_length),
+           reward_credits = COALESCE($3, reward_credits),
+           updated_at = NOW()
+       WHERE id = 1
+       RETURNING enabled, cycle_length, reward_credits, updated_at`,
+      [payload.enabled, payload.cycleLength ?? null, payload.rewardCredits ?? null]
+    );
+
+    return {
+      message: payload.enabled ? "Promocion activada" : "Promocion pausada",
+      settings: {
+        enabled: result.rows[0]?.enabled !== false,
+        cycleLength: Number(result.rows[0]?.cycle_length || 5),
+        rewardCredits: Number(result.rows[0]?.reward_credits || 1),
+        updatedAt: result.rows[0]?.updated_at ?? null
+      }
+    };
   });
 
   app.get("/devices/user/:userId/history", { preHandler: ensureAdmin }, async (request) => {

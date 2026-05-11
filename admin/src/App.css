@@ -300,6 +300,11 @@ body {
   color: #ffcfaa;
 }
 
+.promo-card p {
+  margin: 8px 0 0;
+  color: #ffcfaa;
+}
+
 @media (max-width: 960px) {
   .layout {
     padding: 16px;
