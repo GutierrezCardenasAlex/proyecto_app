@@ -172,8 +172,8 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://taxiya:taxiya@rabbitmq:5672}
       JWT_SECRET: ${JWT_SECRET:-super-secret}
-      MAP_TILES_URL_TEMPLATE: ${MAP_TILES_URL_TEMPLATE:-https://tile.openstreetmap.org/{z}/{x}/{y}.png}
-      MAP_OFFLINE_TILES_URL_TEMPLATE: ${MAP_OFFLINE_TILES_URL_TEMPLATE:-}
+      MAP_TILES_URL_TEMPLATE: ${MAP_TILES_URL_TEMPLATE:-http://tiles-flashgo.cybernovatech.space/styles/basic-preview/512/{z}/{x}/{y}.png}
+      MAP_OFFLINE_TILES_URL_TEMPLATE: ${MAP_OFFLINE_TILES_URL_TEMPLATE:-http://tiles-flashgo.cybernovatech.space/styles/basic-preview/512/{z}/{x}/{y}.png}
       MAP_OFFLINE_REGION_NAME: ${MAP_OFFLINE_REGION_NAME:-Potosi ciudad}
     depends_on:
       postgres:
@@ -187,8 +187,8 @@ services:
     build:
       context: ./admin
       args:
-        VITE_API_BASE_URL: "http://${PUBLIC_HOST:-flashgo.cybernovatech.space}:${GATEWAY_PORT:-3000}/api"
-        VITE_WS_URL: "http://${PUBLIC_HOST:-flashgo.cybernovatech.space}:${WEBSOCKET_PORT:-3008}"
+        VITE_API_BASE_URL: "http://${API_PUBLIC_HOST:-api-flashgo.cybernovatech.space}/api"
+        VITE_WS_URL: "http://${API_PUBLIC_HOST:-api-flashgo.cybernovatech.space}"
     ports:
       - "${ADMIN_WEB_PORT:-8081}:80"
     depends_on:
@@ -209,12 +209,24 @@ services:
   tileserver:
     image: maptiler/tileserver-gl:latest
     container_name: flashgo-tileserver
-    profiles: ["offline-maps"]
     ports:
       - "${TILES_PORT:-8082}:8080"
     volumes:
       - ${TILES_DATA_PATH:-./infra/tiles}:/data
     command: ["--verbose"]
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: flashgo-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./infra/nginx/conf.d:/etc/nginx/conf.d:ro
+    depends_on:
+      - gateway-api
+      - admin-web
+      - websocket-service
+      - tileserver
 
 volumes:
   postgres_data:
