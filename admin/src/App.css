@@ -87,8 +87,12 @@ body {
 
 .content-grid {
   display: grid;
-  grid-template-columns: 1.8fr 1fr;
+  grid-template-columns: 1fr;
   gap: 24px;
+}
+
+.map-section {
+  margin-bottom: 24px;
 }
 
 .toolbar {
@@ -115,6 +119,10 @@ body {
   border-radius: 22px;
 }
 
+.map-card-wide {
+  width: 100%;
+}
+
 .panel-header {
   display: flex;
   align-items: center;
@@ -125,6 +133,10 @@ body {
 .side-column {
   display: grid;
   gap: 24px;
+}
+
+.side-column-full {
+  grid-template-columns: 1fr;
 }
 
 .auth-form {

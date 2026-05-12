@@ -724,16 +724,18 @@ function App() {
 
       {error && <div className="error-box">{error}</div>}
 
-      <section className="content-grid">
-        <div className="map-card">
+      <section className="map-section">
+        <div className="map-card map-card-wide">
           <div className="panel-header">
             <h2>Mapa en vivo</h2>
             <span>Potosi protegido por radio operativo</span>
           </div>
           <div ref={mapRef} className="map" />
         </div>
+      </section>
 
-        <div className="side-column">
+      <section className="content-grid">
+        <div className="side-column side-column-full">
           <div className="panel">
             <div className="panel-header">
               <h2>Estadistica de conductores</h2>
