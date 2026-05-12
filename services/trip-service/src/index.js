@@ -106,6 +106,10 @@ async function ensureSchema() {
       ADD COLUMN IF NOT EXISTS promotional_trip BOOLEAN NOT NULL DEFAULT FALSE
   `);
   await pool.query(`
+    ALTER TABLE trips
+      ALTER COLUMN destination_location DROP NOT NULL
+  `);
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS trip_ratings (
       id BIGSERIAL PRIMARY KEY,
       trip_id UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,

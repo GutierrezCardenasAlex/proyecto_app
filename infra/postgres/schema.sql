@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS trips (
   pickup_address TEXT,
   destination_address TEXT,
   pickup_location GEOGRAPHY(POINT, 4326) NOT NULL,
-  destination_location GEOGRAPHY(POINT, 4326) NOT NULL,
+  destination_location GEOGRAPHY(POINT, 4326),
   estimated_distance_meters INTEGER,
   estimated_duration_seconds INTEGER,
   fare_amount NUMERIC(10,2),
