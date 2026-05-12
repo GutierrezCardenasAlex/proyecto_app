@@ -42,6 +42,10 @@ const sendNotificationSchema = z.object({
   message: z.string().min(6).max(500)
 });
 
+const driverPerformanceRangeSchema = z.object({
+  range: z.enum(["day", "week", "month"]).default("day")
+});
+
 function normalizePhone(rawPhone) {
   const digits = String(rawPhone || "").replace(/\D/g, "");
   if (digits.length === 8) {
@@ -51,6 +55,18 @@ function normalizePhone(rawPhone) {
     return `+${digits}`;
   }
   return String(rawPhone || "").replace(/\s+/g, "");
+}
+
+function getRangeSql(range) {
+  switch (range) {
+    case "week":
+      return "NOW() - INTERVAL '7 days'";
+    case "month":
+      return "NOW() - INTERVAL '30 days'";
+    case "day":
+    default:
+      return "NOW() - INTERVAL '1 day'";
+  }
 }
 
 async function ensureAdminSchema() {
@@ -206,6 +222,75 @@ async function bootstrap() {
     );
 
     return liveDrivers;
+  });
+
+  app.get("/drivers/performance", { preHandler: ensureAdmin }, async (request) => {
+    const { range } = driverPerformanceRangeSchema.parse(request.query || {});
+    const fromSql = getRangeSql(range);
+
+    const result = await pool.query(
+      `WITH filtered_trips AS (
+         SELECT t.*,
+                COALESCE(t.completed_at, t.cancelled_at, t.updated_at, t.requested_at) AS event_at
+         FROM trips t
+         WHERE t.driver_id IS NOT NULL
+           AND COALESCE(t.completed_at, t.cancelled_at, t.updated_at, t.requested_at) >= ${fromSql}
+       )
+       SELECT d.id AS driver_id,
+              d.status AS driver_status,
+              d.is_available,
+              u.full_name,
+              u.phone,
+              COUNT(ft.id)::int AS total_trips,
+              COUNT(*) FILTER (WHERE ft.status = 'completed')::int AS completed_trips,
+              COUNT(*) FILTER (WHERE ft.status = 'cancelled')::int AS cancelled_trips,
+              COUNT(*) FILTER (WHERE ft.promotional_trip = TRUE)::int AS promo_trips,
+              COALESCE(SUM(CASE WHEN ft.status = 'completed' THEN ft.fare_amount ELSE 0 END), 0)::numeric(10,2) AS revenue,
+              COALESCE(ROUND(AVG(CASE WHEN ft.status = 'completed' THEN ft.fare_amount END)::numeric, 2), 0)::numeric(10,2) AS average_fare,
+              MAX(ft.event_at) AS last_trip_at
+       FROM drivers d
+       INNER JOIN users u ON u.id = d.user_id
+       LEFT JOIN filtered_trips ft ON ft.driver_id = d.id
+       GROUP BY d.id, d.status, d.is_available, u.full_name, u.phone
+       ORDER BY completed_trips DESC, total_trips DESC, revenue DESC, u.full_name ASC`
+    );
+
+    const rows = result.rows.map((row) => ({
+      driverId: row.driver_id,
+      fullName: row.full_name,
+      phone: row.phone,
+      driverStatus: row.driver_status,
+      isAvailable: row.is_available === true,
+      totalTrips: Number(row.total_trips || 0),
+      completedTrips: Number(row.completed_trips || 0),
+      cancelledTrips: Number(row.cancelled_trips || 0),
+      promoTrips: Number(row.promo_trips || 0),
+      revenue: Number(row.revenue || 0),
+      averageFare: Number(row.average_fare || 0),
+      lastTripAt: row.last_trip_at,
+    }));
+
+    const summary = rows.reduce(
+      (accumulator, row) => {
+        accumulator.totalTrips += row.totalTrips;
+        accumulator.completedTrips += row.completedTrips;
+        accumulator.cancelledTrips += row.cancelledTrips;
+        accumulator.promoTrips += row.promoTrips;
+        accumulator.revenue += row.revenue;
+        return accumulator;
+      },
+      { totalTrips: 0, completedTrips: 0, cancelledTrips: 0, promoTrips: 0, revenue: 0 }
+    );
+
+    return {
+      range,
+      generatedAt: new Date().toISOString(),
+      summary: {
+        ...summary,
+        activeDrivers: rows.filter((row) => row.totalTrips > 0).length,
+      },
+      rows
+    };
   });
 
   app.get("/drivers/pending-access", { preHandler: ensureAdmin }, async () => {

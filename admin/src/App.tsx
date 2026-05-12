@@ -113,6 +113,37 @@ type UserSummary = {
   role?: string
 }
 
+type PerformanceRange = 'day' | 'week' | 'month'
+
+type DriverPerformanceRow = {
+  driverId: string
+  fullName?: string | null
+  phone: string
+  driverStatus: string
+  isAvailable: boolean
+  totalTrips: number
+  completedTrips: number
+  cancelledTrips: number
+  promoTrips: number
+  revenue: number
+  averageFare: number
+  lastTripAt?: string | null
+}
+
+type DriverPerformanceResponse = {
+  range: PerformanceRange
+  generatedAt: string
+  summary: {
+    totalTrips: number
+    completedTrips: number
+    cancelledTrips: number
+    promoTrips: number
+    revenue: number
+    activeDrivers: number
+  }
+  rows: DriverPerformanceRow[]
+}
+
 function App() {
   const mapRef = useRef<HTMLDivElement | null>(null)
   const mapInstanceRef = useRef<any>(null)
@@ -136,6 +167,20 @@ function App() {
     updatedAt: null,
   })
   const [supportReports, setSupportReports] = useState<SupportReport[]>([])
+  const [performanceRange, setPerformanceRange] = useState<PerformanceRange>('day')
+  const [driverPerformance, setDriverPerformance] = useState<DriverPerformanceResponse>({
+    range: 'day',
+    generatedAt: '',
+    summary: {
+      totalTrips: 0,
+      completedTrips: 0,
+      cancelledTrips: 0,
+      promoTrips: 0,
+      revenue: 0,
+      activeDrivers: 0,
+    },
+    rows: [],
+  })
   const [notificationAudience, setNotificationAudience] = useState<'all' | 'passengers' | 'drivers' | 'user'>('all')
   const [notificationPhone, setNotificationPhone] = useState('')
   const [notificationKind, setNotificationKind] = useState<NotificationKind>('nuevo')
@@ -159,6 +204,7 @@ function App() {
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null)
 
   const isAuthenticated = token.length > 0
+  const topDriver = driverPerformance.rows[0] ?? null
 
   const authHeaders = useMemo(
     () => ({
@@ -192,7 +238,7 @@ function App() {
       return
     }
 
-    const [dashboardResponse, driversResponse, tripsResponse, pendingDriversResponse, pendingResponse, devicesResponse, promoResponse, supportResponse] =
+    const [dashboardResponse, driversResponse, tripsResponse, pendingDriversResponse, pendingResponse, devicesResponse, promoResponse, supportResponse, performanceResponse] =
       await Promise.all([
         fetchWithAdminAuth<Dashboard>(`${apiBase}/admin/dashboard`, { headers: authHeaders }),
         fetchWithAdminAuth<Driver[]>(`${apiBase}/admin/drivers/live`, { headers: authHeaders }),
@@ -202,6 +248,7 @@ function App() {
         fetchWithAdminAuth<DeviceRow[]>(`${apiBase}/admin/devices`, { headers: authHeaders }),
         fetchWithAdminAuth<PromoSettings>(`${apiBase}/admin/promotions/settings`, { headers: authHeaders }),
         fetchWithAdminAuth<SupportReport[]>(`${apiBase}/admin/support/reports/all`, { headers: authHeaders }),
+        fetchWithAdminAuth<DriverPerformanceResponse>(`${apiBase}/admin/drivers/performance?range=${performanceRange}`, { headers: authHeaders }),
       ])
 
     setDashboard(dashboardResponse)
@@ -212,6 +259,7 @@ function App() {
     setAllDevices(devicesResponse)
     setPromoSettings(promoResponse)
     setSupportReports(supportResponse)
+    setDriverPerformance(performanceResponse)
     setLastUpdatedAt(new Date().toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
   }
 
@@ -393,6 +441,26 @@ function App() {
     }
   }
 
+  async function loadDriverPerformance(range: PerformanceRange) {
+    if (!token) {
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    try {
+      const payload = await fetchWithAdminAuth<DriverPerformanceResponse>(`${apiBase}/admin/drivers/performance?range=${range}`, {
+        headers: authHeaders,
+      })
+      setPerformanceRange(range)
+      setDriverPerformance(payload)
+    } catch (statsError) {
+      setError(statsError instanceof Error ? statsError.message : 'No se pudo cargar el reporte de conductores')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function loadUserHistory(user: UserSummary) {
     if (!token) {
       return
@@ -516,7 +584,7 @@ function App() {
       document.removeEventListener('visibilitychange', handleVisibility)
       socket.close()
     }
-  }, [authHeaders, isAuthenticated, token])
+  }, [authHeaders, isAuthenticated, performanceRange, token])
 
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current || !isAuthenticated) {
@@ -668,6 +736,111 @@ function App() {
         <div className="side-column">
           <div className="panel">
             <div className="panel-header">
+              <h2>Estadistica de conductores</h2>
+              <span>{performanceRange === 'day' ? 'Hoy' : performanceRange === 'week' ? '7 dias' : '30 dias'}</span>
+            </div>
+            <article className="list-card stack-card promo-card">
+              <div className="filter-chip-row">
+                <button
+                  className={performanceRange === 'day' ? 'filter-chip active' : 'filter-chip'}
+                  disabled={loading}
+                  onClick={() => loadDriverPerformance('day')}
+                >
+                  Dia
+                </button>
+                <button
+                  className={performanceRange === 'week' ? 'filter-chip active' : 'filter-chip'}
+                  disabled={loading}
+                  onClick={() => loadDriverPerformance('week')}
+                >
+                  Semana
+                </button>
+                <button
+                  className={performanceRange === 'month' ? 'filter-chip active' : 'filter-chip'}
+                  disabled={loading}
+                  onClick={() => loadDriverPerformance('month')}
+                >
+                  Mes
+                </button>
+              </div>
+
+              <div className="mini-stats-grid">
+                <div className="mini-stat-card">
+                  <span>Viajes del periodo</span>
+                  <strong>{driverPerformance.summary.totalTrips}</strong>
+                </div>
+                <div className="mini-stat-card">
+                  <span>Completados</span>
+                  <strong>{driverPerformance.summary.completedTrips}</strong>
+                </div>
+                <div className="mini-stat-card">
+                  <span>Promocionales</span>
+                  <strong>{driverPerformance.summary.promoTrips}</strong>
+                </div>
+                <div className="mini-stat-card">
+                  <span>Choferes activos</span>
+                  <strong>{driverPerformance.summary.activeDrivers}</strong>
+                </div>
+              </div>
+
+              {topDriver && topDriver.totalTrips > 0 && (
+                <div className="highlight-card">
+                  <div>
+                    <span className="status-pill success">Top del periodo</span>
+                    <strong>{topDriver.fullName || topDriver.phone}</strong>
+                    <p>
+                      {topDriver.completedTrips} viajes completados · Bs {topDriver.revenue.toFixed(2)} generados
+                    </p>
+                  </div>
+                  <div className="stack-actions">
+                    <span className={topDriver.isAvailable ? 'status-pill success' : 'status-pill danger'}>
+                      {topDriver.isAvailable ? 'Disponible' : 'No disponible'}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div className="performance-list">
+                {driverPerformance.rows.length === 0 && (
+                  <article className="list-card">Sin viajes para este periodo.</article>
+                )}
+                {driverPerformance.rows.map((row, index) => (
+                  <article key={row.driverId} className="list-card stack-card performance-card">
+                    <div>
+                      <div className="performance-heading">
+                        <strong>
+                          #{index + 1} {row.fullName || row.phone}
+                        </strong>
+                        <span className={row.isAvailable ? 'status-pill success' : 'status-pill danger'}>
+                          {row.isAvailable ? 'Activo' : 'Inactivo'}
+                        </span>
+                      </div>
+                      <p>{row.phone}</p>
+                      <p>
+                        {row.completedTrips} completados · {row.cancelledTrips} cancelados · {row.promoTrips} promo
+                      </p>
+                      <p>
+                        Bs {row.revenue.toFixed(2)} · promedio Bs {row.averageFare.toFixed(2)}
+                      </p>
+                      <p>
+                        Estado actual:{' '}
+                        <span className={row.driverStatus === 'available' ? 'status-pill success subtle' : 'status-pill danger subtle'}>
+                          {row.driverStatus}
+                        </span>
+                      </p>
+                      <p>
+                        Ultimo movimiento:{' '}
+                        {row.lastTripAt ? new Date(row.lastTripAt).toLocaleString('es-BO') : 'Sin viajes en el periodo'}
+                      </p>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </article>
+          </div>
+
+          <div className="panel">
+            <div className="panel-header">
               <h2>Promociones Flash Go</h2>
               <span>{promoSettings.enabled ? 'Activa' : 'Pausada'}</span>
             </div>
@@ -749,10 +922,14 @@ function App() {
               {pendingDrivers.map((driver) => (
                 <article key={driver.id} className="list-card stack-card">
                   <div>
-                    <strong>{driver.full_name || driver.phone}</strong>
+                    <div className="performance-heading">
+                      <strong>{driver.full_name || driver.phone}</strong>
+                      <span className={driver.access_status === 'AUTORIZADO' ? 'status-pill success' : driver.access_status === 'RECHAZADO' ? 'status-pill danger' : 'status-pill warning'}>
+                        {driver.access_status}
+                      </span>
+                    </div>
                     <p>conductor · {driver.phone}</p>
                     <p>Licencia: {driver.license_number}</p>
-                    <p>Estado: {driver.access_status}</p>
                     {driver.access_note && <p>Nota actual: {driver.access_note}</p>}
                   </div>
                   <div className="stack-actions">
@@ -764,7 +941,7 @@ function App() {
                     />
                     <div className="action-row">
                       <button
-                        className="primary-button"
+                        className="success-button"
                         onClick={() => updateDriverAccess(driver.id, 'AUTORIZADO', driverAccessNote)}
                       >
                         Autorizar conductor
@@ -805,13 +982,18 @@ function App() {
               {pendingDevices.map((device) => (
                 <article key={device.id} className="list-card stack-card">
                   <div>
-                    <strong>{device.full_name || device.phone}</strong>
+                    <div className="performance-heading">
+                      <strong>{device.full_name || device.phone}</strong>
+                      <span className={device.status === 'AUTORIZADO' ? 'status-pill success' : device.status === 'RECHAZADO' ? 'status-pill danger' : 'status-pill warning'}>
+                        {device.status}
+                      </span>
+                    </div>
                     <p>{device.role} · {device.phone}</p>
                     <p>{device.device_name || 'Equipo desconocido'}</p>
                     <p>{device.platform || 'sin plataforma'} · {device.device_identifier}</p>
                   </div>
                   <div className="action-row">
-                    <button className="primary-button" onClick={() => updateDeviceStatus(device.id, 'AUTORIZADO')}>
+                    <button className="success-button" onClick={() => updateDeviceStatus(device.id, 'AUTORIZADO')}>
                       Aprobar
                     </button>
                     <button className="danger-button" onClick={() => updateDeviceStatus(device.id, 'RECHAZADO')}>
@@ -866,7 +1048,12 @@ function App() {
                   <div>
                     <strong>{report.full_name || report.phone}</strong>
                     <p>{report.role} · {report.phone}</p>
-                    <p>{report.category} · {report.status}</p>
+                    <p>
+                      {report.category} ·{' '}
+                      <span className={report.status === 'ABIERTO' ? 'status-pill warning subtle' : 'status-pill success subtle'}>
+                        {report.status}
+                      </span>
+                    </p>
                     <p>{report.message}</p>
                     <p>{new Date(report.created_at).toLocaleString('es-BO')}</p>
                   </div>
@@ -906,7 +1093,11 @@ function App() {
                     <strong>{device.device_name || 'Equipo desconocido'}</strong>
                     <div>{device.platform || 'sin plataforma'}</div>
                   </td>
-                  <td>{device.status}</td>
+                  <td>
+                    <span className={device.status === 'AUTORIZADO' ? 'status-pill success' : device.status === 'RECHAZADO' ? 'status-pill danger' : 'status-pill warning'}>
+                      {device.status}
+                    </span>
+                  </td>
                   <td>{device.approved_by_name || 'Sin accion'}</td>
                   <td>
                     <div className="action-row compact">
@@ -923,7 +1114,7 @@ function App() {
                       >
                         Historial
                       </button>
-                      <button className="secondary-button" onClick={() => updateDeviceStatus(device.id, 'AUTORIZADO')}>
+                      <button className="success-button" onClick={() => updateDeviceStatus(device.id, 'AUTORIZADO')}>
                         Autorizar
                       </button>
                       <button className="primary-button" onClick={() => replaceDevice(device.id)}>
