@@ -100,6 +100,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  flex-wrap: wrap;
   margin-bottom: 24px;
 }
 
@@ -279,6 +280,30 @@ body {
   display: grid;
   gap: 10px;
   min-width: min(360px, 100%);
+}
+
+.support-filters-card {
+  margin-bottom: 14px;
+}
+
+.support-summary-grid {
+  margin-bottom: 6px;
+}
+
+.support-filter-bar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.support-filter-bar select,
+.support-filter-bar input {
+  border: 1px solid rgba(249, 115, 22, 0.14);
+  border-radius: 16px;
+  padding: 14px 16px;
+  background: #0f1013;
+  color: #fff4ec;
+  font: inherit;
 }
 
 .table-wrapper {
@@ -599,7 +624,8 @@ body {
 
   .leaders-grid,
   .performance-metric-row,
-  .leader-metrics {
+  .leader-metrics,
+  .support-filter-bar {
     grid-template-columns: 1fr;
   }
 

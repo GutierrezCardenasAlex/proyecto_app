@@ -63,6 +63,7 @@ type SupportReport = {
 }
 
 type NotificationKind = 'nuevo' | 'importante' | 'sistema'
+type AdminView = 'overview' | 'stats' | 'support' | 'devices'
 
 type PendingDriverAccessRow = {
   id: string
@@ -187,6 +188,10 @@ function App() {
   const [notificationKind, setNotificationKind] = useState<NotificationKind>('nuevo')
   const [notificationTitle, setNotificationTitle] = useState('')
   const [notificationMessage, setNotificationMessage] = useState('')
+  const [activeView, setActiveView] = useState<AdminView>('overview')
+  const [supportRoleFilter, setSupportRoleFilter] = useState<'all' | 'passenger' | 'driver'>('all')
+  const [supportStatusFilter, setSupportStatusFilter] = useState<'all' | 'ABIERTO' | 'CERRADO'>('all')
+  const [supportSearch, setSupportSearch] = useState('')
   const [phone, setPhone] = useState('+59170000001')
   const [otp, setOtp] = useState('123456')
   const [otpRequested, setOtpRequested] = useState(false)
@@ -208,6 +213,25 @@ function App() {
   const isAuthenticated = token.length > 0
   const topDriver = driverPerformance.rows[0] ?? null
   const performanceLeaders = driverPerformance.rows.slice(0, 3)
+  const supportSummary = useMemo(
+    () => ({
+      open: supportReports.filter((report) => report.status === 'ABIERTO').length,
+      closed: supportReports.filter((report) => report.status !== 'ABIERTO').length,
+      passengers: supportReports.filter((report) => report.role === 'passenger').length,
+      drivers: supportReports.filter((report) => report.role === 'driver').length,
+    }),
+    [supportReports],
+  )
+  const filteredSupportReports = useMemo(() => {
+    const query = supportSearch.trim().toLowerCase()
+    return supportReports.filter((report) => {
+      const matchesRole = supportRoleFilter === 'all' || report.role === supportRoleFilter
+      const matchesStatus = supportStatusFilter === 'all' || report.status === supportStatusFilter
+      const haystack = `${report.full_name ?? ''} ${report.phone} ${report.category} ${report.message}`.toLowerCase()
+      const matchesSearch = query.length === 0 || haystack.includes(query)
+      return matchesRole && matchesStatus && matchesSearch
+    })
+  }, [supportReports, supportRoleFilter, supportStatusFilter, supportSearch])
 
   const authHeaders = useMemo(
     () => ({
@@ -609,6 +633,9 @@ function App() {
   useEffect(() => {
     const syncFullscreen = () => {
       setMapFullscreen(document.fullscreenElement === mapCardRef.current)
+      window.setTimeout(() => {
+        mapInstanceRef.current?.invalidateSize?.()
+      }, 120)
     }
 
     document.addEventListener('fullscreenchange', syncFullscreen)
@@ -741,6 +768,30 @@ function App() {
         </div>
         <div className="action-row compact">
           <button
+            className={activeView === 'overview' ? 'filter-chip active' : 'filter-chip'}
+            onClick={() => setActiveView('overview')}
+          >
+            Panel
+          </button>
+          <button
+            className={activeView === 'stats' ? 'filter-chip active' : 'filter-chip'}
+            onClick={() => setActiveView('stats')}
+          >
+            Estadisticas
+          </button>
+          <button
+            className={activeView === 'support' ? 'filter-chip active' : 'filter-chip'}
+            onClick={() => setActiveView('support')}
+          >
+            Soporte
+          </button>
+          <button
+            className={activeView === 'devices' ? 'filter-chip active' : 'filter-chip'}
+            onClick={() => setActiveView('devices')}
+          >
+            Dispositivos
+          </button>
+          <button
             className="secondary-button"
             disabled={loading}
             onClick={() => loadCentralData().catch(() => setError('No se pudo actualizar la central.'))}
@@ -755,6 +806,7 @@ function App() {
 
       {error && <div className="error-box">{error}</div>}
 
+      {activeView === 'overview' && (
       <section className="map-section">
         <div ref={mapCardRef} className={mapFullscreen ? 'map-card map-card-wide map-card-fullscreen' : 'map-card map-card-wide'}>
           <div className="panel-header">
@@ -769,9 +821,11 @@ function App() {
           <div ref={mapRef} className="map" />
         </div>
       </section>
+      )}
 
       <section className="content-grid">
         <div className="side-column side-column-full">
+          {(activeView === 'overview' || activeView === 'stats') && (
           <div className="panel">
             <div className="panel-header">
               <h2>Estadistica de conductores</h2>
@@ -930,7 +984,9 @@ function App() {
               </div>
             </article>
           </div>
+          )}
 
+          {activeView === 'overview' && (
           <div className="panel">
             <div className="panel-header">
               <h2>Promociones Flash Go</h2>
@@ -960,7 +1016,9 @@ function App() {
               </div>
             </article>
           </div>
+          )}
 
+          {activeView === 'overview' && (
           <div className="panel">
             <div className="panel-header">
               <h2>Notificaciones central</h2>
@@ -1003,7 +1061,9 @@ function App() {
               </div>
             </article>
           </div>
+          )}
 
+          {activeView === 'overview' && (
           <div className="panel">
             <div className="panel-header">
               <h2>Conductores por autorizar</h2>
@@ -1063,7 +1123,9 @@ function App() {
               ))}
             </div>
           </div>
+          )}
 
+          {activeView === 'overview' && (
           <div className="panel">
             <div className="panel-header">
               <h2>Solicitudes de dispositivos</h2>
@@ -1109,7 +1171,9 @@ function App() {
               ))}
             </div>
           </div>
+          )}
 
+          {activeView === 'overview' && (
           <div className="panel">
             <div className="panel-header">
               <h2>Viajes activos</h2>
@@ -1127,15 +1191,54 @@ function App() {
               ))}
             </div>
           </div>
+          )}
 
+          {(activeView === 'overview' || activeView === 'support') && (
           <div className="panel">
             <div className="panel-header">
               <h2>Reportes de soporte</h2>
-              <span>{supportReports.length} registros</span>
+              <span>{filteredSupportReports.length} visibles</span>
             </div>
+            <article className="list-card stack-card promo-card support-filters-card">
+              <div className="mini-stats-grid support-summary-grid">
+                <div className="mini-stat-card">
+                  <span>Abiertos</span>
+                  <strong>{supportSummary.open}</strong>
+                </div>
+                <div className="mini-stat-card">
+                  <span>Cerrados</span>
+                  <strong>{supportSummary.closed}</strong>
+                </div>
+                <div className="mini-stat-card">
+                  <span>Pasajeros</span>
+                  <strong>{supportSummary.passengers}</strong>
+                </div>
+                <div className="mini-stat-card">
+                  <span>Conductores</span>
+                  <strong>{supportSummary.drivers}</strong>
+                </div>
+              </div>
+              <div className="support-filter-bar">
+                <select value={supportRoleFilter} onChange={(event) => setSupportRoleFilter(event.target.value as 'all' | 'passenger' | 'driver')}>
+                  <option value="all">Todos los roles</option>
+                  <option value="passenger">Solo pasajeros</option>
+                  <option value="driver">Solo conductores</option>
+                </select>
+                <select value={supportStatusFilter} onChange={(event) => setSupportStatusFilter(event.target.value as 'all' | 'ABIERTO' | 'CERRADO')}>
+                  <option value="all">Todos los estados</option>
+                  <option value="ABIERTO">Abiertos</option>
+                  <option value="CERRADO">Cerrados</option>
+                </select>
+                <input
+                  value={supportSearch}
+                  onChange={(event) => setSupportSearch(event.target.value)}
+                  placeholder="Buscar por nombre, telefono, categoria o mensaje"
+                />
+              </div>
+            </article>
             <div className="list">
-              {supportReports.length === 0 && <article className="list-card">Sin reportes por ahora.</article>}
-              {supportReports.map((report) => (
+              {filteredSupportReports.length === 0 && <article className="list-card">No hay reportes con esos filtros.</article>}
+              {filteredSupportReports.map((report) => (
                 <article key={report.id} className="support-card">
                   <div className="support-card-top">
                     <div>
@@ -1160,9 +1263,11 @@ function App() {
               ))}
             </div>
           </div>
+          )}
         </div>
       </section>
 
+      {(activeView === 'overview' || activeView === 'devices') && (
       <section className="panel devices-panel">
         <div className="panel-header">
           <h2>Dispositivos registrados</h2>
@@ -1230,6 +1335,7 @@ function App() {
           </table>
         </div>
       </section>
+      )}
 
       {selectedHistoryUser && (
         <section className="panel devices-panel">
