@@ -11,7 +11,6 @@ class AccountTab extends ConsumerWidget {
     this.onBack,
     required this.onOpenProfile,
     required this.onOpenNotifications,
-    required this.onOpenSecurity,
     required this.onOpenSettings,
     required this.onOpenSupport,
   });
@@ -19,7 +18,6 @@ class AccountTab extends ConsumerWidget {
   final VoidCallback? onBack;
   final VoidCallback onOpenProfile;
   final VoidCallback onOpenNotifications;
-  final VoidCallback onOpenSecurity;
   final VoidCallback onOpenSettings;
   final VoidCallback onOpenSupport;
 
@@ -113,24 +111,17 @@ class AccountTab extends ConsumerWidget {
           ),
           const SizedBox(height: 14),
           SimpleMenuTile(
-            onTap: onOpenSecurity,
-            icon: Icons.lock_outline,
-            title: 'Seguridad',
-            subtitle: 'Revision de sesiones, OTP y proteccion de cuenta.',
-          ),
-          const SizedBox(height: 14),
-          SimpleMenuTile(
             onTap: onOpenSettings,
             icon: Icons.settings_outlined,
-            title: 'Configuraciones',
-            subtitle: 'Preferencias de idioma, mapa y experiencia de viaje.',
+            title: 'Descarga de mapa',
+            subtitle: 'Guarda Potosi ciudad para usar el mapa aun con señal baja.',
           ),
           const SizedBox(height: 14),
           SimpleMenuTile(
             onTap: onOpenSupport,
             icon: Icons.support_agent,
             title: 'Soporte',
-            subtitle: 'Contacta ayuda y revisa preguntas frecuentes.',
+            subtitle: 'Reporta fallas de la app y sigue tus casos con central.',
           ),
           const SizedBox(height: 18),
           SizedBox(

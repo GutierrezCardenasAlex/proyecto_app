@@ -3,9 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../../core/admin_center/admin_center_repository.dart';
 import '../../../../../core/map/offline_map.dart';
 import '../../../../../core/ui/top_notice.dart';
 import '../../../auth/data/auth_repository.dart';
+import '../../../trip/data/trip_repository.dart';
+import '../../../trip/domain/driver_trip.dart';
 import '../widgets/driver_ui_kit.dart';
 
 class DriverProfilePage extends ConsumerStatefulWidget {
@@ -337,18 +340,6 @@ class DriverSettingsPage extends StatelessWidget {
         title: 'Configuraciones',
         child: Column(
           children: [
-            const _DriverSettingsInfoCard(
-              title: 'Navegacion',
-              subtitle: 'Ajusta el comportamiento del mapa y seguimiento de ruta.',
-            ),
-            const _DriverSettingsInfoCard(
-              title: 'Alertas',
-              subtitle: 'Controla sonido y avisos de nuevos viajes.',
-            ),
-            const _DriverSettingsInfoCard(
-              title: 'Cuenta',
-              subtitle: 'Revisa tus datos, vehiculo y documentos.',
-            ),
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
@@ -394,55 +385,275 @@ class DriverSettingsPage extends StatelessWidget {
   }
 }
 
-class DriverSecurityPage extends StatelessWidget {
-  const DriverSecurityPage({super.key});
+class DriverNotificationsPage extends ConsumerWidget {
+  const DriverNotificationsPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return const _SimpleDriverPage(
-      title: 'Seguridad',
-      eyebrow: 'Seguridad',
-      items: [
-        ('Sesion OTP', 'Tu acceso como conductor se valida con OTP.'),
-        ('Ruta segura', 'Comparte tu posicion con panel y pasajero en tiempo real.'),
-        ('Cobertura', 'La app valida operacion solo dentro de Potosi.'),
-      ],
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(driverSessionProvider);
+    final repository = const AdminCenterRepository();
+
+    return _DetailScaffold(
+      title: 'Notificaciones',
+      child: FutureBuilder<List<AdminNotificationItem>>(
+        future: session.token.isEmpty ? Future.value(const <AdminNotificationItem>[]) : repository.fetchNotifications(session.token),
+        builder: (context, snapshot) {
+          final items = snapshot.data ?? const <AdminNotificationItem>[];
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: Padding(
+              padding: EdgeInsets.only(top: 80),
+              child: CircularProgressIndicator(),
+            ));
+          }
+
+          return DriverPageShell(
+            eyebrow: 'Bandeja',
+            title: 'Notificaciones',
+            child: Column(
+              children: [
+                if (items.isEmpty)
+                  const _DriverSettingsInfoCard(
+                    title: 'Sin avisos nuevos',
+                    subtitle: 'Las notificaciones de central, autorizaciones y comunicados apareceran aqui.',
+                  ),
+                ...items.map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: DriverMenuTile(
+                      icon: Icons.notifications_active_outlined,
+                      title: item.title,
+                      subtitle: '${item.message}\n${_formatShortDate(item.createdAt)}',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }
 
-class DriverHelpPage extends StatelessWidget {
-  const DriverHelpPage({super.key});
+class DriverSupportPage extends ConsumerStatefulWidget {
+  const DriverSupportPage({super.key});
+
+  @override
+  ConsumerState<DriverSupportPage> createState() => _DriverSupportPageState();
+}
+
+class _DriverSupportPageState extends ConsumerState<DriverSupportPage> {
+  final _messageController = TextEditingController();
+  String _category = 'Falla de app';
+  bool _sending = false;
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return const _SimpleDriverPage(
-      title: 'Centro de ayuda',
-      eyebrow: 'Ayuda',
-      items: [
-        ('Soporte', 'Canales de ayuda para incidencias de viajes o pagos.'),
-        ('Preguntas frecuentes', 'Respuestas para disponibilidad, GPS y aceptacion.'),
-        ('Emergencias', 'Opciones de asistencia en incidentes.'),
-      ],
+    final session = ref.watch(driverSessionProvider);
+    final repository = const AdminCenterRepository();
+
+    return _DetailScaffold(
+      title: 'Soporte',
+      child: FutureBuilder<List<SupportReportItem>>(
+        future: session.token.isEmpty ? Future.value(const <SupportReportItem>[]) : repository.fetchSupportReports(session.token),
+        builder: (context, snapshot) {
+          final reports = snapshot.data ?? const <SupportReportItem>[];
+          return DriverPageShell(
+            eyebrow: 'Soporte',
+            title: 'Reporta un problema',
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1B1B1F),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: const Color(0xFF2C2C31)),
+                  ),
+                  child: Column(
+                    children: [
+                      DropdownButtonFormField<String>(
+                        initialValue: _category,
+                        dropdownColor: const Color(0xFF1B1B1F),
+                        decoration: const InputDecoration(labelText: 'Tipo de reporte'),
+                        items: const [
+                          DropdownMenuItem(value: 'Falla de app', child: Text('Falla de app')),
+                          DropdownMenuItem(value: 'Problema con viaje', child: Text('Problema con viaje')),
+                          DropdownMenuItem(value: 'Cuenta o acceso', child: Text('Cuenta o acceso')),
+                          DropdownMenuItem(value: 'Mapa o GPS', child: Text('Mapa o GPS')),
+                        ],
+                        onChanged: (value) => setState(() => _category = value ?? 'Falla de app'),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: _messageController,
+                        maxLines: 5,
+                        decoration: const InputDecoration(
+                          labelText: 'Detalle del problema',
+                          hintText: 'Describe lo que pasó para que central pueda ayudarte mejor.',
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: _sending
+                              ? null
+                              : () async {
+                                  if (_messageController.text.trim().length < 8) {
+                                    showTopNotice(
+                                      context,
+                                      'Describe mejor el problema para enviarlo a central.',
+                                      backgroundColor: const Color(0xFF93000A),
+                                    );
+                                    return;
+                                  }
+                                  setState(() => _sending = true);
+                                  try {
+                                    await repository.submitSupportReport(
+                                      token: session.token,
+                                      category: _category,
+                                      message: _messageController.text.trim(),
+                                    );
+                                    _messageController.clear();
+                                    if (!context.mounted) return;
+                                    setState(() {});
+                                    showTopNotice(
+                                      context,
+                                      'Reporte enviado correctamente a central.',
+                                      backgroundColor: const Color(0xFFF97316),
+                                      foregroundColor: const Color(0xFF0F0F10),
+                                    );
+                                  } catch (error) {
+                                    if (!context.mounted) return;
+                                    showTopNotice(
+                                      context,
+                                      error.toString().replaceFirst('Exception: ', ''),
+                                      backgroundColor: const Color(0xFF93000A),
+                                    );
+                                  } finally {
+                                    if (mounted) {
+                                      setState(() => _sending = false);
+                                    }
+                                  }
+                                },
+                          icon: const Icon(Icons.send_rounded),
+                          label: Text(_sending ? 'Enviando...' : 'Enviar reporte'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                if (reports.isEmpty)
+                  const _DriverSettingsInfoCard(
+                    title: 'Sin reportes todavía',
+                    subtitle: 'Cuando envíes un reporte desde aquí, central podrá verlo con tus datos del conductor.',
+                  ),
+                ...reports.map(
+                  (report) => Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: DriverMenuTile(
+                      icon: Icons.support_agent,
+                      title: '${report.category} · ${report.status}',
+                      subtitle: '${report.message}\n${_formatShortDate(report.createdAt)}',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }
 
-class DriverEarningsPage extends StatelessWidget {
-  const DriverEarningsPage({super.key});
+class DriverStatisticsPage extends ConsumerStatefulWidget {
+  const DriverStatisticsPage({super.key});
+
+  @override
+  ConsumerState<DriverStatisticsPage> createState() => _DriverStatisticsPageState();
+}
+
+class _DriverStatisticsPageState extends ConsumerState<DriverStatisticsPage> {
+  String _range = 'Dia';
 
   @override
   Widget build(BuildContext context) {
-    return const _SimpleDriverPage(
-      title: 'Ganancias',
-      eyebrow: 'Ingresos',
-      items: [
-        ('Hoy', 'Visualiza viajes completados y efectivo estimado del dia.'),
-        ('Semana', 'Resumen semanal de actividad del conductor.'),
-        ('Liquidacion', 'Comprobantes y cierres operativos.'),
-      ],
+    final history = ref.watch(driverTripHistoryProvider).value ?? const <DriverTrip>[];
+    final now = DateTime.now();
+    final filtered = history.where((trip) {
+      final date = DateTime.tryParse(trip.requestedAt ?? '');
+      if (date == null) {
+        return false;
+      }
+      final local = date.toLocal();
+      if (_range == 'Dia') {
+        return local.year == now.year && local.month == now.month && local.day == now.day;
+      }
+      if (_range == 'Semana') {
+        return now.difference(local).inDays < 7;
+      }
+      return local.year == now.year && local.month == now.month;
+    }).toList(growable: false);
+
+    final completed = filtered.where((trip) => trip.status == 'completed').length;
+    final promoTrips = filtered.where((trip) => trip.isPromotional).length;
+    final estimatedRevenue = filtered
+        .where((trip) => trip.status == 'completed' && !trip.isPromotional)
+        .fold<double>(0, (sum, trip) => sum + trip.fareAmount);
+
+    return _DetailScaffold(
+      title: 'Estadistica',
+      child: DriverPageShell(
+        eyebrow: 'Rendimiento',
+        title: 'Estadistica',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'Dia', label: Text('Dia')),
+                ButtonSegment(value: 'Semana', label: Text('Semana')),
+                ButtonSegment(value: 'Mes', label: Text('Mes')),
+              ],
+              selected: {_range},
+              onSelectionChanged: (selection) => setState(() => _range = selection.first),
+            ),
+            const SizedBox(height: 18),
+            _DriverSettingsInfoCard(
+              title: 'Viajes completados',
+              subtitle: '$completed viaje(s) cerrados en este periodo.',
+            ),
+            _DriverSettingsInfoCard(
+              title: 'Viajes promocionales',
+              subtitle: '$promoTrips viaje(s) promo en este periodo.',
+            ),
+            _DriverSettingsInfoCard(
+              title: 'Cobro estimado',
+              subtitle: 'Bs ${estimatedRevenue.toStringAsFixed(2)} en viajes no promocionales.',
+            ),
+          ],
+        ),
+      ),
     );
   }
+}
+
+String _formatShortDate(String raw) {
+  final date = DateTime.tryParse(raw)?.toLocal();
+  if (date == null) {
+    return raw;
+  }
+  String two(int value) => value.toString().padLeft(2, '0');
+  return '${two(date.day)}/${two(date.month)}/${date.year} ${two(date.hour)}:${two(date.minute)}';
 }
 
 class _ProfileField extends StatelessWidget {
@@ -552,43 +763,6 @@ class _DriverSettingsInfoCard extends StatelessWidget {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SimpleDriverPage extends StatelessWidget {
-  const _SimpleDriverPage({
-    required this.title,
-    required this.eyebrow,
-    required this.items,
-  });
-
-  final String title;
-  final String eyebrow;
-  final List<(String, String)> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return _DetailScaffold(
-      title: title,
-      child: DriverPageShell(
-        eyebrow: eyebrow,
-        title: title,
-        child: Column(
-          children: items
-              .map(
-                (item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
-                  child: DriverMenuTile(
-                    icon: Icons.check_circle_outline,
-                    title: item.$1,
-                    subtitle: item.$2,
-                  ),
-                ),
-              )
-              .toList(),
         ),
       ),
     );

@@ -50,6 +50,18 @@ type PromoSettings = {
   updatedAt?: string | null
 }
 
+type SupportReport = {
+  id: number
+  user_id: string
+  role: string
+  phone: string
+  full_name?: string | null
+  category: string
+  message: string
+  status: string
+  created_at: string
+}
+
 type PendingDriverAccessRow = {
   id: string
   user_id: string
@@ -121,6 +133,11 @@ function App() {
     rewardCredits: 1,
     updatedAt: null,
   })
+  const [supportReports, setSupportReports] = useState<SupportReport[]>([])
+  const [notificationAudience, setNotificationAudience] = useState<'all' | 'passengers' | 'drivers' | 'user'>('all')
+  const [notificationPhone, setNotificationPhone] = useState('')
+  const [notificationTitle, setNotificationTitle] = useState('')
+  const [notificationMessage, setNotificationMessage] = useState('')
   const [phone, setPhone] = useState('+59170000001')
   const [otp, setOtp] = useState('123456')
   const [otpRequested, setOtpRequested] = useState(false)
@@ -172,7 +189,7 @@ function App() {
       return
     }
 
-    const [dashboardResponse, driversResponse, tripsResponse, pendingDriversResponse, pendingResponse, devicesResponse, promoResponse] =
+    const [dashboardResponse, driversResponse, tripsResponse, pendingDriversResponse, pendingResponse, devicesResponse, promoResponse, supportResponse] =
       await Promise.all([
         fetchWithAdminAuth<Dashboard>(`${apiBase}/admin/dashboard`, { headers: authHeaders }),
         fetchWithAdminAuth<Driver[]>(`${apiBase}/admin/drivers/live`, { headers: authHeaders }),
@@ -181,6 +198,7 @@ function App() {
         fetchWithAdminAuth<DeviceRow[]>(`${apiBase}/admin/devices/pending`, { headers: authHeaders }),
         fetchWithAdminAuth<DeviceRow[]>(`${apiBase}/admin/devices`, { headers: authHeaders }),
         fetchWithAdminAuth<PromoSettings>(`${apiBase}/admin/promotions/settings`, { headers: authHeaders }),
+        fetchWithAdminAuth<SupportReport[]>(`${apiBase}/admin/support/reports/all`, { headers: authHeaders }),
       ])
 
     setDashboard(dashboardResponse)
@@ -190,6 +208,7 @@ function App() {
     setPendingDevices(pendingResponse)
     setAllDevices(devicesResponse)
     setPromoSettings(promoResponse)
+    setSupportReports(supportResponse)
     setLastUpdatedAt(new Date().toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
   }
 
@@ -329,6 +348,42 @@ function App() {
       await loadCentralData()
     } catch (updateError) {
       setError(updateError instanceof Error ? updateError.message : 'No se pudo actualizar la promocion')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function sendAdminNotification() {
+    if (!token) {
+      return
+    }
+    if (notificationTitle.trim().length < 3 || notificationMessage.trim().length < 6) {
+      setError('Escribe un titulo y mensaje validos para la notificacion.')
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    try {
+      await fetchWithAdminAuth(`${apiBase}/admin/notifications/send`, {
+        method: 'POST',
+        headers: {
+          ...authHeaders,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          audience: notificationAudience,
+          phone: notificationAudience === 'user' ? notificationPhone : undefined,
+          title: notificationTitle,
+          message: notificationMessage,
+        }),
+      })
+
+      setNotificationTitle('')
+      setNotificationMessage('')
+      setNotificationPhone('')
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : 'No se pudo enviar la notificacion')
     } finally {
       setLoading(false)
     }
@@ -639,6 +694,44 @@ function App() {
 
           <div className="panel">
             <div className="panel-header">
+              <h2>Notificaciones central</h2>
+              <span>{notificationAudience === 'user' ? 'Usuario puntual' : 'Difusion'}</span>
+            </div>
+            <article className="list-card stack-card promo-card">
+              <div className="phone-change-form">
+                <select value={notificationAudience} onChange={(event) => setNotificationAudience(event.target.value as 'all' | 'passengers' | 'drivers' | 'user')}>
+                  <option value="all">Todos</option>
+                  <option value="passengers">Solo pasajeros</option>
+                  <option value="drivers">Solo conductores</option>
+                  <option value="user">Usuario por telefono</option>
+                </select>
+                {notificationAudience === 'user' && (
+                  <input
+                    value={notificationPhone}
+                    onChange={(event) => setNotificationPhone(event.target.value)}
+                    placeholder="+591..."
+                  />
+                )}
+                <input
+                  value={notificationTitle}
+                  onChange={(event) => setNotificationTitle(event.target.value)}
+                  placeholder="Titulo de la notificacion"
+                />
+                <textarea
+                  className="note-input"
+                  value={notificationMessage}
+                  onChange={(event) => setNotificationMessage(event.target.value)}
+                  placeholder="Mensaje para la app del pasajero o conductor"
+                />
+                <button className="primary-button" onClick={sendAdminNotification} disabled={loading}>
+                  {loading ? 'Enviando...' : 'Enviar notificacion'}
+                </button>
+              </div>
+            </article>
+          </div>
+
+          <div className="panel">
+            <div className="panel-header">
               <h2>Conductores por autorizar</h2>
               <span>{pendingDrivers.length} pendientes</span>
             </div>
@@ -747,6 +840,27 @@ function App() {
                     <p>{trip.status}</p>
                   </div>
                   <span>{trip.driver_id ? 'Asignado' : 'Buscando'}</span>
+                </article>
+              ))}
+            </div>
+          </div>
+
+          <div className="panel">
+            <div className="panel-header">
+              <h2>Reportes de soporte</h2>
+              <span>{supportReports.length} registros</span>
+            </div>
+            <div className="list">
+              {supportReports.length === 0 && <article className="list-card">Sin reportes por ahora.</article>}
+              {supportReports.map((report) => (
+                <article key={report.id} className="list-card stack-card">
+                  <div>
+                    <strong>{report.full_name || report.phone}</strong>
+                    <p>{report.role} · {report.phone}</p>
+                    <p>{report.category} · {report.status}</p>
+                    <p>{report.message}</p>
+                    <p>{new Date(report.created_at).toLocaleString('es-BO')}</p>
+                  </div>
                 </article>
               ))}
             </div>

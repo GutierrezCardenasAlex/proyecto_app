@@ -25,10 +25,10 @@ class DriverAppDrawer extends StatelessWidget {
       ('Panel de viaje', Icons.local_taxi),
       ('Viajes disponibles', Icons.assignment_rounded),
       ('Historial', Icons.history),
+      ('Estadistica', Icons.insights_rounded),
       ('Cuenta', Icons.person_outline_rounded),
-      ('Ganancias', Icons.payments),
-      ('Seguridad', Icons.shield),
-      ('Centro de ayuda', Icons.help),
+      ('Notificaciones', Icons.notifications_active_outlined),
+      ('Soporte', Icons.support_agent),
       ('Configuraciones', Icons.settings),
     ];
 

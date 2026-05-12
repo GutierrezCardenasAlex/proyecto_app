@@ -72,16 +72,13 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
           _selectedIndex = 2;
         });
         break;
-      case 'Metodos de pago':
-        _openPage(const PaymentMethodsPage(), drawerItem: item);
-        break;
       case 'Promociones':
         _openPage(const PromotionsPage(), drawerItem: item);
         break;
-      case 'Seguridad':
-        _openPage(const SecurityPage(), drawerItem: item);
+      case 'Notificaciones':
+        _openPage(const NotificationsPage(), drawerItem: item);
         break;
-      case 'Centro de ayuda':
+      case 'Soporte':
         _openPage(const SupportPage(), drawerItem: item);
         break;
       case 'Configuraciones':
@@ -144,10 +141,9 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
       AccountTab(
         onBack: _goHomeFromSection,
         onOpenProfile: () => _openPage(const ProfilePage(), drawerItem: 'Configuraciones'),
-        onOpenNotifications: () => _openPage(const NotificationsPage(), drawerItem: 'Configuraciones'),
-        onOpenSecurity: () => _openPage(const SecurityPage(), drawerItem: 'Seguridad'),
+        onOpenNotifications: () => _openPage(const NotificationsPage(), drawerItem: 'Notificaciones'),
         onOpenSettings: () => _openPage(const SettingsPage(), drawerItem: 'Configuraciones'),
-        onOpenSupport: () => _openPage(const SupportPage(), drawerItem: 'Centro de ayuda'),
+        onOpenSupport: () => _openPage(const SupportPage(), drawerItem: 'Soporte'),
       ),
     ];
 

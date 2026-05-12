@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../core/admin_center/admin_center_repository.dart';
 import '../../../../core/map/offline_map.dart';
 import '../../../../core/ui/top_notice.dart';
 import '../../../auth/data/auth_repository.dart';
@@ -100,19 +101,62 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 }
 
-class NotificationsPage extends StatelessWidget {
+class NotificationsPage extends ConsumerWidget {
   const NotificationsPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return const _SimpleInfoPage(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(sessionProvider);
+    final repository = const AdminCenterRepository();
+
+    return _DetailScaffold(
       title: 'Notificaciones',
-      eyebrow: 'Alertas',
-      items: [
-        ('Viajes', 'Recibe actualizaciones de asignacion, llegada y finalizacion del taxi.'),
-        ('Promociones', 'Controla cupones, descuentos y campanas activas.'),
-      ('Novedades', 'Avisos de mantenimiento o nuevas funciones en Flash Go.'),
-      ],
+      child: FutureBuilder<List<AdminNotificationItem>>(
+        future: session.token.isEmpty ? Future.value(const <AdminNotificationItem>[]) : repository.fetchNotifications(session.token),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: Padding(
+              padding: EdgeInsets.only(top: 80),
+              child: CircularProgressIndicator(),
+            ));
+          }
+
+          final items = snapshot.data ?? const <AdminNotificationItem>[];
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
+            children: [
+              const Text(
+                'BANDEJA',
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.4, color: Color(0xFFF97316)),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Notificaciones',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFFFFF4EC),
+                ),
+              ),
+              const SizedBox(height: 18),
+              if (items.isEmpty)
+                const _SettingsInfoCard(
+                  title: 'Sin avisos nuevos',
+                  subtitle: 'Cuando central te envie una notificacion o cambie algo importante, aparecera aqui.',
+                ),
+              ...items.map(
+                (item) => Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: _SettingsInfoCard(
+                    title: item.title,
+                    subtitle: '${item.message}\n\n${_formatShortDate(item.createdAt)}',
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }
@@ -384,18 +428,6 @@ class SettingsPage extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 18),
-          const _SettingsInfoCard(
-            title: 'Mapa',
-            subtitle: 'Ajusta visualizacion y comportamiento del mapa.',
-          ),
-          const _SettingsInfoCard(
-            title: 'Idioma',
-            subtitle: 'Personaliza textos y formato de la aplicacion.',
-          ),
-          const _SettingsInfoCard(
-            title: 'Cuenta',
-            subtitle: 'Administra tus datos y sesiones activas.',
-          ),
           Padding(
             padding: const EdgeInsets.only(bottom: 14),
             child: Container(
@@ -447,21 +479,173 @@ class SettingsPage extends StatelessWidget {
   }
 }
 
-class SupportPage extends StatelessWidget {
+class SupportPage extends ConsumerStatefulWidget {
   const SupportPage({super.key});
 
   @override
+  ConsumerState<SupportPage> createState() => _SupportPageState();
+}
+
+class _SupportPageState extends ConsumerState<SupportPage> {
+  final _messageController = TextEditingController();
+  String _category = 'Falla de app';
+  bool _sending = false;
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return const _SimpleInfoPage(
-      title: 'Centro de ayuda',
-      eyebrow: 'Ayuda',
-      items: [
-        ('Soporte', 'Contacta a soporte para resolver dudas o reportar un problema.'),
-        ('Viajes', 'Consulta informacion sobre pedidos, estados y cobros.'),
-        ('Cuenta', 'Recibe ayuda con acceso, perfil y seguridad.'),
-      ],
+    final session = ref.watch(sessionProvider);
+    final repository = const AdminCenterRepository();
+
+    return _DetailScaffold(
+      title: 'Soporte',
+      child: FutureBuilder<List<SupportReportItem>>(
+        future: session.token.isEmpty ? Future.value(const <SupportReportItem>[]) : repository.fetchSupportReports(session.token),
+        builder: (context, snapshot) {
+          final reports = snapshot.data ?? const <SupportReportItem>[];
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
+            children: [
+              const Text(
+                'SOPORTE',
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.4, color: Color(0xFFF97316)),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Reporta un problema',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFFFFF4EC),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1B1B1F),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: const Color(0xFF2C2C31)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      initialValue: _category,
+                      dropdownColor: const Color(0xFF1B1B1F),
+                      decoration: const InputDecoration(labelText: 'Tipo de reporte'),
+                      items: const [
+                        DropdownMenuItem(value: 'Falla de app', child: Text('Falla de app')),
+                        DropdownMenuItem(value: 'Problema con viaje', child: Text('Problema con viaje')),
+                        DropdownMenuItem(value: 'Cuenta o acceso', child: Text('Cuenta o acceso')),
+                        DropdownMenuItem(value: 'Mapa o GPS', child: Text('Mapa o GPS')),
+                      ],
+                      onChanged: (value) => setState(() => _category = value ?? 'Falla de app'),
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: _messageController,
+                      maxLines: 5,
+                      decoration: const InputDecoration(
+                        labelText: 'Cuéntanos qué pasó',
+                        hintText: 'Describe la falla, cuándo ocurrió y qué estabas haciendo.',
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: _sending
+                            ? null
+                            : () async {
+                                if (_messageController.text.trim().length < 8) {
+                                  showTopNotice(
+                                    context,
+                                    'Escribe un detalle un poco más completo para soporte.',
+                                    backgroundColor: const Color(0xFF93000A),
+                                  );
+                                  return;
+                                }
+                                setState(() => _sending = true);
+                                try {
+                                  await repository.submitSupportReport(
+                                    token: session.token,
+                                    category: _category,
+                                    message: _messageController.text.trim(),
+                                  );
+                                  _messageController.clear();
+                                  if (!context.mounted) return;
+                                  setState(() {});
+                                  showTopNotice(
+                                    context,
+                                    'Reporte enviado a central correctamente.',
+                                    backgroundColor: const Color(0xFFF97316),
+                                    foregroundColor: const Color(0xFF0F0F10),
+                                  );
+                                } catch (error) {
+                                  if (!context.mounted) return;
+                                  showTopNotice(
+                                    context,
+                                    error.toString().replaceFirst('Exception: ', ''),
+                                    backgroundColor: const Color(0xFF93000A),
+                                  );
+                                } finally {
+                                  if (mounted) {
+                                    setState(() => _sending = false);
+                                  }
+                                }
+                              },
+                        icon: const Icon(Icons.send_rounded),
+                        label: Text(_sending ? 'Enviando...' : 'Enviar reporte'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Tus reportes',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFFFFF4EC),
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (reports.isEmpty)
+                const _SettingsInfoCard(
+                  title: 'Aún no enviaste reportes',
+                  subtitle: 'Cuando mandes un reporte desde aquí, central podrá verlo con tus datos y darle seguimiento.',
+                ),
+              ...reports.map(
+                (report) => Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: _SettingsInfoCard(
+                    title: '${report.category} · ${report.status}',
+                    subtitle: '${report.message}\n\n${_formatShortDate(report.createdAt)}',
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
+}
+
+String _formatShortDate(String raw) {
+  final date = DateTime.tryParse(raw)?.toLocal();
+  if (date == null) {
+    return raw;
+  }
+  String two(int value) => value.toString().padLeft(2, '0');
+  return '${two(date.day)}/${two(date.month)}/${date.year} ${two(date.hour)}:${two(date.minute)}';
 }
 
 class _SimpleInfoPage extends StatelessWidget {

@@ -65,6 +65,9 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
           _selectedIndex = 1;
         });
         break;
+      case 'Estadistica':
+        _openPage(const DriverStatisticsPage(), drawerItem: item);
+        break;
       case 'Viajes disponibles':
         setState(() {
           _activeDrawerItem = item;
@@ -78,14 +81,11 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
           _selectedIndex = 2;
         });
         break;
-      case 'Ganancias':
-        _openPage(const DriverEarningsPage(), drawerItem: item);
+      case 'Notificaciones':
+        _openPage(const DriverNotificationsPage(), drawerItem: item);
         break;
-      case 'Seguridad':
-        _openPage(const DriverSecurityPage(), drawerItem: item);
-        break;
-      case 'Centro de ayuda':
-        _openPage(const DriverHelpPage(), drawerItem: item);
+      case 'Soporte':
+        _openPage(const DriverSupportPage(), drawerItem: item);
         break;
       case 'Configuraciones':
         _openPage(const DriverSettingsPage(), drawerItem: item);
@@ -297,9 +297,9 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
         phone: session.phone,
         onBack: _goToDriverDashboard,
         onOpenProfile: () => _openPage(const DriverProfilePage(), drawerItem: 'Configuraciones'),
-        onOpenSecurity: () => _openPage(const DriverSecurityPage(), drawerItem: 'Seguridad'),
+        onOpenNotifications: () => _openPage(const DriverNotificationsPage(), drawerItem: 'Notificaciones'),
         onOpenSettings: () => _openPage(const DriverSettingsPage(), drawerItem: 'Configuraciones'),
-        onOpenHelp: () => _openPage(const DriverHelpPage(), drawerItem: 'Centro de ayuda'),
+        onOpenHelp: () => _openPage(const DriverSupportPage(), drawerItem: 'Soporte'),
       ),
     ];
 
@@ -2317,7 +2317,7 @@ class _DriverAccountTab extends ConsumerWidget {
     required this.phone,
     this.onBack,
     required this.onOpenProfile,
-    required this.onOpenSecurity,
+    required this.onOpenNotifications,
     required this.onOpenSettings,
     required this.onOpenHelp,
   });
@@ -2326,7 +2326,7 @@ class _DriverAccountTab extends ConsumerWidget {
   final String phone;
   final VoidCallback? onBack;
   final VoidCallback onOpenProfile;
-  final VoidCallback onOpenSecurity;
+  final VoidCallback onOpenNotifications;
   final VoidCallback onOpenSettings;
   final VoidCallback onOpenHelp;
 
@@ -2398,23 +2398,23 @@ class _DriverAccountTab extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           DriverMenuTile(
-            icon: Icons.shield_outlined,
-            title: 'Seguridad',
-            subtitle: 'Sesion, OTP y proteccion del conductor.',
-            onTap: onOpenSecurity,
+            icon: Icons.notifications_active_outlined,
+            title: 'Notificaciones',
+            subtitle: 'Avisos de central, autorizaciones y mensajes operativos.',
+            onTap: onOpenNotifications,
           ),
           const SizedBox(height: 14),
           DriverMenuTile(
             icon: Icons.settings_outlined,
-            title: 'Configuraciones',
-            subtitle: 'Mapa, alertas y preferencias de operacion.',
+            title: 'Descarga de mapa',
+            subtitle: 'Guarda Potosi ciudad para usar el mapa aun con señal baja.',
             onTap: onOpenSettings,
           ),
           const SizedBox(height: 14),
           DriverMenuTile(
             icon: Icons.support_agent,
-            title: 'Centro de ayuda',
-            subtitle: 'Soporte operativo para viajes y pagos.',
+            title: 'Soporte',
+            subtitle: 'Reporta fallas de la app o incidencias del servicio a central.',
             onTap: onOpenHelp,
           ),
         ],

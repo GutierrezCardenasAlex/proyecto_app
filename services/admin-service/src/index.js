@@ -29,6 +29,18 @@ const promoSettingsSchema = z.object({
   rewardCredits: z.number().int().min(1).max(10).optional()
 });
 
+const supportReportSchema = z.object({
+  category: z.string().min(2).max(60),
+  message: z.string().min(8).max(1000)
+});
+
+const sendNotificationSchema = z.object({
+  audience: z.enum(["all", "passengers", "drivers", "user"]),
+  phone: z.string().min(8).optional(),
+  title: z.string().min(3).max(120),
+  message: z.string().min(6).max(500)
+});
+
 function normalizePhone(rawPhone) {
   const digits = String(rawPhone || "").replace(/\D/g, "");
   if (digits.length === 8) {
@@ -63,6 +75,32 @@ async function ensureAdminSchema() {
     VALUES (1, TRUE, 5, 1)
     ON CONFLICT (id) DO NOTHING
   `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS support_reports (
+      id BIGSERIAL PRIMARY KEY,
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      role VARCHAR(16) NOT NULL,
+      phone VARCHAR(32) NOT NULL,
+      full_name VARCHAR(140),
+      category VARCHAR(60) NOT NULL,
+      message TEXT NOT NULL,
+      status VARCHAR(20) NOT NULL DEFAULT 'ABIERTO',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS admin_notifications (
+      id BIGSERIAL PRIMARY KEY,
+      target_user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+      target_role VARCHAR(16),
+      title VARCHAR(120) NOT NULL,
+      message TEXT NOT NULL,
+      created_by UUID REFERENCES admin_accounts(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
 }
 
 async function ensureAdmin(request, reply) {
@@ -77,6 +115,28 @@ async function ensureAdmin(request, reply) {
   }
 
   return null;
+}
+
+async function ensureUser(request, reply) {
+  try {
+    await request.jwtVerify();
+  } catch (error) {
+    return reply.code(401).send({ message: "No autorizado" });
+  }
+
+  if (request.user?.accountType !== "user") {
+    return reply.code(403).send({ message: "Acceso solo para usuarios de la app" });
+  }
+
+  return null;
+}
+
+async function insertUserNotification({ userId, role, title, message, createdBy = null }) {
+  await pool.query(
+    `INSERT INTO admin_notifications (target_user_id, target_role, title, message, created_by)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [userId, role, title, message, createdBy]
+  );
 }
 
 async function bootstrap() {
@@ -208,6 +268,123 @@ async function bootstrap() {
     return result.rows;
   });
 
+  app.get("/support/reports", { preHandler: ensureUser }, async (request) => {
+    const result = await pool.query(
+      `SELECT id, category, message, status, created_at
+       FROM support_reports
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT 50`,
+      [request.user.sub]
+    );
+
+    return result.rows;
+  });
+
+  app.post("/support/reports", { preHandler: ensureUser }, async (request) => {
+    const payload = supportReportSchema.parse(request.body);
+    const userResult = await pool.query(
+      `SELECT id, role, phone, full_name, first_name, last_name
+       FROM users
+       WHERE id = $1
+       LIMIT 1`,
+      [request.user.sub]
+    );
+
+    const user = userResult.rows[0];
+    const fullName =
+      user?.full_name ||
+      [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim() ||
+      user?.phone ||
+      "Usuario Flash Go";
+
+    const result = await pool.query(
+      `INSERT INTO support_reports (user_id, role, phone, full_name, category, message)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, category, message, status, created_at`,
+      [request.user.sub, user?.role || request.user.role || "passenger", user?.phone || "", fullName, payload.category, payload.message]
+    );
+
+    return {
+      message: "Reporte enviado a central",
+      report: result.rows[0]
+    };
+  });
+
+  app.get("/support/reports/all", { preHandler: ensureAdmin }, async () => {
+    const result = await pool.query(
+      `SELECT id, user_id, role, phone, full_name, category, message, status, created_at
+       FROM support_reports
+       ORDER BY created_at DESC
+       LIMIT 200`
+    );
+
+    return result.rows;
+  });
+
+  app.get("/notifications/inbox", { preHandler: ensureUser }, async (request) => {
+    const userResult = await pool.query(
+      `SELECT role
+       FROM users
+       WHERE id = $1
+       LIMIT 1`,
+      [request.user.sub]
+    );
+    const role = userResult.rows[0]?.role || request.user.role || "passenger";
+
+    const result = await pool.query(
+      `SELECT id, title, message, created_at
+       FROM admin_notifications
+       WHERE (target_user_id = $1)
+          OR (target_user_id IS NULL AND target_role = $2)
+          OR (target_user_id IS NULL AND target_role = 'all')
+       ORDER BY created_at DESC
+       LIMIT 100`,
+      [request.user.sub, role]
+    );
+
+    return result.rows;
+  });
+
+  app.post("/notifications/send", { preHandler: ensureAdmin }, async (request, reply) => {
+    const payload = sendNotificationSchema.parse(request.body);
+    const adminId = request.user.sub;
+
+    if (payload.audience === "user") {
+      const normalizedPhone = normalizePhone(payload.phone || "");
+      const userResult = await pool.query(
+        `SELECT id, role
+         FROM users
+         WHERE phone = $1
+         LIMIT 1`,
+        [normalizedPhone]
+      );
+
+      if (!userResult.rows.length) {
+        return reply.code(404).send({ message: "No se encontro un usuario con ese telefono." });
+      }
+
+      await pool.query(
+        `INSERT INTO admin_notifications (target_user_id, target_role, title, message, created_by)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [userResult.rows[0].id, userResult.rows[0].role, payload.title, payload.message, adminId]
+      );
+
+      return { message: "Notificacion enviada al usuario" };
+    }
+
+    const targetRole =
+      payload.audience === "passengers" ? "passenger" : payload.audience === "drivers" ? "driver" : "all";
+
+    await pool.query(
+      `INSERT INTO admin_notifications (target_user_id, target_role, title, message, created_by)
+       VALUES (NULL, $1, $2, $3, $4)`,
+      [targetRole, payload.title, payload.message, adminId]
+    );
+
+    return { message: "Notificacion enviada correctamente" };
+  });
+
   app.get("/promotions/settings", { preHandler: ensureAdmin }, async () => {
     const result = await pool.query(
       `SELECT enabled, cycle_length, reward_credits, updated_at
@@ -297,6 +474,26 @@ async function bootstrap() {
       return reply.code(404).send({ message: "Dispositivo no encontrado" });
     }
 
+    const userResult = await pool.query(
+      `SELECT id, role
+       FROM users
+       WHERE id = $1
+       LIMIT 1`,
+      [result.rows[0].user_id]
+    );
+    if (userResult.rows.length) {
+      await insertUserNotification({
+        userId: userResult.rows[0].id,
+        role: userResult.rows[0].role,
+        title: status === "AUTORIZADO" ? "Equipo autorizado" : "Equipo bloqueado",
+        message:
+          status === "AUTORIZADO"
+            ? "La central autorizo el uso de la aplicacion en este equipo."
+            : "La central bloqueo este equipo. Contacta soporte si necesitas ayuda.",
+        createdBy: adminId,
+      });
+    }
+
     return {
       message: `Dispositivo ${status === "AUTORIZADO" ? "autorizado" : "rechazado"}`,
       device: result.rows[0]
@@ -384,6 +581,26 @@ async function bootstrap() {
 
     if (!result.rows.length) {
       return reply.code(404).send({ message: "Conductor no encontrado" });
+    }
+
+    const userResult = await pool.query(
+      `SELECT u.id, u.role
+       FROM drivers d
+       INNER JOIN users u ON u.id = d.user_id
+       WHERE d.id = $1
+       LIMIT 1`,
+      [driverId]
+    );
+    if (userResult.rows.length) {
+      await insertUserNotification({
+        userId: userResult.rows[0].id,
+        role: userResult.rows[0].role,
+        title: status === "AUTORIZADO" ? "Acceso de conductor autorizado" : "Acceso de conductor rechazado",
+        message:
+          status === "AUTORIZADO"
+            ? "La central ya autorizo tu acceso como conductor. Ya puedes usar el panel."
+            : "La central rechazo o pauso tu acceso como conductor. Revisa con soporte para continuar.",
+      });
     }
 
     return {
