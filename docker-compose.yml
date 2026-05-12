@@ -172,8 +172,8 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://taxiya:taxiya@rabbitmq:5672}
       JWT_SECRET: ${JWT_SECRET:-super-secret}
-      MAP_TILES_URL_TEMPLATE: ${MAP_TILES_URL_TEMPLATE:-https://flashgo.cybernovatech.space/tiles/styles/basic-preview/512/{z}/{x}/{y}.png}
-      MAP_OFFLINE_TILES_URL_TEMPLATE: ${MAP_OFFLINE_TILES_URL_TEMPLATE:-https://flashgo.cybernovatech.space/tiles/styles/basic-preview/512/{z}/{x}/{y}.png}
+      MAP_TILES_URL_TEMPLATE: ${MAP_TILES_URL_TEMPLATE:-https://taxis.cybernovatech.space/tiles/styles/basic-preview/512/{z}/{x}/{y}.png}
+      MAP_OFFLINE_TILES_URL_TEMPLATE: ${MAP_OFFLINE_TILES_URL_TEMPLATE:-https://taxis.cybernovatech.space/tiles/styles/basic-preview/512/{z}/{x}/{y}.png}
       MAP_OFFLINE_REGION_NAME: ${MAP_OFFLINE_REGION_NAME:-Potosi ciudad}
     depends_on:
       postgres:
@@ -187,8 +187,8 @@ services:
     build:
       context: ./admin
       args:
-        VITE_API_BASE_URL: "https://${PUBLIC_HOST:-flashgo.cybernovatech.space}/api"
-        VITE_WS_URL: "https://${PUBLIC_HOST:-flashgo.cybernovatech.space}"
+        VITE_API_BASE_URL: "https://${PUBLIC_HOST:-taxis.cybernovatech.space}/api"
+        VITE_WS_URL: "https://${PUBLIC_HOST:-taxis.cybernovatech.space}"
     ports:
       - "${ADMIN_WEB_PORT:-8081}:80"
     depends_on:

@@ -5,14 +5,14 @@ class AppConfig {
   static const serverScheme = String.fromEnvironment('SERVER_SCHEME', defaultValue: 'https');
   static const serverHost = String.fromEnvironment(
     'SERVER_HOST',
-    defaultValue: 'flashgo.cybernovatech.space',
+    defaultValue: 'taxis.cybernovatech.space',
   );
   static const gatewayPort = String.fromEnvironment('GATEWAY_PORT', defaultValue: '443');
   static const websocketPort = String.fromEnvironment('WEBSOCKET_PORT', defaultValue: '443');
   static const websocketScheme = String.fromEnvironment('WEBSOCKET_SCHEME', defaultValue: '');
   static const mapTilesUrlTemplate = String.fromEnvironment(
     'MAP_TILES_URL_TEMPLATE',
-    defaultValue: 'https://flashgo.cybernovatech.space/tiles/styles/basic-preview/512/{z}/{x}/{y}.png',
+    defaultValue: 'https://taxis.cybernovatech.space/tiles/styles/basic-preview/512/{z}/{x}/{y}.png',
   );
   static const mapTilesAttribution = String.fromEnvironment(
     'MAP_TILES_ATTRIBUTION',
@@ -20,7 +20,7 @@ class AppConfig {
   );
   static const mapOfflineTilesUrlTemplate = String.fromEnvironment(
     'MAP_OFFLINE_TILES_URL_TEMPLATE',
-    defaultValue: 'https://flashgo.cybernovatech.space/tiles/styles/basic-preview/512/{z}/{x}/{y}.png',
+    defaultValue: 'https://taxis.cybernovatech.space/tiles/styles/basic-preview/512/{z}/{x}/{y}.png',
   );
   static const mapOfflineTilesAttribution = String.fromEnvironment(
     'MAP_OFFLINE_TILES_ATTRIBUTION',
