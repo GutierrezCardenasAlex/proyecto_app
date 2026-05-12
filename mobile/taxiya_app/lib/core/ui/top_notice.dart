@@ -5,12 +5,16 @@ import 'package:flutter/material.dart';
 OverlayEntry? _activeTopNotice;
 Timer? _activeTopNoticeTimer;
 
+enum NoticeTone { info, success, warning, error }
+
 void showTopNotice(
   BuildContext context,
   String message, {
-  Color backgroundColor = const Color(0xFFC2410C),
-  Color foregroundColor = Colors.white,
+  NoticeTone tone = NoticeTone.info,
+  Color? backgroundColor,
+  Color? foregroundColor,
   IconData? icon,
+  Duration duration = const Duration(seconds: 4),
 }) {
   _activeTopNoticeTimer?.cancel();
   _activeTopNotice?.remove();
@@ -28,9 +32,10 @@ void showTopNotice(
           ignoring: true,
           child: _TopNoticeCard(
             message: message,
-            backgroundColor: backgroundColor,
-            foregroundColor: foregroundColor,
+            backgroundColor: backgroundColor ?? _backgroundForTone(tone),
+            foregroundColor: foregroundColor ?? _foregroundForTone(tone),
             icon: icon,
+            tone: tone,
           ),
         ),
       );
@@ -38,11 +43,34 @@ void showTopNotice(
   );
 
   overlay.insert(_activeTopNotice!);
-  _activeTopNoticeTimer = Timer(const Duration(seconds: 4), () {
+  _activeTopNoticeTimer = Timer(duration, () {
     _activeTopNotice?.remove();
     _activeTopNotice = null;
     _activeTopNoticeTimer = null;
   });
+}
+
+Color _backgroundForTone(NoticeTone tone) {
+  switch (tone) {
+    case NoticeTone.success:
+      return const Color(0xFF15803D);
+    case NoticeTone.warning:
+      return const Color(0xFFC2410C);
+    case NoticeTone.error:
+      return const Color(0xFFB91C1C);
+    case NoticeTone.info:
+      return const Color(0xFF1D4ED8);
+  }
+}
+
+Color _foregroundForTone(NoticeTone tone) {
+  switch (tone) {
+    case NoticeTone.success:
+    case NoticeTone.warning:
+    case NoticeTone.error:
+    case NoticeTone.info:
+      return Colors.white;
+  }
 }
 
 class _TopNoticeCard extends StatefulWidget {
@@ -50,12 +78,14 @@ class _TopNoticeCard extends StatefulWidget {
     required this.message,
     required this.backgroundColor,
     required this.foregroundColor,
+    required this.tone,
     this.icon,
   });
 
   final String message;
   final Color backgroundColor;
   final Color foregroundColor;
+  final NoticeTone tone;
   final IconData? icon;
 
   @override
@@ -94,10 +124,13 @@ class _TopNoticeCardState extends State<_TopNoticeCard>
                 decoration: BoxDecoration(
                   color: widget.backgroundColor,
                   borderRadius: BorderRadius.circular(18),
-                  boxShadow: const [
+                  border: Border.all(
+                    color: widget.foregroundColor.withValues(alpha: 0.18),
+                  ),
+                  boxShadow: [
                     BoxShadow(
-                      color: Color(0x33000000),
-                      blurRadius: 18,
+                      color: widget.backgroundColor.withValues(alpha: 0.28),
+                      blurRadius: 20,
                       offset: Offset(0, 10),
                     ),
                   ],
@@ -106,7 +139,7 @@ class _TopNoticeCardState extends State<_TopNoticeCard>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      widget.icon ?? _resolveIcon(widget.backgroundColor),
+                      widget.icon ?? _resolveIcon(widget.tone),
                       color: widget.foregroundColor,
                       size: 20,
                     ),
@@ -131,15 +164,16 @@ class _TopNoticeCardState extends State<_TopNoticeCard>
     );
   }
 
-  IconData _resolveIcon(Color backgroundColor) {
-    final argb = backgroundColor.toARGB32();
-    if (argb == const Color(0xFF93000A).toARGB32()) {
-      return Icons.error_outline_rounded;
+  IconData _resolveIcon(NoticeTone tone) {
+    switch (tone) {
+      case NoticeTone.success:
+        return Icons.check_circle_outline_rounded;
+      case NoticeTone.warning:
+        return Icons.notifications_active_rounded;
+      case NoticeTone.error:
+        return Icons.error_outline_rounded;
+      case NoticeTone.info:
+        return Icons.info_outline_rounded;
     }
-    if (argb == const Color(0xFFF97316).toARGB32() ||
-        argb == const Color(0xFFC2410C).toARGB32()) {
-      return Icons.notifications_active_rounded;
-    }
-    return Icons.info_outline_rounded;
   }
 }

@@ -161,6 +161,7 @@ class AuthRepository {
       body: jsonEncode({
         'phone': phone,
         'password': password,
+        'role': 'passenger',
         'deviceIdentifier': device.identifier,
         'deviceName': device.name,
         'platform': device.platform,
@@ -295,6 +296,12 @@ class AuthRepository {
   AuthResult _parseAuthResult(String body, {required String fallbackPhone}) {
     final payload = jsonDecode(body) as Map<String, dynamic>;
     final user = payload['user'] as Map<String, dynamic>? ?? const {};
+    final role = user['role']?.toString() ?? '';
+    if (role.isNotEmpty && role != 'passenger') {
+      throw Exception(
+        'Esta cuenta pertenece a conductor y no puede entrar por el acceso de pasajero.',
+      );
+    }
     return AuthResult(
       userId: user['id']?.toString() ?? '',
       phone: user['phone']?.toString() ?? fallbackPhone,

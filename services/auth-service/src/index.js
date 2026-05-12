@@ -37,6 +37,7 @@ const registerVerifySchema = z.object({
 const loginSchema = z.object({
   phone: z.string().min(8),
   password: z.string().min(8),
+  role: z.enum(["passenger", "driver"]).default("passenger"),
   deviceIdentifier: z.string().min(3),
   deviceName: z.string().min(2).optional(),
   platform: z.string().min(2).optional()
@@ -529,6 +530,14 @@ async function bootstrap() {
     }
 
     const user = userResult.rows[0];
+    if (user.role && user.role !== parsed.role) {
+      return reply.code(403).send({
+        message:
+          parsed.role === "driver"
+            ? "Esta cuenta pertenece a pasajero y no puede entrar por el acceso de conductor."
+            : "Esta cuenta pertenece a conductor y no puede entrar por el acceso de pasajero."
+      });
+    }
     if (!user.password_hash) {
       return reply.code(400).send({ message: "Esta cuenta aun no tiene contrasena configurada." });
     }

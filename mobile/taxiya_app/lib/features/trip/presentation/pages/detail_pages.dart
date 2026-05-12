@@ -604,7 +604,7 @@ class _SupportPageState extends ConsumerState<SupportPage> {
                                   showTopNotice(
                                     context,
                                     'Escribe un detalle un poco más completo para soporte.',
-                                    backgroundColor: const Color(0xFF93000A),
+                                    tone: NoticeTone.error,
                                   );
                                   return;
                                 }
@@ -621,15 +621,14 @@ class _SupportPageState extends ConsumerState<SupportPage> {
                                   showTopNotice(
                                     context,
                                     'Reporte enviado a central correctamente.',
-                                    backgroundColor: const Color(0xFFF97316),
-                                    foregroundColor: const Color(0xFF0F0F10),
+                                    tone: NoticeTone.success,
                                   );
                                 } catch (error) {
                                   if (!context.mounted) return;
                                   showTopNotice(
                                     context,
                                     error.toString().replaceFirst('Exception: ', ''),
-                                    backgroundColor: const Color(0xFF93000A),
+                                    tone: NoticeTone.error,
                                   );
                                 } finally {
                                   if (mounted) {

@@ -78,21 +78,11 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
   }
 
   void _showInlineError(String message) {
-    showTopNotice(
-      context,
-      message,
-      backgroundColor: const Color(0xFF93000A),
-      foregroundColor: Colors.white,
-    );
+    showTopNotice(context, message, tone: NoticeTone.error);
   }
 
   void _showSuccess(String message) {
-    showTopNotice(
-      context,
-      message,
-      backgroundColor: const Color(0xFFF97316),
-      foregroundColor: const Color(0xFF0F0F10),
-    );
+    showTopNotice(context, message, tone: NoticeTone.success);
   }
 
   void _applyOtpFallback(DriverOtpRequestResult result, {required String successMessage}) {
@@ -105,8 +95,7 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
       showTopNotice(
         context,
         'No pudimos enviar SMS, usa el codigo de respaldo ${result.otp}. Ya lo escribimos por ti.',
-        backgroundColor: const Color(0xFFF97316),
-        foregroundColor: const Color(0xFF0F0F10),
+        tone: NoticeTone.warning,
       );
       return;
     }
@@ -173,8 +162,7 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
                           showTopNotice(
                             context,
                             'No pudimos enviar SMS, usa el codigo de respaldo ${result.otp}.',
-                            backgroundColor: const Color(0xFFF97316),
-                            foregroundColor: const Color(0xFF0F0F10),
+                            tone: NoticeTone.warning,
                           );
                         } else {
                           _showSuccess('OTP enviado para recuperar la contrasena.');
@@ -205,8 +193,7 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
                         showTopNotice(
                           context,
                           'Contrasena actualizada. Ya puedes ingresar.',
-                          backgroundColor: const Color(0xFFF97316),
-                          foregroundColor: const Color(0xFF0F0F10),
+                          tone: NoticeTone.success,
                         );
                       },
                       child: const Text('Actualizar'),

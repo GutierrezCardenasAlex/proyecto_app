@@ -193,8 +193,7 @@ class _DriverProfileCompletionPageState extends ConsumerState<DriverProfileCompl
                                   showTopNotice(
                                     context,
                                     validationError,
-                                    backgroundColor: const Color(0xFF93000A),
-                                    foregroundColor: Colors.white,
+                                    tone: NoticeTone.error,
                                   );
                                   return;
                                 }
@@ -219,8 +218,7 @@ class _DriverProfileCompletionPageState extends ConsumerState<DriverProfileCompl
                                   showTopNotice(
                                     context,
                                     'Actualizaste los datos del conductor y del vehiculo.',
-                                    backgroundColor: const Color(0xFFF97316),
-                                    foregroundColor: const Color(0xFF0F0F10),
+                                    tone: NoticeTone.success,
                                   );
                                 }
                               },

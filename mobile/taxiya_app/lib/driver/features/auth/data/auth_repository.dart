@@ -188,6 +188,7 @@ class DriverAuthRepository {
       body: jsonEncode({
         'phone': phone,
         'password': password,
+        'role': 'driver',
         'deviceIdentifier': device.identifier,
         'deviceName': device.name,
         'platform': device.platform,

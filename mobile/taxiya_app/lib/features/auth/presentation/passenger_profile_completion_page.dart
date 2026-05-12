@@ -126,8 +126,7 @@ class _PassengerProfileCompletionPageState extends ConsumerState<PassengerProfil
                                   showTopNotice(
                                     context,
                                     validationError,
-                                    backgroundColor: const Color(0xFF93000A),
-                                    foregroundColor: Colors.white,
+                                    tone: NoticeTone.error,
                                   );
                                   return;
                                 }
@@ -145,8 +144,7 @@ class _PassengerProfileCompletionPageState extends ConsumerState<PassengerProfil
                                   showTopNotice(
                                     context,
                                     'Actualizaste tus datos correctamente.',
-                                    backgroundColor: const Color(0xFFF97316),
-                                    foregroundColor: const Color(0xFF0F0F10),
+                                    tone: NoticeTone.success,
                                   );
                                 }
                               },

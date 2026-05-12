@@ -1995,9 +1995,9 @@ class _GlassIconButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         onTap: onTap,
         child: SizedBox(
-          width: 48,
-          height: 48,
-          child: Icon(icon, color: const Color(0xFFF97316)),
+          width: 44,
+          height: 44,
+          child: Icon(icon, color: const Color(0xFFF97316), size: 20),
         ),
       ),
     );
@@ -2024,9 +2024,9 @@ class _MapActionButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         onTap: onTap,
         child: SizedBox(
-          width: 52,
-          height: 52,
-          child: Icon(icon, color: const Color(0xFFF97316)),
+          width: 46,
+          height: 46,
+          child: Icon(icon, color: const Color(0xFFF97316), size: 20),
         ),
       ),
     );

@@ -2557,9 +2557,9 @@ class _GlassIconButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         onTap: onTap,
         child: SizedBox(
-          width: 48,
-          height: 48,
-          child: Icon(icon, color: iconColor),
+          width: 44,
+          height: 44,
+          child: Icon(icon, color: iconColor, size: 20),
         ),
       ),
     );

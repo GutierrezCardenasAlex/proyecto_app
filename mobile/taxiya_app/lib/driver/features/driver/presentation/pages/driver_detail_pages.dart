@@ -139,7 +139,7 @@ class _DriverProfilePageState extends ConsumerState<DriverProfilePage> {
       showTopNotice(
         context,
         updatedSession.errorMessage!,
-        backgroundColor: const Color(0xFF93000A),
+        tone: NoticeTone.error,
       );
       return;
     }
@@ -147,8 +147,7 @@ class _DriverProfilePageState extends ConsumerState<DriverProfilePage> {
     showTopNotice(
       context,
       'Actualizaste tus datos correctamente.',
-      backgroundColor: const Color(0xFFF97316),
-      foregroundColor: const Color(0xFF0F0F10),
+      tone: NoticeTone.success,
     );
 
     if (updatedSession.vehicleType != _vehicleType) {
@@ -546,7 +545,7 @@ class _DriverSupportPageState extends ConsumerState<DriverSupportPage> {
                                     showTopNotice(
                                       context,
                                       'Describe mejor el problema para enviarlo a central.',
-                                      backgroundColor: const Color(0xFF93000A),
+                                      tone: NoticeTone.error,
                                     );
                                     return;
                                   }
@@ -563,15 +562,14 @@ class _DriverSupportPageState extends ConsumerState<DriverSupportPage> {
                                     showTopNotice(
                                       context,
                                       'Reporte enviado correctamente a central.',
-                                      backgroundColor: const Color(0xFFF97316),
-                                      foregroundColor: const Color(0xFF0F0F10),
+                                      tone: NoticeTone.success,
                                     );
                                   } catch (error) {
                                     if (!context.mounted) return;
                                     showTopNotice(
                                       context,
                                       error.toString().replaceFirst('Exception: ', ''),
-                                      backgroundColor: const Color(0xFF93000A),
+                                      tone: NoticeTone.error,
                                     );
                                   } finally {
                                     if (mounted) {

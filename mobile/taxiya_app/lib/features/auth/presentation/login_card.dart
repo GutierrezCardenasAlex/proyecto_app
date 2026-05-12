@@ -78,11 +78,11 @@ class _LoginCardState extends ConsumerState<LoginCard> {
   }
 
   void _showInlineError(String message) {
-    showTopNotice(context, message, backgroundColor: const Color(0xFF93000A));
+    showTopNotice(context, message, tone: NoticeTone.error);
   }
 
   void _showSuccess(String message) {
-    showTopNotice(context, message);
+    showTopNotice(context, message, tone: NoticeTone.success);
   }
 
   void _applyOtpFallback(OtpRequestResult result, {required String successMessage}) {
@@ -95,8 +95,7 @@ class _LoginCardState extends ConsumerState<LoginCard> {
       showTopNotice(
         context,
         'No pudimos enviar SMS, usa el codigo de respaldo ${result.otp}. Ya lo escribimos por ti.',
-        backgroundColor: const Color(0xFFF97316),
-        foregroundColor: const Color(0xFF0F0F10),
+        tone: NoticeTone.warning,
       );
       return;
     }
@@ -164,8 +163,7 @@ class _LoginCardState extends ConsumerState<LoginCard> {
                           showTopNotice(
                             context,
                             'No pudimos enviar SMS, usa el codigo de respaldo ${result.otp}.',
-                            backgroundColor: const Color(0xFFF97316),
-                            foregroundColor: const Color(0xFF0F0F10),
+                            tone: NoticeTone.warning,
                           );
                         } else {
                           _showSuccess('OTP enviado para recuperar la contrasena.');
