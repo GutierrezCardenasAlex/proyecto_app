@@ -202,6 +202,9 @@ class _PotosiMapState extends ConsumerState<PotosiMap> {
     ref.watch(offlineMapProvider);
     final initialCenter = widget.routeTarget ?? widget.routeStart ?? widget.userLocation;
     final offlineMap = ref.read(offlineMapProvider.notifier);
+    final fallbackOnlineLayer = offlineMap.buildFallbackOnlineTileLayer(
+      userAgentPackageName: 'bo.taxiya.passenger',
+    );
     final viewBounds = AppConfig.potosiViewBounds;
     final routeService = ref.read(routeServiceProvider);
     final visiblePrimaryRoute = _routeBundle == null
@@ -237,6 +240,7 @@ class _PotosiMapState extends ConsumerState<PotosiMap> {
             onTap: (_, point) => widget.onMapTap?.call(point),
           ),
           children: [
+            ...?fallbackOnlineLayer == null ? null : [fallbackOnlineLayer],
             offlineMap.buildTileLayer(
               userAgentPackageName: 'bo.taxiya.passenger',
             ),

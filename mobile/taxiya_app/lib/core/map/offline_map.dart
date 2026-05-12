@@ -95,7 +95,7 @@ class OfflineMapController extends Notifier<OfflineMapState> {
     required String userAgentPackageName,
   }) {
     return TileLayer(
-      urlTemplate: AppConfig.mapTilesUrlTemplate,
+      urlTemplate: AppConfig.effectiveMapTilesUrlTemplate,
       userAgentPackageName: userAgentPackageName,
       tileProvider: buildTileProvider(),
       minZoom: _offlineMinZoom.toDouble(),
@@ -103,6 +103,25 @@ class OfflineMapController extends Notifier<OfflineMapState> {
       maxNativeZoom: _offlineMaxZoom,
       tileBounds: AppConfig.potosiViewBounds,
       keepBuffer: 4,
+      panBuffer: 1,
+      tileDisplay: const TileDisplay.instantaneous(),
+    );
+  }
+
+  TileLayer? buildFallbackOnlineTileLayer({
+    required String userAgentPackageName,
+  }) {
+    if (!AppConfig.shouldUseOpenStreetMapFallbackLayer) {
+      return null;
+    }
+    return TileLayer(
+      urlTemplate: AppConfig.mapTilesUrlTemplate,
+      userAgentPackageName: userAgentPackageName,
+      minZoom: _offlineMinZoom.toDouble(),
+      maxZoom: _offlineMaxZoom.toDouble(),
+      maxNativeZoom: _offlineMaxZoom,
+      tileBounds: AppConfig.potosiViewBounds,
+      keepBuffer: 2,
       panBuffer: 1,
       tileDisplay: const TileDisplay.instantaneous(),
     );

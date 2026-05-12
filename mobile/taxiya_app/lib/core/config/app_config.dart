@@ -3,24 +3,24 @@ import 'package:latlong2/latlong.dart';
 
 class AppConfig {
   static const serverScheme = String.fromEnvironment('SERVER_SCHEME', defaultValue: 'http');
-  static const serverHost = String.fromEnvironment('SERVER_HOST', defaultValue: '62.171.186.246');
+  static const serverHost = String.fromEnvironment('SERVER_HOST', defaultValue: 'flashgo.cybernovatech.space');
   static const gatewayPort = String.fromEnvironment('GATEWAY_PORT', defaultValue: '3000');
   static const websocketPort = String.fromEnvironment('WEBSOCKET_PORT', defaultValue: '3008');
   static const mapTilesUrlTemplate = String.fromEnvironment(
     'MAP_TILES_URL_TEMPLATE',
-    defaultValue: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    defaultValue: 'http://flashgo.cybernovatech.space:8082/styles/basic-preview/512/{z}/{x}/{y}.png',
   );
   static const mapTilesAttribution = String.fromEnvironment(
     'MAP_TILES_ATTRIBUTION',
-    defaultValue: '',
+    defaultValue: 'Flash Go Tiles',
   );
   static const mapOfflineTilesUrlTemplate = String.fromEnvironment(
     'MAP_OFFLINE_TILES_URL_TEMPLATE',
-    defaultValue: '',
+    defaultValue: 'http://flashgo.cybernovatech.space:8082/styles/basic-preview/512/{z}/{x}/{y}.png',
   );
   static const mapOfflineTilesAttribution = String.fromEnvironment(
     'MAP_OFFLINE_TILES_ATTRIBUTION',
-    defaultValue: '',
+    defaultValue: 'Flash Go Tiles',
   );
   static const _mapRoutingUrlBase = String.fromEnvironment(
     'MAP_ROUTING_URL_BASE',
@@ -36,6 +36,14 @@ class AppConfig {
 
   static String get apiBaseUrl => '$serverScheme://$serverHost:$gatewayPort/api';
   static String get websocketUrl => '$serverScheme://$serverHost:$websocketPort';
+
+  static String get effectiveMapTilesUrlTemplate {
+    final offlineCompatible = effectiveOfflineTilesUrlTemplate.trim();
+    if (offlineCompatible.isNotEmpty) {
+      return offlineCompatible;
+    }
+    return mapTilesUrlTemplate;
+  }
 
   static bool get usesDefaultOpenStreetMapTiles =>
       mapTilesUrlTemplate.contains('tile.openstreetmap.org');
@@ -60,6 +68,8 @@ class AppConfig {
   }
 
   static bool get hasDedicatedOfflineTileSource => effectiveOfflineTilesUrlTemplate.isNotEmpty;
+  static bool get shouldUseOpenStreetMapFallbackLayer =>
+      effectiveOfflineTilesUrlTemplate.isNotEmpty && usesDefaultOpenStreetMapTiles;
   static String get mapRoutingUrlBase {
     final explicit = _mapRoutingUrlBase.trim();
     if (explicit.isNotEmpty) {

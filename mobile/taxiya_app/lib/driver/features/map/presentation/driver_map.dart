@@ -284,6 +284,9 @@ class _DriverMapState extends ConsumerState<DriverMap> {
     final routePoint = isOnDestinationStage ? destinationPoint : pickupPoint;
     final initialCenter = widget.tripAccepted && routePoint != null ? routePoint : driverPoint;
     final offlineMap = ref.read(offlineMapProvider.notifier);
+    final fallbackOnlineLayer = offlineMap.buildFallbackOnlineTileLayer(
+      userAgentPackageName: 'bo.taxiya.driver',
+    );
     final viewBounds = AppConfig.potosiViewBounds;
     final routeService = ref.read(routeServiceProvider);
     final visiblePrimaryRoute = _routeBundle == null
@@ -325,6 +328,7 @@ class _DriverMapState extends ConsumerState<DriverMap> {
             ),
           ),
           children: [
+            ...?fallbackOnlineLayer == null ? null : [fallbackOnlineLayer],
             offlineMap.buildTileLayer(
               userAgentPackageName: 'bo.taxiya.driver',
             ),
