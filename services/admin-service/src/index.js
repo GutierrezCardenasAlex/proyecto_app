@@ -243,19 +243,23 @@ async function bootstrap() {
        SELECT d.id AS driver_id,
               d.status AS driver_status,
               d.is_available,
+              COALESCE(d.rating, 0)::numeric(10,2) AS rating,
               u.full_name,
               u.phone,
               COUNT(ft.id)::int AS total_trips,
               COUNT(*) FILTER (WHERE ft.status = 'completed')::int AS completed_trips,
               COUNT(*) FILTER (WHERE ft.status = 'cancelled')::int AS cancelled_trips,
               COUNT(*) FILTER (WHERE ft.promotional_trip = TRUE)::int AS promo_trips,
+              COUNT(*) FILTER (
+                WHERE COALESCE(ft.completed_at, ft.cancelled_at, ft.updated_at, ft.requested_at) >= NOW() - INTERVAL '7 days'
+              )::int AS trips_this_week,
               COALESCE(SUM(CASE WHEN ft.status = 'completed' THEN ft.fare_amount ELSE 0 END), 0)::numeric(10,2) AS revenue,
               COALESCE(ROUND(AVG(CASE WHEN ft.status = 'completed' THEN ft.fare_amount END)::numeric, 2), 0)::numeric(10,2) AS average_fare,
               MAX(ft.event_at) AS last_trip_at
        FROM drivers d
        INNER JOIN users u ON u.id = d.user_id
        LEFT JOIN filtered_trips ft ON ft.driver_id = d.id
-       GROUP BY d.id, d.status, d.is_available, u.full_name, u.phone
+       GROUP BY d.id, d.status, d.is_available, d.rating, u.full_name, u.phone
        ORDER BY completed_trips DESC, total_trips DESC, revenue DESC, u.full_name ASC`
     );
 
@@ -265,10 +269,12 @@ async function bootstrap() {
       phone: row.phone,
       driverStatus: row.driver_status,
       isAvailable: row.is_available === true,
+      rating: Number(row.rating || 0),
       totalTrips: Number(row.total_trips || 0),
       completedTrips: Number(row.completed_trips || 0),
       cancelledTrips: Number(row.cancelled_trips || 0),
       promoTrips: Number(row.promo_trips || 0),
+      tripsThisWeek: Number(row.trips_this_week || 0),
       revenue: Number(row.revenue || 0),
       averageFare: Number(row.average_fare || 0),
       lastTripAt: row.last_trip_at,

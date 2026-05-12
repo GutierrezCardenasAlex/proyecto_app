@@ -440,41 +440,104 @@ body {
   color: #ffcfaa;
 }
 
-.leaders-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.performance-table-shell {
+  background: #111216;
+  border-radius: 22px;
+  border: 1px solid rgba(249, 115, 22, 0.08);
+  overflow: hidden;
+}
+
+.driver-stats-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.driver-stats-table th,
+.driver-stats-table td {
+  padding: 18px 20px;
+  border-bottom: 1px solid rgba(249, 115, 22, 0.08);
+  vertical-align: middle;
+  text-align: left;
+}
+
+.driver-stats-table th {
+  background: rgba(255, 255, 255, 0.03);
+  color: #ffcfaa;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.driver-table-row:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.driver-identity {
+  display: flex;
+  align-items: center;
   gap: 12px;
 }
 
-.leader-card {
-  background: linear-gradient(180deg, rgba(249, 115, 22, 0.10), rgba(17, 18, 22, 0.96));
-  border: 1px solid rgba(249, 115, 22, 0.12);
-  border-radius: 22px;
-  padding: 18px;
+.driver-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
   display: grid;
-  gap: 10px;
+  place-items: center;
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.22), rgba(251, 146, 60, 0.12));
+  border: 1px solid rgba(249, 115, 22, 0.2);
+  color: #fff4ec;
+  font-weight: 800;
 }
 
-.leader-card p {
+.driver-name {
   margin: 0;
+  color: #fff4ec;
+  font-weight: 800;
+}
+
+.driver-meta,
+.table-secondary {
+  margin: 4px 0 0;
   color: #ffcfaa;
+  font-size: 0.75rem;
 }
 
-.leader-top {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
+.table-primary {
+  margin: 0;
+  color: #fff4ec;
+  font-weight: 800;
+}
+
+.rating-cell {
+  display: inline-flex;
   align-items: center;
+  gap: 6px;
 }
 
-.leader-metrics {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+.rating-star {
+  color: #f59e0b;
+  font-size: 1rem;
+  line-height: 1;
 }
 
-.leader-metrics div,
-.performance-metric {
+.table-actions-cell {
+  text-align: right;
+}
+
+.table-action-button {
+  white-space: nowrap;
+}
+
+.empty-table-state {
+  padding: 24px 0;
+  text-align: center;
+  color: #ffcfaa;
+  font-weight: 700;
+}
+
+.performance-metric,
+.driver-trip-grid .performance-metric {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(249, 115, 22, 0.08);
   border-radius: 16px;
@@ -650,9 +713,7 @@ body {
     grid-template-columns: 1fr;
   }
 
-  .leaders-grid,
   .performance-metric-row,
-  .leader-metrics,
   .support-filter-bar,
   .driver-detail-summary,
   .driver-trip-grid {

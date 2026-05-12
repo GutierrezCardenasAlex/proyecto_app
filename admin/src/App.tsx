@@ -122,10 +122,12 @@ type DriverPerformanceRow = {
   phone: string
   driverStatus: string
   isAvailable: boolean
+  rating: number
   totalTrips: number
   completedTrips: number
   cancelledTrips: number
   promoTrips: number
+  tripsThisWeek: number
   revenue: number
   averageFare: number
   lastTripAt?: string | null
@@ -242,7 +244,6 @@ function App() {
 
   const isAuthenticated = token.length > 0
   const topDriver = driverPerformance.rows[0] ?? null
-  const performanceLeaders = driverPerformance.rows.slice(0, 3)
   const supportSummary = useMemo(
     () => ({
       open: supportReports.filter((report) => report.status === 'ABIERTO').length,
@@ -949,7 +950,7 @@ function App() {
                     <span className="status-pill success">Top del periodo</span>
                     <strong>{topDriver.fullName || topDriver.phone}</strong>
                     <p>
-                      {topDriver.completedTrips} viajes completados · Bs {topDriver.revenue.toFixed(2)} generados
+                      {topDriver.completedTrips} viajes completados · {topDriver.tripsThisWeek} esta semana · {topDriver.rating.toFixed(1)} estrellas
                     </p>
                   </div>
                   <div className="stack-actions">
@@ -959,100 +960,70 @@ function App() {
                   </div>
                 </div>
               )}
-
-              {performanceLeaders.length > 0 && (
-                <div className="leaders-grid">
-                  {performanceLeaders.map((row, index) => {
-                    const completionRate = row.totalTrips > 0 ? Math.round((row.completedTrips / row.totalTrips) * 100) : 0
-                    return (
-                      <article key={row.driverId} className="leader-card">
-                        <div className="leader-top">
-                          <span className="status-pill warning">#{index + 1}</span>
-                          <span className={row.isAvailable ? 'status-pill success subtle' : 'status-pill danger subtle'}>
-                            {row.isAvailable ? 'Disponible' : 'Fuera de linea'}
-                          </span>
-                        </div>
-                        <strong>{row.fullName || row.phone}</strong>
-                        <p>{row.phone}</p>
-                        <div className="leader-metrics">
-                          <div>
-                            <span>Completados</span>
-                            <strong>{row.completedTrips}</strong>
-                          </div>
-                          <div>
-                            <span>Promos</span>
-                            <strong>{row.promoTrips}</strong>
-                          </div>
-                          <div>
-                            <span>Bs</span>
-                            <strong>{row.revenue.toFixed(0)}</strong>
-                          </div>
-                        </div>
-                        <div className="progress-meta">
-                          <span>Eficiencia</span>
-                          <strong>{completionRate}%</strong>
-                        </div>
-                        <div className="progress-track">
-                          <div className="progress-fill" style={{ width: `${completionRate}%` }} />
-                        </div>
-                      </article>
-                    )
-                  })}
+              <div className="performance-table-shell">
+                <div className="table-wrapper">
+                  <table className="driver-stats-table">
+                    <thead>
+                      <tr>
+                        <th>Conductor</th>
+                        <th>Estado</th>
+                        <th>Viajes</th>
+                        <th>Calificacion</th>
+                        <th>Eficiencia</th>
+                        <th className="table-actions-cell">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {driverPerformance.rows.length === 0 && (
+                        <tr>
+                          <td colSpan={6}>
+                            <div className="empty-table-state">Sin viajes para este periodo.</div>
+                          </td>
+                        </tr>
+                      )}
+                      {driverPerformance.rows.map((row, index) => {
+                        const completionRate = row.totalTrips > 0 ? Math.round((row.completedTrips / row.totalTrips) * 100) : 0
+                        return (
+                          <tr key={row.driverId} className="driver-table-row">
+                            <td>
+                              <div className="driver-identity">
+                                <div className="driver-avatar">{(row.fullName || row.phone).trim().charAt(0).toUpperCase()}</div>
+                                <div>
+                                  <p className="driver-name">{row.fullName || row.phone}</p>
+                                  <p className="driver-meta">ID #{index + 1} · {row.phone}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td>
+                              <span className={row.isAvailable ? 'status-pill success' : 'status-pill warning'}>
+                                {row.isAvailable ? 'Activo' : 'En descanso'}
+                              </span>
+                            </td>
+                            <td>
+                              <p className="table-primary">{row.totalTrips}</p>
+                              <p className="table-secondary">{row.tripsThisWeek} esta semana</p>
+                            </td>
+                            <td>
+                              <div className="rating-cell">
+                                <span className="rating-star">★</span>
+                                <span className="table-primary">{row.rating > 0 ? row.rating.toFixed(1) : '0.0'}</span>
+                              </div>
+                            </td>
+                            <td>
+                              <p className="table-primary">{completionRate}%</p>
+                              <p className="table-secondary">{row.promoTrips} promo · {row.cancelledTrips} cancelados</p>
+                            </td>
+                            <td className="table-actions-cell">
+                              <button className="secondary-button table-action-button" onClick={() => loadDriverTrips(row.driverId)}>
+                                Ver historial de viajes
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-              )}
-
-              <div className="performance-list">
-                {driverPerformance.rows.length === 0 && (
-                  <article className="list-card">Sin viajes para este periodo.</article>
-                )}
-                {driverPerformance.rows.map((row, index) => (
-                  <article key={row.driverId} className="list-card stack-card performance-card compact-performance-card">
-                    <div>
-                      <div className="performance-heading">
-                        <strong>
-                          #{index + 1} {row.fullName || row.phone}
-                        </strong>
-                        <span className={row.isAvailable ? 'status-pill success' : 'status-pill danger'}>
-                          {row.isAvailable ? 'Activo' : 'Inactivo'}
-                        </span>
-                      </div>
-                      <p>{row.phone}</p>
-                      <div className="performance-metric-row">
-                        <div className="performance-metric">
-                          <span>Activo</span>
-                          <strong>{row.isAvailable ? 'Si' : 'No'}</strong>
-                        </div>
-                        <div className="performance-metric">
-                          <span>Viajes</span>
-                          <strong>{row.totalTrips}</strong>
-                        </div>
-                        <div className="performance-metric">
-                          <span>Eficiencia</span>
-                          <strong>{row.totalTrips > 0 ? `${Math.round((row.completedTrips / row.totalTrips) * 100)}%` : '0%'}</strong>
-                        </div>
-                        <div className="performance-metric">
-                          <span>Promos</span>
-                          <strong>{row.promoTrips}</strong>
-                        </div>
-                      </div>
-                      <p>
-                        Estado actual:{' '}
-                        <span className={row.driverStatus === 'available' ? 'status-pill success subtle' : 'status-pill danger subtle'}>
-                          {row.driverStatus}
-                        </span>
-                      </p>
-                      <p>
-                        Ultimo movimiento:{' '}
-                        {row.lastTripAt ? new Date(row.lastTripAt).toLocaleString('es-BO') : 'Sin viajes en el periodo'}
-                      </p>
-                    </div>
-                    <div className="performance-card-actions">
-                      <button className="secondary-button" onClick={() => loadDriverTrips(row.driverId)}>
-                        Ver detalles
-                      </button>
-                    </div>
-                  </article>
-                ))}
               </div>
             </article>
           </div>
