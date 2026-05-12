@@ -146,6 +146,7 @@ type DriverPerformanceResponse = {
 
 function App() {
   const mapRef = useRef<HTMLDivElement | null>(null)
+  const mapCardRef = useRef<HTMLDivElement | null>(null)
   const mapInstanceRef = useRef<any>(null)
   const markersLayerRef = useRef<any>(null)
   const [dashboard, setDashboard] = useState<Dashboard>({
@@ -202,9 +203,11 @@ function App() {
     return raw ? (JSON.parse(raw) as AdminProfile) : null
   })
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string | null>(null)
+  const [mapFullscreen, setMapFullscreen] = useState(false)
 
   const isAuthenticated = token.length > 0
   const topDriver = driverPerformance.rows[0] ?? null
+  const performanceLeaders = driverPerformance.rows.slice(0, 3)
 
   const authHeaders = useMemo(
     () => ({
@@ -540,6 +543,23 @@ function App() {
     }
   }
 
+  async function toggleMapFullscreen() {
+    const element = mapCardRef.current
+    if (!element) {
+      return
+    }
+
+    try {
+      if (document.fullscreenElement === element) {
+        await document.exitFullscreen()
+      } else {
+        await element.requestFullscreen()
+      }
+    } catch (fullscreenError) {
+      setError(fullscreenError instanceof Error ? fullscreenError.message : 'No se pudo cambiar el modo del mapa.')
+    }
+  }
+
   useEffect(() => {
     if (!isAuthenticated) {
       return
@@ -585,6 +605,17 @@ function App() {
       socket.close()
     }
   }, [authHeaders, isAuthenticated, performanceRange, token])
+
+  useEffect(() => {
+    const syncFullscreen = () => {
+      setMapFullscreen(document.fullscreenElement === mapCardRef.current)
+    }
+
+    document.addEventListener('fullscreenchange', syncFullscreen)
+    return () => {
+      document.removeEventListener('fullscreenchange', syncFullscreen)
+    }
+  }, [])
 
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current || !isAuthenticated) {
@@ -725,10 +756,15 @@ function App() {
       {error && <div className="error-box">{error}</div>}
 
       <section className="map-section">
-        <div className="map-card map-card-wide">
+        <div ref={mapCardRef} className={mapFullscreen ? 'map-card map-card-wide map-card-fullscreen' : 'map-card map-card-wide'}>
           <div className="panel-header">
-            <h2>Mapa en vivo</h2>
-            <span>Potosi protegido por radio operativo</span>
+            <div>
+              <h2>Mapa en vivo</h2>
+              <span>Potosi protegido por radio operativo</span>
+            </div>
+            <button className="secondary-button" onClick={toggleMapFullscreen}>
+              {mapFullscreen ? 'Salir de pantalla completa' : 'Expandir mapa'}
+            </button>
           </div>
           <div ref={mapRef} className="map" />
         </div>
@@ -802,6 +838,47 @@ function App() {
                 </div>
               )}
 
+              {performanceLeaders.length > 0 && (
+                <div className="leaders-grid">
+                  {performanceLeaders.map((row, index) => {
+                    const completionRate = row.totalTrips > 0 ? Math.round((row.completedTrips / row.totalTrips) * 100) : 0
+                    return (
+                      <article key={row.driverId} className="leader-card">
+                        <div className="leader-top">
+                          <span className="status-pill warning">#{index + 1}</span>
+                          <span className={row.isAvailable ? 'status-pill success subtle' : 'status-pill danger subtle'}>
+                            {row.isAvailable ? 'Disponible' : 'Fuera de linea'}
+                          </span>
+                        </div>
+                        <strong>{row.fullName || row.phone}</strong>
+                        <p>{row.phone}</p>
+                        <div className="leader-metrics">
+                          <div>
+                            <span>Completados</span>
+                            <strong>{row.completedTrips}</strong>
+                          </div>
+                          <div>
+                            <span>Promos</span>
+                            <strong>{row.promoTrips}</strong>
+                          </div>
+                          <div>
+                            <span>Bs</span>
+                            <strong>{row.revenue.toFixed(0)}</strong>
+                          </div>
+                        </div>
+                        <div className="progress-meta">
+                          <span>Eficiencia</span>
+                          <strong>{completionRate}%</strong>
+                        </div>
+                        <div className="progress-track">
+                          <div className="progress-fill" style={{ width: `${completionRate}%` }} />
+                        </div>
+                      </article>
+                    )
+                  })}
+                </div>
+              )}
+
               <div className="performance-list">
                 {driverPerformance.rows.length === 0 && (
                   <article className="list-card">Sin viajes para este periodo.</article>
@@ -818,12 +895,25 @@ function App() {
                         </span>
                       </div>
                       <p>{row.phone}</p>
-                      <p>
-                        {row.completedTrips} completados · {row.cancelledTrips} cancelados · {row.promoTrips} promo
-                      </p>
-                      <p>
-                        Bs {row.revenue.toFixed(2)} · promedio Bs {row.averageFare.toFixed(2)}
-                      </p>
+                      <div className="performance-metric-row">
+                        <div className="performance-metric">
+                          <span>Completados</span>
+                          <strong>{row.completedTrips}</strong>
+                        </div>
+                        <div className="performance-metric">
+                          <span>Cancelados</span>
+                          <strong>{row.cancelledTrips}</strong>
+                        </div>
+                        <div className="performance-metric">
+                          <span>Promos</span>
+                          <strong>{row.promoTrips}</strong>
+                        </div>
+                        <div className="performance-metric">
+                          <span>Bs generados</span>
+                          <strong>{row.revenue.toFixed(2)}</strong>
+                        </div>
+                      </div>
+                      <p>Promedio por viaje: Bs {row.averageFare.toFixed(2)}</p>
                       <p>
                         Estado actual:{' '}
                         <span className={row.driverStatus === 'available' ? 'status-pill success subtle' : 'status-pill danger subtle'}>
@@ -1046,18 +1136,25 @@ function App() {
             <div className="list">
               {supportReports.length === 0 && <article className="list-card">Sin reportes por ahora.</article>}
               {supportReports.map((report) => (
-                <article key={report.id} className="list-card stack-card">
-                  <div>
-                    <strong>{report.full_name || report.phone}</strong>
-                    <p>{report.role} · {report.phone}</p>
-                    <p>
-                      {report.category} ·{' '}
+                <article key={report.id} className="support-card">
+                  <div className="support-card-top">
+                    <div>
+                      <strong>{report.full_name || report.phone}</strong>
+                      <p>{report.role} · {report.phone}</p>
+                    </div>
+                    <div className="support-badges">
+                      <span className="status-pill warning subtle">{report.category}</span>
                       <span className={report.status === 'ABIERTO' ? 'status-pill warning subtle' : 'status-pill success subtle'}>
                         {report.status}
                       </span>
-                    </p>
-                    <p>{report.message}</p>
-                    <p>{new Date(report.created_at).toLocaleString('es-BO')}</p>
+                    </div>
+                  </div>
+                  <div className="support-message">
+                    {report.message}
+                  </div>
+                  <div className="support-card-footer">
+                    <span>Enviado</span>
+                    <strong>{new Date(report.created_at).toLocaleString('es-BO')}</strong>
                   </div>
                 </article>
               ))}
