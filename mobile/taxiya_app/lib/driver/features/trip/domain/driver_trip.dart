@@ -25,8 +25,8 @@ class DriverTrip {
   final String status;
   final double pickupLat;
   final double pickupLng;
-  final double destinationLat;
-  final double destinationLng;
+  final double? destinationLat;
+  final double? destinationLng;
   final double fareAmount;
   final String? requestedAt;
   final String? vehicleType;

@@ -822,9 +822,12 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
     }
     final driverPoint = LatLng(driverLat, driverLng);
     if (trip.status == 'in_progress') {
+      if (trip.destinationLat == null || trip.destinationLng == null) {
+        return LatLngBounds.fromPoints([driverPoint, LatLng(trip.pickupLat, trip.pickupLng)]);
+      }
       return LatLngBounds.fromPoints([
         driverPoint,
-        LatLng(trip.destinationLat, trip.destinationLng),
+        LatLng(trip.destinationLat!, trip.destinationLng!),
       ]);
     }
     if (const {'accepted', 'arriving', 'at_pickup'}.contains(trip.status)) {
@@ -1594,6 +1597,25 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
       return;
     }
     if (trip.status == 'at_pickup') {
+      final destinationLabel = trip.destination.trim().toLowerCase();
+      final destinationMissing =
+          trip.destinationLat == null ||
+          trip.destinationLng == null ||
+          destinationLabel.isEmpty ||
+          destinationLabel == 'destino no esta marcado' ||
+          destinationLabel == 'destino por confirmar' ||
+          destinationLabel == 'abordaje inmediato';
+      if (destinationMissing) {
+        if (mounted) {
+          showTopNotice(
+            context,
+            'El pasajero aun no guardo el destino final. Espera a que lo marque para iniciar el viaje.',
+            backgroundColor: const Color(0xFFF97316),
+            foregroundColor: const Color(0xFF0F0F10),
+          );
+        }
+        return;
+      }
       await ref.read(offeredTripProvider.notifier).updateTripStatus('in_progress');
       if (trip.isPromotional && mounted) {
         showTopNotice(

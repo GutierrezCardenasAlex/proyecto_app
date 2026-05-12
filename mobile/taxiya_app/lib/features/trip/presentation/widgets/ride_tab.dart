@@ -457,7 +457,8 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
         request.destinationLng == null ||
         currentAddress.isEmpty ||
         currentAddress == 'abordaje inmediato' ||
-        currentAddress == 'destino por confirmar';
+        currentAddress == 'destino por confirmar' ||
+        currentAddress == 'destino no esta marcado';
   }
 
   Future<void> _saveActiveTripDestination() async {
@@ -523,7 +524,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     final resolvedDestinationPoint = _resolveDestinationPoint();
     final resolvedDestination =
         _rideMode == RideMode.cercano && destination.isEmpty
-            ? 'Abordaje inmediato'
+            ? TripRepository.destinationPendingLabel
             : (destination.isEmpty && resolvedDestinationPoint != null ? _customDestinationLabel : destination);
     final selectedDriverId = _rideMode == RideMode.cercano ? _selectedDriverId : null;
     final selectedDriver = _findDriverById(ref.read(tripProvider).nearbyDrivers, selectedDriverId);
@@ -534,7 +535,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     }
 
     if (resolvedDestination.isEmpty) {
-      _showMessage('Ingresa un destino para continuar.');
+      _showMessage('Marca o escribe el destino para continuar.');
       return;
     }
 
@@ -622,9 +623,9 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
   String _rideDestinationPreview() {
     final destination = _destinationController.text.trim();
     if (_rideMode == RideMode.cercano) {
-      return destination.isEmpty ? 'Abordaje inmediato' : destination;
+      return destination.isEmpty ? TripRepository.destinationPendingLabel : destination;
     }
-    return destination.isEmpty ? 'Destino por confirmar' : destination;
+    return destination.isEmpty ? TripRepository.destinationPendingLabel : destination;
   }
 
   void _showNearbyDriverDetails(NearbyDriver driver) {
@@ -1291,8 +1292,14 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     final mapRouteTarget = hasActiveTrip
         ? (isRideInProgress ? activeDestinationPoint : activeDriverPoint)
         : selectedDestinationPoint;
+    final editingDestination = ((!rideLocked && _rideMode == RideMode.destino) || canChooseActiveTripDestination) &&
+        _customDestinationPoint != null;
     final shouldDrawPreviewRoute = hasActiveTrip
-        ? (isRideInProgress ? (mapRouteStart != null && mapRouteTarget != null) : activeDriverPoint != null)
+        ? (isRideInProgress
+            ? (mapRouteStart != null && mapRouteTarget != null)
+            : (activeStatus == 'at_pickup'
+                ? activeDestinationPoint != null && activeDriverPoint != null
+                : activeDriverPoint != null))
         : _rideMode == RideMode.destino && selectedDestinationPoint != null;
     final displayNearbyDrivers = _requestableDrivers(tripState.nearbyDrivers);
     final activeDriverKey = activeDriverPoint == null
@@ -1346,6 +1353,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                 routeColor: mapRouteColor,
                 focusBounds: focusBounds,
                 focusSignal: _mapFocusSignal,
+                showTargetEditBadge: editingDestination,
                 onRouteUpdated: () {
                   if (!mounted) {
                     return;
@@ -1746,7 +1754,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Text(
-                                      'Marca el destino antes de iniciar el viaje',
+                                      'Destino aun no anotado',
                                       style: GoogleFonts.plusJakartaSans(
                                         color: const Color(0xFFE6FFF5),
                                         fontWeight: FontWeight.w800,
@@ -1757,7 +1765,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                               ),
                               const SizedBox(height: 10),
                               const Text(
-                                'Tu conductor ya llegó. Ahora puedes tocar el mapa o elegir un lugar para dejar guardado el destino final.',
+                                'Tu conductor ya llego. Marca de parte del pasajero el destino final en el mapa o escribelo y luego guardalo para que el viaje pueda iniciar.',
                                 style: TextStyle(
                                   color: Color(0xFFD6FFF0),
                                   fontWeight: FontWeight.w600,

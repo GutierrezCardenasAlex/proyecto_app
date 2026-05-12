@@ -52,12 +52,12 @@ class DriverTripRepository {
     return DriverTrip(
       id: item['id']?.toString() ?? '',
       passengerPickup: item['pickup_address']?.toString() ?? 'Recojo',
-      destination: item['destination_address']?.toString() ?? 'Destino',
+      destination: item['destination_address']?.toString() ?? 'Destino no esta marcado',
       status: item['status']?.toString() ?? 'accepted',
       pickupLat: _toDouble(item['pickup_lat']),
       pickupLng: _toDouble(item['pickup_lng']),
-      destinationLat: _toDouble(item['destination_lat']),
-      destinationLng: _toDouble(item['destination_lng']),
+      destinationLat: _toNullableDouble(item['destination_lat']),
+      destinationLng: _toNullableDouble(item['destination_lng']),
       fareAmount: _toDouble(item['fare_amount']),
       requestedAt: item['requested_at']?.toString(),
       vehicleType: item['vehicle_type']?.toString(),
@@ -206,12 +206,12 @@ class DriverTripRepository {
     return DriverTrip(
       id: item['id']?.toString() ?? '',
       passengerPickup: item['pickup_address']?.toString() ?? 'Recojo',
-      destination: item['destination_address']?.toString() ?? 'Destino',
+      destination: item['destination_address']?.toString() ?? 'Destino no esta marcado',
       status: item['status']?.toString() ?? fallbackStatus,
       pickupLat: _toDouble(item['pickup_lat']),
       pickupLng: _toDouble(item['pickup_lng']),
-      destinationLat: _toDouble(item['destination_lat']),
-      destinationLng: _toDouble(item['destination_lng']),
+      destinationLat: _toNullableDouble(item['destination_lat']),
+      destinationLng: _toNullableDouble(item['destination_lng']),
       fareAmount: _toDouble(item['fare_amount']),
       requestedAt: item['requested_at']?.toString(),
       vehicleType: item['vehicle_type']?.toString(),
@@ -229,6 +229,16 @@ class DriverTripRepository {
       return value.toDouble();
     }
     return double.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  static double? _toNullableDouble(Object? value) {
+    if (value == null) {
+      return null;
+    }
+    if (value is num) {
+      return value.toDouble();
+    }
+    return double.tryParse(value.toString());
   }
 
   static String? _joinVehicleLabel(Object? brand, Object? model) {

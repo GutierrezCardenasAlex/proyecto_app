@@ -18,10 +18,12 @@ final tripProvider = NotifierProvider<TripController, TripState>(TripController.
 class TripRepository {
   const TripRepository();
 
+  static const String destinationPendingLabel = 'Destino no esta marcado';
+
   TripRequest _mapTripRequest(Map<String, dynamic> payload) {
     return TripRequest(
       pickupAddress: payload['pickup_address']?.toString() ?? 'Mi ubicacion actual',
-      destinationAddress: payload['destination_address']?.toString() ?? 'Destino por confirmar',
+      destinationAddress: payload['destination_address']?.toString() ?? destinationPendingLabel,
       status: payload['status']?.toString() ?? 'idle',
       activeTripId: payload['id']?.toString(),
       pickupLat: _toNullableDouble(payload['pickup_lat']),
@@ -62,7 +64,7 @@ class TripRepository {
             id: item['id']?.toString() ?? '',
             status: item['status']?.toString() ?? 'unknown',
             pickupAddress: item['pickup_address']?.toString() ?? 'Origen',
-            destinationAddress: item['destination_address']?.toString() ?? 'Destino',
+            destinationAddress: item['destination_address']?.toString() ?? destinationPendingLabel,
             requestedAt: item['requested_at']?.toString() ?? '',
             driverName: item['driver_name']?.toString(),
             driverPhone: item['driver_phone']?.toString(),
@@ -185,10 +187,10 @@ class TripRepository {
     LatLng? destinationLocation,
     String? preferredDriverId,
   }) async {
-    final destination = destinationLocation ?? _deriveDestinationFromPickup(pickup);
-    final distanceMeters = _estimateDistanceMeters(pickup, destination);
-    final durationSeconds = max(300, (distanceMeters / 5.5).round());
-    final fareAmount = max(10, (distanceMeters / 700).ceil() * 3).toDouble();
+    final destination = destinationLocation;
+    final distanceMeters = destination == null ? 350 : _estimateDistanceMeters(pickup, destination);
+    final durationSeconds = destination == null ? 300 : max(300, (distanceMeters / 5.5).round());
+    final fareAmount = destination == null ? 10 : max(10, (distanceMeters / 700).ceil() * 3).toDouble();
 
     final response = await http.post(
       Uri.parse('${AppConfig.apiBaseUrl}/trips'),
@@ -199,12 +201,12 @@ class TripRepository {
         'destinationAddress': destinationAddress,
         'pickupLat': pickup.latitude,
         'pickupLng': pickup.longitude,
-        'destinationLat': destination.latitude,
-        'destinationLng': destination.longitude,
         'estimatedDistanceMeters': distanceMeters,
         'estimatedDurationSeconds': durationSeconds,
         'fareAmount': fareAmount,
         'dispatchMode': dispatchMode,
+        if (destination != null) 'destinationLat': destination.latitude,
+        if (destination != null) 'destinationLng': destination.longitude,
         if (preferredDriverId != null && preferredDriverId.isNotEmpty)
           'preferredDriverId': preferredDriverId,
       }),
@@ -230,8 +232,8 @@ class TripRepository {
       activeTripId: payload['id']?.toString(),
       pickupLat: pickup.latitude,
       pickupLng: pickup.longitude,
-      destinationLat: destination.latitude,
-      destinationLng: destination.longitude,
+      destinationLat: destination?.latitude,
+      destinationLng: destination?.longitude,
       etaMinutes: _toNullableInt(payload['eta_minutes']),
       isPromotional: payload['reward_applied'] == true || payload['promotional_trip'] == true,
     );
@@ -313,11 +315,6 @@ class TripRepository {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
       };
-
-  static LatLng _deriveDestinationFromPickup(LatLng pickup) {
-    return LatLng(pickup.latitude + 0.0085, pickup.longitude + 0.0065);
-  }
-
   static int _estimateDistanceMeters(LatLng from, LatLng to) {
     const distance = Distance();
     return distance.as(LengthUnit.Meter, from, to).round();
@@ -381,7 +378,7 @@ class TripController extends Notifier<TripState> {
     return TripState(
       request: const TripRequest(
         pickupAddress: 'Mi ubicacion actual',
-        destinationAddress: 'Destino por confirmar',
+        destinationAddress: TripRepository.destinationPendingLabel,
         status: 'idle',
         activeTripId: null,
       ),

@@ -33,6 +33,7 @@ class PotosiMap extends ConsumerStatefulWidget {
     this.focusSignal = 0,
     this.onRouteUpdated,
     this.onMapTap,
+    this.showTargetEditBadge = false,
   });
 
   final List<PotosiMapDriverMarker> drivers;
@@ -47,6 +48,7 @@ class PotosiMap extends ConsumerStatefulWidget {
   final int focusSignal;
   final VoidCallback? onRouteUpdated;
   final ValueChanged<LatLng>? onMapTap;
+  final bool showTargetEditBadge;
 
   @override
   ConsumerState<PotosiMap> createState() => _PotosiMapState();
@@ -297,10 +299,11 @@ class _PotosiMapState extends ConsumerState<PotosiMap> {
                     point: widget.routeTarget!,
                     width: 120,
                     height: 92,
-                    child: const InteractiveDestinationMarker(
+                    child: InteractiveDestinationMarker(
                       icon: Icons.place_rounded,
-                      color: Color(0xFFF97316),
+                      color: const Color(0xFFF97316),
                       label: 'Destino',
+                      showEditBadge: widget.showTargetEditBadge,
                     ),
                   ),
                 if (widget.secondaryMarker != null &&
@@ -309,11 +312,12 @@ class _PotosiMapState extends ConsumerState<PotosiMap> {
                     point: widget.secondaryMarker!,
                     width: 110,
                     height: 84,
-                    child: const InteractiveDestinationMarker(
+                    child: InteractiveDestinationMarker(
                       icon: Icons.flag_rounded,
-                      color: Color(0xFF0EA5E9),
+                      color: const Color(0xFF0EA5E9),
                       label: 'Ruta final',
                       size: 28,
+                      showEditBadge: widget.showTargetEditBadge,
                     ),
                   ),
                 ...widget.drivers.map(

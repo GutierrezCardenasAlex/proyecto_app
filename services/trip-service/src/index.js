@@ -20,8 +20,8 @@ const tripSchema = z.object({
   destinationAddress: z.string().min(3),
   pickupLat: z.number(),
   pickupLng: z.number(),
-  destinationLat: z.number(),
-  destinationLng: z.number(),
+  destinationLat: z.number().optional().nullable(),
+  destinationLng: z.number().optional().nullable(),
   estimatedDistanceMeters: z.number().int().positive(),
   estimatedDurationSeconds: z.number().int().positive(),
   fareAmount: z.number().positive(),
@@ -175,10 +175,10 @@ async function bootstrap() {
 
   app.post("/", async (request, reply) => {
     const input = tripSchema.parse(request.body);
-    const locations = [
-      [input.pickupLat, input.pickupLng],
-      [input.destinationLat, input.destinationLng]
-    ];
+    const locations = [[input.pickupLat, input.pickupLng]];
+    if (typeof input.destinationLat === "number" && typeof input.destinationLng === "number") {
+      locations.push([input.destinationLat, input.destinationLng]);
+    }
 
     if (!locations.every(([lat, lng]) => isInsidePotosi(lat, lng))) {
       return reply.code(400).send({
@@ -259,7 +259,10 @@ async function bootstrap() {
          ) VALUES (
            $1, $2, $3,
            ST_SetSRID(ST_MakePoint($4, $5), 4326)::geography,
-           ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography,
+           CASE
+             WHEN $6::double precision IS NULL OR $7::double precision IS NULL THEN NULL
+             ELSE ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography
+           END,
           $8, $9, $10, $11, 'requested'
          )
          RETURNING *`,
@@ -269,8 +272,8 @@ async function bootstrap() {
             input.destinationAddress,
             input.pickupLng,
             input.pickupLat,
-            input.destinationLng,
-            input.destinationLat,
+            input.destinationLng ?? null,
+            input.destinationLat ?? null,
             input.estimatedDistanceMeters,
             input.estimatedDurationSeconds,
             effectiveFare,
@@ -454,6 +457,33 @@ async function bootstrap() {
   app.patch("/:tripId/status", async (request, reply) => {
     const { tripId } = request.params;
     const { status } = statusSchema.parse(request.body);
+    if (status === "in_progress") {
+      const destinationCheck = await pool.query(
+        `SELECT destination_address,
+                ST_Y(destination_location::geometry) AS destination_lat,
+                ST_X(destination_location::geometry) AS destination_lng
+         FROM trips
+         WHERE id = $1`,
+        [tripId]
+      );
+      if (!destinationCheck.rows.length) {
+        return reply.code(404).send({ message: "Trip not found" });
+      }
+      const currentTrip = destinationCheck.rows[0];
+      const destinationAddress = (currentTrip.destination_address || "").toString().trim().toLowerCase();
+      if (
+        currentTrip.destination_lat == null ||
+        currentTrip.destination_lng == null ||
+        !destinationAddress ||
+        destinationAddress === "destino no esta marcado" ||
+        destinationAddress === "destino por confirmar" ||
+        destinationAddress === "abordaje inmediato"
+      ) {
+        return reply.code(409).send({
+          message: "El pasajero aun no guardo el destino final del viaje"
+        });
+      }
+    }
     const timestampField = {
       arriving: null,
       at_pickup: null,
