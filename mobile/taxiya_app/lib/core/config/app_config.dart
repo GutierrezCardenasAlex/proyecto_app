@@ -2,16 +2,17 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 class AppConfig {
-  static const serverScheme = String.fromEnvironment('SERVER_SCHEME', defaultValue: 'http');
+  static const serverScheme = String.fromEnvironment('SERVER_SCHEME', defaultValue: 'https');
   static const serverHost = String.fromEnvironment(
     'SERVER_HOST',
     defaultValue: 'api-flashgo.cybernovatech.space',
   );
-  static const gatewayPort = String.fromEnvironment('GATEWAY_PORT', defaultValue: '80');
-  static const websocketPort = String.fromEnvironment('WEBSOCKET_PORT', defaultValue: '80');
+  static const gatewayPort = String.fromEnvironment('GATEWAY_PORT', defaultValue: '443');
+  static const websocketPort = String.fromEnvironment('WEBSOCKET_PORT', defaultValue: '443');
+  static const websocketScheme = String.fromEnvironment('WEBSOCKET_SCHEME', defaultValue: '');
   static const mapTilesUrlTemplate = String.fromEnvironment(
     'MAP_TILES_URL_TEMPLATE',
-    defaultValue: 'http://tiles-flashgo.cybernovatech.space/styles/basic-preview/512/{z}/{x}/{y}.png',
+    defaultValue: 'https://tiles-flashgo.cybernovatech.space/styles/basic-preview/512/{z}/{x}/{y}.png',
   );
   static const mapTilesAttribution = String.fromEnvironment(
     'MAP_TILES_ATTRIBUTION',
@@ -19,7 +20,7 @@ class AppConfig {
   );
   static const mapOfflineTilesUrlTemplate = String.fromEnvironment(
     'MAP_OFFLINE_TILES_URL_TEMPLATE',
-    defaultValue: 'http://tiles-flashgo.cybernovatech.space/styles/basic-preview/512/{z}/{x}/{y}.png',
+    defaultValue: 'https://tiles-flashgo.cybernovatech.space/styles/basic-preview/512/{z}/{x}/{y}.png',
   );
   static const mapOfflineTilesAttribution = String.fromEnvironment(
     'MAP_OFFLINE_TILES_ATTRIBUTION',
@@ -37,8 +38,26 @@ class AppConfig {
     defaultValue: '/route/v1/driving',
   );
 
-  static String get apiBaseUrl => '$serverScheme://$serverHost:$gatewayPort/api';
-  static String get websocketUrl => '$serverScheme://$serverHost:$websocketPort';
+  static String get apiBaseUrl =>
+      '$serverScheme://$serverHost${_formatPort(serverScheme, gatewayPort)}/api';
+  static String get websocketUrl {
+    final resolvedScheme = websocketScheme.trim().isNotEmpty
+        ? websocketScheme.trim()
+        : (serverScheme == 'https' ? 'wss' : 'ws');
+    return '$resolvedScheme://$serverHost${_formatPort(resolvedScheme, websocketPort)}';
+  }
+
+  static String _formatPort(String scheme, String port) {
+    final normalized = port.trim();
+    if (normalized.isEmpty) return '';
+    if ((scheme == 'http' || scheme == 'ws') && normalized == '80') {
+      return '';
+    }
+    if ((scheme == 'https' || scheme == 'wss') && normalized == '443') {
+      return '';
+    }
+    return ':$normalized';
+  }
 
   static String get effectiveMapTilesUrlTemplate {
     final offlineCompatible = effectiveOfflineTilesUrlTemplate.trim();
