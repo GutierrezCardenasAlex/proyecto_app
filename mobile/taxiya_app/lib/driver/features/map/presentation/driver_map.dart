@@ -349,8 +349,8 @@ class _DriverMapState extends ConsumerState<DriverMap> {
                     .map(
                       (route) => Polyline(
                         points: route,
-                        strokeWidth: 3,
-                        color: widget.routeColor.withValues(alpha: 0.22),
+                        strokeWidth: 2.5,
+                        color: widget.routeColor.withValues(alpha: 0.18),
                       ),
                     )
                     .toList(growable: false),
@@ -364,8 +364,8 @@ class _DriverMapState extends ConsumerState<DriverMap> {
                 polylines: [
                   Polyline(
                     points: visibleUpcomingRoute!,
-                    strokeWidth: 4,
-                    color: const Color(0xFF0EA5E9).withValues(alpha: 0.34),
+                    strokeWidth: 3.5,
+                    color: const Color(0xFF0EA5E9).withValues(alpha: 0.28),
                   ),
                 ],
               ),
@@ -377,7 +377,7 @@ class _DriverMapState extends ConsumerState<DriverMap> {
                 polylines: [
                   Polyline(
                     points: visiblePrimaryRoute!,
-                    strokeWidth: 5,
+                    strokeWidth: 4,
                     color: widget.routeColor,
                   ),
                 ],
@@ -386,8 +386,8 @@ class _DriverMapState extends ConsumerState<DriverMap> {
               markers: [
                 Marker(
                   point: driverPoint,
-                  width: 56,
-                  height: 56,
+                  width: 50,
+                  height: 50,
                   child: Container(
                     decoration: BoxDecoration(
                       color: widget.available ? const Color(0xFF17181B) : const Color(0xFF3A3A41),
@@ -399,7 +399,7 @@ class _DriverMapState extends ConsumerState<DriverMap> {
                         BoxShadow(
                           color: (widget.available ? const Color(0xFFF97316) : const Color(0xFF0F0F10))
                               .withValues(alpha: 0.20),
-                          blurRadius: 14,
+                          blurRadius: 10,
                           offset: const Offset(0, 6),
                         ),
                       ],
@@ -407,14 +407,15 @@ class _DriverMapState extends ConsumerState<DriverMap> {
                     child: Icon(
                       _vehicleIcon(widget.vehicleType),
                       color: widget.available ? const Color(0xFFF97316) : const Color(0xFFFFF4EC),
+                      size: 22,
                     ),
                   ),
                 ),
                 if (widget.tripAccepted && routePoint != null)
                   Marker(
                     point: routePoint,
-                    width: 120,
-                    height: 92,
+                    width: 112,
+                    height: 86,
                     child: InteractiveDestinationMarker(
                       icon: isOnDestinationStage ? Icons.flag_rounded : Icons.place_rounded,
                       color: const Color(0xFFF97316),
@@ -427,8 +428,8 @@ class _DriverMapState extends ConsumerState<DriverMap> {
                     destinationPoint != routePoint)
                   Marker(
                     point: destinationPoint,
-                    width: 110,
-                    height: 84,
+                    width: 102,
+                    height: 80,
                     child: const InteractiveDestinationMarker(
                       icon: Icons.flag_rounded,
                       color: Color(0xFF0EA5E9),

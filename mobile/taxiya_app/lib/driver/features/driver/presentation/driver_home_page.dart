@@ -152,8 +152,7 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
         showTopNotice(
           context,
           'Nueva oferta disponible. Revisa el viaje entrante.',
-          backgroundColor: const Color(0xFFF97316),
-          foregroundColor: const Color(0xFF0F0F10),
+          tone: NoticeTone.warning,
         );
       }
     });
@@ -177,8 +176,11 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
           showTopNotice(
             context,
             _statusMessage(status),
-            backgroundColor: const Color(0xFFF97316),
-            foregroundColor: const Color(0xFF0F0F10),
+            tone: status == 'at_pickup' || status == 'completed'
+                ? NoticeTone.success
+                : status == 'cancelled'
+                    ? NoticeTone.warning
+                    : NoticeTone.info,
           );
         }
         ref.invalidate(driverTripHistoryProvider);
@@ -190,8 +192,7 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
         showTopNotice(
           context,
           'El pasajero actualizo el destino del viaje.',
-          backgroundColor: const Color(0xFF10B981),
-          foregroundColor: const Color(0xFF0F0F10),
+          tone: NoticeTone.success,
         );
       }
     });
@@ -201,8 +202,7 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
         showTopNotice(
           context,
           'Destino recibido. Ya puedes seguir la nueva ruta.',
-          backgroundColor: const Color(0xFF10B981),
-          foregroundColor: const Color(0xFF0F0F10),
+          tone: NoticeTone.success,
         );
       }
     });
@@ -1610,8 +1610,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
           showTopNotice(
             context,
             'El pasajero aun no guardo el destino final. Espera a que lo marque para iniciar el viaje.',
-            backgroundColor: const Color(0xFFF97316),
-            foregroundColor: const Color(0xFF0F0F10),
+            tone: NoticeTone.warning,
           );
         }
         return;
@@ -1621,8 +1620,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
         showTopNotice(
           context,
           'Este viaje es gratis. El pasajero se gano la promocion.',
-          backgroundColor: const Color(0xFF22C55E),
-          foregroundColor: const Color(0xFF0F0F10),
+          tone: NoticeTone.success,
         );
       }
       return;
@@ -1795,8 +1793,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                 showTopNotice(
                   context,
                   'Ruta actualizada. La app ya corrigio el camino.',
-                  backgroundColor: const Color(0xFFF97316),
-                  foregroundColor: const Color(0xFF0F0F10),
+                  tone: NoticeTone.info,
                 );
               },
             ),

@@ -44,6 +44,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
   io.Socket? _socket;
   double _sheetSize = 0.34;
   String? _floatingNotification;
+  NoticeTone _floatingNotificationTone = NoticeTone.info;
   RideMode _rideMode = RideMode.destino;
   String? _joinedTripId;
   String? _selectedDriverId;
@@ -470,11 +471,11 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       return;
     }
     if (destinationPoint == null) {
-      _showMessage('Marca o selecciona primero el destino final del viaje.');
+      _showMessage('Marca o selecciona primero el destino final del viaje.', tone: NoticeTone.error);
       return;
     }
     if (destinationAddress.isEmpty) {
-      _showMessage('Escribe o marca el destino para poder guardarlo.');
+      _showMessage('Escribe o marca el destino para poder guardarlo.', tone: NoticeTone.error);
       return;
     }
     await ref.read(tripProvider.notifier).updateTripDestination(
@@ -485,10 +486,13 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
         );
     final error = ref.read(tripProvider).errorMessage;
     if (error != null) {
-      _showMessage(error.replaceFirst('Exception: ', ''));
+      _showMessage(error.replaceFirst('Exception: ', ''), tone: NoticeTone.error);
       return;
     }
-    _showFloatingNotification('Destino guardado. Ya pueden iniciar el viaje con la ruta correcta.');
+    _showFloatingNotification(
+      'Destino guardado. Ya pueden iniciar el viaje con la ruta correcta.',
+      tone: NoticeTone.success,
+    );
   }
 
   void _selectDestinationFromMap(LatLng point) {
@@ -504,7 +508,10 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       _customDestinationPoint = point;
       _mapFocusSignal++;
     });
-    _showFloatingNotification('Destino marcado en el mapa. Ese punto sera el final del viaje.');
+    _showFloatingNotification(
+      'Destino marcado en el mapa. Ese punto sera el final del viaje.',
+      tone: NoticeTone.info,
+    );
   }
 
   Future<void> _requestRide() async {
@@ -517,7 +524,10 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
         const {'requested', 'searching'}.contains(request.status);
     if (const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(request.status) &&
         (request.activeTripId?.isNotEmpty ?? false)) {
-      _showMessage('Ya tienes un conductor asignado. Ahora solo puedes seguir ese viaje activo.');
+      _showMessage(
+        'Ya tienes un conductor asignado. Ahora solo puedes seguir ese viaje activo.',
+        tone: NoticeTone.warning,
+      );
       return;
     }
     final destination = _destinationController.text.trim();
@@ -530,17 +540,23 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     final selectedDriver = _findDriverById(ref.read(tripProvider).nearbyDrivers, selectedDriverId);
 
     if (location == null) {
-      _showMessage(locationState.errorMessage ?? 'Activa tu ubicacion para pedir un taxi.');
+      _showMessage(
+        locationState.errorMessage ?? 'Activa tu ubicacion para pedir un taxi.',
+        tone: NoticeTone.error,
+      );
       return;
     }
 
     if (resolvedDestination.isEmpty) {
-      _showMessage('Marca o escribe el destino para continuar.');
+      _showMessage('Marca o escribe el destino para continuar.', tone: NoticeTone.error);
       return;
     }
 
     if (_rideMode == RideMode.destino && resolvedDestinationPoint == null) {
-      _showMessage('Selecciona un lugar sugerido o marca tu destino tocando el mapa.');
+      _showMessage(
+        'Selecciona un lugar sugerido o marca tu destino tocando el mapa.',
+        tone: NoticeTone.error,
+      );
       return;
     }
 
@@ -565,18 +581,22 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
 
     final error = ref.read(tripProvider).errorMessage;
     if (error != null && mounted) {
-      _showMessage(error.replaceFirst('Exception: ', ''));
+      _showMessage(error.replaceFirst('Exception: ', ''), tone: NoticeTone.error);
       return;
     }
 
     if (mounted) {
       if (isRetryingRequest) {
-        _showFloatingNotification('Solicitud reenviada. Seguimos buscando un conductor para ti.');
+          _showFloatingNotification(
+            'Solicitud reenviada. Seguimos buscando un conductor para ti.',
+            tone: NoticeTone.info,
+          );
       } else {
         _showFloatingNotification(
           selectedDriver == null
               ? 'Solicitud enviada. Estamos buscando un conductor.'
               : 'Solicitud enviada a ${selectedDriver.vehicleLabel}. Esperando respuesta.',
+          tone: NoticeTone.success,
         );
       }
     }
@@ -810,12 +830,11 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     );
   }
 
-  void _showMessage(String message) {
+  void _showMessage(String message, {NoticeTone tone = NoticeTone.warning}) {
     showTopNotice(
       context,
       message,
-      backgroundColor: const Color(0xFFF97316),
-      foregroundColor: const Color(0xFF0F0F10),
+      tone: tone,
     );
   }
 
@@ -1070,9 +1089,12 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     };
   }
 
-  void _showFloatingNotification(String message) {
+  void _showFloatingNotification(String message, {NoticeTone tone = NoticeTone.info}) {
     _notificationTimer?.cancel();
-    setState(() => _floatingNotification = message);
+    setState(() {
+      _floatingNotification = message;
+      _floatingNotificationTone = tone;
+    });
     LocalNotifications.show(
       id: message.hashCode,
       title: 'Flash Go',
@@ -1097,7 +1119,18 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     };
 
     if (message != null) {
-      _showFloatingNotification(message);
+      _showFloatingNotification(
+        message,
+        tone: switch (request.status) {
+          'accepted' => NoticeTone.info,
+          'arriving' => NoticeTone.info,
+          'at_pickup' => NoticeTone.success,
+          'in_progress' => NoticeTone.info,
+          'completed' => NoticeTone.success,
+          'cancelled' => NoticeTone.warning,
+          _ => NoticeTone.info,
+        },
+      );
     }
 
     if (request.status == 'completed' || request.status == 'cancelled') {
@@ -1358,7 +1391,10 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                   if (!mounted) {
                     return;
                   }
-                  _showFloatingNotification('Ruta actualizada. Seguimos el mejor camino hacia tu destino.');
+                  _showFloatingNotification(
+                    'Ruta actualizada. Seguimos el mejor camino hacia tu destino.',
+                    tone: NoticeTone.info,
+                  );
                 },
                 onMapTap: ((!rideLocked && _rideMode == RideMode.destino) || canChooseActiveTripDestination)
                     ? _selectDestinationFromMap
@@ -1426,8 +1462,23 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0F0F10).withValues(alpha: 0.94),
+                        color: _floatingNotificationTone == NoticeTone.success
+                            ? const Color(0xFF123321).withValues(alpha: 0.96)
+                            : _floatingNotificationTone == NoticeTone.error
+                                ? const Color(0xFF3B161A).withValues(alpha: 0.96)
+                                : _floatingNotificationTone == NoticeTone.warning
+                                    ? const Color(0xFF39200F).withValues(alpha: 0.96)
+                                    : const Color(0xFF13243A).withValues(alpha: 0.96),
                         borderRadius: BorderRadius.circular(22),
+                        border: Border.all(
+                          color: _floatingNotificationTone == NoticeTone.success
+                              ? const Color(0xFF22C55E).withValues(alpha: 0.30)
+                              : _floatingNotificationTone == NoticeTone.error
+                                  ? const Color(0xFFF87171).withValues(alpha: 0.30)
+                                  : _floatingNotificationTone == NoticeTone.warning
+                                      ? const Color(0xFFF97316).withValues(alpha: 0.30)
+                                      : const Color(0xFF60A5FA).withValues(alpha: 0.30),
+                        ),
                         boxShadow: const [
                           BoxShadow(
                             color: Color(0x1F000003),
@@ -1438,13 +1489,35 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.notifications_active, color: Color(0xFFF97316)),
+                          Icon(
+                            _floatingNotificationTone == NoticeTone.success
+                                ? Icons.check_circle_outline_rounded
+                                : _floatingNotificationTone == NoticeTone.error
+                                    ? Icons.error_outline_rounded
+                                    : _floatingNotificationTone == NoticeTone.warning
+                                        ? Icons.notifications_active_rounded
+                                        : Icons.info_outline_rounded,
+                            color: _floatingNotificationTone == NoticeTone.success
+                                ? const Color(0xFF86EFAC)
+                                : _floatingNotificationTone == NoticeTone.error
+                                    ? const Color(0xFFFCA5A5)
+                                    : _floatingNotificationTone == NoticeTone.warning
+                                        ? const Color(0xFFF97316)
+                                        : const Color(0xFF93C5FD),
+                            size: 18,
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
                               _floatingNotification!,
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: _floatingNotificationTone == NoticeTone.success
+                                    ? const Color(0xFFE7FFF0)
+                                    : _floatingNotificationTone == NoticeTone.error
+                                        ? const Color(0xFFFFE7E9)
+                                        : _floatingNotificationTone == NoticeTone.warning
+                                            ? const Color(0xFFFFEDD9)
+                                            : const Color(0xFFE8F1FF),
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
@@ -1772,11 +1845,63 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                                   height: 1.45,
                                 ),
                               ),
+                              const SizedBox(height: 12),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  _MiniPill(
+                                    icon: Icons.touch_app_rounded,
+                                    label: '1. Marca en mapa',
+                                    active: _customDestinationPoint != null,
+                                  ),
+                                  _MiniPill(
+                                    icon: Icons.edit_location_alt_rounded,
+                                    label: '2. Revisa destino',
+                                    active: _destinationController.text.trim().isNotEmpty,
+                                  ),
+                                  _MiniPill(
+                                    icon: Icons.save_rounded,
+                                    label: '3. Guarda para iniciar',
+                                    active: false,
+                                  ),
+                                ],
+                              ),
+                              if (_destinationController.text.trim().isNotEmpty) ...[
+                                const SizedBox(height: 12),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10231B),
+                                    borderRadius: BorderRadius.circular(18),
+                                    border: Border.all(color: const Color(0x3322C55E)),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.flag_rounded, size: 16, color: Color(0xFF86EFAC)),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          _destinationController.text.trim(),
+                                          style: const TextStyle(
+                                            color: Color(0xFFE8FFF1),
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                               const SizedBox(height: 14),
                               SizedBox(
                                 width: double.infinity,
                                 child: FilledButton.icon(
-                                  onPressed: _saveActiveTripDestination,
+                                  onPressed: (_destinationController.text.trim().isNotEmpty &&
+                                          _resolveDestinationPoint() != null)
+                                      ? _saveActiveTripDestination
+                                      : null,
                                   style: FilledButton.styleFrom(
                                     backgroundColor: const Color(0xFF10B981),
                                     foregroundColor: const Color(0xFF0B1210),
@@ -2028,6 +2153,51 @@ class _MapActionButton extends StatelessWidget {
           height: 46,
           child: Icon(icon, color: const Color(0xFFF97316), size: 20),
         ),
+      ),
+    );
+  }
+}
+
+class _MiniPill extends StatelessWidget {
+  const _MiniPill({
+    required this.icon,
+    required this.label,
+    required this.active,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: active ? const Color(0x1622C55E) : const Color(0x12111418),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: active ? const Color(0x3322C55E) : const Color(0x22FFFFFF),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 14,
+            color: active ? const Color(0xFF86EFAC) : const Color(0xFFD6FFF0),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: active ? const Color(0xFFE8FFF1) : const Color(0xFFD6FFF0),
+              fontWeight: FontWeight.w700,
+              fontSize: 11.5,
+            ),
+          ),
+        ],
       ),
     );
   }

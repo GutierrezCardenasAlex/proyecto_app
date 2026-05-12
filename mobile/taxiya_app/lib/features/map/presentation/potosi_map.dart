@@ -258,8 +258,8 @@ class _PotosiMapState extends ConsumerState<PotosiMap> {
                     .map(
                       (route) => Polyline(
                         points: route,
-                        strokeWidth: 3,
-                        color: widget.routeColor.withValues(alpha: 0.22),
+                        strokeWidth: 2.5,
+                        color: widget.routeColor.withValues(alpha: 0.18),
                       ),
                     )
                     .toList(growable: false),
@@ -269,7 +269,7 @@ class _PotosiMapState extends ConsumerState<PotosiMap> {
                 polylines: [
                   Polyline(
                     points: visiblePrimaryRoute!,
-                    strokeWidth: 5,
+                    strokeWidth: 4,
                     color: widget.routeColor,
                   ),
                 ],
@@ -278,27 +278,27 @@ class _PotosiMapState extends ConsumerState<PotosiMap> {
               markers: [
                 Marker(
                   point: widget.userLocation,
-                  width: 56,
-                  height: 56,
+                  width: 50,
+                  height: 50,
                   child: Container(
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
                           color: const Color(0xFFF97316).withValues(alpha: 0.35),
-                          blurRadius: 18,
-                          spreadRadius: 2,
+                          blurRadius: 14,
+                          spreadRadius: 1,
                         ),
                       ],
                     ),
-                    child: const Icon(Icons.person_pin_circle, color: Color(0xFFF97316), size: 40),
+                    child: const Icon(Icons.person_pin_circle, color: Color(0xFFF97316), size: 34),
                   ),
                 ),
                 if (widget.showTargetMarker && widget.routeTarget != null)
                   Marker(
                     point: widget.routeTarget!,
-                    width: 120,
-                    height: 92,
+                    width: 112,
+                    height: 86,
                     child: InteractiveDestinationMarker(
                       icon: Icons.place_rounded,
                       color: const Color(0xFFF97316),
@@ -310,8 +310,8 @@ class _PotosiMapState extends ConsumerState<PotosiMap> {
                     widget.secondaryMarker != widget.routeTarget)
                   Marker(
                     point: widget.secondaryMarker!,
-                    width: 110,
-                    height: 84,
+                    width: 102,
+                    height: 80,
                     child: InteractiveDestinationMarker(
                       icon: Icons.flag_rounded,
                       color: const Color(0xFF0EA5E9),
@@ -323,8 +323,8 @@ class _PotosiMapState extends ConsumerState<PotosiMap> {
                 ...widget.drivers.map(
                   (driver) => Marker(
                     point: driver.point,
-                    width: 46,
-                    height: 46,
+                    width: 40,
+                    height: 40,
                     child: Container(
                       decoration: BoxDecoration(
                         color: const Color(0xFF16171A),
@@ -333,7 +333,7 @@ class _PotosiMapState extends ConsumerState<PotosiMap> {
                         boxShadow: [
                           BoxShadow(
                             color: const Color(0xFFF97316).withValues(alpha: 0.22),
-                            blurRadius: 14,
+                            blurRadius: 10,
                             offset: const Offset(0, 6),
                           ),
                         ],
@@ -341,7 +341,7 @@ class _PotosiMapState extends ConsumerState<PotosiMap> {
                       child: Icon(
                         _vehicleIcon(driver.vehicleType),
                         color: const Color(0xFFF97316),
-                        size: 22,
+                        size: 18,
                       ),
                     ),
                   ),
