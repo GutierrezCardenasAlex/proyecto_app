@@ -150,6 +150,38 @@ body {
   flex-wrap: wrap;
 }
 
+.offline-status-card {
+  min-width: 240px;
+  max-width: 320px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(249, 115, 22, 0.12);
+  background: rgba(10, 11, 14, 0.86);
+  display: grid;
+  gap: 6px;
+}
+
+.offline-status-card strong {
+  color: #fff4ec;
+  font-size: 0.96rem;
+}
+
+.offline-status-card p,
+.offline-status-card small {
+  margin: 0;
+  color: #ffcfaa;
+}
+
+.offline-status-card.online {
+  border-color: rgba(34, 197, 94, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.05);
+}
+
+.offline-status-card.pending {
+  border-color: rgba(249, 115, 22, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(249, 115, 22, 0.05);
+}
+
 .side-column {
   display: grid;
   gap: 24px;

@@ -298,7 +298,7 @@ class _PotosiMapState extends ConsumerState<PotosiMap> {
                   Marker(
                     point: widget.routeTarget!,
                     width: 112,
-                    height: 86,
+                    height: 94,
                     child: InteractiveDestinationMarker(
                       icon: Icons.place_rounded,
                       color: const Color(0xFFF97316),
@@ -311,7 +311,7 @@ class _PotosiMapState extends ConsumerState<PotosiMap> {
                   Marker(
                     point: widget.secondaryMarker!,
                     width: 102,
-                    height: 80,
+                    height: 88,
                     child: InteractiveDestinationMarker(
                       icon: Icons.flag_rounded,
                       color: const Color(0xFF0EA5E9),

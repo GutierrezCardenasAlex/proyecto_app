@@ -124,7 +124,7 @@ class OfflineMapController extends Notifier<OfflineMapState> {
             ? 'Mapa offline de ${AppConfig.offlineRegionName} listo'
             : (AppConfig.hasDedicatedOfflineTileSource
                   ? 'Modo online listo. Puedes descargar ${AppConfig.offlineRegionName} cuando quieras.'
-                  : 'Modo online activo con OpenStreetMap.'),
+                  : 'Modo online activo. La central aun no habilito la descarga offline.'),
         clearError: true,
       );
     } catch (error) {
@@ -143,7 +143,7 @@ class OfflineMapController extends Notifier<OfflineMapState> {
     }
     if (!AppConfig.hasDedicatedOfflineTileSource) {
       state = state.copyWith(
-        statusMessage: 'El mapa sigue funcionando online. La descarga offline se activa cuando configures MAP_OFFLINE_TILES_URL_TEMPLATE.',
+        statusMessage: 'La descarga offline aun no fue habilitada por central. El mapa seguira funcionando online sin problema.',
         clearError: true,
       );
       return;
@@ -393,7 +393,7 @@ class OfflineMapReadyBadge extends ConsumerWidget {
         ? '${(offlineState.progress * 100).toStringAsFixed(0)}%'
         : hasOfflineSource
             ? 'cache disponible'
-            : 'OpenStreetMap';
+            : 'solo online';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

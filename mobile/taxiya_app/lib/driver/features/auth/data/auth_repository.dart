@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
@@ -110,12 +111,15 @@ class DriverAuthRepository {
     required String token,
     required String userId,
   }) async {
-    final response = await http.get(
-      Uri.parse('${AppConfig.apiBaseUrl}/drivers/by-user/$userId'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
+    final response = await _safeRequest(
+      () => http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/drivers/by-user/$userId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ),
+      fallbackMessage: 'No se pudo cargar el perfil del conductor',
     );
     await _throwIfError(response, fallbackMessage: 'No se pudo cargar el perfil del conductor');
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
@@ -134,14 +138,17 @@ class DriverAuthRepository {
   }
 
   Future<DriverOtpRequestResult> requestRegistrationOtp(String phone, String firstName) async {
-    final response = await http.post(
-      Uri.parse('${AppConfig.apiBaseUrl}/auth/register/request-otp'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'phone': phone,
-        'role': 'driver',
-        'firstName': firstName,
-      }),
+    final response = await _safeRequest(
+      () => http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/auth/register/request-otp'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'phone': phone,
+          'role': 'driver',
+          'firstName': firstName,
+        }),
+      ),
+      fallbackMessage: 'No se pudo solicitar el OTP',
     );
     await _throwIfError(response, fallbackMessage: 'No se pudo solicitar el OTP');
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
@@ -159,19 +166,22 @@ class DriverAuthRepository {
     required String password,
   }) async {
     final device = await DeviceIdentityService.load();
-    final verify = await http.post(
-      Uri.parse('${AppConfig.apiBaseUrl}/auth/register/verify'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'phone': phone,
-        'otp': otp,
-        'password': password,
-        'role': 'driver',
-        'firstName': firstName,
-        'deviceIdentifier': device.identifier,
-        'deviceName': device.name,
-        'platform': device.platform,
-      }),
+    final verify = await _safeRequest(
+      () => http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/auth/register/verify'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'phone': phone,
+          'otp': otp,
+          'password': password,
+          'role': 'driver',
+          'firstName': firstName,
+          'deviceIdentifier': device.identifier,
+          'deviceName': device.name,
+          'platform': device.platform,
+        }),
+      ),
+      fallbackMessage: 'No se pudo completar el registro',
     );
     await _throwIfError(verify, fallbackMessage: 'No se pudo completar el registro');
     return _resolveDriverAuth(verify.body, fallbackPhone: phone);
@@ -182,27 +192,33 @@ class DriverAuthRepository {
     required String password,
   }) async {
     final device = await DeviceIdentityService.load();
-    final response = await http.post(
-      Uri.parse('${AppConfig.apiBaseUrl}/auth/login'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'phone': phone,
-        'password': password,
-        'role': 'driver',
-        'deviceIdentifier': device.identifier,
-        'deviceName': device.name,
-        'platform': device.platform,
-      }),
+    final response = await _safeRequest(
+      () => http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/auth/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'phone': phone,
+          'password': password,
+          'role': 'driver',
+          'deviceIdentifier': device.identifier,
+          'deviceName': device.name,
+          'platform': device.platform,
+        }),
+      ),
+      fallbackMessage: 'No se pudo iniciar sesion',
     );
     await _throwIfError(response, fallbackMessage: 'No se pudo iniciar sesion');
     return _resolveDriverAuth(response.body, fallbackPhone: phone);
   }
 
   Future<DriverOtpRequestResult> requestPasswordResetOtp(String phone) async {
-    final response = await http.post(
-      Uri.parse('${AppConfig.apiBaseUrl}/auth/password/request-otp'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'phone': phone}),
+    final response = await _safeRequest(
+      () => http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/auth/password/request-otp'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'phone': phone}),
+      ),
+      fallbackMessage: 'No se pudo solicitar el OTP de recuperacion',
     );
     await _throwIfError(response, fallbackMessage: 'No se pudo solicitar el OTP de recuperacion');
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
@@ -218,14 +234,17 @@ class DriverAuthRepository {
     required String otp,
     required String password,
   }) async {
-    final response = await http.post(
-      Uri.parse('${AppConfig.apiBaseUrl}/auth/password/reset'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'phone': phone,
-        'otp': otp,
-        'password': password,
-      }),
+    final response = await _safeRequest(
+      () => http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/auth/password/reset'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'phone': phone,
+          'otp': otp,
+          'password': password,
+        }),
+      ),
+      fallbackMessage: 'No se pudo cambiar la contrasena',
     );
     await _throwIfError(response, fallbackMessage: 'No se pudo cambiar la contrasena');
   }
@@ -247,40 +266,46 @@ class DriverAuthRepository {
     required String color,
     required int? year,
   }) async {
-    final authProfileResponse = await http.post(
-      Uri.parse('${AppConfig.apiBaseUrl}/auth/profile'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode({
-        'firstName': firstName,
-        'lastName': lastName,
-        'email': email,
-        'address': address,
-        'markCompleted': true,
-      }),
+    final authProfileResponse = await _safeRequest(
+      () => http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/auth/profile'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'firstName': firstName,
+          'lastName': lastName,
+          'email': email,
+          'address': address,
+          'markCompleted': true,
+        }),
+      ),
+      fallbackMessage: 'No se pudo guardar el perfil',
     );
     await _throwIfError(authProfileResponse, fallbackMessage: 'No se pudo guardar el perfil');
 
-    final driverProfileResponse = await http.post(
-      Uri.parse('${AppConfig.apiBaseUrl}/drivers/profile'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode({
-        'userId': userId,
-        'licenseNumber': licenseNumber,
-        'vehicle': {
-          'type': vehicleType,
-          'plate': plate,
-          'brand': brand,
-          'model': model,
-          'color': color,
-          'year': year,
+    final driverProfileResponse = await _safeRequest(
+      () => http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/drivers/profile'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
         },
-      }),
+        body: jsonEncode({
+          'userId': userId,
+          'licenseNumber': licenseNumber,
+          'vehicle': {
+            'type': vehicleType,
+            'plate': plate,
+            'brand': brand,
+            'model': model,
+            'color': color,
+            'year': year,
+          },
+        }),
+      ),
+      fallbackMessage: 'No se pudo guardar el vehiculo',
     );
     await _throwIfError(driverProfileResponse, fallbackMessage: 'No se pudo guardar el vehiculo');
 
@@ -309,12 +334,15 @@ class DriverAuthRepository {
     required String token,
   }) async {
     final device = await DeviceIdentityService.load();
-    final response = await http.get(
-      Uri.parse('${AppConfig.apiBaseUrl}/auth/session-status?deviceIdentifier=${Uri.encodeQueryComponent(device.identifier)}'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
+    final response = await _safeRequest(
+      () => http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/auth/session-status?deviceIdentifier=${Uri.encodeQueryComponent(device.identifier)}'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ),
+      fallbackMessage: 'No se pudo revisar el estado del conductor',
     );
     await _throwIfError(response, fallbackMessage: 'No se pudo revisar el estado del conductor');
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
@@ -344,6 +372,19 @@ class DriverAuthRepository {
       // fallback below
     }
     throw Exception('$fallbackMessage (${response.statusCode})');
+  }
+
+  Future<http.Response> _safeRequest(
+    Future<http.Response> Function() request, {
+    required String fallbackMessage,
+  }) async {
+    try {
+      return await request();
+    } on SocketException {
+      throw Exception('No se pudo conectar con Flash Go. Revisa internet o el acceso al servidor.');
+    } on http.ClientException {
+      throw Exception('No se pudo conectar con Flash Go. Revisa internet o el acceso al servidor.');
+    }
   }
 
   Future<DriverAuthResult> _resolveDriverAuth(String body, {required String fallbackPhone}) async {

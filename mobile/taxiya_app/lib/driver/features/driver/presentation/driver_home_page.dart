@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -6,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'package:url_launcher/url_launcher.dart';
 
@@ -34,6 +36,7 @@ class DriverHomePage extends ConsumerStatefulWidget {
 }
 
 class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBindingObserver {
+  static const String _backgroundNoticeSeenKey = 'flashgo_driver_background_notice_seen';
   static const _inactivityDuration = Duration(minutes: 5);
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   Timer? _inactivityTimer;
@@ -370,6 +373,7 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
     _isPreparingExperience = true;
     try {
       await _ensureCriticalPermissions();
+      await _maybeShowBackgroundServiceNotice();
       await LocalNotifications.ensureInitialized();
 
       if (!mounted) {
@@ -402,8 +406,14 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
     while (mounted) {
       final notificationStatus = await Permission.notification.request();
       final locationStatus = await Permission.locationWhenInUse.request();
+      PermissionStatus backgroundLocationStatus = PermissionStatus.granted;
+      if (Platform.isAndroid && (locationStatus.isGranted || locationStatus.isLimited)) {
+        backgroundLocationStatus = await Permission.locationAlways.request();
+      }
       final notificationsReady = notificationStatus.isGranted || notificationStatus.isLimited;
-      final locationReady = locationStatus.isGranted || locationStatus.isLimited;
+      final locationReady =
+          (locationStatus.isGranted || locationStatus.isLimited) &&
+          (backgroundLocationStatus.isGranted || backgroundLocationStatus.isLimited);
       if (notificationsReady && locationReady) {
         return;
       }
@@ -438,7 +448,7 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
               ),
               const SizedBox(height: 12),
               Text(
-                '${locationReady ? '✓' : '•'} Ubicacion activa',
+                '${locationReady ? '✓' : '•'} Ubicacion siempre activa',
                 style: TextStyle(
                   color: locationReady ? const Color(0xFF86EFAC) : const Color(0xFFFFF4EC),
                   fontWeight: FontWeight.w700,
@@ -473,6 +483,40 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
         );
       },
     );
+  }
+
+  Future<void> _maybeShowBackgroundServiceNotice() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_backgroundNoticeSeenKey) == true || !mounted) {
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF17181B),
+          title: const Text(
+            'Flash Go seguira activo',
+            style: TextStyle(color: Color(0xFFFFF4EC), fontWeight: FontWeight.w800),
+          ),
+          content: const Text(
+            'Veras una notificacion fija mientras Flash Go conductor envie ubicacion en segundo plano. Es normal y necesaria para no perder viajes, seguir mandando GPS y recibir alertas aunque bloquees el celular.',
+            style: TextStyle(color: Color(0xFFFFD8BF), height: 1.5),
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFF97316),
+                foregroundColor: const Color(0xFF0F0F10),
+              ),
+              child: const Text('Entendido'),
+            ),
+          ],
+        );
+      },
+    );
+    await prefs.setBool(_backgroundNoticeSeenKey, true);
   }
 
   void _armInactivityTimer() {

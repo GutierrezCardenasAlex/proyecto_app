@@ -50,6 +50,15 @@ type PromoSettings = {
   updatedAt?: string | null
 }
 
+type OfflineMapStatus = {
+  enabled: boolean
+  status: 'HABILITADO' | 'PENDIENTE'
+  regionName: string
+  sourceHost?: string | null
+  sourceType: string
+  message: string
+}
+
 type SupportReport = {
   id: number
   user_id: string
@@ -199,6 +208,14 @@ function App() {
     rewardCredits: 1,
     updatedAt: null,
   })
+  const [offlineMapStatus, setOfflineMapStatus] = useState<OfflineMapStatus>({
+    enabled: false,
+    status: 'PENDIENTE',
+    regionName: 'Potosi ciudad',
+    sourceHost: null,
+    sourceType: 'no-configurado',
+    message: 'La descarga offline aun no fue habilitada por central.',
+  })
   const [supportReports, setSupportReports] = useState<SupportReport[]>([])
   const [performanceRange, setPerformanceRange] = useState<PerformanceRange>('day')
   const [driverPerformance, setDriverPerformance] = useState<DriverPerformanceResponse>({
@@ -296,7 +313,7 @@ function App() {
       return
     }
 
-    const [dashboardResponse, driversResponse, tripsResponse, pendingDriversResponse, pendingResponse, devicesResponse, promoResponse, supportResponse, performanceResponse] =
+    const [dashboardResponse, driversResponse, tripsResponse, pendingDriversResponse, pendingResponse, devicesResponse, promoResponse, supportResponse, performanceResponse, offlineStatusResponse] =
       await Promise.all([
         fetchWithAdminAuth<Dashboard>(`${apiBase}/admin/dashboard`, { headers: authHeaders }),
         fetchWithAdminAuth<Driver[]>(`${apiBase}/admin/drivers/live`, { headers: authHeaders }),
@@ -307,6 +324,7 @@ function App() {
         fetchWithAdminAuth<PromoSettings>(`${apiBase}/admin/promotions/settings`, { headers: authHeaders }),
         fetchWithAdminAuth<SupportReport[]>(`${apiBase}/admin/support/reports/all`, { headers: authHeaders }),
         fetchWithAdminAuth<DriverPerformanceResponse>(`${apiBase}/admin/drivers/performance?range=${performanceRange}`, { headers: authHeaders }),
+        fetchWithAdminAuth<OfflineMapStatus>(`${apiBase}/admin/offline/status`, { headers: authHeaders }),
       ])
 
     setDashboard(dashboardResponse)
@@ -318,6 +336,7 @@ function App() {
     setPromoSettings(promoResponse)
     setSupportReports(supportResponse)
     setDriverPerformance(performanceResponse)
+    setOfflineMapStatus(offlineStatusResponse)
     setLastUpdatedAt(new Date().toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
   }
 
@@ -882,6 +901,14 @@ function App() {
               <span className="status-pill success subtle">Disponible</span>
               <span className="status-pill danger subtle">En viaje</span>
               <span className="status-pill warning subtle">Sin disponibilidad</span>
+              <div className={offlineMapStatus.enabled ? 'offline-status-card online' : 'offline-status-card pending'}>
+                <span className={offlineMapStatus.enabled ? 'status-pill success' : 'status-pill pending'}>
+                  {offlineMapStatus.status === 'HABILITADO' ? 'Offline habilitado' : 'Offline pendiente'}
+                </span>
+                <strong>{offlineMapStatus.regionName}</strong>
+                <p>{offlineMapStatus.message}</p>
+                <small>{offlineMapStatus.sourceHost ? `Fuente: ${offlineMapStatus.sourceHost}` : 'Sin servidor de tiles configurado.'}</small>
+              </div>
               <button className="secondary-button" onClick={toggleMapFullscreen}>
                 {mapFullscreen ? 'Salir de pantalla completa' : 'Expandir mapa'}
               </button>

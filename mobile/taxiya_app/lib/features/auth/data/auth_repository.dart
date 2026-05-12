@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
@@ -107,14 +108,17 @@ class AuthRepository {
   }
 
   Future<OtpRequestResult> requestRegistrationOtp(String phone, String firstName) async {
-    final response = await http.post(
-      Uri.parse('${AppConfig.apiBaseUrl}/auth/register/request-otp'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'phone': phone,
-        'role': 'passenger',
-        'firstName': firstName,
-      }),
+    final response = await _safeRequest(
+      () => http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/auth/register/request-otp'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'phone': phone,
+          'role': 'passenger',
+          'firstName': firstName,
+        }),
+      ),
+      fallbackMessage: 'No se pudo solicitar el OTP',
     );
     await _throwIfError(response, fallbackMessage: 'No se pudo solicitar el OTP');
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
@@ -132,19 +136,22 @@ class AuthRepository {
     required String password,
   }) async {
     final device = await DeviceIdentityService.load();
-    final response = await http.post(
-      Uri.parse('${AppConfig.apiBaseUrl}/auth/register/verify'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'phone': phone,
-        'otp': otp,
-        'password': password,
-        'role': 'passenger',
-        'firstName': firstName,
-        'deviceIdentifier': device.identifier,
-        'deviceName': device.name,
-        'platform': device.platform,
-      }),
+    final response = await _safeRequest(
+      () => http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/auth/register/verify'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'phone': phone,
+          'otp': otp,
+          'password': password,
+          'role': 'passenger',
+          'firstName': firstName,
+          'deviceIdentifier': device.identifier,
+          'deviceName': device.name,
+          'platform': device.platform,
+        }),
+      ),
+      fallbackMessage: 'No se pudo completar el registro',
     );
     await _throwIfError(response, fallbackMessage: 'No se pudo completar el registro');
     return _parseAuthResult(response.body, fallbackPhone: phone);
@@ -155,27 +162,33 @@ class AuthRepository {
     required String password,
   }) async {
     final device = await DeviceIdentityService.load();
-    final response = await http.post(
-      Uri.parse('${AppConfig.apiBaseUrl}/auth/login'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'phone': phone,
-        'password': password,
-        'role': 'passenger',
-        'deviceIdentifier': device.identifier,
-        'deviceName': device.name,
-        'platform': device.platform,
-      }),
+    final response = await _safeRequest(
+      () => http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/auth/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'phone': phone,
+          'password': password,
+          'role': 'passenger',
+          'deviceIdentifier': device.identifier,
+          'deviceName': device.name,
+          'platform': device.platform,
+        }),
+      ),
+      fallbackMessage: 'No se pudo iniciar sesion',
     );
     await _throwIfError(response, fallbackMessage: 'No se pudo iniciar sesion');
     return _parseAuthResult(response.body, fallbackPhone: phone);
   }
 
   Future<OtpRequestResult> requestPasswordResetOtp(String phone) async {
-    final response = await http.post(
-      Uri.parse('${AppConfig.apiBaseUrl}/auth/password/request-otp'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'phone': phone}),
+    final response = await _safeRequest(
+      () => http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/auth/password/request-otp'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'phone': phone}),
+      ),
+      fallbackMessage: 'No se pudo solicitar el OTP de recuperacion',
     );
     await _throwIfError(response, fallbackMessage: 'No se pudo solicitar el OTP de recuperacion');
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
@@ -191,14 +204,17 @@ class AuthRepository {
     required String otp,
     required String password,
   }) async {
-    final response = await http.post(
-      Uri.parse('${AppConfig.apiBaseUrl}/auth/password/reset'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'phone': phone,
-        'otp': otp,
-        'password': password,
-      }),
+    final response = await _safeRequest(
+      () => http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/auth/password/reset'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'phone': phone,
+          'otp': otp,
+          'password': password,
+        }),
+      ),
+      fallbackMessage: 'No se pudo cambiar la contrasena',
     );
     await _throwIfError(response, fallbackMessage: 'No se pudo cambiar la contrasena');
   }
@@ -210,19 +226,22 @@ class AuthRepository {
     required String email,
     required String address,
   }) async {
-    final response = await http.post(
-      Uri.parse('${AppConfig.apiBaseUrl}/auth/profile'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode({
-        'firstName': firstName,
-        'lastName': lastName,
-        'email': email,
-        'address': address,
-        'markCompleted': true,
-      }),
+    final response = await _safeRequest(
+      () => http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/auth/profile'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'firstName': firstName,
+          'lastName': lastName,
+          'email': email,
+          'address': address,
+          'markCompleted': true,
+        }),
+      ),
+      fallbackMessage: 'No se pudo guardar tu perfil',
     );
     await _throwIfError(response, fallbackMessage: 'No se pudo guardar tu perfil');
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
@@ -250,12 +269,15 @@ class AuthRepository {
     required String token,
   }) async {
     final device = await DeviceIdentityService.load();
-    final response = await http.get(
-      Uri.parse('${AppConfig.apiBaseUrl}/auth/session-status?deviceIdentifier=${Uri.encodeQueryComponent(device.identifier)}'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
+    final response = await _safeRequest(
+      () => http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/auth/session-status?deviceIdentifier=${Uri.encodeQueryComponent(device.identifier)}'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ),
+      fallbackMessage: 'No se pudo revisar el estado de la sesion',
     );
     await _throwIfError(response, fallbackMessage: 'No se pudo revisar el estado de la sesion');
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
@@ -291,6 +313,19 @@ class AuthRepository {
       // Continue with fallback message when body is not JSON.
     }
     throw Exception('$fallbackMessage (${response.statusCode})');
+  }
+
+  Future<http.Response> _safeRequest(
+    Future<http.Response> Function() request, {
+    required String fallbackMessage,
+  }) async {
+    try {
+      return await request();
+    } on SocketException {
+      throw Exception('No se pudo conectar con Flash Go. Revisa internet o el acceso al servidor.');
+    } on http.ClientException {
+      throw Exception('No se pudo conectar con Flash Go. Revisa internet o el acceso al servidor.');
+    }
   }
 
   AuthResult _parseAuthResult(String body, {required String fallbackPhone}) {

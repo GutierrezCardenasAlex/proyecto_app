@@ -415,7 +415,7 @@ class _DriverMapState extends ConsumerState<DriverMap> {
                   Marker(
                     point: routePoint,
                     width: 112,
-                    height: 86,
+                    height: 94,
                     child: InteractiveDestinationMarker(
                       icon: isOnDestinationStage ? Icons.flag_rounded : Icons.place_rounded,
                       color: const Color(0xFFF97316),
@@ -429,7 +429,7 @@ class _DriverMapState extends ConsumerState<DriverMap> {
                   Marker(
                     point: destinationPoint,
                     width: 102,
-                    height: 80,
+                    height: 88,
                     child: const InteractiveDestinationMarker(
                       icon: Icons.flag_rounded,
                       color: Color(0xFF0EA5E9),

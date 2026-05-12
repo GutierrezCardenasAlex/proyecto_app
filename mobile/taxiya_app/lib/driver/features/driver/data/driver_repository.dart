@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -94,6 +95,17 @@ class DriverRepository {
   }
 
   Future<Position> getCurrentPosition() async {
+    await ensureLocationReady();
+
+    final current = await Geolocator.getCurrentPosition();
+    if (!_isInsidePotosi(current.latitude, current.longitude)) {
+      throw Exception('La app del conductor solo opera dentro de Potosi.');
+    }
+
+    return current;
+  }
+
+  Future<void> ensureLocationReady() async {
     final enabled = await Geolocator.isLocationServiceEnabled();
     if (!enabled) {
       throw Exception('Activa el GPS para operar como conductor.');
@@ -107,13 +119,10 @@ class DriverRepository {
     if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
       throw Exception('Permiso de ubicacion denegado.');
     }
+  }
 
-    final current = await Geolocator.getCurrentPosition();
-    if (!_isInsidePotosi(current.latitude, current.longitude)) {
-      throw Exception('La app del conductor solo opera dentro de Potosi.');
-    }
-
-    return current;
+  Stream<Position> watchPositionStream() {
+    return Geolocator.getPositionStream(locationSettings: _locationSettings());
   }
 
   Future<DriverSnapshot> fetchDriverSnapshot({
@@ -201,16 +210,48 @@ class DriverRepository {
       };
 
   double _toRadians(double value) => (value * pi) / 180;
+
+  LocationSettings _locationSettings() {
+    if (Platform.isAndroid) {
+      return AndroidSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: 5,
+        intervalDuration: const Duration(seconds: 4),
+        foregroundNotificationConfig: const ForegroundNotificationConfig(
+          notificationTitle: 'Flash Go conductor activo',
+          notificationText: 'Seguimos enviando tu ubicacion para viajes y notificaciones.',
+          enableWakeLock: true,
+          setOngoing: true,
+        ),
+      );
+    }
+    if (Platform.isIOS || Platform.isMacOS) {
+      return AppleSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: 5,
+        pauseLocationUpdatesAutomatically: false,
+        showBackgroundLocationIndicator: true,
+      );
+    }
+    return const LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 5,
+    );
+  }
 }
 
 class DriverStateController extends Notifier<DriverState> {
   late final DriverRepository _repository;
-  Timer? _gpsTimer;
+  StreamSubscription<Position>? _positionSubscription;
+  bool _isSendingTrackedLocation = false;
+  Position? _queuedTrackedPosition;
 
   @override
   DriverState build() {
     _repository = ref.watch(driverRepositoryProvider);
-    ref.onDispose(() => _gpsTimer?.cancel());
+    ref.onDispose(() {
+      _positionSubscription?.cancel();
+    });
     return const DriverState(
       available: false,
       backendStatus: 'offline',
@@ -262,12 +303,9 @@ class DriverStateController extends Notifier<DriverState> {
 
       if (available) {
         await _sendLocation();
-        _gpsTimer?.cancel();
-        _gpsTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
-          await _sendLocation();
-        });
+        await _startTrackedLocationUpdates();
       } else {
-        _gpsTimer?.cancel();
+        await _stopTrackedLocationUpdates();
       }
 
       await _repository.persistDesiredAvailability(available);
@@ -338,12 +376,9 @@ class DriverStateController extends Notifier<DriverState> {
 
       if (shouldBeAvailable) {
         await _sendLocation();
-        _gpsTimer?.cancel();
-        _gpsTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
-          await _sendLocation();
-        });
+        await _startTrackedLocationUpdates();
       } else {
-        _gpsTimer?.cancel();
+        await _stopTrackedLocationUpdates();
       }
     } catch (error) {
       state = state.copyWith(errorMessage: error.toString().replaceFirst('Exception: ', ''));
@@ -375,16 +410,97 @@ class DriverStateController extends Notifier<DriverState> {
     final trip = ref.read(offeredTripProvider).value;
     final effectiveDriverId = await _resolveDriverId(session);
     final position = await _repository.getCurrentPosition();
-    state = await _repository.sendLocation(
+    await _sendResolvedPosition(
       token: session.token,
       driverId: effectiveDriverId,
       position: position,
-      currentState: state,
-      activeTripId: trip == null
+      tripId: trip == null
           ? null
           : const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(trip.status)
-          ? trip.id
-          : null,
+              ? trip.id
+              : null,
+    );
+  }
+
+  Future<void> _startTrackedLocationUpdates() async {
+    await _repository.ensureLocationReady();
+    await _positionSubscription?.cancel();
+    _positionSubscription = _repository.watchPositionStream().listen(
+      (position) {
+        unawaited(_handleTrackedPosition(position));
+      },
+      onError: (error) {
+        state = state.copyWith(
+          errorMessage: error.toString().replaceFirst('Exception: ', ''),
+        );
+      },
+    );
+  }
+
+  Future<void> _stopTrackedLocationUpdates() async {
+    await _positionSubscription?.cancel();
+    _positionSubscription = null;
+    _queuedTrackedPosition = null;
+    _isSendingTrackedLocation = false;
+  }
+
+  Future<void> _handleTrackedPosition(Position position) async {
+    if (!_repository._isInsidePotosi(position.latitude, position.longitude)) {
+      state = state.copyWith(
+        errorMessage: 'La app del conductor solo opera dentro de Potosi.',
+      );
+      return;
+    }
+
+    if (_isSendingTrackedLocation) {
+      _queuedTrackedPosition = position;
+      return;
+    }
+
+    _isSendingTrackedLocation = true;
+    try {
+      final session = ref.read(driverSessionProvider);
+      if (!session.loggedIn || session.token.isEmpty || !state.available) {
+        return;
+      }
+      final trip = ref.read(offeredTripProvider).value;
+      final effectiveDriverId = await _resolveDriverId(session);
+      await _sendResolvedPosition(
+        token: session.token,
+        driverId: effectiveDriverId,
+        position: position,
+        tripId: trip == null
+            ? null
+            : const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(trip.status)
+                ? trip.id
+                : null,
+      );
+    } catch (error) {
+      state = state.copyWith(
+        errorMessage: error.toString().replaceFirst('Exception: ', ''),
+      );
+    } finally {
+      _isSendingTrackedLocation = false;
+      final queued = _queuedTrackedPosition;
+      _queuedTrackedPosition = null;
+      if (queued != null) {
+        unawaited(_handleTrackedPosition(queued));
+      }
+    }
+  }
+
+  Future<void> _sendResolvedPosition({
+    required String token,
+    required String driverId,
+    required Position position,
+    required String? tripId,
+  }) async {
+    state = await _repository.sendLocation(
+      token: token,
+      driverId: driverId,
+      position: position,
+      currentState: state,
+      activeTripId: tripId,
     );
   }
 }

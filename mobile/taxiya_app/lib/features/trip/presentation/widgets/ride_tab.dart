@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -35,11 +36,13 @@ class RideTab extends ConsumerStatefulWidget {
 class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
   static const String _lastPassengerLatKey = 'flashgo_passenger_last_lat';
   static const String _lastPassengerLngKey = 'flashgo_passenger_last_lng';
+  static const String _backgroundNoticeSeenKey = 'flashgo_passenger_background_notice_seen';
   static const String _customDestinationLabel = 'Destino marcado en mapa';
   final TextEditingController _destinationController = TextEditingController();
   final DraggableScrollableController _sheetController = DraggableScrollableController();
   Timer? _refreshTimer;
   Timer? _notificationTimer;
+  Timer? _scheduledDashboardSync;
   ProviderSubscription<TripState>? _tripSubscription;
   io.Socket? _socket;
   double _sheetSize = 0.34;
@@ -51,6 +54,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
   String? _ratingPromptedTripId;
   PotosiPlace? _selectedDestinationPlace;
   LatLng? _customDestinationPoint;
+  bool _destinationMoveMode = false;
   int _mapFocusSignal = 0;
   bool _isSyncingDashboard = false;
   bool _isPreparingExperience = false;
@@ -81,6 +85,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     _isPreparingExperience = true;
     try {
       await _ensureCriticalPermissions();
+      await _maybeShowBackgroundServiceNotice();
       await LocalNotifications.ensureInitialized();
       await _restoreLastKnownLocation();
       await ref.read(passengerLocationProvider.notifier).loadCurrentLocation();
@@ -119,8 +124,14 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     while (mounted) {
       final notificationStatus = await Permission.notification.request();
       final locationStatus = await Permission.locationWhenInUse.request();
+      PermissionStatus backgroundLocationStatus = PermissionStatus.granted;
+      if (Platform.isAndroid && (locationStatus.isGranted || locationStatus.isLimited)) {
+        backgroundLocationStatus = await Permission.locationAlways.request();
+      }
       final notificationsReady = notificationStatus.isGranted || notificationStatus.isLimited;
-      final locationReady = locationStatus.isGranted || locationStatus.isLimited;
+      final locationReady =
+          (locationStatus.isGranted || locationStatus.isLimited) &&
+          (backgroundLocationStatus.isGranted || backgroundLocationStatus.isLimited);
       if (notificationsReady && locationReady) {
         return;
       }
@@ -155,7 +166,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
               ),
               const SizedBox(height: 12),
               Text(
-                '${locationReady ? '✓' : '•'} Ubicacion activa',
+                '${locationReady ? '✓' : '•'} Ubicacion siempre activa',
                 style: TextStyle(
                   color: locationReady ? const Color(0xFF86EFAC) : const Color(0xFFFFF4EC),
                   fontWeight: FontWeight.w700,
@@ -192,6 +203,40 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     );
   }
 
+  Future<void> _maybeShowBackgroundServiceNotice() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(_backgroundNoticeSeenKey) == true || !mounted) {
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF17181B),
+          title: const Text(
+            'Flash Go seguira activo',
+            style: TextStyle(color: Color(0xFFFFF4EC), fontWeight: FontWeight.w800),
+          ),
+          content: const Text(
+            'Veras una notificacion fija mientras Flash Go use ubicacion en segundo plano. Es normal: sirve para que el mapa, las alertas y el seguimiento del viaje sigan funcionando aunque bloquees el celular.',
+            style: TextStyle(color: Color(0xFFFFD8BF), height: 1.5),
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFF97316),
+                foregroundColor: const Color(0xFF0F0F10),
+              ),
+              child: const Text('Entendido'),
+            ),
+          ],
+        );
+      },
+    );
+    await prefs.setBool(_backgroundNoticeSeenKey, true);
+  }
+
   @override
   void dispose() {
     final location = ref.read(passengerLocationProvider).position ?? _lastKnownLocation;
@@ -200,6 +245,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     }
     WidgetsBinding.instance.removeObserver(this);
     _refreshTimer?.cancel();
+    _scheduledDashboardSync?.cancel();
     _notificationTimer?.cancel();
     _tripSubscription?.close();
     _socket?.dispose();
@@ -227,7 +273,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
   void _startRefreshLoop() {
     _refreshTimer?.cancel();
     _refreshTimer = Timer.periodic(
-      const Duration(seconds: 6),
+      const Duration(seconds: 15),
       (_) => Future<void>.microtask(_syncDashboard),
     );
   }
@@ -235,6 +281,13 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
   void _stopRefreshLoop() {
     _refreshTimer?.cancel();
     _refreshTimer = null;
+  }
+
+  void _scheduleDashboardSync([Duration delay = const Duration(milliseconds: 500)]) {
+    _scheduledDashboardSync?.cancel();
+    _scheduledDashboardSync = Timer(delay, () {
+      Future<void>.microtask(_syncDashboard);
+    });
   }
 
   void _connectSocket() {
@@ -253,6 +306,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       if (tripId != null && tripId.isNotEmpty) {
         _joinTripRoom(tripId);
       }
+      _scheduleDashboardSync();
     });
     _socket?.on('trip:accepted', (data) {
       final map = data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
@@ -265,6 +319,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
               tripId: tripId,
               etaMinutes: etaMinutes,
             );
+        _scheduleDashboardSync();
       }
     });
     _socket?.on('trip:status_changed', (data) {
@@ -273,6 +328,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       final status = map['status']?.toString();
       if (tripId != null && status != null && tripId.isNotEmpty && status.isNotEmpty) {
         ref.read(tripProvider.notifier).markTripAccepted(tripId: tripId, status: status);
+        _scheduleDashboardSync();
       }
     });
     _socket?.on('trip:destination_updated', (data) {
@@ -286,6 +342,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
               destinationLat: destinationLat,
               destinationLng: destinationLng,
             );
+        _scheduleDashboardSync();
       }
     });
     _socket?.on('driver:location', (data) {
@@ -409,6 +466,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
           value.trim().toLowerCase() != _customDestinationLabel.toLowerCase()) {
         setState(() {
           _customDestinationPoint = null;
+          _destinationMoveMode = false;
         });
         return;
       }
@@ -419,6 +477,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     if (value.trim().toLowerCase() != selected.name.toLowerCase()) {
       setState(() {
         _selectedDestinationPlace = null;
+        _destinationMoveMode = false;
       });
       return;
     }
@@ -434,6 +493,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     setState(() {
       _selectedDestinationPlace = place;
       _customDestinationPoint = null;
+      _destinationMoveMode = false;
     });
   }
 
@@ -493,6 +553,11 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       'Destino guardado. Ya pueden iniciar el viaje con la ruta correcta.',
       tone: NoticeTone.success,
     );
+    if (mounted) {
+      setState(() {
+        _destinationMoveMode = false;
+      });
+    }
   }
 
   void _selectDestinationFromMap(LatLng point) {
@@ -509,7 +574,21 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       _mapFocusSignal++;
     });
     _showFloatingNotification(
-      'Destino marcado en el mapa. Ese punto sera el final del viaje.',
+      _destinationMoveMode
+          ? 'Destino movido en tiempo real. Revisa el punto exacto y guardalo cuando este listo.'
+          : 'Destino marcado en el mapa. Ese punto sera el final del viaje.',
+      tone: NoticeTone.info,
+    );
+  }
+
+  void _toggleDestinationMoveMode() {
+    setState(() {
+      _destinationMoveMode = !_destinationMoveMode;
+    });
+    _showFloatingNotification(
+      _destinationMoveMode
+          ? 'Modo mover destino activo. Toca el mapa para ajustar el punto exacto.'
+          : 'Modo mover destino desactivado.',
       tone: NoticeTone.info,
     );
   }
@@ -1311,6 +1390,9 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     final activeStatus = tripState.request.status;
     final canChooseActiveTripDestination = _canChooseDestinationForActiveTrip(tripState.request);
     final activeTripNeedsDestination = _activeTripNeedsDestination(tripState.request);
+    final canEditDestinationOnMap =
+        ((!rideLocked && _rideMode == RideMode.destino) || canChooseActiveTripDestination) &&
+        (_resolveDestinationPoint() == null || _destinationMoveMode);
     final isRideInProgress = activeStatus == 'in_progress';
     final focusBounds = _buildPassengerFocusBounds(
       userLocation: userLocation,
@@ -1325,8 +1407,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     final mapRouteTarget = hasActiveTrip
         ? (isRideInProgress ? activeDestinationPoint : activeDriverPoint)
         : selectedDestinationPoint;
-    final editingDestination = ((!rideLocked && _rideMode == RideMode.destino) || canChooseActiveTripDestination) &&
-        _customDestinationPoint != null;
+    final editingDestination = _destinationMoveMode;
     final shouldDrawPreviewRoute = hasActiveTrip
         ? (isRideInProgress
             ? (mapRouteStart != null && mapRouteTarget != null)
@@ -1396,9 +1477,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                     tone: NoticeTone.info,
                   );
                 },
-                onMapTap: ((!rideLocked && _rideMode == RideMode.destino) || canChooseActiveTripDestination)
-                    ? _selectDestinationFromMap
-                    : null,
+                onMapTap: canEditDestinationOnMap ? _selectDestinationFromMap : null,
               ),
             ),
           ),
@@ -1689,7 +1768,9 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                                     Text(
                                       _selectedDestinationPlace != null
                                           ? 'Destino exacto listo para la ruta del conductor'
-                                          : 'Punto personalizado listo para guiar el viaje',
+                                          : _destinationMoveMode
+                                              ? 'Toca el mapa para mover este punto en tiempo real'
+                                              : 'Punto personalizado listo para guiar el viaje',
                                       style: GoogleFonts.plusJakartaSans(
                                         color: const Color(0xFFFFC89B),
                                         fontSize: 12,
@@ -1700,11 +1781,25 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                                 ),
                               ),
                               IconButton(
+                                onPressed: _toggleDestinationMoveMode,
+                                tooltip: _destinationMoveMode ? 'Terminar ajuste' : 'Mover destino',
+                                icon: Icon(
+                                  _destinationMoveMode
+                                      ? Icons.check_circle_rounded
+                                      : Icons.edit_location_alt_rounded,
+                                  color: _destinationMoveMode
+                                      ? const Color(0xFF86EFAC)
+                                      : const Color(0xFFFFC89B),
+                                  size: 20,
+                                ),
+                              ),
+                              IconButton(
                                 onPressed: () {
                                   _destinationController.clear();
                                   setState(() {
                                     _selectedDestinationPlace = null;
                                     _customDestinationPoint = null;
+                                    _destinationMoveMode = false;
                                   });
                                 },
                                 icon: const Icon(Icons.close_rounded, color: Color(0xFFFFF4EC)),
@@ -1734,7 +1829,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Text(
-                                      'Si tu destino no aparece, toca el mapa para marcarlo exacto.',
+                                      'Si tu destino no aparece, toca el mapa para marcarlo exacto y luego podras moverlo con el lapiz.',
                                       style: GoogleFonts.plusJakartaSans(
                                         color: const Color(0xFFE6FFF5),
                                         fontWeight: FontWeight.w700,
@@ -1770,6 +1865,34 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                                     ),
                                   )
                                   .toList(growable: false),
+                            ),
+                            const SizedBox(height: 10),
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: _toggleDestinationMoveMode,
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFFFFD8BF),
+                                  side: const BorderSide(color: Color(0x33F97316)),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                ),
+                                icon: Icon(
+                                  _destinationMoveMode
+                                      ? Icons.check_circle_rounded
+                                      : Icons.edit_location_alt_rounded,
+                                  size: 18,
+                                ),
+                                label: Text(
+                                  _destinationMoveMode
+                                      ? 'Mover destino activo'
+                                      : 'Mover destino en mapa',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
                             ),
                           ],
                         ),
@@ -1853,7 +1976,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                                   _MiniPill(
                                     icon: Icons.touch_app_rounded,
                                     label: '1. Marca en mapa',
-                                    active: _customDestinationPoint != null,
+                                    active: _resolveDestinationPoint() != null,
                                   ),
                                   _MiniPill(
                                     icon: Icons.edit_location_alt_rounded,
@@ -1866,6 +1989,32 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                                     active: false,
                                   ),
                                 ],
+                              ),
+                              const SizedBox(height: 10),
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  onPressed: _toggleDestinationMoveMode,
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFFD6FFF0),
+                                    side: const BorderSide(color: Color(0x3310B981)),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                  ),
+                                  icon: Icon(
+                                    _destinationMoveMode
+                                        ? Icons.check_circle_rounded
+                                        : Icons.edit_location_alt_rounded,
+                                    size: 18,
+                                  ),
+                                  label: Text(
+                                    _destinationMoveMode
+                                        ? 'Mover destino activo en el mapa'
+                                        : 'Activar lapiz para mover destino',
+                                    style: const TextStyle(fontWeight: FontWeight.w700),
+                                  ),
+                                ),
                               ),
                               if (_destinationController.text.trim().isNotEmpty) ...[
                                 const SizedBox(height: 12),

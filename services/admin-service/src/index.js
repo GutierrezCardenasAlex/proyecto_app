@@ -50,6 +50,32 @@ const driverPerformanceRangeSchema = z.object({
   range: z.enum(["day", "week", "month"]).default("day")
 });
 
+function readOfflineMapStatus() {
+  const urlTemplate = String(process.env.MAP_OFFLINE_TILES_URL_TEMPLATE || "").trim();
+  const regionName = String(process.env.MAP_OFFLINE_REGION_NAME || "Potosi ciudad").trim();
+  let sourceHost = null;
+
+  if (urlTemplate) {
+    try {
+      sourceHost = new URL(urlTemplate).host;
+    } catch (error) {
+      sourceHost = null;
+    }
+  }
+
+  return {
+    enabled: urlTemplate.length > 0,
+    status: urlTemplate.length > 0 ? "HABILITADO" : "PENDIENTE",
+    regionName,
+    sourceHost,
+    sourceType: urlTemplate.length > 0 ? "tiles-server" : "no-configurado",
+    message:
+      urlTemplate.length > 0
+        ? `Descarga offline lista para ${regionName}.`
+        : `La descarga offline de ${regionName} aun no fue habilitada por central.`
+  };
+}
+
 function normalizePhone(rawPhone) {
   const digits = String(rawPhone || "").replace(/\D/g, "");
   if (digits.length === 8) {
@@ -193,6 +219,10 @@ async function bootstrap() {
       revenue: revenue.rows[0].total,
       pendingDevices: pendingDevices.rows[0].count
     };
+  });
+
+  app.get("/offline/status", { preHandler: ensureAdmin }, async () => {
+    return readOfflineMapStatus();
   });
 
   app.get("/active-trips", { preHandler: ensureAdmin }, async () => {
