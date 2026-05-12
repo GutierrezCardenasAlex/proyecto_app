@@ -145,6 +145,35 @@ type DriverPerformanceResponse = {
   rows: DriverPerformanceRow[]
 }
 
+type DriverTripHistoryItem = {
+  id: string
+  status: string
+  requestedAt?: string | null
+  acceptedAt?: string | null
+  completedAt?: string | null
+  cancelledAt?: string | null
+  promotionalTrip: boolean
+  fareAmount?: number | null
+  passengerName?: string | null
+  passengerPhone?: string | null
+  pickupLat?: number | null
+  pickupLng?: number | null
+  destinationLat?: number | null
+  destinationLng?: number | null
+}
+
+type DriverTripsResponse = {
+  range: 'all' | PerformanceRange
+  driver: {
+    id: string
+    fullName?: string | null
+    phone: string
+    status: string
+    isAvailable: boolean
+  }
+  trips: DriverTripHistoryItem[]
+}
+
 function App() {
   const mapRef = useRef<HTMLDivElement | null>(null)
   const mapCardRef = useRef<HTMLDivElement | null>(null)
@@ -193,6 +222,7 @@ function App() {
   const [supportStatusFilter, setSupportStatusFilter] = useState<'all' | 'ABIERTO' | 'CERRADO'>('all')
   const [supportSearch, setSupportSearch] = useState('')
   const [phone, setPhone] = useState('+59170000001')
+  const [selectedDriverTrips, setSelectedDriverTrips] = useState<DriverTripsResponse | null>(null)
   const [otp, setOtp] = useState('123456')
   const [otpRequested, setOtpRequested] = useState(false)
   const [otpFallback, setOtpFallback] = useState<string | null>(null)
@@ -488,6 +518,26 @@ function App() {
     }
   }
 
+  async function loadDriverTrips(driverId: string) {
+    if (!token) {
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    try {
+      const payload = await fetchWithAdminAuth<DriverTripsResponse>(
+        `${apiBase}/admin/drivers/${driverId}/trips?range=${performanceRange}`,
+        { headers: authHeaders },
+      )
+      setSelectedDriverTrips(payload)
+    } catch (driverTripsError) {
+      setError(driverTripsError instanceof Error ? driverTripsError.message : 'No se pudo cargar el detalle del conductor')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function loadUserHistory(user: UserSummary) {
     if (!token) {
       return
@@ -679,8 +729,21 @@ function App() {
     drivers
       .filter((driver) => driver.location?.lat && driver.location?.lng)
       .forEach((driver) => {
+        const markerTone =
+          driver.current_trip_id
+            ? '#ef4444'
+            : driver.is_available
+              ? '#22c55e'
+              : '#f97316'
         L.marker([Number(driver.location?.lat), Number(driver.location?.lng)], { icon: driverIcon })
-          .bindPopup(`<strong>${driver.id}</strong><br/>${driver.status}`)
+          .bindPopup(
+            `<div style="min-width:180px">
+              <strong>Conductor ${driver.id.slice(0, 8)}</strong><br/>
+              <span style="color:${markerTone};font-weight:700">${driver.status}</span><br/>
+              <span>${driver.is_available ? 'Disponible' : 'Sin disponibilidad'}</span><br/>
+              <span>${driver.current_trip_id ? 'En viaje activo' : 'Esperando solicitud'}</span>
+            </div>`,
+          )
           .addTo(markersLayerRef.current!)
       })
   }, [drivers])
@@ -814,9 +877,14 @@ function App() {
               <h2>Mapa en vivo</h2>
               <span>Potosi protegido por radio operativo</span>
             </div>
-            <button className="secondary-button" onClick={toggleMapFullscreen}>
-              {mapFullscreen ? 'Salir de pantalla completa' : 'Expandir mapa'}
-            </button>
+            <div className="map-actions">
+              <span className="status-pill success subtle">Disponible</span>
+              <span className="status-pill danger subtle">En viaje</span>
+              <span className="status-pill warning subtle">Sin disponibilidad</span>
+              <button className="secondary-button" onClick={toggleMapFullscreen}>
+                {mapFullscreen ? 'Salir de pantalla completa' : 'Expandir mapa'}
+              </button>
+            </div>
           </div>
           <div ref={mapRef} className="map" />
         </div>
@@ -938,7 +1006,7 @@ function App() {
                   <article className="list-card">Sin viajes para este periodo.</article>
                 )}
                 {driverPerformance.rows.map((row, index) => (
-                  <article key={row.driverId} className="list-card stack-card performance-card">
+                  <article key={row.driverId} className="list-card stack-card performance-card compact-performance-card">
                     <div>
                       <div className="performance-heading">
                         <strong>
@@ -951,23 +1019,22 @@ function App() {
                       <p>{row.phone}</p>
                       <div className="performance-metric-row">
                         <div className="performance-metric">
-                          <span>Completados</span>
-                          <strong>{row.completedTrips}</strong>
+                          <span>Activo</span>
+                          <strong>{row.isAvailable ? 'Si' : 'No'}</strong>
                         </div>
                         <div className="performance-metric">
-                          <span>Cancelados</span>
-                          <strong>{row.cancelledTrips}</strong>
+                          <span>Viajes</span>
+                          <strong>{row.totalTrips}</strong>
+                        </div>
+                        <div className="performance-metric">
+                          <span>Eficiencia</span>
+                          <strong>{row.totalTrips > 0 ? `${Math.round((row.completedTrips / row.totalTrips) * 100)}%` : '0%'}</strong>
                         </div>
                         <div className="performance-metric">
                           <span>Promos</span>
                           <strong>{row.promoTrips}</strong>
                         </div>
-                        <div className="performance-metric">
-                          <span>Bs generados</span>
-                          <strong>{row.revenue.toFixed(2)}</strong>
-                        </div>
                       </div>
-                      <p>Promedio por viaje: Bs {row.averageFare.toFixed(2)}</p>
                       <p>
                         Estado actual:{' '}
                         <span className={row.driverStatus === 'available' ? 'status-pill success subtle' : 'status-pill danger subtle'}>
@@ -978,6 +1045,11 @@ function App() {
                         Ultimo movimiento:{' '}
                         {row.lastTripAt ? new Date(row.lastTripAt).toLocaleString('es-BO') : 'Sin viajes en el periodo'}
                       </p>
+                    </div>
+                    <div className="performance-card-actions">
+                      <button className="secondary-button" onClick={() => loadDriverTrips(row.driverId)}>
+                        Ver detalles
+                      </button>
                     </div>
                   </article>
                 ))}
@@ -1387,6 +1459,92 @@ function App() {
                 </div>
               </article>
             ))}
+          </div>
+        </section>
+      )}
+
+      {selectedDriverTrips && (
+        <section className="panel devices-panel">
+          <div className="panel-header">
+            <h2>Detalle del conductor</h2>
+            <span>
+              {selectedDriverTrips.driver.fullName || selectedDriverTrips.driver.phone} · {selectedDriverTrips.trips.length} viajes
+            </span>
+          </div>
+          <div className="driver-detail-summary">
+            <div className="mini-stat-card">
+              <span>Conductor</span>
+              <strong>{selectedDriverTrips.driver.fullName || 'Sin nombre'}</strong>
+              <p>{selectedDriverTrips.driver.phone}</p>
+            </div>
+            <div className="mini-stat-card">
+              <span>Estado</span>
+              <strong>{selectedDriverTrips.driver.status}</strong>
+              <p>{selectedDriverTrips.driver.isAvailable ? 'Disponible' : 'No disponible'}</p>
+            </div>
+            <div className="mini-stat-card">
+              <span>Periodo</span>
+              <strong>{selectedDriverTrips.range === 'all' ? 'Todos' : selectedDriverTrips.range}</strong>
+              <p>Incluye promociones y todos los viajes del filtro</p>
+            </div>
+            <div className="mini-stat-card">
+              <span>Promos</span>
+              <strong>{selectedDriverTrips.trips.filter((trip) => trip.promotionalTrip).length}</strong>
+              <p>Viajes promocionales detectados</p>
+            </div>
+          </div>
+          <div className="list">
+            {selectedDriverTrips.trips.map((trip) => (
+              <article key={trip.id} className="support-card">
+                <div className="support-card-top">
+                  <div>
+                    <strong>{trip.passengerName || 'Pasajero Flash Go'}</strong>
+                    <p>{trip.passengerPhone || 'Sin telefono visible'} · viaje {trip.id.slice(0, 8)}</p>
+                  </div>
+                  <div className="support-badges">
+                    <span className={trip.promotionalTrip ? 'status-pill success subtle' : 'status-pill warning subtle'}>
+                      {trip.promotionalTrip ? 'Promo' : 'Normal'}
+                    </span>
+                    <span className={trip.status === 'completed' ? 'status-pill success subtle' : trip.status === 'cancelled' ? 'status-pill danger subtle' : 'status-pill warning subtle'}>
+                      {trip.status}
+                    </span>
+                  </div>
+                </div>
+                <div className="driver-trip-grid">
+                  <div className="performance-metric">
+                    <span>Recojo</span>
+                    <strong>
+                      {trip.pickupLat != null && trip.pickupLng != null ? `${trip.pickupLat.toFixed(5)}, ${trip.pickupLng.toFixed(5)}` : 'Sin coordenada'}
+                    </strong>
+                  </div>
+                  <div className="performance-metric">
+                    <span>Destino</span>
+                    <strong>
+                      {trip.destinationLat != null && trip.destinationLng != null ? `${trip.destinationLat.toFixed(5)}, ${trip.destinationLng.toFixed(5)}` : 'Sin coordenada'}
+                    </strong>
+                  </div>
+                  <div className="performance-metric">
+                    <span>Solicitado</span>
+                    <strong>{trip.requestedAt ? new Date(trip.requestedAt).toLocaleString('es-BO') : 'Sin dato'}</strong>
+                  </div>
+                  <div className="performance-metric">
+                    <span>Finalizado</span>
+                    <strong>
+                      {trip.completedAt
+                        ? new Date(trip.completedAt).toLocaleString('es-BO')
+                        : trip.cancelledAt
+                          ? new Date(trip.cancelledAt).toLocaleString('es-BO')
+                          : 'En proceso'}
+                    </strong>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+          <div className="action-row">
+            <button className="secondary-button" onClick={() => setSelectedDriverTrips(null)}>
+              Cerrar detalle
+            </button>
           </div>
         </section>
       )}

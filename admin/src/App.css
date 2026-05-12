@@ -143,6 +143,13 @@ body {
   margin-bottom: 14px;
 }
 
+.map-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .side-column {
   display: grid;
   gap: 24px;
@@ -519,6 +526,10 @@ body {
   padding: 18px;
 }
 
+.compact-performance-card {
+  align-items: stretch;
+}
+
 .performance-heading {
   display: flex;
   justify-content: space-between;
@@ -533,6 +544,19 @@ body {
   margin-top: 12px;
 }
 
+.performance-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.driver-detail-summary,
+.driver-trip-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .support-card {
   background: #111216;
   border-radius: 22px;
@@ -540,6 +564,10 @@ body {
   padding: 18px;
   display: grid;
   gap: 14px;
+}
+
+.support-card strong {
+  line-height: 1.35;
 }
 
 .support-card-top,
@@ -625,7 +653,9 @@ body {
   .leaders-grid,
   .performance-metric-row,
   .leader-metrics,
-  .support-filter-bar {
+  .support-filter-bar,
+  .driver-detail-summary,
+  .driver-trip-grid {
     grid-template-columns: 1fr;
   }
 

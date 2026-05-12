@@ -42,6 +42,10 @@ const sendNotificationSchema = z.object({
   message: z.string().min(6).max(500)
 });
 
+const driverTripsRangeSchema = z.object({
+  range: z.enum(["all", "day", "week", "month"]).default("all")
+});
+
 const driverPerformanceRangeSchema = z.object({
   range: z.enum(["day", "week", "month"]).default("day")
 });
@@ -290,6 +294,80 @@ async function bootstrap() {
         activeDrivers: rows.filter((row) => row.totalTrips > 0).length,
       },
       rows
+    };
+  });
+
+  app.get("/drivers/:driverId/trips", { preHandler: ensureAdmin }, async (request, reply) => {
+    const { driverId } = request.params;
+    const { range } = driverTripsRangeSchema.parse(request.query || {});
+    const fromSql = range === "all" ? null : getRangeSql(range);
+
+    const driverResult = await pool.query(
+      `SELECT d.id,
+              d.status,
+              d.is_available,
+              u.full_name,
+              u.phone
+       FROM drivers d
+       INNER JOIN users u ON u.id = d.user_id
+       WHERE d.id = $1
+       LIMIT 1`,
+      [driverId]
+    );
+
+    if (!driverResult.rows.length) {
+      return reply.code(404).send({ message: "Conductor no encontrado" });
+    }
+
+    const tripsResult = await pool.query(
+      `SELECT t.id,
+              t.status,
+              t.requested_at,
+              t.accepted_at,
+              t.completed_at,
+              t.cancelled_at,
+              t.promotional_trip,
+              t.fare_amount,
+              pu.full_name AS passenger_name,
+              pu.phone AS passenger_phone,
+              ST_Y(t.pickup_location::geometry) AS pickup_lat,
+              ST_X(t.pickup_location::geometry) AS pickup_lng,
+              ST_Y(t.destination_location::geometry) AS destination_lat,
+              ST_X(t.destination_location::geometry) AS destination_lng
+       FROM trips t
+       LEFT JOIN users pu ON pu.id = t.passenger_id
+       WHERE t.driver_id = $1
+         AND ($2::text IS NULL OR COALESCE(t.completed_at, t.cancelled_at, t.updated_at, t.requested_at) >= ${fromSql || "COALESCE(t.completed_at, t.cancelled_at, t.updated_at, t.requested_at)"})
+       ORDER BY COALESCE(t.completed_at, t.cancelled_at, t.updated_at, t.requested_at) DESC
+       LIMIT 200`,
+      [driverId, fromSql]
+    );
+
+    return {
+      range,
+      driver: {
+        id: driverResult.rows[0].id,
+        fullName: driverResult.rows[0].full_name,
+        phone: driverResult.rows[0].phone,
+        status: driverResult.rows[0].status,
+        isAvailable: driverResult.rows[0].is_available === true,
+      },
+      trips: tripsResult.rows.map((row) => ({
+        id: row.id,
+        status: row.status,
+        requestedAt: row.requested_at,
+        acceptedAt: row.accepted_at,
+        completedAt: row.completed_at,
+        cancelledAt: row.cancelled_at,
+        promotionalTrip: row.promotional_trip === true,
+        fareAmount: row.fare_amount == null ? null : Number(row.fare_amount),
+        passengerName: row.passenger_name,
+        passengerPhone: row.passenger_phone,
+        pickupLat: row.pickup_lat == null ? null : Number(row.pickup_lat),
+        pickupLng: row.pickup_lng == null ? null : Number(row.pickup_lng),
+        destinationLat: row.destination_lat == null ? null : Number(row.destination_lat),
+        destinationLng: row.destination_lng == null ? null : Number(row.destination_lng),
+      }))
     };
   });
 
