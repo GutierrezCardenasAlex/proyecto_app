@@ -51,7 +51,12 @@ const driverPerformanceRangeSchema = z.object({
 });
 
 function readOfflineMapStatus() {
-  const urlTemplate = String(process.env.MAP_OFFLINE_TILES_URL_TEMPLATE || "").trim();
+  const dedicatedUrlTemplate = String(process.env.MAP_OFFLINE_TILES_URL_TEMPLATE || "").trim();
+  const primaryTilesUrlTemplate = String(process.env.MAP_TILES_URL_TEMPLATE || "").trim();
+  const primaryLooksLikeOpenStreetMap = primaryTilesUrlTemplate.includes("tile.openstreetmap.org");
+  const urlTemplate =
+    dedicatedUrlTemplate ||
+    (!primaryLooksLikeOpenStreetMap ? primaryTilesUrlTemplate : "");
   const regionName = String(process.env.MAP_OFFLINE_REGION_NAME || "Potosi ciudad").trim();
   let sourceHost = null;
 

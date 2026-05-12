@@ -37,7 +37,29 @@ class AppConfig {
   static String get apiBaseUrl => '$serverScheme://$serverHost:$gatewayPort/api';
   static String get websocketUrl => '$serverScheme://$serverHost:$websocketPort';
 
-  static bool get hasDedicatedOfflineTileSource => mapOfflineTilesUrlTemplate.trim().isNotEmpty;
+  static bool get usesDefaultOpenStreetMapTiles =>
+      mapTilesUrlTemplate.contains('tile.openstreetmap.org');
+
+  static String get effectiveOfflineTilesUrlTemplate {
+    final dedicated = mapOfflineTilesUrlTemplate.trim();
+    if (dedicated.isNotEmpty) {
+      return dedicated;
+    }
+    if (!usesDefaultOpenStreetMapTiles) {
+      return mapTilesUrlTemplate;
+    }
+    return '';
+  }
+
+  static String get effectiveOfflineTilesAttribution {
+    final dedicated = mapOfflineTilesAttribution.trim();
+    if (dedicated.isNotEmpty) {
+      return dedicated;
+    }
+    return mapTilesAttribution.trim();
+  }
+
+  static bool get hasDedicatedOfflineTileSource => effectiveOfflineTilesUrlTemplate.isNotEmpty;
   static String get mapRoutingUrlBase {
     final explicit = _mapRoutingUrlBase.trim();
     if (explicit.isNotEmpty) {

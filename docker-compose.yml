@@ -172,6 +172,9 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://taxiya:taxiya@rabbitmq:5672}
       JWT_SECRET: ${JWT_SECRET:-super-secret}
+      MAP_TILES_URL_TEMPLATE: ${MAP_TILES_URL_TEMPLATE:-https://tile.openstreetmap.org/{z}/{x}/{y}.png}
+      MAP_OFFLINE_TILES_URL_TEMPLATE: ${MAP_OFFLINE_TILES_URL_TEMPLATE:-}
+      MAP_OFFLINE_REGION_NAME: ${MAP_OFFLINE_REGION_NAME:-Potosi ciudad}
     depends_on:
       postgres:
         condition: service_healthy
