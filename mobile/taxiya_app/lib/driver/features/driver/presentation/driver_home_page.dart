@@ -311,6 +311,7 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
         drawer: DriverAppDrawer(
           fullName: session.fullName,
           phone: session.phone,
+          token: session.token,
           activeItem: _activeDrawerItem,
           onSelect: _handleDrawerSelection,
           onLogout: () => ref.read(driverSessionProvider.notifier).logout(),

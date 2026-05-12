@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../../core/admin_center/admin_center_repository.dart';
+
 class DriverAppDrawer extends StatelessWidget {
   const DriverAppDrawer({
     super.key,
     required this.fullName,
     required this.phone,
+    required this.token,
     required this.activeItem,
     required this.onSelect,
     required this.onLogout,
@@ -14,6 +17,7 @@ class DriverAppDrawer extends StatelessWidget {
 
   final String fullName;
   final String phone;
+  final String token;
   final String activeItem;
   final ValueChanged<String> onSelect;
   final VoidCallback onLogout;
@@ -142,6 +146,8 @@ class DriverAppDrawer extends StatelessWidget {
                     itemBuilder: (context, index) {
                       final item = items[index];
                       final active = item.$1 == activeItem;
+                      final isNotifications = item.$1 == 'Notificaciones';
+                      final isSupport = item.$1 == 'Soporte';
                       return Container(
                         decoration: BoxDecoration(
                           color: active ? const Color(0xFFF97316) : Colors.transparent,
@@ -171,6 +177,11 @@ class DriverAppDrawer extends StatelessWidget {
                               color: active ? const Color(0xFF0F0F10) : const Color(0xFFFFF4EC),
                             ),
                           ),
+                          trailing: isNotifications
+                              ? _DriverInboxBadge(token: token)
+                              : isSupport
+                                  ? _DriverSupportBadge(token: token)
+                                  : null,
                           onTap: () {
                             Navigator.pop(context);
                             onSelect(item.$1);
@@ -200,6 +211,84 @@ class DriverAppDrawer extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DriverInboxBadge extends StatelessWidget {
+  const _DriverInboxBadge({required this.token});
+
+  final String token;
+
+  @override
+  Widget build(BuildContext context) {
+    final repository = const AdminCenterRepository();
+    return FutureBuilder<List<AdminNotificationItem>>(
+      future: token.isEmpty ? Future.value(const <AdminNotificationItem>[]) : repository.fetchNotifications(token),
+      builder: (context, snapshot) {
+        final count = snapshot.data?.length ?? 0;
+        return _DriverDrawerBadge(
+          count: count,
+          color: const Color(0xFF22C55E),
+          emptyLabel: '0',
+        );
+      },
+    );
+  }
+}
+
+class _DriverSupportBadge extends StatelessWidget {
+  const _DriverSupportBadge({required this.token});
+
+  final String token;
+
+  @override
+  Widget build(BuildContext context) {
+    final repository = const AdminCenterRepository();
+    return FutureBuilder<List<SupportReportItem>>(
+      future: token.isEmpty ? Future.value(const <SupportReportItem>[]) : repository.fetchSupportReports(token),
+      builder: (context, snapshot) {
+        final openCount = (snapshot.data ?? const <SupportReportItem>[])
+            .where((item) => item.status.toUpperCase() == 'ABIERTO')
+            .length;
+        return _DriverDrawerBadge(
+          count: openCount,
+          color: const Color(0xFFF97316),
+          emptyLabel: 'OK',
+        );
+      },
+    );
+  }
+}
+
+class _DriverDrawerBadge extends StatelessWidget {
+  const _DriverDrawerBadge({
+    required this.count,
+    required this.color,
+    required this.emptyLabel,
+  });
+
+  final int count;
+  final Color color;
+  final String emptyLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasCount = count > 0;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: hasCount ? color.withValues(alpha: 0.14) : const Color(0xFF25252B),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        hasCount ? '$count' : emptyLabel,
+        style: TextStyle(
+          color: hasCount ? color : const Color(0xFFFFD8BF),
+          fontWeight: FontWeight.w800,
+          fontSize: 11,
         ),
       ),
     );

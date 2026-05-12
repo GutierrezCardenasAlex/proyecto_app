@@ -152,6 +152,7 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
         drawer: AppDrawer(
           fullName: session.fullName,
           phone: session.phone,
+          token: session.token,
           onLogout: () => ref.read(sessionProvider.notifier).signOut(),
           activeItem: _activeDrawerItem,
           onSelect: _handleDrawerSelection,

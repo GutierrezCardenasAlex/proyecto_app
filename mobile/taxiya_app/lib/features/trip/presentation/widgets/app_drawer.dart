@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../core/admin_center/admin_center_repository.dart';
+
 class AppDrawer extends StatelessWidget {
   const AppDrawer({
     super.key,
     required this.fullName,
     required this.phone,
+    required this.token,
     required this.onLogout,
     required this.activeItem,
     required this.onSelect,
@@ -19,6 +22,7 @@ class AppDrawer extends StatelessWidget {
 
   final String fullName;
   final String phone;
+  final String token;
   final VoidCallback onLogout;
   final String activeItem;
   final ValueChanged<String> onSelect;
@@ -262,6 +266,8 @@ class AppDrawer extends StatelessWidget {
                       final item = items[index];
                       final active = item.$1 == activeItem;
                       final isPromotions = item.$1 == 'Promociones';
+                      final isNotifications = item.$1 == 'Notificaciones';
+                      final isSupport = item.$1 == 'Soporte';
                       return Container(
                         decoration: BoxDecoration(
                           color: active ? const Color(0xFFF97316) : Colors.transparent,
@@ -324,6 +330,10 @@ class AppDrawer extends StatelessWidget {
                                     ),
                                   ),
                                 )
+                              : isNotifications
+                                  ? _InboxBadge(token: token)
+                                  : isSupport
+                                      ? _SupportBadge(token: token)
                               : null,
                           onTap: () {
                             Navigator.pop(context);
@@ -353,6 +363,84 @@ class AppDrawer extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InboxBadge extends StatelessWidget {
+  const _InboxBadge({required this.token});
+
+  final String token;
+
+  @override
+  Widget build(BuildContext context) {
+    final repository = const AdminCenterRepository();
+    return FutureBuilder<List<AdminNotificationItem>>(
+      future: token.isEmpty ? Future.value(const <AdminNotificationItem>[]) : repository.fetchNotifications(token),
+      builder: (context, snapshot) {
+        final count = snapshot.data?.length ?? 0;
+        return _DrawerCountBadge(
+          count: count,
+          color: const Color(0xFF22C55E),
+          emptyLabel: '0',
+        );
+      },
+    );
+  }
+}
+
+class _SupportBadge extends StatelessWidget {
+  const _SupportBadge({required this.token});
+
+  final String token;
+
+  @override
+  Widget build(BuildContext context) {
+    final repository = const AdminCenterRepository();
+    return FutureBuilder<List<SupportReportItem>>(
+      future: token.isEmpty ? Future.value(const <SupportReportItem>[]) : repository.fetchSupportReports(token),
+      builder: (context, snapshot) {
+        final openCount = (snapshot.data ?? const <SupportReportItem>[])
+            .where((item) => item.status.toUpperCase() == 'ABIERTO')
+            .length;
+        return _DrawerCountBadge(
+          count: openCount,
+          color: const Color(0xFFF97316),
+          emptyLabel: 'OK',
+        );
+      },
+    );
+  }
+}
+
+class _DrawerCountBadge extends StatelessWidget {
+  const _DrawerCountBadge({
+    required this.count,
+    required this.color,
+    required this.emptyLabel,
+  });
+
+  final int count;
+  final Color color;
+  final String emptyLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasCount = count > 0;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: hasCount ? color.withValues(alpha: 0.14) : const Color(0xFF25252B),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        hasCount ? '$count' : emptyLabel,
+        style: TextStyle(
+          color: hasCount ? color : const Color(0xFFFFD8BF),
+          fontWeight: FontWeight.w800,
+          fontSize: 11,
         ),
       ),
     );

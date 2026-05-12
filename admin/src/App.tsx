@@ -62,6 +62,8 @@ type SupportReport = {
   created_at: string
 }
 
+type NotificationKind = 'nuevo' | 'importante' | 'sistema'
+
 type PendingDriverAccessRow = {
   id: string
   user_id: string
@@ -136,6 +138,7 @@ function App() {
   const [supportReports, setSupportReports] = useState<SupportReport[]>([])
   const [notificationAudience, setNotificationAudience] = useState<'all' | 'passengers' | 'drivers' | 'user'>('all')
   const [notificationPhone, setNotificationPhone] = useState('')
+  const [notificationKind, setNotificationKind] = useState<NotificationKind>('nuevo')
   const [notificationTitle, setNotificationTitle] = useState('')
   const [notificationMessage, setNotificationMessage] = useState('')
   const [phone, setPhone] = useState('+59170000001')
@@ -374,6 +377,7 @@ function App() {
         body: JSON.stringify({
           audience: notificationAudience,
           phone: notificationAudience === 'user' ? notificationPhone : undefined,
+          kind: notificationKind,
           title: notificationTitle,
           message: notificationMessage,
         }),
@@ -704,6 +708,11 @@ function App() {
                   <option value="passengers">Solo pasajeros</option>
                   <option value="drivers">Solo conductores</option>
                   <option value="user">Usuario por telefono</option>
+                </select>
+                <select value={notificationKind} onChange={(event) => setNotificationKind(event.target.value as NotificationKind)}>
+                  <option value="nuevo">Nuevo</option>
+                  <option value="importante">Importante</option>
+                  <option value="sistema">Sistema</option>
                 </select>
                 {notificationAudience === 'user' && (
                   <input

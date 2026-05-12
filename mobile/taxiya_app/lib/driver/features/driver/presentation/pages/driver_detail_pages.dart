@@ -419,10 +419,11 @@ class DriverNotificationsPage extends ConsumerWidget {
                 ...items.map(
                   (item) => Padding(
                     padding: const EdgeInsets.only(bottom: 14),
-                    child: DriverMenuTile(
-                      icon: Icons.notifications_active_outlined,
+                    child: _DriverNotificationCard(
+                      kind: item.kind,
                       title: item.title,
-                      subtitle: '${item.message}\n${_formatShortDate(item.createdAt)}',
+                      message: item.message,
+                      createdAt: item.createdAt,
                     ),
                   ),
                 ),
@@ -481,12 +482,30 @@ class _DriverSupportPageState extends ConsumerState<DriverSupportPage> {
                       DropdownButtonFormField<String>(
                         initialValue: _category,
                         dropdownColor: const Color(0xFF1B1B1F),
-                        decoration: const InputDecoration(labelText: 'Tipo de reporte'),
+                        style: const TextStyle(color: Color(0xFFFFF4EC), fontWeight: FontWeight.w700),
+                        decoration: InputDecoration(
+                          labelText: 'Tipo de reporte',
+                          labelStyle: const TextStyle(color: Color(0xFFFFC89B)),
+                          filled: true,
+                          fillColor: const Color(0xFF25252B),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: const BorderSide(color: Color(0xFF303035)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: const BorderSide(color: Color(0xFFF97316), width: 1.4),
+                          ),
+                        ),
                         items: const [
-                          DropdownMenuItem(value: 'Falla de app', child: Text('Falla de app')),
-                          DropdownMenuItem(value: 'Problema con viaje', child: Text('Problema con viaje')),
-                          DropdownMenuItem(value: 'Cuenta o acceso', child: Text('Cuenta o acceso')),
-                          DropdownMenuItem(value: 'Mapa o GPS', child: Text('Mapa o GPS')),
+                          DropdownMenuItem(value: 'Falla de app', child: Text('Falla de app', style: TextStyle(color: Color(0xFFFFF4EC)))),
+                          DropdownMenuItem(value: 'Problema con viaje', child: Text('Problema con viaje', style: TextStyle(color: Color(0xFFFFF4EC)))),
+                          DropdownMenuItem(value: 'Cuenta o acceso', child: Text('Cuenta o acceso', style: TextStyle(color: Color(0xFFFFF4EC)))),
+                          DropdownMenuItem(value: 'Mapa o GPS', child: Text('Mapa o GPS', style: TextStyle(color: Color(0xFFFFF4EC)))),
                         ],
                         onChanged: (value) => setState(() => _category = value ?? 'Falla de app'),
                       ),
@@ -494,9 +513,26 @@ class _DriverSupportPageState extends ConsumerState<DriverSupportPage> {
                       TextField(
                         controller: _messageController,
                         maxLines: 5,
-                        decoration: const InputDecoration(
+                        style: const TextStyle(color: Color(0xFFFFF4EC)),
+                        decoration: InputDecoration(
                           labelText: 'Detalle del problema',
                           hintText: 'Describe lo que pasó para que central pueda ayudarte mejor.',
+                          hintStyle: const TextStyle(color: Color(0xFFB9A79A)),
+                          labelStyle: const TextStyle(color: Color(0xFFFFC89B)),
+                          filled: true,
+                          fillColor: const Color(0xFF25252B),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: const BorderSide(color: Color(0xFF303035)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: const BorderSide(color: Color(0xFFF97316), width: 1.4),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 14),
@@ -654,6 +690,140 @@ String _formatShortDate(String raw) {
   }
   String two(int value) => value.toString().padLeft(2, '0');
   return '${two(date.day)}/${two(date.month)}/${date.year} ${two(date.hour)}:${two(date.minute)}';
+}
+
+class _DriverNotificationCard extends StatelessWidget {
+  const _DriverNotificationCard({
+    required this.kind,
+    required this.title,
+    required this.message,
+    required this.createdAt,
+  });
+
+  final String kind;
+  final String title;
+  final String message;
+  final String createdAt;
+
+  @override
+  Widget build(BuildContext context) {
+    final visual = _driverNotificationVisual(kind);
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1B1B1F),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: visual.borderColor),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x22000000),
+            blurRadius: 18,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: visual.backgroundColor,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(visual.icon, color: visual.accentColor),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFFFFF4EC),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: visual.backgroundColor,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    visual.label,
+                    style: TextStyle(
+                      color: visual.accentColor,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  message,
+                  style: const TextStyle(
+                    color: Color(0xFFFFD8BF),
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF25252B),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    _formatShortDate(createdAt),
+                    style: const TextStyle(
+                      color: Color(0xFFFFC89B),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+({Color accentColor, Color backgroundColor, Color borderColor, IconData icon, String label}) _driverNotificationVisual(String kind) {
+  switch (kind.toLowerCase()) {
+    case 'importante':
+      return (
+        accentColor: const Color(0xFFEF4444),
+        backgroundColor: const Color(0x22EF4444),
+        borderColor: const Color(0x44EF4444),
+        icon: Icons.priority_high_rounded,
+        label: 'IMPORTANTE',
+      );
+    case 'sistema':
+      return (
+        accentColor: const Color(0xFF38BDF8),
+        backgroundColor: const Color(0x2238BDF8),
+        borderColor: const Color(0x4438BDF8),
+        icon: Icons.settings_suggest_rounded,
+        label: 'SISTEMA',
+      );
+    default:
+      return (
+        accentColor: const Color(0xFFF97316),
+        backgroundColor: const Color(0x33F97316),
+        borderColor: const Color(0xFF2C2C31),
+        icon: Icons.notifications_active_outlined,
+        label: 'NUEVO',
+      );
+  }
 }
 
 class _ProfileField extends StatelessWidget {

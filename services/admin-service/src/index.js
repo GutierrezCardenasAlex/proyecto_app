@@ -37,6 +37,7 @@ const supportReportSchema = z.object({
 const sendNotificationSchema = z.object({
   audience: z.enum(["all", "passengers", "drivers", "user"]),
   phone: z.string().min(8).optional(),
+  kind: z.enum(["nuevo", "importante", "sistema"]).default("nuevo"),
   title: z.string().min(3).max(120),
   message: z.string().min(6).max(500)
 });
@@ -95,11 +96,17 @@ async function ensureAdminSchema() {
       id BIGSERIAL PRIMARY KEY,
       target_user_id UUID REFERENCES users(id) ON DELETE CASCADE,
       target_role VARCHAR(16),
+      kind VARCHAR(16) NOT NULL DEFAULT 'nuevo',
       title VARCHAR(120) NOT NULL,
       message TEXT NOT NULL,
       created_by UUID REFERENCES admin_accounts(id) ON DELETE SET NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
+  `);
+
+  await pool.query(`
+    ALTER TABLE admin_notifications
+      ADD COLUMN IF NOT EXISTS kind VARCHAR(16) NOT NULL DEFAULT 'nuevo'
   `);
 }
 
@@ -131,11 +138,11 @@ async function ensureUser(request, reply) {
   return null;
 }
 
-async function insertUserNotification({ userId, role, title, message, createdBy = null }) {
+async function insertUserNotification({ userId, role, title, message, kind = "sistema", createdBy = null }) {
   await pool.query(
-    `INSERT INTO admin_notifications (target_user_id, target_role, title, message, created_by)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [userId, role, title, message, createdBy]
+    `INSERT INTO admin_notifications (target_user_id, target_role, kind, title, message, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [userId, role, kind, title, message, createdBy]
   );
 }
 
@@ -333,7 +340,7 @@ async function bootstrap() {
     const role = userResult.rows[0]?.role || request.user.role || "passenger";
 
     const result = await pool.query(
-      `SELECT id, title, message, created_at
+      `SELECT id, kind, title, message, created_at
        FROM admin_notifications
        WHERE (target_user_id = $1)
           OR (target_user_id IS NULL AND target_role = $2)
@@ -365,9 +372,9 @@ async function bootstrap() {
       }
 
       await pool.query(
-        `INSERT INTO admin_notifications (target_user_id, target_role, title, message, created_by)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [userResult.rows[0].id, userResult.rows[0].role, payload.title, payload.message, adminId]
+        `INSERT INTO admin_notifications (target_user_id, target_role, kind, title, message, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [userResult.rows[0].id, userResult.rows[0].role, payload.kind, payload.title, payload.message, adminId]
       );
 
       return { message: "Notificacion enviada al usuario" };
@@ -377,9 +384,9 @@ async function bootstrap() {
       payload.audience === "passengers" ? "passenger" : payload.audience === "drivers" ? "driver" : "all";
 
     await pool.query(
-      `INSERT INTO admin_notifications (target_user_id, target_role, title, message, created_by)
-       VALUES (NULL, $1, $2, $3, $4)`,
-      [targetRole, payload.title, payload.message, adminId]
+      `INSERT INTO admin_notifications (target_user_id, target_role, kind, title, message, created_by)
+       VALUES (NULL, $1, $2, $3, $4, $5)`,
+      [targetRole, payload.kind, payload.title, payload.message, adminId]
     );
 
     return { message: "Notificacion enviada correctamente" };
@@ -485,6 +492,7 @@ async function bootstrap() {
       await insertUserNotification({
         userId: userResult.rows[0].id,
         role: userResult.rows[0].role,
+        kind: "importante",
         title: status === "AUTORIZADO" ? "Equipo autorizado" : "Equipo bloqueado",
         message:
           status === "AUTORIZADO"
@@ -595,6 +603,7 @@ async function bootstrap() {
       await insertUserNotification({
         userId: userResult.rows[0].id,
         role: userResult.rows[0].role,
+        kind: status === "AUTORIZADO" ? "nuevo" : "importante",
         title: status === "AUTORIZADO" ? "Acceso de conductor autorizado" : "Acceso de conductor rechazado",
         message:
           status === "AUTORIZADO"
