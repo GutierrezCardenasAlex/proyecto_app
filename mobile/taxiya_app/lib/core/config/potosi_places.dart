@@ -41,8 +41,8 @@ class PotosiPlaces {
   static const List<PotosiPlace> all = [
     PotosiPlace(
       name: 'Cementerio General',
-      latitude: -19.5694,
-      longitude: -65.7442,
+      latitude: -19.57347,
+      longitude: -65.75115,
       aliases: ['cementerio', 'cementerio general potosi'],
     ),
     PotosiPlace(

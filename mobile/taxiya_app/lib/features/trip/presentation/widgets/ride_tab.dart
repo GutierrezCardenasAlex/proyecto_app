@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../../auth/data/auth_repository.dart';
@@ -32,6 +33,9 @@ class RideTab extends ConsumerStatefulWidget {
 }
 
 class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
+  static const String _lastPassengerLatKey = 'flashgo_passenger_last_lat';
+  static const String _lastPassengerLngKey = 'flashgo_passenger_last_lng';
+  static const String _customDestinationLabel = 'Destino marcado en mapa';
   final TextEditingController _destinationController = TextEditingController();
   final DraggableScrollableController _sheetController = DraggableScrollableController();
   Timer? _refreshTimer;
@@ -45,10 +49,12 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
   String? _selectedDriverId;
   String? _ratingPromptedTripId;
   PotosiPlace? _selectedDestinationPlace;
+  LatLng? _customDestinationPoint;
   int _mapFocusSignal = 0;
   bool _isSyncingDashboard = false;
   bool _isPreparingExperience = false;
   bool _offlineSheetQueued = false;
+  LatLng? _lastKnownLocation;
 
   @override
   void initState() {
@@ -75,7 +81,12 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     try {
       await _ensureCriticalPermissions();
       await LocalNotifications.ensureInitialized();
+      await _restoreLastKnownLocation();
       await ref.read(passengerLocationProvider.notifier).loadCurrentLocation();
+      final currentLocation = ref.read(passengerLocationProvider).position;
+      if (currentLocation != null) {
+        await _persistLastKnownLocation(currentLocation);
+      }
 
       if (!mounted) {
         return;
@@ -182,6 +193,10 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    final location = ref.read(passengerLocationProvider).position ?? _lastKnownLocation;
+    if (location != null) {
+      unawaited(_persistLastKnownLocation(location));
+    }
     WidgetsBinding.instance.removeObserver(this);
     _refreshTimer?.cancel();
     _notificationTimer?.cancel();
@@ -200,6 +215,10 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       return;
     }
     if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
+      final location = ref.read(passengerLocationProvider).position ?? _lastKnownLocation;
+      if (location != null) {
+        unawaited(_persistLastKnownLocation(location));
+      }
       _stopRefreshLoop();
     }
   }
@@ -253,6 +272,19 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       final status = map['status']?.toString();
       if (tripId != null && status != null && tripId.isNotEmpty && status.isNotEmpty) {
         ref.read(tripProvider.notifier).markTripAccepted(tripId: tripId, status: status);
+      }
+    });
+    _socket?.on('trip:destination_updated', (data) {
+      final map = data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+      final destinationAddress = map['destinationAddress']?.toString();
+      final destinationLat = double.tryParse(map['destinationLat']?.toString() ?? '');
+      final destinationLng = double.tryParse(map['destinationLng']?.toString() ?? '');
+      if (destinationAddress != null && destinationLat != null && destinationLng != null) {
+        ref.read(tripProvider.notifier).applyTripDestinationUpdate(
+              destinationAddress: destinationAddress,
+              destinationLat: destinationLat,
+              destinationLng: destinationLng,
+            );
       }
     });
     _socket?.on('driver:location', (data) {
@@ -313,13 +345,14 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     }
 
     final session = ref.read(sessionProvider);
-    final location = ref.read(passengerLocationProvider).position;
+    final location = ref.read(passengerLocationProvider).position ?? _lastKnownLocation;
     if (!mounted || !session.isAuthenticated || location == null) {
       return;
     }
 
     _isSyncingDashboard = true;
     try {
+      await _persistLastKnownLocation(location);
       await ref.read(tripProvider.notifier).loadDashboard(
             token: session.token,
             passengerId: session.userId,
@@ -330,6 +363,34 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     } finally {
       _isSyncingDashboard = false;
     }
+  }
+
+  Future<void> _restoreLastKnownLocation() async {
+    final preferences = await SharedPreferences.getInstance();
+    final latitude = preferences.getDouble(_lastPassengerLatKey);
+    final longitude = preferences.getDouble(_lastPassengerLngKey);
+    if (latitude == null || longitude == null || !mounted) {
+      return;
+    }
+    setState(() {
+      _lastKnownLocation = LatLng(latitude, longitude);
+    });
+  }
+
+  Future<void> _persistLastKnownLocation(LatLng point) async {
+    final current = _lastKnownLocation;
+    final unchanged = current != null &&
+        (current.latitude - point.latitude).abs() < 0.000001 &&
+        (current.longitude - point.longitude).abs() < 0.000001;
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setDouble(_lastPassengerLatKey, point.latitude);
+    await preferences.setDouble(_lastPassengerLngKey, point.longitude);
+    if (!mounted || unchanged) {
+      return;
+    }
+    setState(() {
+      _lastKnownLocation = point;
+    });
   }
 
   List<PotosiPlace> _destinationSuggestions() {
@@ -343,6 +404,13 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
   void _handleDestinationChanged(String value) {
     final selected = _selectedDestinationPlace;
     if (selected == null) {
+      if (_customDestinationPoint != null &&
+          value.trim().toLowerCase() != _customDestinationLabel.toLowerCase()) {
+        setState(() {
+          _customDestinationPoint = null;
+        });
+        return;
+      }
       setState(() {});
       return;
     }
@@ -364,6 +432,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     );
     setState(() {
       _selectedDestinationPlace = place;
+      _customDestinationPoint = null;
     });
   }
 
@@ -371,10 +440,76 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     return _selectedDestinationPlace ?? PotosiPlaces.findExact(_destinationController.text.trim());
   }
 
+  LatLng? _resolveDestinationPoint() {
+    return _resolveDestinationPlace()?.point ?? _customDestinationPoint;
+  }
+
+  bool _canChooseDestinationForActiveTrip(TripRequest request) {
+    return (request.activeTripId?.isNotEmpty ?? false) && request.status == 'at_pickup';
+  }
+
+  bool _activeTripNeedsDestination(TripRequest request) {
+    if (!_canChooseDestinationForActiveTrip(request)) {
+      return false;
+    }
+    final currentAddress = request.destinationAddress.trim().toLowerCase();
+    return request.destinationLat == null ||
+        request.destinationLng == null ||
+        currentAddress.isEmpty ||
+        currentAddress == 'abordaje inmediato' ||
+        currentAddress == 'destino por confirmar';
+  }
+
+  Future<void> _saveActiveTripDestination() async {
+    final request = ref.read(tripProvider).request;
+    final session = ref.read(sessionProvider);
+    final destinationPoint = _resolveDestinationPoint();
+    final destinationAddress = _destinationController.text.trim();
+    if (!_canChooseDestinationForActiveTrip(request) || request.activeTripId == null) {
+      return;
+    }
+    if (destinationPoint == null) {
+      _showMessage('Marca o selecciona primero el destino final del viaje.');
+      return;
+    }
+    if (destinationAddress.isEmpty) {
+      _showMessage('Escribe o marca el destino para poder guardarlo.');
+      return;
+    }
+    await ref.read(tripProvider.notifier).updateTripDestination(
+          token: session.token,
+          tripId: request.activeTripId!,
+          destinationAddress: destinationAddress,
+          destinationLocation: destinationPoint,
+        );
+    final error = ref.read(tripProvider).errorMessage;
+    if (error != null) {
+      _showMessage(error.replaceFirst('Exception: ', ''));
+      return;
+    }
+    _showFloatingNotification('Destino guardado. Ya pueden iniciar el viaje con la ruta correcta.');
+  }
+
+  void _selectDestinationFromMap(LatLng point) {
+    if (!mounted) {
+      return;
+    }
+    _destinationController.value = const TextEditingValue(
+      text: _customDestinationLabel,
+      selection: TextSelection.collapsed(offset: _customDestinationLabel.length),
+    );
+    setState(() {
+      _selectedDestinationPlace = null;
+      _customDestinationPoint = point;
+      _mapFocusSignal++;
+    });
+    _showFloatingNotification('Destino marcado en el mapa. Ese punto sera el final del viaje.');
+  }
+
   Future<void> _requestRide() async {
     final session = ref.read(sessionProvider);
     final locationState = ref.read(passengerLocationProvider);
-    final location = locationState.position;
+    final location = locationState.position ?? _lastKnownLocation;
     final request = ref.read(tripProvider).request;
     final isRetryingRequest =
         (request.activeTripId?.isNotEmpty ?? false) &&
@@ -385,9 +520,11 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       return;
     }
     final destination = _destinationController.text.trim();
+    final resolvedDestinationPoint = _resolveDestinationPoint();
     final resolvedDestination =
-        _rideMode == RideMode.cercano && destination.isEmpty ? 'Abordaje inmediato' : destination;
-    final resolvedDestinationPlace = _resolveDestinationPlace();
+        _rideMode == RideMode.cercano && destination.isEmpty
+            ? 'Abordaje inmediato'
+            : (destination.isEmpty && resolvedDestinationPoint != null ? _customDestinationLabel : destination);
     final selectedDriverId = _rideMode == RideMode.cercano ? _selectedDriverId : null;
     final selectedDriver = _findDriverById(ref.read(tripProvider).nearbyDrivers, selectedDriverId);
 
@@ -401,8 +538,8 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       return;
     }
 
-    if (_rideMode == RideMode.destino && resolvedDestinationPlace == null) {
-      _showMessage('Selecciona un lugar sugerido para guardar un destino exacto en el viaje.');
+    if (_rideMode == RideMode.destino && resolvedDestinationPoint == null) {
+      _showMessage('Selecciona un lugar sugerido o marca tu destino tocando el mapa.');
       return;
     }
 
@@ -421,7 +558,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
           userLocation: location,
           destinationAddress: resolvedDestination,
           dispatchMode: _rideMode == RideMode.destino ? 'broadcast' : 'nearby',
-          destinationLocation: resolvedDestinationPlace?.point,
+          destinationLocation: resolvedDestinationPoint,
           preferredDriverId: selectedDriverId,
         );
 
@@ -962,6 +1099,18 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       _showFloatingNotification(message);
     }
 
+    if (request.status == 'completed' || request.status == 'cancelled') {
+      final finalPoint =
+          request.status == 'completed' &&
+                  request.destinationLat != null &&
+                  request.destinationLng != null
+              ? LatLng(request.destinationLat!, request.destinationLng!)
+              : ref.read(passengerLocationProvider).position ?? _lastKnownLocation;
+      if (finalPoint != null) {
+        unawaited(_persistLastKnownLocation(finalPoint));
+      }
+    }
+
     if (request.status == 'completed' &&
         request.activeTripId != null &&
         _ratingPromptedTripId != request.activeTripId) {
@@ -1111,7 +1260,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     if (activeTripId != null && activeTripId.isNotEmpty && _socket?.connected == true) {
       _joinTripRoom(activeTripId);
     }
-    final userLocation = locationState.position ?? const LatLng(-19.5836, -65.7531);
+    final userLocation = locationState.position ?? _lastKnownLocation ?? const LatLng(-19.5836, -65.7531);
     final hasActiveTrip = activeTripId != null && activeTripId.isNotEmpty;
       final rideLocked = hasActiveTrip &&
           const {'accepted', 'arriving', 'at_pickup', 'in_progress'}
@@ -1120,12 +1269,14 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
         tripState.request.driverLat != null && tripState.request.driverLng != null
             ? LatLng(tripState.request.driverLat!, tripState.request.driverLng!)
             : null;
-    final selectedDestinationPoint = _resolveDestinationPlace()?.point;
+    final selectedDestinationPoint = _resolveDestinationPoint();
     final activeDestinationPoint =
         tripState.request.destinationLat != null && tripState.request.destinationLng != null
             ? LatLng(tripState.request.destinationLat!, tripState.request.destinationLng!)
             : selectedDestinationPoint;
     final activeStatus = tripState.request.status;
+    final canChooseActiveTripDestination = _canChooseDestinationForActiveTrip(tripState.request);
+    final activeTripNeedsDestination = _activeTripNeedsDestination(tripState.request);
     final isRideInProgress = activeStatus == 'in_progress';
     final focusBounds = _buildPassengerFocusBounds(
       userLocation: userLocation,
@@ -1189,11 +1340,21 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                 userLocation: userLocation,
                 routeStart: mapRouteStart,
                 routeTarget: mapRouteTarget,
+                secondaryMarker: hasActiveTrip && !isRideInProgress ? activeDestinationPoint : null,
                 showRoute: shouldDrawPreviewRoute,
                 showTargetMarker: mapRouteTarget != null,
                 routeColor: mapRouteColor,
                 focusBounds: focusBounds,
                 focusSignal: _mapFocusSignal,
+                onRouteUpdated: () {
+                  if (!mounted) {
+                    return;
+                  }
+                  _showFloatingNotification('Ruta actualizada. Seguimos el mejor camino hacia tu destino.');
+                },
+                onMapTap: ((!rideLocked && _rideMode == RideMode.destino) || canChooseActiveTripDestination)
+                    ? _selectDestinationFromMap
+                    : null,
               ),
             ),
           ),
@@ -1363,6 +1524,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                                   _rideMode = RideMode.destino;
                                   _selectedDriverId = null;
                                   _selectedDestinationPlace = null;
+                                  _customDestinationPoint = null;
                                 }),
                               ),
                             ),
@@ -1380,7 +1542,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                         ),
                       ),
                     const SizedBox(height: 18),
-                    if (!rideLocked && _rideMode == RideMode.destino)
+                    if ((!rideLocked && _rideMode == RideMode.destino) || canChooseActiveTripDestination)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
                         decoration: BoxDecoration(
@@ -1412,9 +1574,9 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                           ],
                         ),
                       ),
-                    if (!rideLocked && _rideMode == RideMode.destino) ...[
+                    if ((!rideLocked && _rideMode == RideMode.destino) || canChooseActiveTripDestination) ...[
                       const SizedBox(height: 12),
-                      if (_selectedDestinationPlace != null)
+                      if (_selectedDestinationPlace != null || _customDestinationPoint != null)
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -1436,7 +1598,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      _selectedDestinationPlace!.name,
+                                      _selectedDestinationPlace?.name ?? _customDestinationLabel,
                                       style: GoogleFonts.plusJakartaSans(
                                         color: const Color(0xFFFFF4EC),
                                         fontWeight: FontWeight.w800,
@@ -1444,7 +1606,9 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      'Destino exacto listo para la ruta del conductor',
+                                      _selectedDestinationPlace != null
+                                          ? 'Destino exacto listo para la ruta del conductor'
+                                          : 'Punto personalizado listo para guiar el viaje',
                                       style: GoogleFonts.plusJakartaSans(
                                         color: const Color(0xFFFFC89B),
                                         fontSize: 12,
@@ -1457,7 +1621,10 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                               IconButton(
                                 onPressed: () {
                                   _destinationController.clear();
-                                  setState(() => _selectedDestinationPlace = null);
+                                  setState(() {
+                                    _selectedDestinationPlace = null;
+                                    _customDestinationPoint = null;
+                                  });
                                 },
                                 icon: const Icon(Icons.close_rounded, color: Color(0xFFFFF4EC)),
                               ),
@@ -1465,33 +1632,69 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                           ),
                         )
                       else
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: _destinationSuggestions()
-                              .map(
-                                (place) => ActionChip(
-                                  onPressed: () => _selectDestinationPlace(place),
-                                  avatar: const Icon(
-                                    Icons.near_me_rounded,
-                                    size: 18,
-                                    color: Color(0xFFF97316),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF17181B),
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(color: const Color(0x2610B981)),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.touch_app_rounded,
+                                    color: Color(0xFF10B981),
+                                    size: 20,
                                   ),
-                                  backgroundColor: const Color(0xFF1A1B1F),
-                                  side: const BorderSide(color: Color(0x26F97316)),
-                                  label: Text(
-                                    place.name,
-                                    style: GoogleFonts.plusJakartaSans(
-                                      color: const Color(0xFFFFF4EC),
-                                      fontWeight: FontWeight.w700,
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      'Si tu destino no aparece, toca el mapa para marcarlo exacto.',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        color: const Color(0xFFE6FFF5),
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 12,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              )
-                              .toList(growable: false),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: _destinationSuggestions()
+                                  .map(
+                                    (place) => ActionChip(
+                                      onPressed: () => _selectDestinationPlace(place),
+                                      avatar: const Icon(
+                                        Icons.near_me_rounded,
+                                        size: 18,
+                                        color: Color(0xFFF97316),
+                                      ),
+                                      backgroundColor: const Color(0xFF1A1B1F),
+                                      side: const BorderSide(color: Color(0x26F97316)),
+                                      label: Text(
+                                        place.name,
+                                        style: GoogleFonts.plusJakartaSans(
+                                          color: const Color(0xFFFFF4EC),
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(growable: false),
+                            ),
+                          ],
                         ),
                     ],
-                    if (!rideLocked && _rideMode == RideMode.destino) const SizedBox(height: 18),
+                    if ((!rideLocked && _rideMode == RideMode.destino) || canChooseActiveTripDestination)
+                      const SizedBox(height: 18),
                     if (locationState.errorMessage != null)
                       _StatusBanner(
                         message: locationState.errorMessage!,
@@ -1521,6 +1724,68 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                           driverName: tripState.request.driverName,
                           driverPhone: tripState.request.driverPhone,
                           etaMinutes: tripState.request.etaMinutes,
+                        ),
+                      ),
+                    if (activeTripNeedsDestination)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 14),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            color: const Color(0x1410B981),
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(color: const Color(0x3310B981)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.route_rounded, color: Color(0xFF10B981)),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      'Marca el destino antes de iniciar el viaje',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        color: const Color(0xFFE6FFF5),
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              const Text(
+                                'Tu conductor ya llegó. Ahora puedes tocar el mapa o elegir un lugar para dejar guardado el destino final.',
+                                style: TextStyle(
+                                  color: Color(0xFFD6FFF0),
+                                  fontWeight: FontWeight.w600,
+                                  height: 1.45,
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              SizedBox(
+                                width: double.infinity,
+                                child: FilledButton.icon(
+                                  onPressed: _saveActiveTripDestination,
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: const Color(0xFF10B981),
+                                    foregroundColor: const Color(0xFF0B1210),
+                                    minimumSize: const Size.fromHeight(52),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(18),
+                                    ),
+                                  ),
+                                  icon: const Icon(Icons.check_circle_rounded),
+                                  label: const Text(
+                                    'Guardar destino del viaje',
+                                    style: TextStyle(fontWeight: FontWeight.w800),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     _buildTripActions(tripState),

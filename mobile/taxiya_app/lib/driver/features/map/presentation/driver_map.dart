@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../../../core/config/app_config.dart';
+import '../../../../../core/map/interactive_destination_marker.dart';
 import '../../../../../core/map/offline_map.dart';
 import '../../../../../core/map/route_service.dart';
 
@@ -23,6 +24,7 @@ class DriverMap extends ConsumerStatefulWidget {
     this.routeColor = const Color(0xFFF97316),
     this.focusBounds,
     this.focusSignal = 0,
+    this.onRouteUpdated,
   });
 
   final bool available;
@@ -38,18 +40,22 @@ class DriverMap extends ConsumerStatefulWidget {
   final Color routeColor;
   final LatLngBounds? focusBounds;
   final int focusSignal;
+  final VoidCallback? onRouteUpdated;
 
   @override
   ConsumerState<DriverMap> createState() => _DriverMapState();
 }
 
 class _DriverMapState extends ConsumerState<DriverMap> {
-  static const double _rerouteDistanceMeters = 55;
-  static const double _rerouteTargetShiftMeters = 80;
+  static const double _rerouteDistanceMeters = 34;
+  static const double _rerouteTargetShiftMeters = 50;
   final MapController _mapController = MapController();
-  List<LatLng>? _routePoints;
+  RoutePathBundle? _routeBundle;
+  RoutePathBundle? _upcomingRouteBundle;
   String? _routeKey;
+  String? _upcomingRouteKey;
   LatLng? _lastRouteEnd;
+  bool _shouldAnnounceRouteUpdate = false;
 
   @override
   void initState() {
@@ -61,11 +67,29 @@ class _DriverMapState extends ConsumerState<DriverMap> {
   void didUpdateWidget(covariant DriverMap oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (_shouldRefreshRoute(oldWidget)) {
+      _shouldAnnounceRouteUpdate = _shouldShowRouteUpdatedNotice();
       _refreshRoute();
     }
     if (oldWidget.focusSignal != widget.focusSignal) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _applyFocus());
     }
+  }
+
+  bool _shouldShowRouteUpdatedNotice() {
+    final currentTarget = _currentRouteTarget();
+    final routePoints = _routeBundle?.primary;
+    if (currentTarget == null || routePoints == null || routePoints.length < 2) {
+      return false;
+    }
+    final routeService = ref.read(routeServiceProvider);
+    final offRouteDistance = routeService.distanceToRoute(
+      point: LatLng(widget.driverLat, widget.driverLng),
+      route: routePoints,
+    );
+    final targetShift = _lastRouteEnd == null
+        ? double.infinity
+        : routeService.pointDistance(_lastRouteEnd!, currentTarget);
+    return offRouteDistance > _rerouteDistanceMeters || targetShift > _rerouteTargetShiftMeters;
   }
 
   void _applyFocus() {
@@ -99,7 +123,8 @@ class _DriverMapState extends ConsumerState<DriverMap> {
       destinationLng: oldWidget.destinationLng,
     );
 
-    if (_routePoints == null || _routePoints!.length < 2) {
+    final routePoints = _routeBundle?.primary;
+    if (routePoints == null || routePoints.length < 2) {
       return oldWidget.driverLat != widget.driverLat ||
           oldWidget.driverLng != widget.driverLng ||
           oldTarget != currentTarget;
@@ -112,7 +137,7 @@ class _DriverMapState extends ConsumerState<DriverMap> {
     final routeService = ref.read(routeServiceProvider);
     final offRouteDistance = routeService.distanceToRoute(
       point: LatLng(widget.driverLat, widget.driverLng),
-      route: _routePoints!,
+      route: routePoints,
     );
     final targetShift = _lastRouteEnd == null
         ? double.infinity
@@ -122,45 +147,99 @@ class _DriverMapState extends ConsumerState<DriverMap> {
 
   Future<void> _refreshRoute() async {
     final driverPoint = LatLng(widget.driverLat, widget.driverLng);
-    final destinationPoint = _currentRouteTarget();
-    if (destinationPoint == null) {
+    final pickupPoint = widget.pickupLat != null && widget.pickupLng != null
+        ? LatLng(widget.pickupLat!, widget.pickupLng!)
+        : null;
+    final finalDestinationPoint = widget.destinationLat != null && widget.destinationLng != null
+        ? LatLng(widget.destinationLat!, widget.destinationLng!)
+        : null;
+    final routeTargetPoint = _currentRouteTarget();
+    if (routeTargetPoint == null) {
       if (mounted) {
         setState(() {
-          _routePoints = null;
+          _routeBundle = null;
+          _upcomingRouteBundle = null;
           _routeKey = null;
+          _upcomingRouteKey = null;
         });
       }
       return;
     }
 
     final nextKey = '${driverPoint.latitude.toStringAsFixed(5)},${driverPoint.longitude.toStringAsFixed(5)}>'
-        '${destinationPoint.latitude.toStringAsFixed(5)},${destinationPoint.longitude.toStringAsFixed(5)}';
-    if (_routeKey == nextKey && _routePoints != null) {
+        '${routeTargetPoint.latitude.toStringAsFixed(5)},${routeTargetPoint.longitude.toStringAsFixed(5)}';
+    if (_routeKey == nextKey && _routeBundle != null) {
       return;
     }
 
+    final routeService = ref.read(routeServiceProvider);
     try {
-      final points = await ref.read(routeServiceProvider).fetchRoute(
-            start: driverPoint,
-            end: destinationPoint,
+      final bundle = await routeService.fetchRouteBundle(
+        start: driverPoint,
+        end: routeTargetPoint,
+      );
+      RoutePathBundle? upcomingBundle;
+      String? upcomingKey;
+      if (pickupPoint != null &&
+          finalDestinationPoint != null &&
+          const {'accepted', 'arriving', 'at_pickup'}.contains(widget.tripStatus)) {
+        upcomingKey =
+            '${pickupPoint.latitude.toStringAsFixed(5)},${pickupPoint.longitude.toStringAsFixed(5)}>'
+            '${finalDestinationPoint.latitude.toStringAsFixed(5)},${finalDestinationPoint.longitude.toStringAsFixed(5)}';
+        if (_upcomingRouteKey == upcomingKey && _upcomingRouteBundle != null) {
+          upcomingBundle = _upcomingRouteBundle;
+        } else {
+          upcomingBundle = await routeService.fetchRouteBundle(
+            start: pickupPoint,
+            end: finalDestinationPoint,
           );
+        }
+      }
       if (!mounted) {
         return;
       }
       setState(() {
-        _routePoints = points;
+        _routeBundle = bundle;
+        _upcomingRouteBundle = upcomingBundle;
         _routeKey = nextKey;
-        _lastRouteEnd = destinationPoint;
+        _upcomingRouteKey = upcomingKey;
+        _lastRouteEnd = routeTargetPoint;
       });
+      if (_shouldAnnounceRouteUpdate) {
+        _shouldAnnounceRouteUpdate = false;
+        widget.onRouteUpdated?.call();
+      }
     } catch (_) {
       if (!mounted) {
         return;
       }
       setState(() {
-        _routePoints = [driverPoint, destinationPoint];
+        _routeBundle = RoutePathBundle(
+          primary: <LatLng>[driverPoint, routeTargetPoint],
+          start: driverPoint,
+          end: routeTargetPoint,
+        );
+        _upcomingRouteBundle =
+            pickupPoint != null &&
+                    finalDestinationPoint != null &&
+                    const {'accepted', 'arriving', 'at_pickup'}.contains(widget.tripStatus)
+                ? RoutePathBundle(
+                    primary: <LatLng>[pickupPoint, finalDestinationPoint],
+                    start: pickupPoint,
+                    end: finalDestinationPoint,
+                  )
+                : null;
         _routeKey = nextKey;
-        _lastRouteEnd = destinationPoint;
+        _upcomingRouteKey = pickupPoint != null && finalDestinationPoint != null
+            ? '${pickupPoint.latitude.toStringAsFixed(5)},${pickupPoint.longitude.toStringAsFixed(5)}>'
+                '${finalDestinationPoint.latitude.toStringAsFixed(5)},${finalDestinationPoint.longitude.toStringAsFixed(5)}'
+            : null;
+        _lastRouteEnd = routeTargetPoint;
       });
+      if (_shouldAnnounceRouteUpdate) {
+        _shouldAnnounceRouteUpdate = false;
+        widget.onRouteUpdated?.call();
+      }
     }
   }
 
@@ -206,6 +285,30 @@ class _DriverMapState extends ConsumerState<DriverMap> {
     final initialCenter = widget.tripAccepted && routePoint != null ? routePoint : driverPoint;
     final offlineMap = ref.read(offlineMapProvider.notifier);
     final viewBounds = AppConfig.potosiViewBounds;
+    final routeService = ref.read(routeServiceProvider);
+    final visiblePrimaryRoute = _routeBundle == null
+        ? null
+        : routeService.trimRouteFromPoint(
+            point: driverPoint,
+            route: _routeBundle!.primary,
+          );
+    final visibleAlternativeRoutes = _routeBundle == null
+        ? const <List<LatLng>>[]
+        : _routeBundle!.alternatives
+            .map(
+              (route) => routeService.trimRouteFromPoint(
+                point: driverPoint,
+                route: route,
+              ),
+            )
+            .where((route) => route.length >= 2)
+            .toList(growable: false);
+    final visibleUpcomingRoute = _upcomingRouteBundle == null
+        ? null
+        : routeService.trimRouteFromPoint(
+            point: pickupPoint ?? driverPoint,
+            route: _upcomingRouteBundle!.primary,
+          );
 
     return Stack(
       children: [
@@ -240,11 +343,40 @@ class _DriverMapState extends ConsumerState<DriverMap> {
             if (widget.tripAccepted &&
                 routePoint != null &&
                 (isOnPickupStage || isOnDestinationStage) &&
-                (_routePoints?.length ?? 0) >= 2)
+                visibleAlternativeRoutes.isNotEmpty)
+              PolylineLayer(
+                polylines: visibleAlternativeRoutes
+                    .map(
+                      (route) => Polyline(
+                        points: route,
+                        strokeWidth: 3,
+                        color: widget.routeColor.withValues(alpha: 0.22),
+                      ),
+                    )
+                    .toList(growable: false),
+              ),
+            if (widget.tripAccepted &&
+                isOnPickupStage &&
+                pickupPoint != null &&
+                destinationPoint != null &&
+                (visibleUpcomingRoute?.length ?? 0) >= 2)
               PolylineLayer(
                 polylines: [
                   Polyline(
-                    points: _routePoints!,
+                    points: visibleUpcomingRoute!,
+                    strokeWidth: 4,
+                    color: const Color(0xFF0EA5E9).withValues(alpha: 0.34),
+                  ),
+                ],
+              ),
+            if (widget.tripAccepted &&
+                routePoint != null &&
+                (isOnPickupStage || isOnDestinationStage) &&
+                (visiblePrimaryRoute?.length ?? 0) >= 2)
+              PolylineLayer(
+                polylines: [
+                  Polyline(
+                    points: visiblePrimaryRoute!,
                     strokeWidth: 5,
                     color: widget.routeColor,
                   ),
@@ -281,12 +413,27 @@ class _DriverMapState extends ConsumerState<DriverMap> {
                 if (widget.tripAccepted && routePoint != null)
                   Marker(
                     point: routePoint,
-                    width: 54,
-                    height: 54,
-                    child: Icon(
-                      isOnDestinationStage ? Icons.flag_rounded : Icons.place,
+                    width: 120,
+                    height: 92,
+                    child: InteractiveDestinationMarker(
+                      icon: isOnDestinationStage ? Icons.flag_rounded : Icons.place_rounded,
                       color: const Color(0xFFF97316),
-                      size: 34,
+                      label: isOnDestinationStage ? 'Destino' : 'Recojo',
+                    ),
+                  ),
+                if (widget.tripAccepted &&
+                    isOnPickupStage &&
+                    destinationPoint != null &&
+                    destinationPoint != routePoint)
+                  Marker(
+                    point: destinationPoint,
+                    width: 110,
+                    height: 84,
+                    child: const InteractiveDestinationMarker(
+                      icon: Icons.flag_rounded,
+                      color: Color(0xFF0EA5E9),
+                      label: 'Luego destino',
+                      size: 28,
                     ),
                   ),
               ],

@@ -18,6 +18,29 @@ final tripProvider = NotifierProvider<TripController, TripState>(TripController.
 class TripRepository {
   const TripRepository();
 
+  TripRequest _mapTripRequest(Map<String, dynamic> payload) {
+    return TripRequest(
+      pickupAddress: payload['pickup_address']?.toString() ?? 'Mi ubicacion actual',
+      destinationAddress: payload['destination_address']?.toString() ?? 'Destino por confirmar',
+      status: payload['status']?.toString() ?? 'idle',
+      activeTripId: payload['id']?.toString(),
+      pickupLat: _toNullableDouble(payload['pickup_lat']),
+      pickupLng: _toNullableDouble(payload['pickup_lng']),
+      destinationLat: _toNullableDouble(payload['destination_lat']),
+      destinationLng: _toNullableDouble(payload['destination_lng']),
+      driverLat: _toNullableDouble(payload['driver_lat']),
+      driverLng: _toNullableDouble(payload['driver_lng']),
+      vehicleType: payload['vehicle_type']?.toString(),
+      vehicleLabel: _joinVehicleLabel(payload['vehicle_brand'], payload['vehicle_model']),
+      vehiclePlate: payload['vehicle_plate']?.toString(),
+      vehicleColor: payload['vehicle_color']?.toString(),
+      driverName: payload['driver_name']?.toString(),
+      driverPhone: payload['driver_phone']?.toString(),
+      etaMinutes: _toNullableInt(payload['eta_minutes']),
+      isPromotional: payload['promotional_trip'] == true,
+    );
+  }
+
   Future<List<TripHistoryItem>> fetchHistory({
     required String token,
     required String passengerId,
@@ -71,26 +94,7 @@ class TripRepository {
     }
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
-    return TripRequest(
-      pickupAddress: payload['pickup_address']?.toString() ?? 'Mi ubicacion actual',
-      destinationAddress: payload['destination_address']?.toString() ?? 'Destino por confirmar',
-      status: payload['status']?.toString() ?? 'idle',
-      activeTripId: payload['id']?.toString(),
-      pickupLat: _toNullableDouble(payload['pickup_lat']),
-      pickupLng: _toNullableDouble(payload['pickup_lng']),
-      destinationLat: _toNullableDouble(payload['destination_lat']),
-      destinationLng: _toNullableDouble(payload['destination_lng']),
-      driverLat: _toNullableDouble(payload['driver_lat']),
-      driverLng: _toNullableDouble(payload['driver_lng']),
-      vehicleType: payload['vehicle_type']?.toString(),
-      vehicleLabel: _joinVehicleLabel(payload['vehicle_brand'], payload['vehicle_model']),
-      vehiclePlate: payload['vehicle_plate']?.toString(),
-      vehicleColor: payload['vehicle_color']?.toString(),
-      driverName: payload['driver_name']?.toString(),
-      driverPhone: payload['driver_phone']?.toString(),
-      etaMinutes: _toNullableInt(payload['eta_minutes']),
-      isPromotional: payload['promotional_trip'] == true,
-    );
+    return _mapTripRequest(payload);
   }
 
   Future<List<NearbyDriver>> fetchNearbyDrivers({
@@ -249,25 +253,37 @@ class TripRepository {
     }
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
-    return TripRequest(
-      pickupAddress: payload['pickup_address']?.toString() ?? 'Mi ubicacion actual',
-      destinationAddress: payload['destination_address']?.toString() ?? 'Destino por confirmar',
+    return _mapTripRequest(payload).copyWith(
       status: payload['status']?.toString() ?? status,
       activeTripId: payload['id']?.toString() ?? tripId,
-      pickupLat: _toNullableDouble(payload['pickup_lat']),
-      pickupLng: _toNullableDouble(payload['pickup_lng']),
-      destinationLat: _toNullableDouble(payload['destination_lat']),
-      destinationLng: _toNullableDouble(payload['destination_lng']),
-      driverLat: _toNullableDouble(payload['driver_lat']),
-      driverLng: _toNullableDouble(payload['driver_lng']),
-      vehicleType: payload['vehicle_type']?.toString(),
-      vehicleLabel: _joinVehicleLabel(payload['vehicle_brand'], payload['vehicle_model']),
-      vehiclePlate: payload['vehicle_plate']?.toString(),
-      vehicleColor: payload['vehicle_color']?.toString(),
-      driverName: payload['driver_name']?.toString(),
-      driverPhone: payload['driver_phone']?.toString(),
-      etaMinutes: _toNullableInt(payload['eta_minutes']),
-      isPromotional: payload['promotional_trip'] == true,
+    );
+  }
+
+  Future<TripRequest> updateTripDestination({
+    required String token,
+    required String tripId,
+    required String destinationAddress,
+    required LatLng destinationLocation,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('${AppConfig.apiBaseUrl}/trips/$tripId/destination'),
+      headers: _headers(token),
+      body: jsonEncode({
+        'destinationAddress': destinationAddress,
+        'destinationLat': destinationLocation.latitude,
+        'destinationLng': destinationLocation.longitude,
+      }),
+    );
+
+    if (response.statusCode >= 400) {
+      final payload = response.body.isEmpty ? null : jsonDecode(response.body);
+      final message = payload is Map<String, dynamic> ? payload['message']?.toString() : null;
+      throw Exception(message ?? 'No se pudo actualizar el destino (${response.statusCode})');
+    }
+
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    return _mapTripRequest(payload).copyWith(
+      activeTripId: payload['id']?.toString() ?? tripId,
     );
   }
 
@@ -508,6 +524,40 @@ class TripController extends Notifier<TripState> {
     } catch (error) {
       state = state.copyWith(errorMessage: error.toString());
     }
+  }
+
+  Future<void> updateTripDestination({
+    required String token,
+    required String tripId,
+    required String destinationAddress,
+    required LatLng destinationLocation,
+  }) async {
+    try {
+      final request = await _repository.updateTripDestination(
+        token: token,
+        tripId: tripId,
+        destinationAddress: destinationAddress,
+        destinationLocation: destinationLocation,
+      );
+      state = state.copyWith(request: request, clearError: true);
+    } catch (error) {
+      state = state.copyWith(errorMessage: error.toString());
+    }
+  }
+
+  void applyTripDestinationUpdate({
+    required String destinationAddress,
+    required double destinationLat,
+    required double destinationLng,
+  }) {
+    state = state.copyWith(
+      request: state.request.copyWith(
+        destinationAddress: destinationAddress,
+        destinationLat: destinationLat,
+        destinationLng: destinationLng,
+      ),
+      clearError: true,
+    );
   }
 
   Future<void> submitRating({

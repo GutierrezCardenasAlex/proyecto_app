@@ -10,31 +10,59 @@ final routeServiceProvider = Provider<RouteService>((ref) {
   return const RouteService();
 });
 
+class RoutePathBundle {
+  const RoutePathBundle({
+    required this.primary,
+    this.alternatives = const <List<LatLng>>[],
+    required this.start,
+    required this.end,
+  });
+
+  final List<LatLng> primary;
+  final List<List<LatLng>> alternatives;
+  final LatLng start;
+  final LatLng end;
+}
+
 class RouteService {
   const RouteService();
 
   static const Distance _distance = Distance();
 
-  static final Map<String, List<LatLng>> _cache = <String, List<LatLng>>{};
+  static final Map<String, RoutePathBundle> _cache = <String, RoutePathBundle>{};
 
   Future<List<LatLng>> fetchRoute({
     required LatLng start,
     required LatLng end,
   }) async {
+    final bundle = await fetchRouteBundle(start: start, end: end);
+    return bundle.primary;
+  }
+
+  Future<RoutePathBundle> fetchRouteBundle({
+    required LatLng start,
+    required LatLng end,
+  }) async {
     final cacheKey = _keyFor(start, end);
     final cached = _cache[cacheKey];
-    if (cached != null && cached.isNotEmpty) {
+    if (cached != null && cached.primary.isNotEmpty) {
       return cached;
     }
 
     if (!AppConfig.hasRoutingSource) {
-      return [start, end];
+      return RoutePathBundle(
+        primary: <LatLng>[start, end],
+        start: start,
+        end: end,
+      );
     }
 
+    final snappedStart = await _snapPointIfPossible(start);
+    final snappedEnd = await _snapPointIfPossible(end);
     final base = AppConfig.mapRoutingUrlBase.replaceAll(RegExp(r'/$'), '');
     final uri = Uri.parse(
-      '$base/${start.longitude},${start.latitude};${end.longitude},${end.latitude}'
-      '?overview=full&geometries=geojson',
+      '$base/${snappedStart.longitude},${snappedStart.latitude};${snappedEnd.longitude},${snappedEnd.latitude}'
+      '?overview=full&geometries=geojson&alternatives=true&steps=false&continue_straight=false',
     );
 
     final response = await http.get(uri, headers: const {'Accept': 'application/json'});
@@ -45,10 +73,50 @@ class RouteService {
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
     final routes = payload['routes'] as List<dynamic>? ?? const [];
     if (routes.isEmpty) {
-      return [start, end];
+      return RoutePathBundle(
+        primary: <LatLng>[start, end],
+        start: start,
+        end: end,
+      );
     }
 
-    final geometry = (routes.first as Map<String, dynamic>)['geometry'] as Map<String, dynamic>?;
+    final decodedRoutes = routes
+        .whereType<Map<String, dynamic>>()
+        .take(3)
+        .map((route) => _decodeRouteGeometry(route, exactStart: start, exactEnd: end))
+        .where((points) => points.length >= 2)
+        .toList(growable: false);
+
+    if (decodedRoutes.isEmpty) {
+      return RoutePathBundle(
+        primary: <LatLng>[start, end],
+        start: start,
+        end: end,
+      );
+    }
+
+    final bundle = RoutePathBundle(
+      primary: decodedRoutes.first,
+      alternatives: decodedRoutes.length > 1 ? decodedRoutes.sublist(1) : const <List<LatLng>>[],
+      start: start,
+      end: end,
+    );
+    _cache[cacheKey] = bundle;
+    return bundle;
+  }
+
+  String _keyFor(LatLng start, LatLng end) {
+    return '${start.latitude.toStringAsFixed(5)},${start.longitude.toStringAsFixed(5)}'
+        '>'
+        '${end.latitude.toStringAsFixed(5)},${end.longitude.toStringAsFixed(5)}';
+  }
+
+  List<LatLng> _decodeRouteGeometry(
+    Map<String, dynamic> route, {
+    required LatLng exactStart,
+    required LatLng exactEnd,
+  }) {
+    final geometry = route['geometry'] as Map<String, dynamic>?;
     final coordinates = geometry?['coordinates'] as List<dynamic>? ?? const [];
     final points = coordinates
         .whereType<List<dynamic>>()
@@ -59,20 +127,64 @@ class RouteService {
             (item[0] as num).toDouble(),
           ),
         )
-        .toList(growable: false);
-
+        .toList(growable: true);
     if (points.length < 2) {
-      return [start, end];
+      return <LatLng>[exactStart, exactEnd];
     }
-
-    _cache[cacheKey] = points;
+    if (pointDistance(points.first, exactStart) > 3) {
+      points.insert(0, exactStart);
+    } else {
+      points[0] = exactStart;
+    }
+    if (pointDistance(points.last, exactEnd) > 3) {
+      points.add(exactEnd);
+    } else {
+      points[points.length - 1] = exactEnd;
+    }
     return points;
   }
 
-  String _keyFor(LatLng start, LatLng end) {
-    return '${start.latitude.toStringAsFixed(5)},${start.longitude.toStringAsFixed(5)}'
-        '>'
-        '${end.latitude.toStringAsFixed(5)},${end.longitude.toStringAsFixed(5)}';
+  Future<LatLng> _snapPointIfPossible(LatLng point) async {
+    final snapBase = _nearestUrlBase();
+    if (snapBase == null) {
+      return point;
+    }
+    try {
+      final uri = Uri.parse(
+        '$snapBase/${point.longitude},${point.latitude}?number=1',
+      );
+      final response = await http.get(uri, headers: const {'Accept': 'application/json'});
+      if (response.statusCode >= 400) {
+        return point;
+      }
+      final payload = jsonDecode(response.body) as Map<String, dynamic>;
+      final waypoints = payload['waypoints'] as List<dynamic>? ?? const [];
+      if (waypoints.isEmpty) {
+        return point;
+      }
+      final location = (waypoints.first as Map<String, dynamic>)['location'] as List<dynamic>?;
+      if (location == null || location.length < 2) {
+        return point;
+      }
+      final snapped = LatLng(
+        (location[1] as num).toDouble(),
+        (location[0] as num).toDouble(),
+      );
+      if (pointDistance(point, snapped) > 250) {
+        return point;
+      }
+      return snapped;
+    } catch (_) {
+      return point;
+    }
+  }
+
+  String? _nearestUrlBase() {
+    final base = AppConfig.mapRoutingUrlBase.trim().replaceAll(RegExp(r'/$'), '');
+    if (base.contains('/route/v1/')) {
+      return base.replaceFirst('/route/v1/', '/nearest/v1/');
+    }
+    return null;
   }
 
   double distanceToRoute({
@@ -95,5 +207,29 @@ class RouteService {
 
   double pointDistance(LatLng from, LatLng to) {
     return _distance.as(LengthUnit.Meter, from, to);
+  }
+
+  List<LatLng> trimRouteFromPoint({
+    required LatLng point,
+    required List<LatLng> route,
+  }) {
+    if (route.length < 2) {
+      return route;
+    }
+    var bestIndex = 0;
+    var bestDistance = double.infinity;
+    for (var index = 0; index < route.length; index++) {
+      final current = pointDistance(point, route[index]);
+      if (current < bestDistance) {
+        bestDistance = current;
+        bestIndex = index;
+      }
+    }
+    final trimmed = <LatLng>[point];
+    trimmed.addAll(route.skip(bestIndex));
+    if (trimmed.length < 2) {
+      trimmed.add(route.last);
+    }
+    return trimmed;
   }
 }

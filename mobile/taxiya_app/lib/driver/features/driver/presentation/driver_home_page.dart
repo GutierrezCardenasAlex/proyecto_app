@@ -184,6 +184,28 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
         ref.invalidate(driverTripHistoryProvider);
       }
     });
+    _socket?.on('trip:destination_updated', (_) async {
+      await ref.read(offeredTripProvider.notifier).loadOffer();
+      if (mounted) {
+        showTopNotice(
+          context,
+          'El pasajero actualizo el destino del viaje.',
+          backgroundColor: const Color(0xFF10B981),
+          foregroundColor: const Color(0xFF0F0F10),
+        );
+      }
+    });
+    _socket?.on('driver:trip_destination_updated', (_) async {
+      await ref.read(offeredTripProvider.notifier).loadOffer();
+      if (mounted) {
+        showTopNotice(
+          context,
+          'Destino recibido. Ya puedes seguir la nueva ruta.',
+          backgroundColor: const Color(0xFF10B981),
+          foregroundColor: const Color(0xFF0F0F10),
+        );
+      }
+    });
     _socket?.on('driver:trip_rejected', (_) {
       ref.read(driverOffersProvider.notifier).loadOffers();
       ref.invalidate(driverTripHistoryProvider);
@@ -1744,6 +1766,17 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
               routeColor: routeColor,
               focusBounds: focusBounds,
               focusSignal: _mapFocusSignal,
+              onRouteUpdated: () {
+                if (!mounted) {
+                  return;
+                }
+                showTopNotice(
+                  context,
+                  'Ruta actualizada. La app ya corrigio el camino.',
+                  backgroundColor: const Color(0xFFF97316),
+                  foregroundColor: const Color(0xFF0F0F10),
+                );
+              },
             ),
           ),
         ),

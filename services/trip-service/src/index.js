@@ -33,6 +33,12 @@ const statusSchema = z.object({
   status: z.enum(["arriving", "at_pickup", "in_progress", "completed", "cancelled"])
 });
 
+const destinationUpdateSchema = z.object({
+  destinationAddress: z.string().min(3),
+  destinationLat: z.number(),
+  destinationLng: z.number()
+});
+
 const ratingSchema = z.object({
   fromRole: z.enum(["passenger", "driver"]),
   score: z.number().int().min(1).max(5),
@@ -529,6 +535,86 @@ async function bootstrap() {
         status
       });
     }
+    reply.send(trip);
+  });
+
+  app.patch("/:tripId/destination", async (request, reply) => {
+    const { tripId } = request.params;
+    const input = destinationUpdateSchema.parse(request.body);
+
+    if (!isInsidePotosi(input.destinationLat, input.destinationLng)) {
+      return reply.code(400).send({
+        message: "El destino debe quedar dentro del area operativa de Potosi"
+      });
+    }
+
+    const currentTripResult = await pool.query(
+      `SELECT id, status, driver_id, passenger_id
+       FROM trips
+       WHERE id = $1`,
+      [tripId]
+    );
+
+    if (!currentTripResult.rows.length) {
+      return reply.code(404).send({ message: "Trip not found" });
+    }
+
+    const currentTrip = currentTripResult.rows[0];
+    if (!["requested", "searching", "accepted", "arriving", "at_pickup"].includes(currentTrip.status)) {
+      return reply.code(409).send({
+        message: "Ya no se puede cambiar el destino cuando el viaje esta en curso o finalizado"
+      });
+    }
+
+    const result = await pool.query(
+      `UPDATE trips
+       SET destination_address = $2,
+           destination_location = ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography,
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [tripId, input.destinationAddress, input.destinationLng, input.destinationLat]
+    );
+
+    const trip = result.rows[0];
+
+    await pool.query(
+      `INSERT INTO trip_events (trip_id, event_type, payload)
+       VALUES ($1, $2, $3::jsonb)`,
+      [
+        tripId,
+        "destination_updated",
+        JSON.stringify({
+          destinationAddress: input.destinationAddress,
+          destinationLat: input.destinationLat,
+          destinationLng: input.destinationLng
+        })
+      ]
+    );
+
+    await publish("trip.destination_updated", {
+      tripId,
+      destinationAddress: input.destinationAddress,
+      destinationLat: input.destinationLat,
+      destinationLng: input.destinationLng
+    });
+    await emitRealtime("trip:destination_updated", `trip:${tripId}`, {
+      tripId,
+      driverId: currentTrip.driver_id,
+      passengerId: currentTrip.passenger_id,
+      destinationAddress: input.destinationAddress,
+      destinationLat: input.destinationLat,
+      destinationLng: input.destinationLng
+    });
+    if (currentTrip.driver_id) {
+      await emitRealtime("driver:trip_destination_updated", `driver:${currentTrip.driver_id}`, {
+        tripId,
+        destinationAddress: input.destinationAddress,
+        destinationLat: input.destinationLat,
+        destinationLng: input.destinationLng
+      });
+    }
+
     reply.send(trip);
   });
 
