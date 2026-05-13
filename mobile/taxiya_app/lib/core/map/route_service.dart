@@ -16,12 +16,16 @@ class RoutePathBundle {
     this.alternatives = const <List<LatLng>>[],
     required this.start,
     required this.end,
+    this.distanceMeters,
+    this.durationSeconds,
   });
 
   final List<LatLng> primary;
   final List<List<LatLng>> alternatives;
   final LatLng start;
   final LatLng end;
+  final double? distanceMeters;
+  final double? durationSeconds;
 }
 
 class RouteService {
@@ -100,6 +104,12 @@ class RouteService {
       alternatives: decodedRoutes.length > 1 ? decodedRoutes.sublist(1) : const <List<LatLng>>[],
       start: start,
       end: end,
+      distanceMeters: (routes.first as Map<String, dynamic>)['distance'] is num
+          ? ((routes.first as Map<String, dynamic>)['distance'] as num).toDouble()
+          : null,
+      durationSeconds: (routes.first as Map<String, dynamic>)['duration'] is num
+          ? ((routes.first as Map<String, dynamic>)['duration'] as num).toDouble()
+          : null,
     );
     _cache[cacheKey] = bundle;
     return bundle;

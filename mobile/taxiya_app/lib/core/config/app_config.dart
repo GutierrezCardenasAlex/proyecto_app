@@ -12,7 +12,7 @@ class AppConfig {
   static const websocketScheme = String.fromEnvironment('WEBSOCKET_SCHEME', defaultValue: '');
   static const mapTilesUrlTemplate = String.fromEnvironment(
     'MAP_TILES_URL_TEMPLATE',
-    defaultValue: 'https://taxis.cybernovatech.space/tiles/styles/basic-preview/512/{z}/{x}/{y}.png',
+    defaultValue: 'https://taxis.cybernovatech.space/tiles/styles/flashgo-navigation/512/{z}/{x}/{y}.png',
   );
   static const mapTilesAttribution = String.fromEnvironment(
     'MAP_TILES_ATTRIBUTION',
@@ -20,7 +20,7 @@ class AppConfig {
   );
   static const mapOfflineTilesUrlTemplate = String.fromEnvironment(
     'MAP_OFFLINE_TILES_URL_TEMPLATE',
-    defaultValue: 'https://taxis.cybernovatech.space/tiles/styles/basic-preview/512/{z}/{x}/{y}.png',
+    defaultValue: 'https://taxis.cybernovatech.space/tiles/styles/flashgo-navigation/512/{z}/{x}/{y}.png',
   );
   static const mapOfflineTilesAttribution = String.fromEnvironment(
     'MAP_OFFLINE_TILES_ATTRIBUTION',
@@ -29,6 +29,10 @@ class AppConfig {
   static const _mapRoutingUrlBase = String.fromEnvironment(
     'MAP_ROUTING_URL_BASE',
     defaultValue: '',
+  );
+  static const mapGeocodingUrlBase = String.fromEnvironment(
+    'MAP_GEOCODING_URL_BASE',
+    defaultValue: 'https://nominatim.openstreetmap.org/reverse',
   );
   static const routingScheme = String.fromEnvironment('ROUTING_SCHEME', defaultValue: serverScheme);
   static const routingHost = String.fromEnvironment('ROUTING_HOST', defaultValue: serverHost);
@@ -120,7 +124,7 @@ class AppConfig {
         const LatLng(-19.5350, -65.6950),
       );
 
-  static const mapMinZoom = 13.4;
-  static const mapInitialZoom = 14.8;
-  static const mapMaxZoom = 16.0;
+  static const mapMinZoom = 13.0;
+  static const mapInitialZoom = 15.1;
+  static const mapMaxZoom = 18.0;
 }

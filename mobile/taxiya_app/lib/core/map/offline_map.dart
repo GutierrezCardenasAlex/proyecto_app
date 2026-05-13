@@ -10,7 +10,7 @@ import '../config/app_config.dart';
 
 const _potosiStoreName = 'potosi';
 const _offlineMinZoom = 12;
-const _offlineMaxZoom = 16;
+const _offlineMaxZoom = 18;
 
 final offlineMapProvider =
     NotifierProvider<OfflineMapController, OfflineMapState>(OfflineMapController.new);

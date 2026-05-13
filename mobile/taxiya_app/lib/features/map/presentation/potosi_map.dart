@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../../core/config/app_config.dart';
+import '../../../../core/map/geocoding_service.dart';
 import '../../../../core/map/interactive_destination_marker.dart';
+import '../../../../core/map/map_navigation_banner.dart';
 import '../../../../core/map/offline_map.dart';
 import '../../../../core/map/route_service.dart';
 
@@ -57,16 +61,24 @@ class PotosiMap extends ConsumerStatefulWidget {
 class _PotosiMapState extends ConsumerState<PotosiMap> {
   static const double _rerouteDistanceMeters = 38;
   static const double _rerouteTargetShiftMeters = 55;
+  static const double _detailRefreshDistanceMeters = 45;
   final MapController _mapController = MapController();
   RoutePathBundle? _routeBundle;
   String? _routeKey;
   LatLng? _lastRouteEnd;
   bool _shouldAnnounceRouteUpdate = false;
+  final Distance _distance = const Distance();
+  MapLocationDetails? _currentLocationDetails;
+  MapLocationDetails? _targetLocationDetails;
+  LatLng? _lastCurrentLookupPoint;
+  LatLng? _lastTargetLookupPoint;
+  Timer? _detailsDebounce;
 
   @override
   void initState() {
     super.initState();
     _refreshRoute();
+    _scheduleLocationDetailsRefresh(force: true);
   }
 
   @override
@@ -79,6 +91,15 @@ class _PotosiMapState extends ConsumerState<PotosiMap> {
     if (oldWidget.focusSignal != widget.focusSignal) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _applyFocus());
     }
+    if (_shouldRefreshLocationDetails(oldWidget)) {
+      _scheduleLocationDetailsRefresh();
+    }
+  }
+
+  @override
+  void dispose() {
+    _detailsDebounce?.cancel();
+    super.dispose();
   }
 
   bool _shouldShowRouteUpdatedNotice() {
@@ -194,6 +215,106 @@ class _PotosiMapState extends ConsumerState<PotosiMap> {
         _shouldAnnounceRouteUpdate = false;
         widget.onRouteUpdated?.call();
       }
+    }
+  }
+
+  bool _shouldRefreshLocationDetails(PotosiMap oldWidget) {
+    final movedEnough = _lastCurrentLookupPoint == null ||
+        _distance(widget.userLocation, _lastCurrentLookupPoint!) > _detailRefreshDistanceMeters;
+    final oldTarget = oldWidget.routeTarget;
+    final newTarget = widget.routeTarget;
+    final targetChanged = oldTarget != newTarget ||
+        (_lastTargetLookupPoint != null &&
+            newTarget != null &&
+            _distance(newTarget, _lastTargetLookupPoint!) > _detailRefreshDistanceMeters);
+    return movedEnough || targetChanged;
+  }
+
+  void _scheduleLocationDetailsRefresh({bool force = false}) {
+    _detailsDebounce?.cancel();
+    _detailsDebounce = Timer(force ? Duration.zero : const Duration(milliseconds: 500), () {
+      unawaited(_refreshLocationDetails(force: force));
+    });
+  }
+
+  String? _formatDistance(double? meters) {
+    if (meters == null || meters <= 0) {
+      return null;
+    }
+    if (meters >= 1000) {
+      return '${(meters / 1000).toStringAsFixed(meters >= 10000 ? 0 : 1)} km';
+    }
+    return '${meters.round()} m';
+  }
+
+  String? _formatDuration(double? seconds) {
+    if (seconds == null || seconds <= 0) {
+      return null;
+    }
+    final minutes = (seconds / 60).round();
+    if (minutes < 60) {
+      return '$minutes min';
+    }
+    final hours = minutes ~/ 60;
+    final remainingMinutes = minutes % 60;
+    if (remainingMinutes == 0) {
+      return '$hours h';
+    }
+    return '$hours h $remainingMinutes min';
+  }
+
+  Future<void> _refreshLocationDetails({bool force = false}) async {
+    final geocoding = ref.read(geocodingServiceProvider);
+    final userPoint = widget.userLocation;
+    final targetPoint = widget.routeTarget;
+    try {
+      if (force ||
+          _lastCurrentLookupPoint == null ||
+          _distance(userPoint, _lastCurrentLookupPoint!) > _detailRefreshDistanceMeters) {
+        final details = await geocoding.reverseLookup(userPoint);
+        if (mounted) {
+          setState(() {
+            _currentLocationDetails = details;
+            _lastCurrentLookupPoint = userPoint;
+          });
+        }
+      }
+      if (targetPoint != null &&
+          (force ||
+              _lastTargetLookupPoint == null ||
+              _distance(targetPoint, _lastTargetLookupPoint!) > _detailRefreshDistanceMeters)) {
+        final details = await geocoding.reverseLookup(targetPoint);
+        if (mounted) {
+          setState(() {
+            _targetLocationDetails = details;
+            _lastTargetLookupPoint = targetPoint;
+          });
+        }
+      } else if (targetPoint == null && mounted && _targetLocationDetails != null) {
+        setState(() {
+          _targetLocationDetails = null;
+          _lastTargetLookupPoint = null;
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _currentLocationDetails ??= const MapLocationDetails(
+          primary: 'Ubicacion actual',
+          secondary: 'Potosi',
+          fullAddress: 'Potosi',
+        );
+        if (targetPoint == null) {
+          _targetLocationDetails = null;
+          _lastTargetLookupPoint = null;
+        } else {
+          _targetLocationDetails ??= const MapLocationDetails(
+            primary: 'Destino del viaje',
+            secondary: 'Potosi',
+            fullAddress: 'Potosi',
+          );
+        }
+      });
     }
   }
 
@@ -358,6 +479,23 @@ class _PotosiMapState extends ConsumerState<PotosiMap> {
           left: 16,
           bottom: 16,
           child: OfflineMapReadyBadge(),
+        ),
+        Positioned(
+          left: 16,
+          top: 16,
+          child: MapNavigationBanner(
+            currentLabel: _currentLocationDetails?.primary ?? 'Ubicacion actual',
+            currentDetail: _currentLocationDetails?.secondary ?? 'Buscando calle...',
+            targetLabel: widget.showTargetMarker && widget.routeTarget != null
+                ? (_targetLocationDetails?.primary ?? 'Destino del viaje')
+                : null,
+            targetDetail: widget.showTargetMarker && widget.routeTarget != null
+                ? (_targetLocationDetails?.secondary ?? 'Buscando referencia...')
+                : null,
+            remainingDistanceLabel: _formatDistance(_routeBundle?.distanceMeters),
+            remainingDurationLabel: _formatDuration(_routeBundle?.durationSeconds),
+            targetCaption: widget.secondaryMarker != null ? 'Punto del viaje' : 'Destino',
+          ),
         ),
       ],
     );
