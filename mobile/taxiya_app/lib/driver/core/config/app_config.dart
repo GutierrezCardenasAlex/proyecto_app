@@ -1,11 +1,11 @@
 class AppConfig {
-  static const serverScheme = String.fromEnvironment('SERVER_SCHEME', defaultValue: 'https');
+  static const serverScheme = String.fromEnvironment('SERVER_SCHEME', defaultValue: 'http');
   static const serverHost = String.fromEnvironment(
     'SERVER_HOST',
-    defaultValue: 'taxis.cybernovatech.space',
+    defaultValue: '62.171.186.246',
   );
-  static const gatewayPort = String.fromEnvironment('GATEWAY_PORT', defaultValue: '443');
-  static const websocketPort = String.fromEnvironment('WEBSOCKET_PORT', defaultValue: '443');
+  static const gatewayPort = String.fromEnvironment('GATEWAY_PORT', defaultValue: '3000');
+  static const websocketPort = String.fromEnvironment('WEBSOCKET_PORT', defaultValue: '3008');
   static const websocketScheme = String.fromEnvironment('WEBSOCKET_SCHEME', defaultValue: '');
 
   static String get apiBaseUrl =>

@@ -4,8 +4,8 @@ import { io } from 'socket.io-client'
 import './App.css'
 
 const cityCenter: [number, number] = [-19.5836, -65.7531]
-const apiBase = import.meta.env.VITE_API_BASE_URL ?? `${window.location.origin}/api`
-const wsBase = import.meta.env.VITE_WS_URL ?? window.location.origin
+const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'http://62.171.186.246:3000/api'
+const wsBase = import.meta.env.VITE_WS_URL ?? 'http://62.171.186.246:3008'
 
 const driverIcon = new L.DivIcon({
   className: 'driver-pin',
