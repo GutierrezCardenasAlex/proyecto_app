@@ -129,7 +129,8 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
     _socket = io.io(
       AppConfig.websocketUrl,
       io.OptionBuilder()
-          .setTransports(['websocket'])
+          .setPath('/socket.io')
+          .setTransports(['websocket', 'polling'])
           .disableAutoConnect()
           .enableForceNew()
           .build(),

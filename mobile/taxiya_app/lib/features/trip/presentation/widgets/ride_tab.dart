@@ -295,7 +295,8 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     _socket = io.io(
       AppConfig.websocketUrl,
       io.OptionBuilder()
-          .setTransports(['websocket'])
+          .setPath('/socket.io')
+          .setTransports(['websocket', 'polling'])
           .disableAutoConnect()
           .enableForceNew()
           .build(),

@@ -8,7 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../config/app_config.dart';
 
-const _potosiStoreName = 'potosi';
+const _potosiStoreName = 'potosi_online_map_v3';
 const _offlineMinZoom = 12;
 const _offlineMaxZoom = 18;
 
@@ -98,6 +98,8 @@ class OfflineMapController extends Notifier<OfflineMapState> {
       urlTemplate: AppConfig.effectiveMapTilesUrlTemplate,
       userAgentPackageName: userAgentPackageName,
       tileProvider: buildTileProvider(),
+      tileDimension: AppConfig.mapTileDimension,
+      zoomOffset: AppConfig.mapTileZoomOffset,
       minZoom: _offlineMinZoom.toDouble(),
       maxZoom: _offlineMaxZoom.toDouble(),
       maxNativeZoom: _offlineMaxZoom,
@@ -117,6 +119,8 @@ class OfflineMapController extends Notifier<OfflineMapState> {
     return TileLayer(
       urlTemplate: AppConfig.mapTilesUrlTemplate,
       userAgentPackageName: userAgentPackageName,
+      tileDimension: AppConfig.mapTileDimension,
+      zoomOffset: AppConfig.mapTileZoomOffset,
       minZoom: _offlineMinZoom.toDouble(),
       maxZoom: _offlineMaxZoom.toDouble(),
       maxNativeZoom: _offlineMaxZoom,
@@ -140,10 +144,12 @@ class OfflineMapController extends Notifier<OfflineMapState> {
         isReady: stats.length > 0,
         downloadedTiles: stats.length,
         statusMessage: stats.length > 0
-            ? 'Mapa offline de ${AppConfig.offlineRegionName} listo'
+            ? AppConfig.hasDedicatedOfflineTileSource
+                ? 'Mapa offline de ${AppConfig.offlineRegionName} listo'
+                : 'Cache inteligente activo. El mapa guardara las zonas vistas para seguir mostrandolas cuando la señal baje.'
             : (AppConfig.hasDedicatedOfflineTileSource
                   ? 'Modo online listo. Puedes descargar ${AppConfig.offlineRegionName} cuando quieras.'
-                  : 'Modo online activo. La central aun no habilito la descarga offline.'),
+                  : 'Modo online listo. Mientras avances, el mapa ira guardando en cache las zonas que ya viste.'),
         clearError: true,
       );
     } catch (error) {
@@ -162,7 +168,8 @@ class OfflineMapController extends Notifier<OfflineMapState> {
     }
     if (!AppConfig.hasDedicatedOfflineTileSource) {
       state = state.copyWith(
-        statusMessage: 'La descarga offline aun no fue habilitada por central. El mapa seguira funcionando online sin problema.',
+        statusMessage:
+            'El mapa seguira funcionando online y guardando en cache las zonas recorridas para reutilizarlas si la señal baja.',
         clearError: true,
       );
       return;
@@ -201,6 +208,8 @@ class OfflineMapController extends Notifier<OfflineMapState> {
         options: TileLayer(
           urlTemplate: AppConfig.effectiveOfflineTilesUrlTemplate,
           userAgentPackageName: 'bo.flashgo.offline',
+          tileDimension: AppConfig.mapTileDimension,
+          zoomOffset: AppConfig.mapTileZoomOffset,
           minZoom: _offlineMinZoom.toDouble(),
           maxZoom: _offlineMaxZoom.toDouble(),
         ),
@@ -289,7 +298,9 @@ class OfflineMapDownloadButton extends ConsumerWidget {
             children: [
               Expanded(
                 child: Text(
-                  offlineState.isReady ? 'Mapa offline listo' : 'Descargar mapa',
+                  offlineState.isReady
+                      ? (AppConfig.hasDedicatedOfflineTileSource ? 'Mapa offline listo' : 'Cache del mapa lista')
+                      : (AppConfig.hasDedicatedOfflineTileSource ? 'Descargar mapa' : 'Cache inteligente'),
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
@@ -314,7 +325,10 @@ class OfflineMapDownloadButton extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            offlineState.statusMessage ?? 'Guarda ${AppConfig.offlineRegionName} para usar el mapa sin internet.',
+            offlineState.statusMessage ??
+                (AppConfig.hasDedicatedOfflineTileSource
+                    ? 'Guarda ${AppConfig.offlineRegionName} para usar el mapa sin internet.'
+                    : 'El mapa ira guardando automaticamente las zonas vistas para seguir mostrandolas si la señal baja.'),
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
@@ -360,9 +374,17 @@ class OfflineMapDownloadButton extends ConsumerWidget {
               width: double.infinity,
               height: 40,
               child: FilledButton.icon(
-                onPressed: AppConfig.hasDedicatedOfflineTileSource ? controller.downloadPotosiMap : null,
-                icon: Icon(offlineState.isReady ? Icons.refresh_rounded : Icons.download_rounded),
-                label: Text(offlineState.isReady ? 'Actualizar cache' : 'Guardar Potosi ciudad'),
+                onPressed: AppConfig.hasDedicatedOfflineTileSource ? controller.downloadPotosiMap : controller.refreshStatus,
+                icon: Icon(
+                  AppConfig.hasDedicatedOfflineTileSource
+                      ? (offlineState.isReady ? Icons.refresh_rounded : Icons.download_rounded)
+                      : Icons.wifi_tethering_rounded,
+                ),
+                label: Text(
+                  AppConfig.hasDedicatedOfflineTileSource
+                      ? (offlineState.isReady ? 'Actualizar cache' : 'Guardar Potosi ciudad')
+                      : 'Usar cache automatica',
+                ),
                 style: FilledButton.styleFrom(
                   backgroundColor: const Color(0xFFF97316),
                   foregroundColor: const Color(0xFF0F0F10),
@@ -535,9 +557,11 @@ Future<void> showOfflineMapSheet(BuildContext context) {
                         ),
                       ),
                       const SizedBox(height: 6),
-                      const Text(
-                        'El mapa online sigue funcionando normal. Si inicias la descarga, puedes cerrar esta ventana y seguira avanzando.',
-                        style: TextStyle(
+                      Text(
+                        AppConfig.hasDedicatedOfflineTileSource
+                            ? 'El mapa online sigue funcionando normal. Si inicias la descarga, puedes cerrar esta ventana y seguira avanzando.'
+                            : 'El mapa funciona online y ademas guarda automaticamente en cache las zonas vistas para seguir mostrandolas si la señal baja.',
+                        style: const TextStyle(
                           color: Color(0xFFFFD8BF),
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -576,7 +600,7 @@ Future<void> showOfflineMapSheet(BuildContext context) {
                             border: Border.all(color: const Color(0x55F97316)),
                           ),
                           child: const Text(
-                            'Ahora mismo estas en modo online con OpenStreetMap. Para activar la descarga offline sin tocar ese modo, configura MAP_OFFLINE_TILES_URL_TEMPLATE con tu servidor de tiles propio.',
+                            'Modo online con cache inteligente activo. El mapa ira guardando automaticamente las zonas que recorras para seguir mostrandolas con poca señal. Cuando tengamos un paquete offline dedicado, esta misma pantalla permitira descargarlo completo.',
                             style: TextStyle(
                               color: Color(0xFFFFD8BF),
                               fontSize: 12,

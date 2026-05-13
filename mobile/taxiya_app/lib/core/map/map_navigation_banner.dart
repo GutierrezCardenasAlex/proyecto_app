@@ -102,6 +102,132 @@ class MapNavigationBanner extends StatelessWidget {
   }
 }
 
+class MapNavigationTriggerButton extends StatelessWidget {
+  const MapNavigationTriggerButton({
+    super.key,
+    required this.currentLabel,
+    required this.currentDetail,
+    this.targetLabel,
+    this.targetDetail,
+    this.remainingDistanceLabel,
+    this.remainingDurationLabel,
+    this.accentColor = const Color(0xFFF97316),
+    this.targetCaption = 'Destino',
+  });
+
+  final String currentLabel;
+  final String currentDetail;
+  final String? targetLabel;
+  final String? targetDetail;
+  final String? remainingDistanceLabel;
+  final String? remainingDurationLabel;
+  final Color accentColor;
+  final String targetCaption;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => showModalBottomSheet<void>(
+          context: context,
+          backgroundColor: Colors.transparent,
+          isScrollControlled: true,
+          builder: (context) => SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: IconButton.styleFrom(
+                        backgroundColor: const Color(0xE6121214),
+                        foregroundColor: const Color(0xFFFFF4EC),
+                      ),
+                      icon: const Icon(Icons.close_rounded, size: 18),
+                    ),
+                  ),
+                  MapNavigationBanner(
+                    currentLabel: currentLabel,
+                    currentDetail: currentDetail,
+                    targetLabel: targetLabel,
+                    targetDetail: targetDetail,
+                    remainingDistanceLabel: remainingDistanceLabel,
+                    remainingDurationLabel: remainingDurationLabel,
+                    accentColor: accentColor,
+                    targetCaption: targetCaption,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xEE121214),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0x33FFFFFF)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x22000000),
+                blurRadius: 16,
+                offset: Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: accentColor.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.explore_rounded,
+                  size: 18,
+                  color: accentColor,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Detalles del mapa',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFFFFF4EC),
+                    ),
+                  ),
+                  Text(
+                    'Ver calle, destino y distancia',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFFFFD8BF),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _MapLine extends StatelessWidget {
   const _MapLine({
     required this.icon,

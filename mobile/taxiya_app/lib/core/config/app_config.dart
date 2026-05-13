@@ -12,19 +12,19 @@ class AppConfig {
   static const websocketScheme = String.fromEnvironment('WEBSOCKET_SCHEME', defaultValue: '');
   static const mapTilesUrlTemplate = String.fromEnvironment(
     'MAP_TILES_URL_TEMPLATE',
-    defaultValue: 'https://taxis.cybernovatech.space/tiles/styles/flashgo-navigation/512/{z}/{x}/{y}.png',
+    defaultValue: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
   );
   static const mapTilesAttribution = String.fromEnvironment(
     'MAP_TILES_ATTRIBUTION',
-    defaultValue: 'Flash Go Tiles',
+    defaultValue: '© OpenStreetMap contributors',
   );
   static const mapOfflineTilesUrlTemplate = String.fromEnvironment(
     'MAP_OFFLINE_TILES_URL_TEMPLATE',
-    defaultValue: 'https://taxis.cybernovatech.space/tiles/styles/flashgo-navigation/512/{z}/{x}/{y}.png',
+    defaultValue: '',
   );
   static const mapOfflineTilesAttribution = String.fromEnvironment(
     'MAP_OFFLINE_TILES_ATTRIBUTION',
-    defaultValue: 'Flash Go Tiles',
+    defaultValue: '',
   );
   static const _mapRoutingUrlBase = String.fromEnvironment(
     'MAP_ROUTING_URL_BASE',
@@ -96,6 +96,9 @@ class AppConfig {
   static bool get hasDedicatedOfflineTileSource => effectiveOfflineTilesUrlTemplate.isNotEmpty;
   static bool get shouldUseOpenStreetMapFallbackLayer =>
       effectiveOfflineTilesUrlTemplate.isNotEmpty && usesDefaultOpenStreetMapTiles;
+  static int get mapTileDimension =>
+      effectiveMapTilesUrlTemplate.contains('/512/') ? 512 : 256;
+  static double get mapTileZoomOffset => mapTileDimension > 256 ? -1.0 : 0.0;
   static String get mapRoutingUrlBase {
     final explicit = _mapRoutingUrlBase.trim();
     if (explicit.isNotEmpty) {

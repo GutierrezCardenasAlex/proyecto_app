@@ -5,7 +5,7 @@ import './App.css'
 
 const cityCenter: [number, number] = [-19.5836, -65.7531]
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api'
-const wsBase = import.meta.env.VITE_WS_URL ?? 'http://localhost:3008'
+const wsBase = import.meta.env.VITE_WS_URL ?? window.location.origin
 
 const driverIcon = new L.DivIcon({
   className: 'driver-pin',
@@ -663,7 +663,10 @@ function App() {
       setError('No se pudo cargar la central.')
     })
 
-    const socket = io(wsBase, { transports: ['websocket'] })
+    const socket = io(wsBase, {
+      path: '/socket.io',
+      transports: ['websocket', 'polling'],
+    })
     socket.emit('join:admin')
     socket.on('driver:location', (payload: { driverId: string; lat: string; lng: string; updatedAt: string }) => {
       setDrivers((current) =>

@@ -579,9 +579,9 @@ class _DriverMapState extends ConsumerState<DriverMap> {
           child: OfflineMapReadyBadge(),
         ),
         Positioned(
-          left: 16,
-          top: 16,
-          child: MapNavigationBanner(
+          right: 16,
+          bottom: 16,
+          child: MapNavigationTriggerButton(
             currentLabel: _currentLocationDetails?.primary ?? 'Ubicacion actual',
             currentDetail: _currentLocationDetails?.secondary ?? 'Buscando calle...',
             targetLabel: routePoint != null
