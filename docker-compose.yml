@@ -213,7 +213,7 @@ services:
       - "${TILES_PORT:-8082}:8080"
     volumes:
       - ${TILES_DATA_PATH:-./infra/tiles}:/data
-    command: ["--verbose"]
+    command: ["--verbose", "/data/config.json"]
 
   nginx:
     image: nginx:1.27-alpine
