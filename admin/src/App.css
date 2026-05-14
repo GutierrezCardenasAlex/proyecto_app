@@ -40,6 +40,10 @@ body {
   width: min(980px, 100%);
 }
 
+.executive-auth-stats {
+  margin-top: 18px;
+}
+
 .eyebrow {
   margin: 0 0 12px;
   text-transform: uppercase;
@@ -59,10 +63,34 @@ body {
   color: #ffcfaa;
 }
 
+.success-box {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(34, 197, 94, 0.14);
+  border: 1px solid rgba(34, 197, 94, 0.28);
+  color: #dcfce7;
+  font-weight: 700;
+}
+
 .stats {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+}
+
+.executive-strip {
+  margin-bottom: 24px;
+}
+
+.executive-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.executive-mini-card strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 1.5rem;
+  color: #fff4ec;
 }
 
 .stats article,

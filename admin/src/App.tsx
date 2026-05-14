@@ -107,6 +107,7 @@ type DeviceRow = {
 type AdminProfile = {
   id: string
   phone: string
+  username?: string
   fullName?: string
 }
 
@@ -114,6 +115,11 @@ type AdminOtpRequestResponse = {
   message?: string
   smsDelivered?: boolean
   otp?: string
+}
+
+type AdminLoginResponse = {
+  message?: string
+  admin: AdminProfile
 }
 
 type UserSummary = {
@@ -240,9 +246,12 @@ function App() {
   const [supportRoleFilter, setSupportRoleFilter] = useState<'all' | 'passenger' | 'driver'>('all')
   const [supportStatusFilter, setSupportStatusFilter] = useState<'all' | 'ABIERTO' | 'CERRADO'>('all')
   const [supportSearch, setSupportSearch] = useState('')
+  const [username, setUsername] = useState('centralflashgo')
+  const [password, setPassword] = useState('FlashGo2026')
   const [phone, setPhone] = useState('+59170000001')
   const [selectedDriverTrips, setSelectedDriverTrips] = useState<DriverTripsResponse | null>(null)
   const [otp, setOtp] = useState('123456')
+  const [credentialsVerified, setCredentialsVerified] = useState(false)
   const [otpRequested, setOtpRequested] = useState(false)
   const [otpFallback, setOtpFallback] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -261,6 +270,26 @@ function App() {
 
   const isAuthenticated = token.length > 0
   const topDriver = driverPerformance.rows[0] ?? null
+  const executiveSignals = useMemo(
+    () => [
+      {
+        label: 'Flota disponible',
+        value: `${drivers.filter((driver) => driver.is_available).length}/${Math.max(drivers.length, 1)}`,
+        tone: 'success',
+      },
+      {
+        label: 'Soporte abierto',
+        value: `${supportReports.filter((report) => report.status === 'ABIERTO').length}`,
+        tone: 'warning',
+      },
+      {
+        label: 'Equipos pendientes',
+        value: `${pendingDevices.length + pendingDrivers.length}`,
+        tone: pendingDevices.length + pendingDrivers.length > 0 ? 'danger' : 'success',
+      },
+    ],
+    [drivers, supportReports, pendingDevices.length, pendingDrivers.length],
+  )
   const supportSummary = useMemo(
     () => ({
       open: supportReports.filter((report) => report.status === 'ABIERTO').length,
@@ -297,6 +326,7 @@ function App() {
       localStorage.removeItem('admin_profile')
       setToken('')
       setAdminProfile(null)
+      setCredentialsVerified(false)
       setOtpRequested(false)
       throw new Error('Tu sesion de central vencio o ya no es valida. Vuelve a ingresar.')
     }
@@ -341,6 +371,10 @@ function App() {
   }
 
   async function requestOtp() {
+    if (!credentialsVerified) {
+      setError('Primero valida el usuario y la contrasena de la central.')
+      return
+    }
     setLoading(true)
     setError(null)
     try {
@@ -365,6 +399,29 @@ function App() {
     }
   }
 
+  async function loginAdminCredentials() {
+    setLoading(true)
+    setError(null)
+    try {
+      const payload = await fetchWithAdminAuth<AdminLoginResponse>(`${apiBase}/auth/admin/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      })
+
+      setCredentialsVerified(true)
+      setAdminProfile(payload.admin)
+      setPhone(payload.admin.phone || phone)
+      setOtpRequested(false)
+      setOtpFallback(null)
+    } catch (loginError) {
+      setCredentialsVerified(false)
+      setError(loginError instanceof Error ? loginError.message : 'No se pudieron validar las credenciales de central')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function verifyOtp() {
     setLoading(true)
     setError(null)
@@ -379,6 +436,7 @@ function App() {
       localStorage.setItem('admin_profile', JSON.stringify(payload.admin))
       setToken(payload.token)
       setAdminProfile(payload.admin)
+      setCredentialsVerified(true)
       setOtpRequested(false)
       setOtpFallback(null)
     } catch (verifyError) {
@@ -393,6 +451,7 @@ function App() {
     localStorage.removeItem('admin_profile')
     setToken('')
     setAdminProfile(null)
+    setCredentialsVerified(false)
     setOtpRequested(false)
     setOtpFallback(null)
     setPendingDrivers([])
@@ -777,18 +836,38 @@ function App() {
         <section className="hero-panel auth-card">
           <div>
             <p className="eyebrow">Central Flash Go</p>
-            <h1>Autoriza dispositivos y controla accesos desde oficina.</h1>
+            <h1>Centro ejecutivo de operacion, autorizacion y monitoreo institucional.</h1>
             <p className="subtitle">
-              Solo la central puede liberar un nuevo telefono para pasajero o conductor.
+              Ingresa con tu usuario y contrasena de central. Luego valida con el numero institucional para abrir el dashboard ejecutivo.
             </p>
+            <div className="stats executive-auth-stats">
+              <article className="stat-card">
+                <strong>Acceso institucional</strong>
+                <span>Usuario, contrasena y OTP de la central</span>
+              </article>
+              <article className="stat-card">
+                <strong>Control total</strong>
+                <span>Flota, soporte, dispositivos y promociones</span>
+              </article>
+            </div>
           </div>
           <div className="auth-form">
             <label>
-              <span>Numero de la central</span>
-              <input value={phone} onChange={(event) => setPhone(event.target.value)} />
+              <span>Usuario ejecutivo</span>
+              <input value={username} onChange={(event) => setUsername(event.target.value)} />
             </label>
 
-            {otpRequested && (
+            <label>
+              <span>Contrasena</span>
+              <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+            </label>
+
+            <label>
+              <span>Numero institucional</span>
+              <input value={phone} onChange={(event) => setPhone(event.target.value)} disabled={!credentialsVerified} />
+            </label>
+
+            {credentialsVerified && otpRequested && (
               <label>
                 <span>OTP</span>
                 <input value={otp} onChange={(event) => setOtp(event.target.value)} />
@@ -797,11 +876,33 @@ function App() {
 
             {otpFallback && <div className="error-box">OTP de respaldo para central: {otpFallback}</div>}
 
-            <button className="primary-button" disabled={loading} onClick={otpRequested ? verifyOtp : requestOtp}>
-              {loading ? 'Procesando...' : otpRequested ? 'Ingresar a central' : 'Solicitar OTP'}
+            <button
+              className="primary-button"
+              disabled={loading}
+              onClick={
+                !credentialsVerified
+                  ? loginAdminCredentials
+                  : otpRequested
+                    ? verifyOtp
+                    : requestOtp
+              }
+            >
+              {loading
+                ? 'Procesando...'
+                : !credentialsVerified
+                  ? 'Validar credenciales'
+                  : otpRequested
+                    ? 'Ingresar a central'
+                    : 'Solicitar OTP institucional'}
             </button>
 
-            {otpRequested && (
+            {credentialsVerified && !otpRequested && (
+              <div className="success-box">
+                Credenciales validadas. Ahora solicita el OTP del numero institucional para ingresar.
+              </div>
+            )}
+
+            {credentialsVerified && otpRequested && (
               <button className="secondary-button" disabled={loading} onClick={requestOtp}>
                 Reenviar OTP
               </button>
@@ -841,6 +942,21 @@ function App() {
             <span>Pendientes central</span>
             <strong>{dashboard.pendingDevices + pendingDrivers.length}</strong>
           </article>
+        </div>
+      </section>
+
+      <section className="panel executive-strip">
+        <div className="panel-header">
+          <h2>Resumen ejecutivo</h2>
+          <span>{adminProfile?.fullName || adminProfile?.username || 'Central activa'}</span>
+        </div>
+        <div className="mini-stats-grid executive-grid">
+          {executiveSignals.map((signal) => (
+            <article key={signal.label} className="mini-stat-card executive-mini-card">
+              <span className={`status-pill ${signal.tone}`}>{signal.label}</span>
+              <strong>{signal.value}</strong>
+            </article>
+          ))}
         </div>
       </section>
 

@@ -241,8 +241,10 @@ class DriverRepository {
 }
 
 class DriverStateController extends Notifier<DriverState> {
+  static const _availabilityHeartbeatInterval = Duration(seconds: 18);
   late final DriverRepository _repository;
   StreamSubscription<Position>? _positionSubscription;
+  Timer? _availabilityHeartbeatTimer;
   bool _isSendingTrackedLocation = false;
   Position? _queuedTrackedPosition;
 
@@ -251,6 +253,7 @@ class DriverStateController extends Notifier<DriverState> {
     _repository = ref.watch(driverRepositoryProvider);
     ref.onDispose(() {
       _positionSubscription?.cancel();
+      _availabilityHeartbeatTimer?.cancel();
     });
     return const DriverState(
       available: false,
@@ -304,8 +307,10 @@ class DriverStateController extends Notifier<DriverState> {
       if (available) {
         await _sendLocation();
         await _startTrackedLocationUpdates();
+        _startAvailabilityHeartbeat();
       } else {
         await _stopTrackedLocationUpdates();
+        _stopAvailabilityHeartbeat();
       }
 
       await _repository.persistDesiredAvailability(available);
@@ -377,8 +382,10 @@ class DriverStateController extends Notifier<DriverState> {
       if (shouldBeAvailable) {
         await _sendLocation();
         await _startTrackedLocationUpdates();
+        _startAvailabilityHeartbeat();
       } else {
         await _stopTrackedLocationUpdates();
+        _stopAvailabilityHeartbeat();
       }
     } catch (error) {
       state = state.copyWith(errorMessage: error.toString().replaceFirst('Exception: ', ''));
@@ -442,6 +449,31 @@ class DriverStateController extends Notifier<DriverState> {
     _positionSubscription = null;
     _queuedTrackedPosition = null;
     _isSendingTrackedLocation = false;
+  }
+
+  void _startAvailabilityHeartbeat() {
+    _availabilityHeartbeatTimer?.cancel();
+    _availabilityHeartbeatTimer = Timer.periodic(
+      _availabilityHeartbeatInterval,
+      (_) => unawaited(_sendAvailabilityHeartbeat()),
+    );
+  }
+
+  void _stopAvailabilityHeartbeat() {
+    _availabilityHeartbeatTimer?.cancel();
+    _availabilityHeartbeatTimer = null;
+  }
+
+  Future<void> _sendAvailabilityHeartbeat() async {
+    final session = ref.read(driverSessionProvider);
+    if (!session.loggedIn || session.token.isEmpty || !state.available) {
+      return;
+    }
+    try {
+      await _sendLocation();
+    } catch (_) {
+      // Keep background heartbeat resilient; the live stream will retry again.
+    }
   }
 
   Future<void> _handleTrackedPosition(Position position) async {

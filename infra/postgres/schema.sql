@@ -41,12 +41,14 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS admin_accounts (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  phone VARCHAR(32) UNIQUE NOT NULL,
-  full_name VARCHAR(120),
-  otp_code VARCHAR(8),
-  otp_expires_at TIMESTAMPTZ,
+  CREATE TABLE IF NOT EXISTS admin_accounts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    phone VARCHAR(32) UNIQUE NOT NULL,
+    username VARCHAR(80) UNIQUE,
+    password_hash TEXT,
+    full_name VARCHAR(120),
+    otp_code VARCHAR(8),
+    otp_expires_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

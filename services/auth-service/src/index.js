@@ -16,6 +16,12 @@ const phoneRegex = /^\+591\d{8}$/;
 const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
 const smsProvider = (process.env.SMS_PROVIDER || "").toLowerCase();
 const exposeOtpInResponse = String(process.env.AUTH_EXPOSE_OTP || "true").toLowerCase() === "true";
+const defaultAdminPhone = process.env.ADMIN_DEFAULT_PHONE || "+59170000001";
+const defaultAdminUsername = (process.env.ADMIN_DEFAULT_USERNAME || "centralflashgo").trim().toLowerCase();
+const defaultAdminPasswordHash =
+  process.env.ADMIN_DEFAULT_PASSWORD_HASH ||
+  "$2b$10$c17Q4cIl8rCYLsBdgwrNP.u.w7RFGViG6Zcmgvfy/dRsYu3fVMDna";
+const defaultAdminFullName = process.env.ADMIN_DEFAULT_FULL_NAME || "Central Flash Go";
 
 const registerRequestSchema = z.object({
   phone: z.string().min(8),
@@ -68,6 +74,11 @@ const adminRequestOtpSchema = z.object({
 const adminVerifyOtpSchema = z.object({
   phone: z.string().min(8),
   otp: z.string().length(6)
+});
+
+const adminLoginSchema = z.object({
+  username: z.string().min(3),
+  password: z.string().min(8)
 });
 
 function normalizePhone(rawPhone) {
@@ -189,6 +200,8 @@ async function ensureSchema() {
     CREATE TABLE IF NOT EXISTS admin_accounts (
       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
       phone VARCHAR(32) UNIQUE NOT NULL,
+      username VARCHAR(80) UNIQUE,
+      password_hash TEXT,
       full_name VARCHAR(120),
       otp_code VARCHAR(8),
       otp_expires_at TIMESTAMPTZ,
@@ -196,6 +209,23 @@ async function ensureSchema() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+
+  await pool.query(`
+    ALTER TABLE admin_accounts
+      ADD COLUMN IF NOT EXISTS username VARCHAR(80),
+      ADD COLUMN IF NOT EXISTS password_hash TEXT
+  `);
+
+  await pool.query(
+    `INSERT INTO admin_accounts (phone, username, password_hash, full_name)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (phone)
+     DO UPDATE SET username = EXCLUDED.username,
+                   password_hash = EXCLUDED.password_hash,
+                   full_name = EXCLUDED.full_name,
+                   updated_at = NOW()`,
+    [defaultAdminPhone, defaultAdminUsername, defaultAdminPasswordHash, defaultAdminFullName]
+  );
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_devices (
@@ -752,6 +782,42 @@ async function bootstrap() {
       smsDelivered,
       otp: exposeOtpInResponse && !smsDelivered ? otp : undefined,
       expiresAt
+    });
+  });
+
+  app.post("/admin/login", async (request, reply) => {
+    const parsed = adminLoginSchema.parse(request.body);
+    const username = parsed.username.trim().toLowerCase();
+
+    const adminResult = await pool.query(
+      `SELECT id, phone, username, full_name, password_hash
+       FROM admin_accounts
+       WHERE LOWER(username) = $1`,
+      [username]
+    );
+
+    if (!adminResult.rows.length) {
+      return reply.code(404).send({ message: "Usuario administrativo no encontrado." });
+    }
+
+    const adminAccount = adminResult.rows[0];
+    if (!adminAccount.password_hash) {
+      return reply.code(400).send({ message: "La cuenta administrativa aun no tiene contrasena configurada." });
+    }
+
+    const passwordValid = await bcrypt.compare(parsed.password, adminAccount.password_hash);
+    if (!passwordValid) {
+      return reply.code(401).send({ message: "Contrasena incorrecta." });
+    }
+
+    reply.send({
+      message: "Credenciales validadas",
+      admin: {
+        id: adminAccount.id,
+        phone: adminAccount.phone,
+        username: adminAccount.username,
+        fullName: adminAccount.full_name
+      }
     });
   });
 

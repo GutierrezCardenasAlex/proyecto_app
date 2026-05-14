@@ -37,10 +37,7 @@ class DriverHomePage extends ConsumerStatefulWidget {
 
 class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBindingObserver {
   static const String _backgroundNoticeSeenKey = 'flashgo_driver_background_notice_seen';
-  static const _inactivityDuration = Duration(minutes: 5);
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  Timer? _inactivityTimer;
-  DateTime _lastInteractionAt = DateTime.now();
   io.Socket? _socket;
   String? _joinedDriverId;
   String? _joinedTripId;
@@ -248,7 +245,6 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _socket?.dispose();
-    _inactivityTimer?.cancel();
     _sessionRefreshTimer?.cancel();
     super.dispose();
   }
@@ -329,29 +325,25 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
       ),
     ];
 
-    return Listener(
-      behavior: HitTestBehavior.translucent,
-      onPointerDown: (_) => _markInteraction(),
-      child: Scaffold(
-        key: _scaffoldKey,
-        drawer: DriverAppDrawer(
-          fullName: session.fullName,
-          phone: session.phone,
-          token: session.token,
-          activeItem: _activeDrawerItem,
-          onSelect: _handleDrawerSelection,
-          onLogout: () => ref.read(driverSessionProvider.notifier).logout(),
-          onOpenProfile: () {
-            Navigator.pop(context);
-            _openPage(const DriverProfilePage(), drawerItem: 'Configuraciones');
-          },
-        ),
-        backgroundColor: const Color(0xFF111214),
-        extendBody: true,
-        body: IndexedStack(
-          index: _selectedIndex,
-          children: pages,
-        ),
+    return Scaffold(
+      key: _scaffoldKey,
+      drawer: DriverAppDrawer(
+        fullName: session.fullName,
+        phone: session.phone,
+        token: session.token,
+        activeItem: _activeDrawerItem,
+        onSelect: _handleDrawerSelection,
+        onLogout: () => ref.read(driverSessionProvider.notifier).logout(),
+        onOpenProfile: () {
+          Navigator.pop(context);
+          _openPage(const DriverProfilePage(), drawerItem: 'Configuraciones');
+        },
+      ),
+      backgroundColor: const Color(0xFF111214),
+      extendBody: true,
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: pages,
       ),
     );
   }
@@ -360,7 +352,6 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _armInactivityTimer();
     _sessionRefreshTimer = Timer.periodic(
       const Duration(seconds: 12),
       (_) => Future<void>.microtask(_refreshDriverAccessState),
@@ -520,35 +511,9 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
     await prefs.setBool(_backgroundNoticeSeenKey, true);
   }
 
-  void _armInactivityTimer() {
-    _inactivityTimer?.cancel();
-    _inactivityTimer = Timer(_inactivityDuration, _handleInactivityTimeout);
-  }
-
-  void _markInteraction() {
-    _lastInteractionAt = DateTime.now();
-    _armInactivityTimer();
-  }
-
-  Future<void> _handleInactivityTimeout() async {
-    final session = ref.read(driverSessionProvider);
-    if (!session.loggedIn) {
-      return;
-    }
-    final driverState = ref.read(driverStateProvider);
-    if (driverState.available) {
-      await ref.read(driverStateProvider.notifier).toggleAvailability(false);
-    }
-  }
-
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      if (DateTime.now().difference(_lastInteractionAt) >= _inactivityDuration) {
-        Future<void>.microtask(_handleInactivityTimeout);
-        return;
-      }
-      _markInteraction();
       Future<void>.microtask(_restoreDriverOperationalState);
     }
   }
@@ -573,13 +538,6 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
     _isRefreshingAuthorization = true;
     try {
       await ref.read(driverSessionProvider.notifier).refreshAccessStatus();
-      final updatedSession = ref.read(driverSessionProvider);
-      if (updatedSession.accessStatus != 'AUTORIZADO') {
-        final driverState = ref.read(driverStateProvider);
-        if (driverState.available) {
-          await ref.read(driverStateProvider.notifier).toggleAvailability(false);
-        }
-      }
     } finally {
       _isRefreshingAuthorization = false;
     }
@@ -589,10 +547,6 @@ class _DriverHomePageState extends ConsumerState<DriverHomePage> with WidgetsBin
     await ref.read(driverSessionProvider.notifier).refreshSessionStatus();
     final updatedSession = ref.read(driverSessionProvider);
     if (updatedSession.deviceStatus != 'AUTORIZADO') {
-      final driverState = ref.read(driverStateProvider);
-      if (driverState.available) {
-        await ref.read(driverStateProvider.notifier).toggleAvailability(false);
-      }
       return;
     }
     await _refreshAuthorizationStatus();
@@ -1236,6 +1190,20 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
       'completed' => 'Finalizado',
       _ => 'Activo',
     };
+  }
+
+  String _lastPingLabel(DateTime? lastPing) {
+    if (lastPing == null) {
+      return 'Aun estamos preparando el primer ping GPS.';
+    }
+    final elapsed = DateTime.now().difference(lastPing);
+    if (elapsed.inSeconds < 20) {
+      return 'Ultimo ping hace unos segundos.';
+    }
+    if (elapsed.inMinutes < 1) {
+      return 'Ultimo ping hace ${elapsed.inSeconds}s.';
+    }
+    return 'Ultimo ping hace ${elapsed.inMinutes} min.';
   }
 
   bool _hasPendingOffer(DriverTrip? trip) {
@@ -2153,6 +2121,74 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard> {
                       style: TextStyle(fontWeight: FontWeight.w800),
                     ),
                     subtitle: const Text('Envia tu GPS cada 5 segundos y permite recibir viajes.'),
+                  ),
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: driverState.available
+                          ? const Color(0xFF102015)
+                          : const Color(0xFF191A1E),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: driverState.available
+                            ? const Color(0x5522C55E)
+                            : const Color(0x33FFFFFF),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: driverState.available
+                                ? const Color(0x3322C55E)
+                                : const Color(0x22FFFFFF),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Icon(
+                            driverState.available
+                                ? Icons.cloud_done_rounded
+                                : Icons.pause_circle_outline_rounded,
+                            color: driverState.available
+                                ? const Color(0xFF22C55E)
+                                : const Color(0xFFFFD8BF),
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                driverState.available
+                                    ? 'Disponible en segundo plano'
+                                    : 'Disponibilidad manual',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                driverState.available
+                                    ? 'Seguimos enviando tu ubicacion aunque bloquees la pantalla. ${_lastPingLabel(driverState.lastLocationPing)}'
+                                    : 'Tu disponibilidad solo cambia cuando la desactivas manualmente.',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFFFFD8BF),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   Wrap(
                     spacing: 10,
