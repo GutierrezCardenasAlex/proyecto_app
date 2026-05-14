@@ -13,9 +13,79 @@ body {
   color: #fff4ec;
 }
 
+.dashboard-shell {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.dashboard-main {
+  min-width: 0;
+}
+
+.dashboard-gap {
+  margin-bottom: 24px;
+}
+
 .auth-layout {
   display: grid;
   place-items: center;
+}
+
+.nav-shell {
+  position: sticky;
+  top: 24px;
+  display: grid;
+  gap: 22px;
+  padding: 24px;
+}
+
+.nav-brand h2 {
+  margin: 0;
+}
+
+.nav-brand p:last-child {
+  margin: 8px 0 0;
+  color: #ffcfaa;
+}
+
+.nav-menu {
+  display: grid;
+  gap: 10px;
+}
+
+.nav-item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid rgba(249, 115, 22, 0.12);
+  background: rgba(255, 255, 255, 0.02);
+  color: #fff4ec;
+  border-radius: 20px;
+  padding: 14px 16px;
+  cursor: pointer;
+}
+
+.nav-item strong,
+.nav-item span {
+  display: block;
+}
+
+.nav-item span {
+  margin-top: 6px;
+  color: #ffcfaa;
+  font-size: 0.8rem;
+}
+
+.nav-item.active {
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.28), rgba(194, 65, 12, 0.18));
+  border-color: rgba(251, 146, 60, 0.4);
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.18);
+}
+
+.nav-footer {
+  display: grid;
+  gap: 10px;
 }
 
 .hero-panel,
@@ -34,6 +104,10 @@ body {
   grid-template-columns: 1.3fr 1fr;
   padding: 28px;
   margin-bottom: 24px;
+}
+
+.dashboard-hero {
+  margin-bottom: 20px;
 }
 
 .auth-card {
@@ -117,6 +191,24 @@ body {
   display: grid;
   grid-template-columns: 1fr;
   gap: 24px;
+}
+
+.double-grid,
+.triple-grid {
+  display: grid;
+  gap: 24px;
+}
+
+.double-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.triple-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.compact-panel {
+  min-height: 100%;
 }
 
 .map-section {
@@ -317,6 +409,31 @@ body {
   gap: 12px;
   max-height: 34vh;
   overflow: auto;
+}
+
+.directory-list,
+.activity-list {
+  max-height: none;
+}
+
+.activity-list {
+  display: grid;
+  gap: 12px;
+}
+
+.activity-card {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border-radius: 20px;
+  background: #111216;
+  border: 1px solid rgba(249, 115, 22, 0.08);
+}
+
+.activity-card p,
+.activity-card small {
+  margin: 0;
+  color: #ffcfaa;
 }
 
 .stack-card {
@@ -756,8 +873,18 @@ body {
     padding: 16px;
   }
 
+  .dashboard-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .nav-shell {
+    position: static;
+  }
+
   .hero-panel,
-  .content-grid {
+  .content-grid,
+  .double-grid,
+  .triple-grid {
     grid-template-columns: 1fr;
   }
 

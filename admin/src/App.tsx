@@ -72,7 +72,7 @@ type SupportReport = {
 }
 
 type NotificationKind = 'nuevo' | 'importante' | 'sistema'
-type AdminView = 'overview' | 'stats' | 'support' | 'devices'
+type AdminView = 'overview' | 'map' | 'users' | 'activity' | 'stats' | 'support' | 'devices'
 
 type PendingDriverAccessRow = {
   id: string
@@ -99,6 +99,7 @@ type DeviceRow = {
   platform?: string | null
   status: 'PENDIENTE' | 'AUTORIZADO' | 'RECHAZADO'
   created_at: string
+  updated_at?: string | null
   approved_at?: string | null
   approved_by_name?: string | null
   last_login_at?: string | null
@@ -191,6 +192,31 @@ type DriverTripsResponse = {
   trips: DriverTripHistoryItem[]
 }
 
+const viewLabels: Record<AdminView, string> = {
+  overview: 'Inicio',
+  map: 'Mapa',
+  users: 'Usuarios',
+  activity: 'Actividad',
+  stats: 'Estadisticas',
+  support: 'Soporte',
+  devices: 'Dispositivos',
+}
+
+function normalizeView(raw: string | null | undefined): AdminView {
+  const value = (raw ?? '').replace(/^#\/?/, '').trim().toLowerCase()
+  switch (value) {
+    case 'map':
+    case 'users':
+    case 'activity':
+    case 'stats':
+    case 'support':
+    case 'devices':
+      return value
+    default:
+      return 'overview'
+  }
+}
+
 function App() {
   const mapRef = useRef<HTMLDivElement | null>(null)
   const mapCardRef = useRef<HTMLDivElement | null>(null)
@@ -242,7 +268,9 @@ function App() {
   const [notificationKind, setNotificationKind] = useState<NotificationKind>('nuevo')
   const [notificationTitle, setNotificationTitle] = useState('')
   const [notificationMessage, setNotificationMessage] = useState('')
-  const [activeView, setActiveView] = useState<AdminView>('overview')
+  const [activeView, setActiveView] = useState<AdminView>(() =>
+    typeof window === 'undefined' ? 'overview' : normalizeView(window.location.hash),
+  )
   const [supportRoleFilter, setSupportRoleFilter] = useState<'all' | 'passenger' | 'driver'>('all')
   const [supportStatusFilter, setSupportStatusFilter] = useState<'all' | 'ABIERTO' | 'CERRADO'>('all')
   const [supportSearch, setSupportSearch] = useState('')
@@ -290,6 +318,76 @@ function App() {
     ],
     [drivers, supportReports, pendingDevices.length, pendingDrivers.length],
   )
+  const userDirectory = useMemo(() => {
+    const map = new Map<string, UserSummary & { role?: string; full_name?: string | null; phone: string }>()
+
+    allDevices.forEach((device) => {
+      if (!map.has(device.user_id)) {
+        map.set(device.user_id, {
+          user_id: device.user_id,
+          phone: device.phone,
+          full_name: device.full_name,
+          role: device.role,
+        })
+      }
+    })
+
+    pendingDrivers.forEach((driver) => {
+      if (!map.has(driver.user_id)) {
+        map.set(driver.user_id, {
+          user_id: driver.user_id,
+          phone: driver.phone,
+          full_name: driver.full_name,
+          role: 'driver',
+        })
+      }
+    })
+
+    supportReports.forEach((report) => {
+      if (!map.has(report.user_id)) {
+        map.set(report.user_id, {
+          user_id: report.user_id,
+          phone: report.phone,
+          full_name: report.full_name,
+          role: report.role,
+        })
+      }
+    })
+
+    return Array.from(map.values()).sort((a, b) => (a.full_name || a.phone).localeCompare(b.full_name || b.phone))
+  }, [allDevices, pendingDrivers, supportReports])
+  const activityFeed = useMemo(() => {
+    const tripEvents = trips.map((trip) => ({
+      id: `trip-${trip.id}`,
+      title: `Viaje ${trip.id.slice(0, 8)}`,
+      detail: trip.driver_id ? 'Asignado a conductor' : 'Pendiente de asignacion',
+      meta: trip.status,
+      createdAt: new Date().toISOString(),
+      tone: trip.driver_id ? 'success' : 'warning',
+    }))
+
+    const supportEvents = supportReports.slice(0, 8).map((report) => ({
+      id: `support-${report.id}`,
+      title: report.full_name || report.phone,
+      detail: report.message,
+      meta: `Soporte · ${report.category}`,
+      createdAt: report.created_at,
+      tone: report.status === 'ABIERTO' ? 'warning' : 'success',
+    }))
+
+    const deviceEvents = pendingDevices.slice(0, 8).map((device) => ({
+      id: `device-${device.id}`,
+      title: device.full_name || device.phone,
+      detail: `${device.device_name || 'Equipo desconocido'} · ${device.platform || 'sin plataforma'}`,
+      meta: `Dispositivo ${device.status}`,
+      createdAt: device.updated_at ?? device.created_at,
+      tone: device.status === 'PENDIENTE' ? 'warning' : device.status === 'AUTORIZADO' ? 'success' : 'danger',
+    }))
+
+    return [...tripEvents, ...supportEvents, ...deviceEvents]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 18)
+  }, [trips, supportReports, pendingDevices])
   const supportSummary = useMemo(
     () => ({
       open: supportReports.filter((report) => report.status === 'ABIERTO').length,
@@ -443,6 +541,13 @@ function App() {
       setError(verifyError instanceof Error ? verifyError.message : 'No se pudo validar OTP')
     } finally {
       setLoading(false)
+    }
+  }
+
+  function changeView(view: AdminView) {
+    setActiveView(view)
+    if (typeof window !== 'undefined') {
+      window.location.hash = view === 'overview' ? '#/inicio' : `#/${view}`
     }
   }
 
@@ -777,6 +882,21 @@ function App() {
   }, [])
 
   useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    const syncViewFromHash = () => {
+      setActiveView(normalizeView(window.location.hash))
+    }
+
+    window.addEventListener('hashchange', syncViewFromHash)
+    return () => {
+      window.removeEventListener('hashchange', syncViewFromHash)
+    }
+  }, [])
+
+  useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current || !isAuthenticated) {
       return
     }
@@ -915,100 +1035,147 @@ function App() {
     )
   }
 
+  const navigationItems: Array<{ view: AdminView; label: string; hint: string }> = [
+    { view: 'overview', label: 'Inicio', hint: 'Resumen general' },
+    { view: 'map', label: 'Mapa', hint: 'Flota y zonas' },
+    { view: 'users', label: 'Usuarios', hint: 'Pasajeros y choferes' },
+    { view: 'activity', label: 'Actividad', hint: 'Eventos recientes' },
+    { view: 'stats', label: 'Estadisticas', hint: 'Rendimiento y reportes' },
+    { view: 'support', label: 'Soporte', hint: 'Casos y filtros' },
+    { view: 'devices', label: 'Dispositivos', hint: 'Control de accesos' },
+  ]
+
+  const viewDescriptions: Record<AdminView, string> = {
+    overview: 'Vision ejecutiva de la operacion, aprobaciones y pulso comercial en un solo lugar.',
+    map: 'Mapa operativo con lectura rapida de disponibilidad, actividad y cobertura de la flota.',
+    users: 'Directorio operativo para revisar cuentas, numeros, historial y estado por persona.',
+    activity: 'Linea de tiempo centralizada con viajes, equipos y soporte para reaccion inmediata.',
+    stats: 'Lectura por conductor, eficiencia, volumen y top del periodo para decisiones rapidas.',
+    support: 'Mesa de atencion con filtros visibles, estados y contexto claro por reporte.',
+    devices: 'Gobierno de equipos, autorizaciones y reemplazos con trazabilidad por usuario.',
+  }
+
+  const activeViewMetrics: Record<AdminView, Array<{ label: string; value: string }>> = {
+    overview: [
+      { label: 'Flota visible', value: `${drivers.length}` },
+      { label: 'Viajes activos', value: `${dashboard.activeTrips}` },
+      { label: 'Pendientes', value: `${pendingDevices.length + pendingDrivers.length}` },
+      { label: 'Soporte abierto', value: `${supportSummary.open}` },
+    ],
+    map: [
+      { label: 'Disponibles', value: `${drivers.filter((driver) => driver.is_available).length}` },
+      { label: 'En ruta', value: `${drivers.filter((driver) => driver.current_trip_id).length}` },
+      { label: 'Viajes', value: `${trips.length}` },
+      { label: 'Cobertura', value: '15 km' },
+    ],
+    users: [
+      { label: 'Directorio', value: `${userDirectory.length}` },
+      { label: 'Conductores', value: `${userDirectory.filter((user) => user.role === 'driver').length}` },
+      { label: 'Pasajeros', value: `${userDirectory.filter((user) => user.role !== 'driver').length}` },
+      { label: 'Historiales', value: `${userHistory.length}` },
+    ],
+    activity: [
+      { label: 'Eventos', value: `${activityFeed.length}` },
+      { label: 'Soporte abierto', value: `${supportSummary.open}` },
+      { label: 'Equipos pendientes', value: `${pendingDevices.length}` },
+      { label: 'Conductores pendientes', value: `${pendingDrivers.length}` },
+    ],
+    stats: [
+      { label: 'Viajes', value: `${driverPerformance.summary.totalTrips}` },
+      { label: 'Completados', value: `${driverPerformance.summary.completedTrips}` },
+      { label: 'Promo', value: `${driverPerformance.summary.promoTrips}` },
+      { label: 'Choferes activos', value: `${driverPerformance.summary.activeDrivers}` },
+    ],
+    support: [
+      { label: 'Abiertos', value: `${supportSummary.open}` },
+      { label: 'Cerrados', value: `${supportSummary.closed}` },
+      { label: 'Pasajeros', value: `${supportSummary.passengers}` },
+      { label: 'Conductores', value: `${supportSummary.drivers}` },
+    ],
+    devices: [
+      { label: 'Registrados', value: `${allDevices.length}` },
+      { label: 'Pendientes', value: `${pendingDevices.length}` },
+      { label: 'Bloqueados', value: `${allDevices.filter((device) => device.status === 'RECHAZADO').length}` },
+      { label: 'Autorizados', value: `${allDevices.filter((device) => device.status === 'AUTORIZADO').length}` },
+    ],
+  }
+
   return (
-    <main className="layout">
-      <section className="hero-panel">
-        <div>
-          <p className="eyebrow">Central Flash Go / Potosi</p>
-          <h1>Despacho, control de dispositivos y monitoreo operativo en tiempo real.</h1>
-          <p className="subtitle">
-            La central valida nuevos equipos, sigue la flota y mantiene el servicio bajo control.
+    <main className="layout dashboard-shell">
+      <aside className="panel nav-shell">
+        <div className="nav-brand">
+          <p className="eyebrow">Flash Go Executive</p>
+          <h2>Cabina central</h2>
+          <p>
+            {adminProfile?.fullName || adminProfile?.username || 'Central'} · {adminProfile?.phone}
           </p>
         </div>
-        <div className="stats">
-          <article>
-            <span>Conductores</span>
-            <strong>{dashboard.drivers}</strong>
-          </article>
-          <article>
-            <span>Viajes</span>
-            <strong>{dashboard.trips}</strong>
-          </article>
-          <article>
-            <span>Activos</span>
-            <strong>{dashboard.activeTrips}</strong>
-          </article>
-          <article>
-            <span>Pendientes central</span>
-            <strong>{dashboard.pendingDevices + pendingDrivers.length}</strong>
-          </article>
-        </div>
-      </section>
 
-      <section className="panel executive-strip">
-        <div className="panel-header">
-          <h2>Resumen ejecutivo</h2>
-          <span>{adminProfile?.fullName || adminProfile?.username || 'Central activa'}</span>
-        </div>
-        <div className="mini-stats-grid executive-grid">
-          {executiveSignals.map((signal) => (
-            <article key={signal.label} className="mini-stat-card executive-mini-card">
-              <span className={`status-pill ${signal.tone}`}>{signal.label}</span>
-              <strong>{signal.value}</strong>
-            </article>
+        <nav className="nav-menu">
+          {navigationItems.map((item) => (
+            <button
+              key={item.view}
+              className={activeView === item.view ? 'nav-item active' : 'nav-item'}
+              onClick={() => changeView(item.view)}
+            >
+              <strong>{item.label}</strong>
+              <span>{item.hint}</span>
+            </button>
           ))}
-        </div>
-      </section>
+        </nav>
 
-      <section className="toolbar">
-        <div>
-          <strong>{adminProfile?.fullName ?? 'Central'}</strong>
-          <span>
-            {adminProfile?.phone}
-            {lastUpdatedAt ? ` · Actualizado ${lastUpdatedAt}` : ''}
-          </span>
-        </div>
-        <div className="action-row compact">
+        <div className="nav-footer">
           <button
-            className={activeView === 'overview' ? 'filter-chip active' : 'filter-chip'}
-            onClick={() => setActiveView('overview')}
-          >
-            Panel
-          </button>
-          <button
-            className={activeView === 'stats' ? 'filter-chip active' : 'filter-chip'}
-            onClick={() => setActiveView('stats')}
-          >
-            Estadisticas
-          </button>
-          <button
-            className={activeView === 'support' ? 'filter-chip active' : 'filter-chip'}
-            onClick={() => setActiveView('support')}
-          >
-            Soporte
-          </button>
-          <button
-            className={activeView === 'devices' ? 'filter-chip active' : 'filter-chip'}
-            onClick={() => setActiveView('devices')}
-          >
-            Dispositivos
-          </button>
-          <button
-            className="secondary-button"
+            className="primary-button"
             disabled={loading}
             onClick={() => loadCentralData().catch(() => setError('No se pudo actualizar la central.'))}
           >
-            {loading ? 'Actualizando...' : 'Actualizar ahora'}
+            {loading ? 'Actualizando...' : 'Actualizar central'}
           </button>
           <button className="secondary-button" onClick={logout}>
             Cerrar sesion
           </button>
         </div>
-      </section>
+      </aside>
 
-      {error && <div className="error-box">{error}</div>}
+      <section className="dashboard-main">
+        <section className="hero-panel dashboard-hero">
+          <div>
+            <p className="eyebrow">Central Flash Go / Potosi</p>
+            <h1>{viewLabels[activeView]}</h1>
+            <p className="subtitle">{viewDescriptions[activeView]}</p>
+          </div>
+          <div className="stats">
+            {activeViewMetrics[activeView].map((metric) => (
+              <article key={metric.label}>
+                <span>{metric.label}</span>
+                <strong>{metric.value}</strong>
+              </article>
+            ))}
+          </div>
+        </section>
 
-      {activeView === 'overview' && (
+        <section className="panel executive-strip">
+          <div className="panel-header">
+            <h2>Resumen ejecutivo</h2>
+            <span>
+              {adminProfile?.fullName || adminProfile?.username || 'Central activa'}
+              {lastUpdatedAt ? ` · ${lastUpdatedAt}` : ''}
+            </span>
+          </div>
+          <div className="mini-stats-grid executive-grid">
+            {executiveSignals.map((signal) => (
+              <article key={signal.label} className="mini-stat-card executive-mini-card">
+                <span className={`status-pill ${signal.tone}`}>{signal.label}</span>
+                <strong>{signal.value}</strong>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        {error && <div className="error-box">{error}</div>}
+
+        {(activeView === 'overview' || activeView === 'map') && (
       <section className="map-section">
         <div ref={mapCardRef} className={mapFullscreen ? 'map-card map-card-wide map-card-fullscreen' : 'map-card map-card-wide'}>
           <div className="panel-header">
@@ -1034,6 +1201,164 @@ function App() {
             </div>
           </div>
           <div ref={mapRef} className="map" />
+        </div>
+      </section>
+      )}
+
+      {activeView === 'map' && (
+      <section className="content-grid dashboard-gap">
+        <div className="triple-grid">
+          <article className="panel compact-panel">
+            <div className="panel-header">
+              <h2>Flota visible</h2>
+              <span>{drivers.length} conductores</span>
+            </div>
+            <div className="list">
+              {drivers.slice(0, 8).map((driver) => (
+                <article key={driver.id} className="list-card">
+                  <div>
+                    <strong>Conductor {driver.id.slice(0, 8)}</strong>
+                    <p>{driver.status}</p>
+                  </div>
+                  <span className={driver.is_available ? 'status-pill success subtle' : 'status-pill warning subtle'}>
+                    {driver.is_available ? 'Disponible' : 'No disponible'}
+                  </span>
+                </article>
+              ))}
+            </div>
+          </article>
+
+          <article className="panel compact-panel">
+            <div className="panel-header">
+              <h2>Viajes visibles</h2>
+              <span>{trips.length} en pantalla</span>
+            </div>
+            <div className="list">
+              {trips.slice(0, 8).map((trip) => (
+                <article key={trip.id} className="list-card">
+                  <div>
+                    <strong>{trip.id.slice(0, 8)}</strong>
+                    <p>{trip.status}</p>
+                  </div>
+                  <span>{trip.driver_id ? 'Asignado' : 'Buscando'}</span>
+                </article>
+              ))}
+            </div>
+          </article>
+
+          <article className="panel compact-panel">
+            <div className="panel-header">
+              <h2>Infraestructura</h2>
+              <span>Lectura rapida</span>
+            </div>
+            <div className="mini-stats-grid">
+              <div className="mini-stat-card">
+                <span>Offline</span>
+                <strong>{offlineMapStatus.status}</strong>
+              </div>
+              <div className="mini-stat-card">
+                <span>Fuente</span>
+                <strong>{offlineMapStatus.sourceType}</strong>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+      )}
+
+      {activeView === 'users' && (
+      <section className="content-grid dashboard-gap">
+        <div className="double-grid">
+          <section className="panel">
+            <div className="panel-header">
+              <h2>Directorio operativo</h2>
+              <span>{userDirectory.length} usuarios unificados</span>
+            </div>
+            <div className="list directory-list">
+              {userDirectory.map((user) => (
+                <article key={user.user_id} className="list-card stack-card">
+                  <div>
+                    <strong>{user.full_name || user.phone}</strong>
+                    <p>{user.role || 'passenger'} · {user.phone}</p>
+                  </div>
+                  <div className="action-row compact">
+                    <span className={user.role === 'driver' ? 'status-pill warning subtle' : 'status-pill success subtle'}>
+                      {user.role === 'driver' ? 'Chofer' : 'Pasajero'}
+                    </span>
+                    <button className="secondary-button" onClick={() => loadUserHistory(user)}>
+                      Ver historial
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panel-header">
+              <h2>Control rapido</h2>
+              <span>Acciones pendientes</span>
+            </div>
+            <div className="mini-stats-grid">
+              <div className="mini-stat-card">
+                <span>Conductores por autorizar</span>
+                <strong>{pendingDrivers.length}</strong>
+              </div>
+              <div className="mini-stat-card">
+                <span>Equipos pendientes</span>
+                <strong>{pendingDevices.length}</strong>
+              </div>
+              <div className="mini-stat-card">
+                <span>Reportes vinculados</span>
+                <strong>{supportReports.length}</strong>
+              </div>
+              <div className="mini-stat-card">
+                <span>Dispositivos totales</span>
+                <strong>{allDevices.length}</strong>
+              </div>
+            </div>
+          </section>
+        </div>
+      </section>
+      )}
+
+      {activeView === 'activity' && (
+      <section className="content-grid dashboard-gap">
+        <div className="double-grid">
+          <section className="panel">
+            <div className="panel-header">
+              <h2>Actividad reciente</h2>
+              <span>{activityFeed.length} eventos</span>
+            </div>
+            <div className="activity-list">
+              {activityFeed.map((event) => (
+                <article key={event.id} className="activity-card">
+                  <span className={`status-pill ${event.tone}`}>{event.meta}</span>
+                  <strong>{event.title}</strong>
+                  <p>{event.detail}</p>
+                  <small>{new Date(event.createdAt).toLocaleString('es-BO')}</small>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panel-header">
+              <h2>Movimientos operativos</h2>
+              <span>Lectura instantanea</span>
+            </div>
+            <div className="list">
+              {trips.slice(0, 8).map((trip) => (
+                <article key={trip.id} className="list-card">
+                  <div>
+                    <strong>{trip.id.slice(0, 8)}</strong>
+                    <p>{trip.status}</p>
+                  </div>
+                  <span>{trip.driver_id ? 'Con chofer' : 'Sin chofer'}</span>
+                </article>
+              ))}
+            </div>
+          </section>
         </div>
       </section>
       )}
@@ -1665,6 +1990,7 @@ function App() {
           </div>
         </section>
       )}
+      </section>
     </main>
   )
 }
