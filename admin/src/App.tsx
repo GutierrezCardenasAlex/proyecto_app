@@ -274,6 +274,7 @@ function App() {
   const [supportRoleFilter, setSupportRoleFilter] = useState<'all' | 'passenger' | 'driver'>('all')
   const [supportStatusFilter, setSupportStatusFilter] = useState<'all' | 'ABIERTO' | 'CERRADO'>('all')
   const [supportSearch, setSupportSearch] = useState('')
+  const [adminSearch, setAdminSearch] = useState('')
   const [username, setUsername] = useState('centralflashgo')
   const [password, setPassword] = useState('FlashGo2026')
   const [phone, setPhone] = useState('+59170000001')
@@ -388,6 +389,26 @@ function App() {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 18)
   }, [trips, supportReports, pendingDevices])
+  const filteredUserDirectory = useMemo(() => {
+    const query = adminSearch.trim().toLowerCase()
+    if (!query) {
+      return userDirectory
+    }
+
+    return userDirectory.filter((user) =>
+      `${user.full_name ?? ''} ${user.phone} ${user.role ?? ''}`.toLowerCase().includes(query),
+    )
+  }, [adminSearch, userDirectory])
+  const filteredActivityFeed = useMemo(() => {
+    const query = adminSearch.trim().toLowerCase()
+    if (!query) {
+      return activityFeed
+    }
+
+    return activityFeed.filter((event) =>
+      `${event.title} ${event.detail} ${event.meta}`.toLowerCase().includes(query),
+    )
+  }, [activityFeed, adminSearch])
   const supportSummary = useMemo(
     () => ({
       open: supportReports.filter((report) => report.status === 'ABIERTO').length,
@@ -1069,13 +1090,13 @@ function App() {
       { label: 'Cobertura', value: '15 km' },
     ],
     users: [
-      { label: 'Directorio', value: `${userDirectory.length}` },
-      { label: 'Conductores', value: `${userDirectory.filter((user) => user.role === 'driver').length}` },
-      { label: 'Pasajeros', value: `${userDirectory.filter((user) => user.role !== 'driver').length}` },
+      { label: 'Directorio', value: `${filteredUserDirectory.length}` },
+      { label: 'Conductores', value: `${filteredUserDirectory.filter((user) => user.role === 'driver').length}` },
+      { label: 'Pasajeros', value: `${filteredUserDirectory.filter((user) => user.role !== 'driver').length}` },
       { label: 'Historiales', value: `${userHistory.length}` },
     ],
     activity: [
-      { label: 'Eventos', value: `${activityFeed.length}` },
+      { label: 'Eventos', value: `${filteredActivityFeed.length}` },
       { label: 'Soporte abierto', value: `${supportSummary.open}` },
       { label: 'Equipos pendientes', value: `${pendingDevices.length}` },
       { label: 'Conductores pendientes', value: `${pendingDrivers.length}` },
@@ -1139,6 +1160,30 @@ function App() {
       </aside>
 
       <section className="dashboard-main">
+        <section className="panel dashboard-topbar">
+          <div className="dashboard-topbar-copy">
+            <strong>Centro de mando</strong>
+            <span>Vista ejecutiva para monitoreo, respuesta y control institucional.</span>
+          </div>
+          <div className="dashboard-topbar-actions">
+            <label className="search-shell">
+              <input
+                value={adminSearch}
+                onChange={(event) => setAdminSearch(event.target.value)}
+                placeholder="Buscar conductor, usuario, viaje o evento..."
+              />
+            </label>
+            <span className="status-pill warning">Central en vivo</span>
+            <button
+              className="secondary-button"
+              disabled={loading}
+              onClick={() => loadCentralData().catch(() => setError('No se pudo actualizar la central.'))}
+            >
+              {loading ? 'Actualizando...' : 'Sincronizar'}
+            </button>
+          </div>
+        </section>
+
         <section className="hero-panel dashboard-hero">
           <div>
             <p className="eyebrow">Central Flash Go / Potosi</p>
@@ -1272,10 +1317,10 @@ function App() {
           <section className="panel">
             <div className="panel-header">
               <h2>Directorio operativo</h2>
-              <span>{userDirectory.length} usuarios unificados</span>
+              <span>{filteredUserDirectory.length} usuarios visibles</span>
             </div>
             <div className="list directory-list">
-              {userDirectory.map((user) => (
+              {filteredUserDirectory.map((user) => (
                 <article key={user.user_id} className="list-card stack-card">
                   <div>
                     <strong>{user.full_name || user.phone}</strong>
@@ -1328,10 +1373,10 @@ function App() {
           <section className="panel">
             <div className="panel-header">
               <h2>Actividad reciente</h2>
-              <span>{activityFeed.length} eventos</span>
+              <span>{filteredActivityFeed.length} eventos</span>
             </div>
             <div className="activity-list">
-              {activityFeed.map((event) => (
+              {filteredActivityFeed.map((event) => (
                 <article key={event.id} className="activity-card">
                   <span className={`status-pill ${event.tone}`}>{event.meta}</span>
                   <strong>{event.title}</strong>

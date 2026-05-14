@@ -28,6 +28,56 @@ body {
   margin-bottom: 24px;
 }
 
+.dashboard-topbar {
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, rgba(10, 10, 12, 0.94), rgba(28, 16, 10, 0.92));
+}
+
+.dashboard-topbar-copy strong,
+.dashboard-topbar-copy span {
+  display: block;
+}
+
+.dashboard-topbar-copy span {
+  margin-top: 6px;
+  color: #ffcfaa;
+}
+
+.dashboard-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.search-shell {
+  min-width: min(420px, 100%);
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(249, 115, 22, 0.12);
+}
+
+.search-shell input {
+  width: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: #fff4ec;
+  font: inherit;
+}
+
+.search-shell input::placeholder {
+  color: #ffcfaa;
+}
+
 .auth-layout {
   display: grid;
   place-items: center;
@@ -39,10 +89,13 @@ body {
   display: grid;
   gap: 22px;
   padding: 24px;
+  background:
+    linear-gradient(180deg, rgba(12, 12, 16, 0.98) 0%, rgba(20, 20, 24, 0.94) 100%);
 }
 
 .nav-brand h2 {
   margin: 0;
+  font-size: 1.8rem;
 }
 
 .nav-brand p:last-child {
@@ -83,6 +136,12 @@ body {
   box-shadow: 0 16px 30px rgba(0, 0, 0, 0.18);
 }
 
+.nav-item:hover {
+  transform: translateX(2px);
+  transition: transform 0.18s ease, border-color 0.18s ease;
+  border-color: rgba(251, 146, 60, 0.24);
+}
+
 .nav-footer {
   display: grid;
   gap: 10px;
@@ -104,6 +163,9 @@ body {
   grid-template-columns: 1.3fr 1fr;
   padding: 28px;
   margin-bottom: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(249, 115, 22, 0.14), transparent 28%),
+    linear-gradient(160deg, rgba(15, 15, 18, 0.95), rgba(30, 19, 12, 0.88));
 }
 
 .dashboard-hero {
@@ -175,6 +237,10 @@ body {
   border: 1px solid rgba(249, 115, 22, 0.08);
 }
 
+.stats article {
+  background: linear-gradient(180deg, rgba(23, 23, 28, 0.94), rgba(17, 18, 22, 0.98));
+}
+
 .stats span,
 .list-card p,
 .panel-header span {
@@ -209,6 +275,10 @@ body {
 
 .compact-panel {
   min-height: 100%;
+}
+
+.compact-panel .panel-header h2 {
+  font-size: 1rem;
 }
 
 .map-section {
@@ -428,6 +498,7 @@ body {
   border-radius: 20px;
   background: #111216;
   border: 1px solid rgba(249, 115, 22, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .activity-card p,
@@ -879,6 +950,16 @@ body {
 
   .nav-shell {
     position: static;
+  }
+
+  .dashboard-topbar,
+  .dashboard-topbar-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .search-shell {
+    min-width: 0;
   }
 
   .hero-panel,
