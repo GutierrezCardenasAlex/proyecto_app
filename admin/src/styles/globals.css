@@ -1164,6 +1164,10 @@ a {
   gap: 14px;
 }
 
+.saas-sidebar-brand {
+  justify-content: space-between;
+}
+
 .saas-logo-mark,
 .saas-avatar {
   width: 48px;
@@ -1253,6 +1257,18 @@ a {
   gap: 10px;
 }
 
+.saas-sidebar-close {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: none;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-soft);
+  border: 0;
+  cursor: pointer;
+}
+
 .saas-ghost-button,
 .saas-danger-link,
 .saas-burger,
@@ -1327,7 +1343,7 @@ a {
 }
 
 .saas-burger {
-  display: none;
+  display: grid;
 }
 
 .saas-navbar-copy strong {
@@ -1681,6 +1697,10 @@ a {
     transform: translateX(0);
     opacity: 1;
     pointer-events: auto;
+  }
+
+  .saas-sidebar-close {
+    display: grid;
   }
 
   .saas-main,

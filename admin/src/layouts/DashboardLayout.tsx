@@ -21,6 +21,15 @@ export default function DashboardLayout() {
     return found?.[1] ?? PAGE_META['/dashboard']
   }, [location.pathname])
 
+  function handleToggleMenu() {
+    const isMobileViewport = typeof window !== 'undefined' && window.innerWidth <= 960
+    if (isMobileViewport) {
+      setMobileMenuOpen((current) => !current)
+      return
+    }
+    setSidebarCollapsed((current) => !current)
+  }
+
   return (
     <div className="saas-shell">
       <DashboardSidebar
@@ -43,7 +52,7 @@ export default function DashboardLayout() {
           search={adminSearch}
           loading={loading}
           onSearchChange={setAdminSearch}
-          onToggleMobileMenu={() => setMobileMenuOpen(true)}
+          onToggleMenu={handleToggleMenu}
         />
 
         <section className="saas-content">

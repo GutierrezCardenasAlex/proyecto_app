@@ -4,7 +4,7 @@ type Props = {
   search: string
   loading: boolean
   onSearchChange: (value: string) => void
-  onToggleMobileMenu: () => void
+  onToggleMenu: () => void
 }
 
 function BurgerIcon() {
@@ -26,11 +26,11 @@ function BellIcon() {
   )
 }
 
-export default function DashboardNavbar({ title, subtitle, search, loading, onSearchChange, onToggleMobileMenu }: Props) {
+export default function DashboardNavbar({ title, subtitle, search, loading, onSearchChange, onToggleMenu }: Props) {
   return (
     <header className="saas-navbar">
       <div className="saas-navbar-left">
-        <button type="button" className="saas-burger" onClick={onToggleMobileMenu}>
+        <button type="button" className="saas-burger" onClick={onToggleMenu} aria-label="Mostrar u ocultar menu lateral">
           <BurgerIcon />
         </button>
         <div className="saas-navbar-copy">

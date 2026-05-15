@@ -13,6 +13,15 @@ type Props = {
   onLogout: () => void
 }
 
+function CloseIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
+  )
+}
+
 function Icon({ name }: { name: string }) {
   const common = { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
   switch (name) {
@@ -56,6 +65,9 @@ export default function DashboardSidebar({
             <span>Executive Mobility Hub</span>
           </div>
         )}
+        <button type="button" className="saas-sidebar-close" onClick={onCloseMobile} aria-label="Cerrar menu">
+          <CloseIcon />
+        </button>
       </div>
 
       <div className="saas-sidebar-profile">
