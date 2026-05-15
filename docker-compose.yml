@@ -23,7 +23,7 @@ services:
     container_name: taxiya-redis
     ports:
       - "6379:6379"
-    command: ["redis-server", "--appendonly", "yes"]
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-taxiyaRedis2026}"]
 
   rabbitmq:
     image: rabbitmq:3.13-management
@@ -65,7 +65,7 @@ services:
     environment:
       PORT: ${AUTH_PORT:-3001}
       DATABASE_URL: ${DATABASE_URL:-postgresql://taxiya:taxiya@postgres:5432/taxiya}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      REDIS_URL: ${REDIS_URL:-redis://:taxiyaRedis2026@redis:6379}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://taxiya:taxiya@rabbitmq:5672}
       JWT_SECRET: ${JWT_SECRET:-super-secret}
       SMS_PROVIDER: ${SMS_PROVIDER:-}
@@ -86,7 +86,7 @@ services:
     environment:
       PORT: ${DRIVER_PORT:-3002}
       DATABASE_URL: ${DATABASE_URL:-postgresql://taxiya:taxiya@postgres:5432/taxiya}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      REDIS_URL: ${REDIS_URL:-redis://:taxiyaRedis2026@redis:6379}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://taxiya:taxiya@rabbitmq:5672}
     depends_on:
       postgres:
@@ -101,7 +101,7 @@ services:
     environment:
       PORT: ${TRIP_PORT:-3003}
       DATABASE_URL: ${DATABASE_URL:-postgresql://taxiya:taxiya@postgres:5432/taxiya}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      REDIS_URL: ${REDIS_URL:-redis://:taxiyaRedis2026@redis:6379}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://taxiya:taxiya@rabbitmq:5672}
       DISPATCH_SERVICE_URL: "http://dispatch-service:3004"
       WEBSOCKET_EMIT_URL: "http://websocket-service:3008/internal/events"
@@ -118,7 +118,7 @@ services:
     environment:
       PORT: ${DISPATCH_PORT:-3004}
       DATABASE_URL: ${DATABASE_URL:-postgresql://taxiya:taxiya@postgres:5432/taxiya}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      REDIS_URL: ${REDIS_URL:-redis://:taxiyaRedis2026@redis:6379}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://taxiya:taxiya@rabbitmq:5672}
       DRIVER_SERVICE_URL: "http://driver-service:3002"
       WEBSOCKET_EMIT_URL: "http://websocket-service:3008/internal/events"
@@ -135,7 +135,7 @@ services:
     environment:
       PORT: ${LOCATION_PORT:-3005}
       DATABASE_URL: ${DATABASE_URL:-postgresql://taxiya:taxiya@postgres:5432/taxiya}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      REDIS_URL: ${REDIS_URL:-redis://:taxiyaRedis2026@redis:6379}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://taxiya:taxiya@rabbitmq:5672}
       WEBSOCKET_EMIT_URL: "http://websocket-service:3008/internal/events"
     depends_on:
@@ -151,7 +151,7 @@ services:
     environment:
       PORT: ${NOTIFICATION_PORT:-3006}
       DATABASE_URL: ${DATABASE_URL:-postgresql://taxiya:taxiya@postgres:5432/taxiya}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      REDIS_URL: ${REDIS_URL:-redis://:taxiyaRedis2026@redis:6379}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://taxiya:taxiya@rabbitmq:5672}
       FCM_PROJECT_ID: ${FCM_PROJECT_ID:-demo-project}
       FCM_CLIENT_EMAIL: ${FCM_CLIENT_EMAIL:-demo@example.com}
@@ -169,7 +169,7 @@ services:
     environment:
       PORT: ${ADMIN_API_PORT:-3007}
       DATABASE_URL: ${DATABASE_URL:-postgresql://taxiya:taxiya@postgres:5432/taxiya}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      REDIS_URL: ${REDIS_URL:-redis://:taxiyaRedis2026@redis:6379}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://taxiya:taxiya@rabbitmq:5672}
       JWT_SECRET: ${JWT_SECRET:-super-secret}
       MAP_TILES_URL_TEMPLATE: ${MAP_TILES_URL_TEMPLATE:-https://taxis.cybernovatech.space/tiles/styles/flashgo-navigation/512/{z}/{x}/{y}.png}
@@ -198,7 +198,7 @@ services:
     build: ./services/websocket-service
     environment:
       PORT: ${WEBSOCKET_PORT:-3008}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      REDIS_URL: ${REDIS_URL:-redis://:taxiyaRedis2026@redis:6379}
       JWT_SECRET: ${JWT_SECRET:-super-secret}
     ports:
       - "${WEBSOCKET_PORT:-3008}:${WEBSOCKET_PORT:-3008}"
