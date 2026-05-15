@@ -8,12 +8,19 @@ const port = Number(process.env.PORT || 3008);
 const redis = new Redis(process.env.REDIS_URL);
 
 async function bootstrap() {
-  await app.register(cors, { origin: true, credentials: true });
+  await app.register(cors, {
+    origin: true,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  });
 
   const io = new Server(app.server, {
     cors: {
       origin: true,
-      credentials: true
+      credentials: true,
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization"]
     }
   });
 
