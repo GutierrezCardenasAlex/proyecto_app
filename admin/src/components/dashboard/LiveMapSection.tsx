@@ -3,7 +3,7 @@ import L from 'leaflet'
 import Button from '../common/Button'
 import type { Driver, OfflineMapStatus, Trip } from '../../types/admin'
 import { CITY_CENTER } from '../../utils/constants'
-import { getDriverDisplayName, getInitials } from '../../utils/helpers'
+import { getDriverAvailabilityLabel, getDriverDisplayName, getDriverStatusLabel, getDriverTelemetryLabel, getInitials } from '../../utils/helpers'
 
 type Props = {
   drivers: Driver[]
@@ -50,7 +50,8 @@ export default function LiveMapSection({ drivers, trips, offlineStatus, mapFulls
     drivers
       .filter((driver) => driver.location?.lat && driver.location?.lng)
       .forEach((driver) => {
-        const markerTone = driver.current_trip_id ? '#ef4444' : driver.is_available ? '#22c55e' : '#f97316'
+        const operationalStatus = getDriverStatusLabel(driver)
+        const markerTone = operationalStatus === 'En viaje' ? '#ef4444' : operationalStatus === 'Disponible' ? '#22c55e' : '#f97316'
         const displayName = getDriverDisplayName(driver)
         const driverIcon = new L.DivIcon({
           className: 'driver-pin',
@@ -62,9 +63,9 @@ export default function LiveMapSection({ drivers, trips, offlineStatus, mapFulls
             `<div style="min-width:180px">
               <strong>${displayName}</strong><br/>
               <span>${driver.phone || driver.id}</span><br/>
-              <span style="color:${markerTone};font-weight:700">${driver.status}</span><br/>
-              <span>${driver.is_available ? 'Disponible' : 'Sin disponibilidad'}</span><br/>
-              <span>${driver.current_trip_id ? 'En viaje activo' : 'Esperando solicitud'}</span>
+              <span style="color:${markerTone};font-weight:700">${operationalStatus}</span><br/>
+              <span>${getDriverAvailabilityLabel(driver)}</span><br/>
+              <span>${driver.current_trip_id ? 'En viaje activo' : getDriverTelemetryLabel(driver, 'Ultimo GPS')}</span>
             </div>`,
           )
           .addTo(markersLayerRef.current!)

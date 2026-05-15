@@ -1,7 +1,7 @@
 import Card from '../../components/cards/Card'
 import MetricCard from '../../components/dashboard/MetricCard'
 import { useCentral } from '../../hooks/useCentral'
-import { getDriverDisplayName } from '../../utils/helpers'
+import { getDriverAvailabilityLabel, getDriverDisplayName, getDriverStatusLabel, getDriverTelemetryDate } from '../../utils/helpers'
 
 export default function DriversPage() {
   const central = useCentral()
@@ -23,10 +23,18 @@ export default function DriversPage() {
               <article key={driver.id} className="list-card stack-card">
                 <div>
                   <strong>{getDriverDisplayName(driver)}</strong>
-                  <p>{driver.phone || driver.id} · {driver.status} · {driver.is_available ? 'Disponible' : 'No disponible'}</p>
+                  <p>{driver.phone || driver.id} · {getDriverStatusLabel(driver)} · {getDriverAvailabilityLabel(driver)}</p>
                 </div>
-                <span className={driver.current_trip_id ? 'status-pill warning subtle' : driver.is_available ? 'status-pill success subtle' : 'status-pill danger subtle'}>
-                  {driver.current_trip_id ? 'En viaje' : driver.is_available ? 'Disponible' : 'Desconectado'}
+                <span
+                  className={
+                    getDriverStatusLabel(driver) === 'En viaje'
+                      ? 'status-pill warning subtle'
+                      : getDriverStatusLabel(driver) === 'Disponible'
+                        ? 'status-pill success subtle'
+                        : 'status-pill danger subtle'
+                  }
+                >
+                  {getDriverTelemetryDate(driver) ? getDriverStatusLabel(driver) : 'Sin telemetria · offline'}
                 </span>
               </article>
             ))}

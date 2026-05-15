@@ -6,7 +6,7 @@ import OverviewSections from '../../components/dashboard/OverviewSections'
 import VehicleStatusCard from '../../components/dashboard/VehicleStatusCard'
 import Modal from '../../components/common/Modal'
 import { useCentral } from '../../hooks/useCentral'
-import { getDriverDisplayName } from '../../utils/helpers'
+import { getDriverAvailabilityLabel, getDriverDisplayName, getDriverStateValue, getDriverStatusLabel, getDriverTelemetryDateTimeLabel, getDriverTelemetryLabel } from '../../utils/helpers'
 
 export default function DashboardHome() {
   const central = useCentral()
@@ -54,8 +54,8 @@ export default function DashboardHome() {
                 key={driver.id}
                 title={getDriverDisplayName(driver)}
                 subtitle={driver.phone || driver.status}
-                status={driver.current_trip_id ? 'En viaje' : driver.is_available ? 'Disponible' : 'Desconectado'}
-                meta={driver.location?.updatedAt ? `Ping ${new Date(driver.location.updatedAt).toLocaleTimeString('es-BO')}` : 'Sin GPS reciente'}
+                status={getDriverStatusLabel(driver)}
+                meta={getDriverTelemetryLabel(driver, 'Ping')}
                 onClick={() => setSelectedDriverId(driver.id)}
               />
             ))}
@@ -76,11 +76,11 @@ export default function DashboardHome() {
             </div>
             <div className="saas-detail-row">
               <span>Estado</span>
-              <strong>{selectedDriver.status}</strong>
+              <strong>{getDriverStateValue(selectedDriver)}</strong>
             </div>
             <div className="saas-detail-row">
               <span>Disponibilidad</span>
-              <strong>{selectedDriver.is_available ? 'Disponible' : 'No disponible'}</strong>
+              <strong>{getDriverAvailabilityLabel(selectedDriver)}</strong>
             </div>
             <div className="saas-detail-row">
               <span>Viaje actual</span>
@@ -88,7 +88,7 @@ export default function DashboardHome() {
             </div>
             <div className="saas-detail-row">
               <span>Ultimo ping</span>
-              <strong>{selectedDriver.location?.updatedAt ? new Date(selectedDriver.location.updatedAt).toLocaleString('es-BO') : 'Sin GPS reciente'}</strong>
+              <strong>{getDriverTelemetryDateTimeLabel(selectedDriver, 'Sin GPS reciente')}</strong>
             </div>
           </div>
         )}

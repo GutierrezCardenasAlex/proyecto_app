@@ -4,7 +4,7 @@ import MetricCard from '../../components/dashboard/MetricCard'
 import LiveMapSection from '../../components/dashboard/LiveMapSection'
 import VehicleStatusCard from '../../components/dashboard/VehicleStatusCard'
 import { useCentral } from '../../hooks/useCentral'
-import { getDriverDisplayName } from '../../utils/helpers'
+import { getDriverAvailabilityLabel, getDriverDisplayName, getDriverStateValue, getDriverStatusLabel, getDriverTelemetryDateTimeLabel, getDriverTelemetryLabel } from '../../utils/helpers'
 
 export default function LiveMapPage() {
   const central = useCentral()
@@ -52,8 +52,8 @@ export default function LiveMapPage() {
                   key={driver.id}
                   title={getDriverDisplayName(driver)}
                   subtitle={driver.phone || driver.status}
-                  status={driver.current_trip_id ? 'En viaje' : driver.is_available ? 'Disponible' : 'Desconectado'}
-                  meta={driver.location?.updatedAt ? `GPS ${new Date(driver.location.updatedAt).toLocaleTimeString('es-BO')}` : 'Sin señal reciente'}
+                  status={getDriverStatusLabel(driver)}
+                  meta={getDriverTelemetryLabel(driver)}
                   active={driver.id === selectedDriver?.id}
                   onClick={() => setSelectedDriverId(driver.id)}
                 />
@@ -74,11 +74,11 @@ export default function LiveMapPage() {
                 </div>
                 <div className="saas-detail-row">
                   <span>Estado</span>
-                  <strong>{selectedDriver.status}</strong>
+                  <strong>{getDriverStateValue(selectedDriver)}</strong>
                 </div>
                 <div className="saas-detail-row">
                   <span>Disponibilidad</span>
-                  <strong>{selectedDriver.is_available ? 'Disponible' : 'No disponible'}</strong>
+                  <strong>{getDriverAvailabilityLabel(selectedDriver)}</strong>
                 </div>
                 <div className="saas-detail-row">
                   <span>Viaje actual</span>
@@ -86,7 +86,7 @@ export default function LiveMapPage() {
                 </div>
                 <div className="saas-detail-row">
                   <span>Ultima lectura</span>
-                  <strong>{selectedDriver.location?.updatedAt ? new Date(selectedDriver.location.updatedAt).toLocaleString('es-BO') : 'Sin telemetria'}</strong>
+                  <strong>{getDriverTelemetryDateTimeLabel(selectedDriver)}</strong>
                 </div>
               </div>
             ) : (

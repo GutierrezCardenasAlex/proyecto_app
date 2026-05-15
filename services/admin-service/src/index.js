@@ -77,6 +77,8 @@ const driverPerformanceRangeSchema = z.object({
   range: z.enum(["day", "week", "month"]).default("day")
 });
 
+const DRIVER_SIGNAL_TIMEOUT_MS = Number(process.env.DRIVER_SIGNAL_TIMEOUT_MS || 5 * 60 * 1000);
+
 function readOfflineMapStatus() {
   const dedicatedUrlTemplate = String(process.env.MAP_OFFLINE_TILES_URL_TEMPLATE || "").trim();
   const primaryTilesUrlTemplate = String(process.env.MAP_TILES_URL_TEMPLATE || "").trim();
@@ -117,6 +119,23 @@ function normalizePhone(rawPhone) {
     return `+${digits}`;
   }
   return String(rawPhone || "").replace(/\s+/g, "");
+}
+
+function parseDriverLocationSnapshot(snapshot) {
+  if (!snapshot || !snapshot.updatedAt) {
+    return { hasSignal: false, isRecent: false, updatedAt: null };
+  }
+
+  const updatedAt = new Date(snapshot.updatedAt);
+  if (Number.isNaN(updatedAt.getTime())) {
+    return { hasSignal: false, isRecent: false, updatedAt: null };
+  }
+
+  return {
+    hasSignal: true,
+    isRecent: Date.now() - updatedAt.getTime() <= DRIVER_SIGNAL_TIMEOUT_MS,
+    updatedAt: updatedAt.toISOString()
+  };
 }
 
 function getRangeSql(range) {
@@ -343,10 +362,29 @@ async function bootstrap() {
     );
 
     const liveDrivers = await Promise.all(
-      drivers.rows.map(async (driver) => ({
-        ...driver,
-        location: await redis.hgetall(`driver:last_location:${driver.id}`)
-      }))
+      drivers.rows.map(async (driver) => {
+        const location = await redis.hgetall(`driver:last_location:${driver.id}`);
+        const telemetry = parseDriverLocationSnapshot(location);
+        const shouldForceOffline = !driver.current_trip_id && (!telemetry.hasSignal || !telemetry.isRecent);
+
+        if (shouldForceOffline && (driver.status !== "offline" || driver.is_available === true)) {
+          await pool.query(
+            `UPDATE drivers
+             SET status = 'offline',
+                 is_available = FALSE,
+                 updated_at = NOW()
+             WHERE id = $1`,
+            [driver.id]
+          );
+        }
+
+        return {
+          ...driver,
+          status: shouldForceOffline ? "offline" : driver.status,
+          is_available: shouldForceOffline ? false : driver.is_available,
+          location,
+        };
+      })
     );
 
     return liveDrivers;
