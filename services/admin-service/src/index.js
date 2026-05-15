@@ -178,6 +178,18 @@ async function ensureAdminSchema() {
   `);
 
   await pool.query(`
+    ALTER TABLE trips
+      ADD COLUMN IF NOT EXISTS promotional_trip BOOLEAN NOT NULL DEFAULT FALSE
+  `);
+
+  await pool.query(`
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS completed_trip_count INTEGER NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS promo_progress_count INTEGER NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS free_trip_credits INTEGER NOT NULL DEFAULT 0
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS promo_settings (
       id SMALLINT PRIMARY KEY DEFAULT 1 CHECK (id = 1),
       enabled BOOLEAN NOT NULL DEFAULT TRUE,
