@@ -1150,11 +1150,15 @@ a {
   border: 1px solid rgba(255, 255, 255, 0.07);
   box-shadow: var(--shadow-lg);
   z-index: 30;
+  transform: translateX(0);
+  opacity: 1;
   transition: width 0.25s ease, transform 0.25s ease, opacity 0.25s ease;
 }
 
 .saas-sidebar.collapsed {
-  width: 94px;
+  transform: translateX(-120%);
+  opacity: 0;
+  pointer-events: none;
 }
 
 .saas-sidebar-brand,
@@ -1257,6 +1261,10 @@ a {
   gap: 10px;
 }
 
+.saas-sidebar-footer.hidden {
+  display: none;
+}
+
 .saas-sidebar-close {
   width: 38px;
   height: 38px;
@@ -1298,12 +1306,12 @@ a {
 }
 
 .saas-main {
-  padding-left: 336px;
+  padding-left: 32px;
   transition: padding-left 0.25s ease;
 }
 
-.saas-main.collapsed {
-  padding-left: 138px;
+.saas-main:not(.collapsed) {
+  padding-left: 336px;
 }
 
 .saas-navbar {
@@ -1686,9 +1694,6 @@ a {
 
 @media (max-width: 960px) {
   .saas-sidebar {
-    transform: translateX(-120%);
-    opacity: 0;
-    pointer-events: none;
     inset: 12px auto 12px 12px;
     width: min(320px, calc(100vw - 24px));
   }
@@ -1704,7 +1709,8 @@ a {
   }
 
   .saas-main,
-  .saas-main.collapsed {
+  .saas-main.collapsed,
+  .saas-main:not(.collapsed) {
     padding-left: 0;
   }
 

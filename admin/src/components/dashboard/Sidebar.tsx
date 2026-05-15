@@ -55,11 +55,13 @@ export default function DashboardSidebar({
   onRefresh,
   onLogout,
 }: Props) {
+  const isOpen = mobileOpen || !collapsed
+
   return (
-    <aside className={mobileOpen ? `saas-sidebar ${collapsed ? 'collapsed' : ''} mobile-open` : `saas-sidebar ${collapsed ? 'collapsed' : ''}`}>
+    <aside className={isOpen ? 'saas-sidebar mobile-open' : 'saas-sidebar collapsed'}>
       <div className="saas-sidebar-brand">
         <div className="saas-logo-mark">FG</div>
-        {!collapsed && (
+        {isOpen && (
           <div>
             <strong>Flash Go Fleet</strong>
             <span>Executive Mobility Hub</span>
@@ -72,7 +74,7 @@ export default function DashboardSidebar({
 
       <div className="saas-sidebar-profile">
         <div className="saas-avatar">{(adminProfile?.fullName || adminProfile?.username || 'C').charAt(0).toUpperCase()}</div>
-        {!collapsed && (
+        {isOpen && (
           <div>
             <strong>{adminProfile?.fullName || adminProfile?.username || 'Central Flash Go'}</strong>
             <span>{adminProfile?.phone || 'Sin telefono'}</span>
@@ -89,7 +91,7 @@ export default function DashboardSidebar({
             onClick={onCloseMobile}
           >
             <span className="saas-nav-icon"><Icon name={item.icon} /></span>
-            {!collapsed && (
+            {isOpen && (
               <span className="saas-nav-copy">
                 <strong>{item.label}</strong>
                 <small>{item.hint}</small>
@@ -99,9 +101,9 @@ export default function DashboardSidebar({
         ))}
       </nav>
 
-      <div className="saas-sidebar-footer">
+      <div className={isOpen ? 'saas-sidebar-footer' : 'saas-sidebar-footer hidden'}>
         <button type="button" className="saas-ghost-button" onClick={onToggleCollapse}>
-          {collapsed ? 'Expandir' : 'Colapsar'}
+          {collapsed ? 'Abrir menu' : 'Ocultar menu'}
         </button>
         <button type="button" className="saas-ghost-button" onClick={onRefresh} disabled={loading}>
           {loading ? 'Actualizando...' : 'Sincronizar'}

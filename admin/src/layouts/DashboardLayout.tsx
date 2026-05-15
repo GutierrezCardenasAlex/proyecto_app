@@ -12,7 +12,7 @@ export default function DashboardLayout() {
   const { adminProfile, logout } = useAuth()
   const { adminSearch, setAdminSearch, refreshAll, loading, error, clearError } = useCentral()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
 
   const pageMeta = useMemo(() => {
     const found = Object.entries(PAGE_META)
@@ -43,7 +43,21 @@ export default function DashboardLayout() {
         onLogout={logout}
       />
 
-      {mobileMenuOpen && <button type="button" className="saas-overlay" aria-label="Cerrar menu" onClick={() => setMobileMenuOpen(false)} />}
+      {(mobileMenuOpen || !sidebarCollapsed) && (
+        <button
+          type="button"
+          className="saas-overlay"
+          aria-label="Cerrar menu"
+          onClick={() => {
+            const isMobileViewport = typeof window !== 'undefined' && window.innerWidth <= 960
+            if (isMobileViewport) {
+              setMobileMenuOpen(false)
+              return
+            }
+            setSidebarCollapsed(true)
+          }}
+        />
+      )}
 
       <div className={sidebarCollapsed ? 'saas-main collapsed' : 'saas-main'}>
         <DashboardNavbar
