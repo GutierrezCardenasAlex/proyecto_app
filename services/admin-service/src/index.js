@@ -329,8 +329,15 @@ async function bootstrap() {
 
   app.get("/drivers/live", { preHandler: ensureAdmin }, async () => {
     const drivers = await pool.query(
-      `SELECT id, user_id, status, is_available, current_trip_id
-       FROM drivers
+      `SELECT d.id,
+              d.user_id,
+              d.status,
+              d.is_available,
+              d.current_trip_id,
+              u.full_name,
+              u.phone
+       FROM drivers d
+       INNER JOIN users u ON u.id = d.user_id
        ORDER BY updated_at DESC
        LIMIT 500`
     );

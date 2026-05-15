@@ -1,14 +1,19 @@
+import { useState } from 'react'
 import Card from '../../components/cards/Card'
 import ActivityPanel from '../../components/dashboard/ActivityPanel'
 import MetricCard from '../../components/dashboard/MetricCard'
 import OverviewSections from '../../components/dashboard/OverviewSections'
 import VehicleStatusCard from '../../components/dashboard/VehicleStatusCard'
+import Modal from '../../components/common/Modal'
 import { useCentral } from '../../hooks/useCentral'
+import { getDriverDisplayName } from '../../utils/helpers'
 
 export default function DashboardHome() {
   const central = useCentral()
   const activeDrivers = central.drivers.filter((driver) => driver.is_available)
   const revenue = Number(central.dashboard.revenue || 0).toFixed(2)
+  const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null)
+  const selectedDriver = central.drivers.find((driver) => driver.id === selectedDriverId) ?? null
 
   return (
     <div className="saas-page-stack">
@@ -47,15 +52,47 @@ export default function DashboardHome() {
             {central.drivers.slice(0, 4).map((driver) => (
               <VehicleStatusCard
                 key={driver.id}
-                title={`Conductor ${driver.id.slice(0, 8)}`}
-                subtitle={driver.status}
+                title={getDriverDisplayName(driver)}
+                subtitle={driver.phone || driver.status}
                 status={driver.current_trip_id ? 'En viaje' : driver.is_available ? 'Disponible' : 'Desconectado'}
                 meta={driver.location?.updatedAt ? `Ping ${new Date(driver.location.updatedAt).toLocaleTimeString('es-BO')}` : 'Sin GPS reciente'}
+                onClick={() => setSelectedDriverId(driver.id)}
               />
             ))}
           </div>
         </Card>
       </section>
+
+      <Modal open={Boolean(selectedDriver)} title={selectedDriver ? getDriverDisplayName(selectedDriver) : 'Detalle del conductor'} onClose={() => setSelectedDriverId(null)}>
+        {selectedDriver && (
+          <div className="saas-detail-stack">
+            <div className="saas-detail-row">
+              <span>Nombre</span>
+              <strong>{getDriverDisplayName(selectedDriver)}</strong>
+            </div>
+            <div className="saas-detail-row">
+              <span>Telefono o ID</span>
+              <strong>{selectedDriver.phone || selectedDriver.id}</strong>
+            </div>
+            <div className="saas-detail-row">
+              <span>Estado</span>
+              <strong>{selectedDriver.status}</strong>
+            </div>
+            <div className="saas-detail-row">
+              <span>Disponibilidad</span>
+              <strong>{selectedDriver.is_available ? 'Disponible' : 'No disponible'}</strong>
+            </div>
+            <div className="saas-detail-row">
+              <span>Viaje actual</span>
+              <strong>{selectedDriver.current_trip_id ? selectedDriver.current_trip_id.slice(0, 8) : 'Sin viaje asignado'}</strong>
+            </div>
+            <div className="saas-detail-row">
+              <span>Ultimo ping</span>
+              <strong>{selectedDriver.location?.updatedAt ? new Date(selectedDriver.location.updatedAt).toLocaleString('es-BO') : 'Sin GPS reciente'}</strong>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       <OverviewSections
         promoSettings={central.promoSettings}

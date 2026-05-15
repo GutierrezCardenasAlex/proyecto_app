@@ -1,6 +1,7 @@
 import Card from '../../components/cards/Card'
 import MetricCard from '../../components/dashboard/MetricCard'
 import { useCentral } from '../../hooks/useCentral'
+import { getDriverDisplayName } from '../../utils/helpers'
 
 export default function DriversPage() {
   const central = useCentral()
@@ -21,8 +22,8 @@ export default function DriversPage() {
             {central.drivers.map((driver) => (
               <article key={driver.id} className="list-card stack-card">
                 <div>
-                  <strong>Conductor {driver.id.slice(0, 8)}</strong>
-                  <p>{driver.status} · {driver.is_available ? 'Disponible' : 'No disponible'}</p>
+                  <strong>{getDriverDisplayName(driver)}</strong>
+                  <p>{driver.phone || driver.id} · {driver.status} · {driver.is_available ? 'Disponible' : 'No disponible'}</p>
                 </div>
                 <span className={driver.current_trip_id ? 'status-pill warning subtle' : driver.is_available ? 'status-pill success subtle' : 'status-pill danger subtle'}>
                   {driver.current_trip_id ? 'En viaje' : driver.is_available ? 'Disponible' : 'Desconectado'}

@@ -12,8 +12,11 @@ export type AdminView =
 
 export type Driver = {
   id: string
+  user_id?: string
   status: string
   is_available: boolean
+  full_name?: string | null
+  phone?: string | null
   current_trip_id?: string | null
   location?: {
     lat?: string

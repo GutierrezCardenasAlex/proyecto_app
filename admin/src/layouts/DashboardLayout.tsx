@@ -65,6 +65,7 @@ export default function DashboardLayout() {
           subtitle={pageMeta.subtitle}
           search={adminSearch}
           loading={loading}
+          onLogout={logout}
           onSearchChange={setAdminSearch}
           onToggleMenu={handleToggleMenu}
         />

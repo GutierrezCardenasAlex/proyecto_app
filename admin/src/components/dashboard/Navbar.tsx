@@ -3,6 +3,7 @@ type Props = {
   subtitle: string
   search: string
   loading: boolean
+  onLogout: () => void
   onSearchChange: (value: string) => void
   onToggleMenu: () => void
 }
@@ -26,7 +27,7 @@ function BellIcon() {
   )
 }
 
-export default function DashboardNavbar({ title, subtitle, search, loading, onSearchChange, onToggleMenu }: Props) {
+export default function DashboardNavbar({ title, subtitle, search, loading, onLogout, onSearchChange, onToggleMenu }: Props) {
   return (
     <header className="saas-navbar">
       <div className="saas-navbar-left">
@@ -51,6 +52,9 @@ export default function DashboardNavbar({ title, subtitle, search, loading, onSe
           <BellIcon />
         </button>
         <div className={loading ? 'saas-status-badge syncing' : 'saas-status-badge'}>{loading ? 'Sincronizando' : 'Central en vivo'}</div>
+        <button type="button" className="saas-logout-button" onClick={onLogout}>
+          Cerrar sesion
+        </button>
       </div>
     </header>
   )

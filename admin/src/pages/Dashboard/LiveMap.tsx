@@ -4,6 +4,7 @@ import MetricCard from '../../components/dashboard/MetricCard'
 import LiveMapSection from '../../components/dashboard/LiveMapSection'
 import VehicleStatusCard from '../../components/dashboard/VehicleStatusCard'
 import { useCentral } from '../../hooks/useCentral'
+import { getDriverDisplayName } from '../../utils/helpers'
 
 export default function LiveMapPage() {
   const central = useCentral()
@@ -49,8 +50,8 @@ export default function LiveMapPage() {
               {central.drivers.map((driver) => (
                 <VehicleStatusCard
                   key={driver.id}
-                  title={`Unidad ${driver.id.slice(0, 8)}`}
-                  subtitle={driver.status}
+                  title={getDriverDisplayName(driver)}
+                  subtitle={driver.phone || driver.status}
                   status={driver.current_trip_id ? 'En viaje' : driver.is_available ? 'Disponible' : 'Desconectado'}
                   meta={driver.location?.updatedAt ? `GPS ${new Date(driver.location.updatedAt).toLocaleTimeString('es-BO')}` : 'Sin señal reciente'}
                   active={driver.id === selectedDriver?.id}
@@ -64,8 +65,12 @@ export default function LiveMapPage() {
             {selectedDriver ? (
               <div className="saas-detail-stack">
                 <div className="saas-detail-row">
-                  <span>ID</span>
-                  <strong>{selectedDriver.id}</strong>
+                  <span>Conductor</span>
+                  <strong>{getDriverDisplayName(selectedDriver)}</strong>
+                </div>
+                <div className="saas-detail-row">
+                  <span>Contacto</span>
+                  <strong>{selectedDriver.phone || selectedDriver.id}</strong>
                 </div>
                 <div className="saas-detail-row">
                   <span>Estado</span>

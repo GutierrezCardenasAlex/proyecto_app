@@ -44,9 +44,10 @@ export default function DevicesPanel({ devices, onLoadHistory, onAuthorize, onRe
                 </td>
                 <td>{device.approved_by_name || 'Sin accion'}</td>
                 <td>
-                  <div className="action-row compact">
+                  <div className="action-row compact devices-actions">
                     <Button
                       variant="secondary"
+                      className="table-action-button uniform-button"
                       onClick={() =>
                         onLoadHistory({
                           user_id: device.user_id,
@@ -58,11 +59,11 @@ export default function DevicesPanel({ devices, onLoadHistory, onAuthorize, onRe
                     >
                       Historial
                     </Button>
-                    <Button variant="success" onClick={() => onAuthorize(device.id)}>
+                    <Button variant="success" className="table-action-button uniform-button" onClick={() => onAuthorize(device.id)}>
                       Autorizar
                     </Button>
-                    <Button onClick={() => onReplace(device.id)}>Reemplazar</Button>
-                    <Button variant="danger" onClick={() => onBlock(device.id)}>
+                    <Button className="table-action-button uniform-button" onClick={() => onReplace(device.id)}>Reemplazar</Button>
+                    <Button variant="danger" className="table-action-button uniform-button" onClick={() => onBlock(device.id)}>
                       Bloquear
                     </Button>
                   </div>

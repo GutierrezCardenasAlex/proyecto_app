@@ -1350,6 +1350,17 @@ a {
   cursor: pointer;
 }
 
+.saas-logout-button {
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(239, 68, 68, 0.28);
+  background: rgba(239, 68, 68, 0.12);
+  color: #ffd0d0;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .saas-burger {
   display: grid;
 }
@@ -1581,6 +1592,18 @@ a {
   gap: 6px;
 }
 
+.devices-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 240px;
+}
+
+.uniform-button {
+  justify-content: center;
+  width: 100%;
+}
+
 .saas-chart-placeholder {
   display: flex;
   flex-direction: column;
@@ -1735,6 +1758,11 @@ a {
   .saas-search {
     min-width: 0;
     width: 100%;
+  }
+
+  .devices-actions {
+    grid-template-columns: 1fr;
+    min-width: 0;
   }
 }
 

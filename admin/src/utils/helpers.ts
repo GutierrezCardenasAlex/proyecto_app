@@ -1,4 +1,5 @@
 import type { AdminView } from '../types/admin'
+import type { Driver } from '../types/admin'
 
 export function normalizeViewFromPath(pathname: string): AdminView {
   const clean = pathname.replace(/^\//, '').trim().toLowerCase()
@@ -56,4 +57,8 @@ export function getInitials(value?: string | null) {
     .slice(0, 2)
     .map((part) => part.charAt(0).toUpperCase())
     .join('')
+}
+
+export function getDriverDisplayName(driver: Pick<Driver, 'id' | 'full_name' | 'phone'>) {
+  return driver.full_name?.trim() || driver.phone?.trim() || `Conductor ${driver.id.slice(0, 8)}`
 }
