@@ -15,6 +15,13 @@ export const CITY_CENTER: [number, number] = [-19.5836, -65.7531]
 export const APP_ROUTES = {
   login: '/login',
   dashboard: '/dashboard',
+  dashboardMap: '/dashboard/mapa',
+  dashboardDrivers: '/dashboard/conductores',
+  dashboardVehicles: '/dashboard/vehiculos',
+  dashboardTrips: '/dashboard/viajes',
+  dashboardUsers: '/dashboard/usuarios',
+  dashboardReports: '/dashboard/reportes',
+  dashboardSettings: '/dashboard/configuracion',
   overview: '/inicio',
   map: '/mapa',
   users: '/usuarios',
@@ -23,6 +30,84 @@ export const APP_ROUTES = {
   support: '/soporte',
   devices: '/dispositivos',
   profile: '/perfil',
+} as const
+
+export const DASHBOARD_NAV_ITEMS = [
+  {
+    key: 'dashboard',
+    label: 'Dashboard',
+    hint: 'Resumen ejecutivo',
+    to: APP_ROUTES.dashboard,
+    icon: 'dashboard',
+    description: 'Metricas, ingresos y estado global de la plataforma.',
+  },
+  {
+    key: 'mapa',
+    label: 'Mapa en vivo',
+    hint: 'Seguimiento operativo',
+    to: APP_ROUTES.dashboardMap,
+    icon: 'map',
+    description: 'Monitoreo visual de autos, cobertura y actividad en tiempo real.',
+  },
+  {
+    key: 'conductores',
+    label: 'Conductores',
+    hint: 'Flota humana',
+    to: APP_ROUTES.dashboardDrivers,
+    icon: 'drivers',
+    description: 'Disponibilidad, aprobaciones y desempeno de los conductores.',
+  },
+  {
+    key: 'vehiculos',
+    label: 'Vehiculos',
+    hint: 'Unidades y equipos',
+    to: APP_ROUTES.dashboardVehicles,
+    icon: 'vehicles',
+    description: 'Estado operativo de unidades, reemplazos y accesos.',
+  },
+  {
+    key: 'viajes',
+    label: 'Viajes',
+    hint: 'Operacion activa',
+    to: APP_ROUTES.dashboardTrips,
+    icon: 'trips',
+    description: 'Seguimiento de viajes activos y contexto de servicio.',
+  },
+  {
+    key: 'usuarios',
+    label: 'Usuarios',
+    hint: 'CRUD centralizado',
+    to: APP_ROUTES.dashboardUsers,
+    icon: 'users',
+    description: 'Gestion de cuentas, historial y telefonos desde central.',
+  },
+  {
+    key: 'reportes',
+    label: 'Reportes',
+    hint: 'Analitica operativa',
+    to: APP_ROUTES.dashboardReports,
+    icon: 'reports',
+    description: 'Estadisticas, soporte y actividad consolidada.',
+  },
+  {
+    key: 'configuracion',
+    label: 'Configuracion',
+    hint: 'Sistema y central',
+    to: APP_ROUTES.dashboardSettings,
+    icon: 'settings',
+    description: 'Perfil institucional, modo offline y parametros clave.',
+  },
+] as const
+
+export const PAGE_META = {
+  [APP_ROUTES.dashboard]: { title: 'Dashboard', subtitle: 'Vista ejecutiva de movilidad y rendimiento en tiempo real.' },
+  [APP_ROUTES.dashboardMap]: { title: 'Mapa en vivo', subtitle: 'Mapa protagonista con unidades, estados y cobertura activa.' },
+  [APP_ROUTES.dashboardDrivers]: { title: 'Conductores', subtitle: 'Disponibilidad, acceso y desempeno de la flota humana.' },
+  [APP_ROUTES.dashboardVehicles]: { title: 'Vehiculos', subtitle: 'Control de equipos, unidades digitales y estado operativo.' },
+  [APP_ROUTES.dashboardTrips]: { title: 'Viajes', subtitle: 'Monitoreo de viajes en curso y actividad de servicio.' },
+  [APP_ROUTES.dashboardUsers]: { title: 'Usuarios', subtitle: 'CRUD profesional de pasajeros y conductores.' },
+  [APP_ROUTES.dashboardReports]: { title: 'Reportes', subtitle: 'Indicadores, soporte y actividad para toma de decisiones.' },
+  [APP_ROUTES.dashboardSettings]: { title: 'Configuracion', subtitle: 'Central institucional, promociones y mapa offline.' },
 } as const
 
 export const VIEW_LABELS: Record<AdminView, string> = {

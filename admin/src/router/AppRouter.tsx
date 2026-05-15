@@ -4,18 +4,17 @@ import { CentralProvider } from '../context/CentralContext'
 import { useAuth } from '../hooks/useAuth'
 import { APP_ROUTES } from '../utils/constants'
 import AuthLayout from '../layouts/AuthLayout'
-import MainLayout from '../layouts/MainLayout'
-import ActivityPage from '../pages/Activity/Activity'
-import Dashboard from '../pages/Dashboard/Dashboard'
-import DevicesPage from '../pages/Devices/Devices'
-import Home from '../pages/Home/Home'
+import DashboardLayout from '../layouts/DashboardLayout'
+import DashboardHome from '../pages/Dashboard/DashboardHome'
+import DriversPage from '../pages/Dashboard/Drivers'
+import LiveMapPage from '../pages/Dashboard/LiveMap'
+import ReportsPage from '../pages/Dashboard/Reports'
+import SettingsPage from '../pages/Dashboard/Settings'
+import TripsPage from '../pages/Dashboard/Trips'
+import DashboardUsersPage from '../pages/Dashboard/Users'
+import VehiclesPage from '../pages/Dashboard/Vehicles'
 import Login from '../pages/Login/Login'
-import MapPage from '../pages/Map/Map'
 import NotFound from '../pages/NotFound/NotFound'
-import ProfilePage from '../pages/Profile/Profile'
-import StatisticsPage from '../pages/Statistics/Statistics'
-import SupportPage from '../pages/Support/Support'
-import UsersPage from '../pages/Users/Users'
 
 function ProtectedRoute() {
   const { isAuthenticated } = useAuth()
@@ -24,7 +23,7 @@ function ProtectedRoute() {
 
 function PublicRoute() {
   const { isAuthenticated } = useAuth()
-  return isAuthenticated ? <Navigate to={APP_ROUTES.overview} replace /> : <Outlet />
+  return isAuthenticated ? <Navigate to={APP_ROUTES.dashboard} replace /> : <Outlet />
 }
 
 function RouterTree() {
@@ -41,20 +40,28 @@ function RouterTree() {
           <Route
             element={
               <CentralProvider>
-                <MainLayout />
+                <DashboardLayout />
               </CentralProvider>
             }
           >
-            <Route path="/" element={<Navigate to={APP_ROUTES.overview} replace />} />
-            <Route path={APP_ROUTES.dashboard} element={<Dashboard />} />
-            <Route path={APP_ROUTES.overview} element={<Home />} />
-            <Route path={APP_ROUTES.map} element={<MapPage />} />
-            <Route path={APP_ROUTES.users} element={<UsersPage />} />
-            <Route path={APP_ROUTES.activity} element={<ActivityPage />} />
-            <Route path={APP_ROUTES.stats} element={<StatisticsPage />} />
-            <Route path={APP_ROUTES.support} element={<SupportPage />} />
-            <Route path={APP_ROUTES.devices} element={<DevicesPage />} />
-            <Route path={APP_ROUTES.profile} element={<ProfilePage />} />
+            <Route path="/" element={<Navigate to={APP_ROUTES.dashboard} replace />} />
+            <Route path={APP_ROUTES.dashboard} element={<DashboardHome />} />
+            <Route path={APP_ROUTES.dashboardMap} element={<LiveMapPage />} />
+            <Route path={APP_ROUTES.dashboardDrivers} element={<DriversPage />} />
+            <Route path={APP_ROUTES.dashboardVehicles} element={<VehiclesPage />} />
+            <Route path={APP_ROUTES.dashboardTrips} element={<TripsPage />} />
+            <Route path={APP_ROUTES.dashboardUsers} element={<DashboardUsersPage />} />
+            <Route path={APP_ROUTES.dashboardReports} element={<ReportsPage />} />
+            <Route path={APP_ROUTES.dashboardSettings} element={<SettingsPage />} />
+
+            <Route path={APP_ROUTES.overview} element={<Navigate to={APP_ROUTES.dashboard} replace />} />
+            <Route path={APP_ROUTES.map} element={<Navigate to={APP_ROUTES.dashboardMap} replace />} />
+            <Route path={APP_ROUTES.users} element={<Navigate to={APP_ROUTES.dashboardUsers} replace />} />
+            <Route path={APP_ROUTES.activity} element={<Navigate to={APP_ROUTES.dashboardReports} replace />} />
+            <Route path={APP_ROUTES.stats} element={<Navigate to={APP_ROUTES.dashboardReports} replace />} />
+            <Route path={APP_ROUTES.support} element={<Navigate to={APP_ROUTES.dashboardReports} replace />} />
+            <Route path={APP_ROUTES.devices} element={<Navigate to={APP_ROUTES.dashboardVehicles} replace />} />
+            <Route path={APP_ROUTES.profile} element={<Navigate to={APP_ROUTES.dashboardSettings} replace />} />
           </Route>
         </Route>
 
