@@ -24,6 +24,12 @@ export default function DevicesPage() {
       <ExecutiveStrip title="Gobierno de dispositivos" subtitle="Autorizaciones, reemplazos y trazabilidad por usuario." signals={central.executiveSignals} />
       <DevicesPanel
         devices={central.allDevices}
+        onManageUser={(userId) => {
+          const user = central.managedUsers.find((item) => item.user_id === userId)
+          if (user) {
+            central.openEditUserForm(user)
+          }
+        }}
         onLoadHistory={central.loadUserHistory}
         onAuthorize={(deviceId) => central.updateDeviceStatus(deviceId, 'AUTORIZADO')}
         onReplace={central.replaceDevice}

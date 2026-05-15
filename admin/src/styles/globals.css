@@ -1599,6 +1599,12 @@ a {
   min-width: 240px;
 }
 
+.devices-actions-modal {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
 .uniform-button {
   justify-content: center;
   width: 100%;
@@ -1763,6 +1769,10 @@ a {
   .devices-actions {
     grid-template-columns: 1fr;
     min-width: 0;
+  }
+
+  .devices-actions-modal {
+    grid-template-columns: 1fr;
   }
 }
 

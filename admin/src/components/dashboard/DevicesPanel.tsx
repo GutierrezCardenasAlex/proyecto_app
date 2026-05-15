@@ -8,9 +8,10 @@ type Props = {
   onAuthorize: (deviceId: number) => Promise<void>
   onReplace: (deviceId: number) => Promise<void>
   onBlock: (deviceId: number) => Promise<void>
+  onManageUser: (userId: string) => void
 }
 
-export default function DevicesPanel({ devices, onLoadHistory, onAuthorize, onReplace, onBlock }: Props) {
+export default function DevicesPanel({ devices, onLoadHistory, onAuthorize, onReplace, onBlock, onManageUser }: Props) {
   return (
     <Card title="Dispositivos registrados" subtitle={`${devices.length} en total`} className="devices-panel">
       <div className="table-wrapper">
@@ -45,6 +46,13 @@ export default function DevicesPanel({ devices, onLoadHistory, onAuthorize, onRe
                 <td>{device.approved_by_name || 'Sin accion'}</td>
                 <td>
                   <div className="action-row compact devices-actions">
+                    <Button
+                      variant="secondary"
+                      className="table-action-button uniform-button"
+                      onClick={() => onManageUser(device.user_id)}
+                    >
+                      Gestionar usuario
+                    </Button>
                     <Button
                       variant="secondary"
                       className="table-action-button uniform-button"
