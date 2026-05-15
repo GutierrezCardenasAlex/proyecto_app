@@ -338,7 +338,7 @@ async function bootstrap() {
               u.phone
        FROM drivers d
        INNER JOIN users u ON u.id = d.user_id
-       ORDER BY updated_at DESC
+       ORDER BY d.updated_at DESC
        LIMIT 500`
     );
 
