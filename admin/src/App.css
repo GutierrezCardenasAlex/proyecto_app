@@ -491,6 +491,37 @@ body {
   gap: 12px;
 }
 
+.user-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.user-form-grid input,
+.user-form-grid select {
+  border: 1px solid rgba(249, 115, 22, 0.14);
+  border-radius: 16px;
+  padding: 14px 16px;
+  background: #0f1013;
+  color: #fff4ec;
+  font: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.inline-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 4px;
+  color: #ffcfaa;
+  min-height: 48px;
+}
+
+.inline-check input {
+  width: auto;
+}
+
 .activity-card {
   display: grid;
   gap: 10px;
@@ -984,7 +1015,8 @@ body {
   .performance-metric-row,
   .support-filter-bar,
   .driver-detail-summary,
-  .driver-trip-grid {
+  .driver-trip-grid,
+  .user-form-grid {
     grid-template-columns: 1fr;
   }
 

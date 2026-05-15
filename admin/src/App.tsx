@@ -130,6 +130,43 @@ type UserSummary = {
   role?: string
 }
 
+type ManagedUserRow = {
+  user_id: string
+  phone: string
+  full_name?: string | null
+  first_name?: string | null
+  last_name?: string | null
+  email?: string | null
+  address?: string | null
+  role: 'passenger' | 'driver'
+  profile_completed: boolean
+  created_at: string
+  updated_at: string
+  driver_id?: string | null
+  driver_status?: string | null
+  driver_available?: boolean | null
+  driver_access_status?: 'PENDIENTE' | 'AUTORIZADO' | 'RECHAZADO' | null
+  license_number?: string | null
+  device_count: number
+  authorized_devices: number
+  pending_devices: number
+  support_open_count: number
+  total_trips: number
+}
+
+type ManagedUserForm = {
+  phone: string
+  role: 'passenger' | 'driver'
+  firstName: string
+  lastName: string
+  email: string
+  address: string
+  password: string
+  profileCompleted: boolean
+  licenseNumber: string
+  accessStatus: 'PENDIENTE' | 'AUTORIZADO' | 'RECHAZADO'
+}
+
 type PerformanceRange = 'day' | 'week' | 'month'
 
 type DriverPerformanceRow = {
@@ -202,18 +239,57 @@ const viewLabels: Record<AdminView, string> = {
   devices: 'Dispositivos',
 }
 
+const viewSlugs: Record<AdminView, string> = {
+  overview: 'inicio',
+  map: 'mapa',
+  users: 'usuarios',
+  activity: 'actividad',
+  stats: 'estadisticas',
+  support: 'soporte',
+  devices: 'dispositivos',
+}
+
 function normalizeView(raw: string | null | undefined): AdminView {
   const value = (raw ?? '').replace(/^#\/?/, '').trim().toLowerCase()
   switch (value) {
     case 'map':
+    case 'mapa':
+      return 'map'
     case 'users':
+    case 'usuarios':
+      return 'users'
     case 'activity':
+    case 'actividad':
+      return 'activity'
     case 'stats':
+    case 'estadisticas':
+      return 'stats'
     case 'support':
+    case 'soporte':
+      return 'support'
     case 'devices':
-      return value
+    case 'dispositivos':
+      return 'devices'
+    case 'overview':
+    case 'inicio':
+      return 'overview'
     default:
       return 'overview'
+  }
+}
+
+function createEmptyManagedUserForm(): ManagedUserForm {
+  return {
+    phone: '',
+    role: 'passenger',
+    firstName: '',
+    lastName: '',
+    email: '',
+    address: '',
+    password: '',
+    profileCompleted: false,
+    licenseNumber: '',
+    accessStatus: 'PENDIENTE',
   }
 }
 
@@ -234,6 +310,7 @@ function App() {
   const [pendingDrivers, setPendingDrivers] = useState<PendingDriverAccessRow[]>([])
   const [pendingDevices, setPendingDevices] = useState<DeviceRow[]>([])
   const [allDevices, setAllDevices] = useState<DeviceRow[]>([])
+  const [managedUsers, setManagedUsers] = useState<ManagedUserRow[]>([])
   const [promoSettings, setPromoSettings] = useState<PromoSettings>({
     enabled: true,
     cycleLength: 5,
@@ -289,6 +366,9 @@ function App() {
   const [selectedHistoryUser, setSelectedHistoryUser] = useState<UserSummary | null>(null)
   const [userHistory, setUserHistory] = useState<DeviceRow[]>([])
   const [phoneDraft, setPhoneDraft] = useState('')
+  const [selectedManagedUser, setSelectedManagedUser] = useState<ManagedUserRow | null>(null)
+  const [userFormMode, setUserFormMode] = useState<'create' | 'edit'>('create')
+  const [managedUserForm, setManagedUserForm] = useState<ManagedUserForm>(() => createEmptyManagedUserForm())
   const [driverAccessNote, setDriverAccessNote] = useState('')
   const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(() => {
     const raw = localStorage.getItem('admin_profile')
@@ -319,44 +399,6 @@ function App() {
     ],
     [drivers, supportReports, pendingDevices.length, pendingDrivers.length],
   )
-  const userDirectory = useMemo(() => {
-    const map = new Map<string, UserSummary & { role?: string; full_name?: string | null; phone: string }>()
-
-    allDevices.forEach((device) => {
-      if (!map.has(device.user_id)) {
-        map.set(device.user_id, {
-          user_id: device.user_id,
-          phone: device.phone,
-          full_name: device.full_name,
-          role: device.role,
-        })
-      }
-    })
-
-    pendingDrivers.forEach((driver) => {
-      if (!map.has(driver.user_id)) {
-        map.set(driver.user_id, {
-          user_id: driver.user_id,
-          phone: driver.phone,
-          full_name: driver.full_name,
-          role: 'driver',
-        })
-      }
-    })
-
-    supportReports.forEach((report) => {
-      if (!map.has(report.user_id)) {
-        map.set(report.user_id, {
-          user_id: report.user_id,
-          phone: report.phone,
-          full_name: report.full_name,
-          role: report.role,
-        })
-      }
-    })
-
-    return Array.from(map.values()).sort((a, b) => (a.full_name || a.phone).localeCompare(b.full_name || b.phone))
-  }, [allDevices, pendingDrivers, supportReports])
   const activityFeed = useMemo(() => {
     const tripEvents = trips.map((trip) => ({
       id: `trip-${trip.id}`,
@@ -389,16 +431,16 @@ function App() {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 18)
   }, [trips, supportReports, pendingDevices])
-  const filteredUserDirectory = useMemo(() => {
+  const filteredManagedUsers = useMemo(() => {
     const query = adminSearch.trim().toLowerCase()
     if (!query) {
-      return userDirectory
+      return managedUsers
     }
 
-    return userDirectory.filter((user) =>
-      `${user.full_name ?? ''} ${user.phone} ${user.role ?? ''}`.toLowerCase().includes(query),
+    return managedUsers.filter((user) =>
+      `${user.full_name ?? ''} ${user.phone} ${user.role ?? ''} ${user.email ?? ''}`.toLowerCase().includes(query),
     )
-  }, [adminSearch, userDirectory])
+  }, [adminSearch, managedUsers])
   const filteredActivityFeed = useMemo(() => {
     const query = adminSearch.trim().toLowerCase()
     if (!query) {
@@ -462,7 +504,7 @@ function App() {
       return
     }
 
-    const [dashboardResponse, driversResponse, tripsResponse, pendingDriversResponse, pendingResponse, devicesResponse, promoResponse, supportResponse, performanceResponse, offlineStatusResponse] =
+  const [dashboardResponse, driversResponse, tripsResponse, pendingDriversResponse, pendingResponse, devicesResponse, managedUsersResponse, promoResponse, supportResponse, performanceResponse, offlineStatusResponse] =
       await Promise.all([
         fetchWithAdminAuth<Dashboard>(`${apiBase}/admin/dashboard`, { headers: authHeaders }),
         fetchWithAdminAuth<Driver[]>(`${apiBase}/admin/drivers/live`, { headers: authHeaders }),
@@ -470,6 +512,7 @@ function App() {
         fetchWithAdminAuth<PendingDriverAccessRow[]>(`${apiBase}/admin/drivers/pending-access`, { headers: authHeaders }),
         fetchWithAdminAuth<DeviceRow[]>(`${apiBase}/admin/devices/pending`, { headers: authHeaders }),
         fetchWithAdminAuth<DeviceRow[]>(`${apiBase}/admin/devices`, { headers: authHeaders }),
+        fetchWithAdminAuth<ManagedUserRow[]>(`${apiBase}/admin/users`, { headers: authHeaders }),
         fetchWithAdminAuth<PromoSettings>(`${apiBase}/admin/promotions/settings`, { headers: authHeaders }),
         fetchWithAdminAuth<SupportReport[]>(`${apiBase}/admin/support/reports/all`, { headers: authHeaders }),
         fetchWithAdminAuth<DriverPerformanceResponse>(`${apiBase}/admin/drivers/performance?range=${performanceRange}`, { headers: authHeaders }),
@@ -482,6 +525,7 @@ function App() {
     setPendingDrivers(pendingDriversResponse)
     setPendingDevices(pendingResponse)
     setAllDevices(devicesResponse)
+    setManagedUsers(managedUsersResponse)
     setPromoSettings(promoResponse)
     setSupportReports(supportResponse)
     setDriverPerformance(performanceResponse)
@@ -568,7 +612,7 @@ function App() {
   function changeView(view: AdminView) {
     setActiveView(view)
     if (typeof window !== 'undefined') {
-      window.location.hash = view === 'overview' ? '#/inicio' : `#/${view}`
+      window.location.hash = `#/${viewSlugs[view]}`
     }
   }
 
@@ -583,6 +627,37 @@ function App() {
     setPendingDrivers([])
     setPendingDevices([])
     setAllDevices([])
+    setManagedUsers([])
+  }
+
+  function openCreateUserForm() {
+    setUserFormMode('create')
+    setSelectedManagedUser(null)
+    setManagedUserForm(createEmptyManagedUserForm())
+  }
+
+  function openEditUserForm(user: ManagedUserRow) {
+    setUserFormMode('edit')
+    setSelectedManagedUser(user)
+    setManagedUserForm({
+      phone: user.phone,
+      role: user.role,
+      firstName: user.first_name || '',
+      lastName: user.last_name || '',
+      email: user.email || '',
+      address: user.address || '',
+      password: '',
+      profileCompleted: Boolean(user.profile_completed),
+      licenseNumber: user.license_number || '',
+      accessStatus: user.driver_access_status || 'PENDIENTE',
+    })
+  }
+
+  function updateManagedUserForm<K extends keyof ManagedUserForm>(field: K, value: ManagedUserForm[K]) {
+    setManagedUserForm((current) => ({
+      ...current,
+      [field]: value,
+    }))
   }
 
   async function updateDriverAccess(driverId: string, status: 'AUTORIZADO' | 'RECHAZADO', note?: string) {
@@ -817,6 +892,99 @@ function App() {
       })
     } catch (changeError) {
       setError(changeError instanceof Error ? changeError.message : 'No se pudo cambiar el telefono')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function saveManagedUser() {
+    if (!token) {
+      return
+    }
+
+    if (!managedUserForm.phone.trim() || !managedUserForm.firstName.trim()) {
+      setError('Completa telefono y nombre para guardar el usuario.')
+      return
+    }
+
+    if (managedUserForm.role === 'driver' && !managedUserForm.licenseNumber.trim()) {
+      setError('La licencia es obligatoria para un conductor.')
+      return
+    }
+
+    if (userFormMode === 'create' && managedUserForm.password.trim().length < 8) {
+      setError('La contrasena inicial debe tener al menos 8 caracteres.')
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    try {
+      const payload = {
+        phone: managedUserForm.phone.trim(),
+        role: managedUserForm.role,
+        firstName: managedUserForm.firstName.trim(),
+        lastName: managedUserForm.lastName.trim(),
+        email: managedUserForm.email.trim(),
+        address: managedUserForm.address.trim(),
+        password: managedUserForm.password.trim(),
+        profileCompleted: managedUserForm.profileCompleted,
+        licenseNumber: managedUserForm.licenseNumber.trim(),
+        accessStatus: managedUserForm.accessStatus,
+      }
+
+      if (userFormMode === 'create') {
+        await fetchWithAdminAuth(`${apiBase}/admin/users`, {
+          method: 'POST',
+          headers: {
+            ...authHeaders,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        })
+      } else if (selectedManagedUser) {
+        await fetchWithAdminAuth(`${apiBase}/admin/users/${selectedManagedUser.user_id}`, {
+          method: 'PATCH',
+          headers: {
+            ...authHeaders,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        })
+      }
+
+      await loadCentralData()
+      openCreateUserForm()
+    } catch (userError) {
+      setError(userError instanceof Error ? userError.message : 'No se pudo guardar el usuario.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function deleteManagedUser(user: ManagedUserRow) {
+    if (!token) {
+      return
+    }
+
+    const confirmed = window.confirm(`Se eliminara la cuenta ${user.full_name || user.phone}. Deseas continuar?`)
+    if (!confirmed) {
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    try {
+      await fetchWithAdminAuth(`${apiBase}/admin/users/${user.user_id}`, {
+        method: 'DELETE',
+        headers: authHeaders,
+      })
+      if (selectedManagedUser?.user_id === user.user_id) {
+        openCreateUserForm()
+      }
+      await loadCentralData()
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'No se pudo eliminar el usuario.')
     } finally {
       setLoading(false)
     }
@@ -1090,9 +1258,9 @@ function App() {
       { label: 'Cobertura', value: '15 km' },
     ],
     users: [
-      { label: 'Directorio', value: `${filteredUserDirectory.length}` },
-      { label: 'Conductores', value: `${filteredUserDirectory.filter((user) => user.role === 'driver').length}` },
-      { label: 'Pasajeros', value: `${filteredUserDirectory.filter((user) => user.role !== 'driver').length}` },
+      { label: 'Directorio', value: `${filteredManagedUsers.length}` },
+      { label: 'Conductores', value: `${filteredManagedUsers.filter((user) => user.role === 'driver').length}` },
+      { label: 'Pasajeros', value: `${filteredManagedUsers.filter((user) => user.role !== 'driver').length}` },
       { label: 'Historiales', value: `${userHistory.length}` },
     ],
     activity: [
@@ -1316,22 +1484,36 @@ function App() {
         <div className="double-grid">
           <section className="panel">
             <div className="panel-header">
-              <h2>Directorio operativo</h2>
-              <span>{filteredUserDirectory.length} usuarios visibles</span>
+              <h2>Usuarios de central</h2>
+              <span>{filteredManagedUsers.length} usuarios visibles</span>
             </div>
             <div className="list directory-list">
-              {filteredUserDirectory.map((user) => (
+              {filteredManagedUsers.map((user) => (
                 <article key={user.user_id} className="list-card stack-card">
                   <div>
                     <strong>{user.full_name || user.phone}</strong>
-                    <p>{user.role || 'passenger'} · {user.phone}</p>
+                    <p>{user.role} · {user.phone}</p>
+                    <p>
+                      {user.device_count} equipos · {user.total_trips} viajes · {user.support_open_count} soporte abierto
+                    </p>
                   </div>
                   <div className="action-row compact">
                     <span className={user.role === 'driver' ? 'status-pill warning subtle' : 'status-pill success subtle'}>
                       {user.role === 'driver' ? 'Chofer' : 'Pasajero'}
                     </span>
+                    {user.role === 'driver' && user.driver_access_status && (
+                      <span className={user.driver_access_status === 'AUTORIZADO' ? 'status-pill success subtle' : user.driver_access_status === 'RECHAZADO' ? 'status-pill danger subtle' : 'status-pill warning subtle'}>
+                        {user.driver_access_status}
+                      </span>
+                    )}
+                    <button className="secondary-button" onClick={() => openEditUserForm(user)}>
+                      Editar
+                    </button>
                     <button className="secondary-button" onClick={() => loadUserHistory(user)}>
                       Ver historial
+                    </button>
+                    <button className="danger-button" onClick={() => deleteManagedUser(user)}>
+                      Eliminar
                     </button>
                   </div>
                 </article>
@@ -1341,27 +1523,90 @@ function App() {
 
           <section className="panel">
             <div className="panel-header">
-              <h2>Control rapido</h2>
-              <span>Acciones pendientes</span>
+              <h2>{userFormMode === 'create' ? 'Crear usuario' : 'Editar usuario'}</h2>
+              <span>{userFormMode === 'create' ? 'Alta directa desde central' : selectedManagedUser?.full_name || selectedManagedUser?.phone}</span>
             </div>
-            <div className="mini-stats-grid">
-              <div className="mini-stat-card">
-                <span>Conductores por autorizar</span>
-                <strong>{pendingDrivers.length}</strong>
+            <article className="list-card stack-card promo-card">
+              <div className="user-form-grid">
+                <input
+                  value={managedUserForm.phone}
+                  onChange={(event) => updateManagedUserForm('phone', event.target.value)}
+                  placeholder="+591..."
+                />
+                <select
+                  value={managedUserForm.role}
+                  onChange={(event) => updateManagedUserForm('role', event.target.value as 'passenger' | 'driver')}
+                >
+                  <option value="passenger">Pasajero</option>
+                  <option value="driver">Conductor</option>
+                </select>
+                <input
+                  value={managedUserForm.firstName}
+                  onChange={(event) => updateManagedUserForm('firstName', event.target.value)}
+                  placeholder="Nombre"
+                />
+                <input
+                  value={managedUserForm.lastName}
+                  onChange={(event) => updateManagedUserForm('lastName', event.target.value)}
+                  placeholder="Apellido"
+                />
+                <input
+                  value={managedUserForm.email}
+                  onChange={(event) => updateManagedUserForm('email', event.target.value)}
+                  placeholder="correo@empresa.com"
+                />
+                <input
+                  value={managedUserForm.address}
+                  onChange={(event) => updateManagedUserForm('address', event.target.value)}
+                  placeholder="Direccion o referencia"
+                />
+                <input
+                  value={managedUserForm.password}
+                  onChange={(event) => updateManagedUserForm('password', event.target.value)}
+                  placeholder={userFormMode === 'create' ? 'Contrasena inicial' : 'Nueva contrasena (opcional)'}
+                  type="password"
+                />
+                <label className="inline-check">
+                  <input
+                    checked={managedUserForm.profileCompleted}
+                    onChange={(event) => updateManagedUserForm('profileCompleted', event.target.checked)}
+                    type="checkbox"
+                  />
+                  <span>Perfil completo</span>
+                </label>
+
+                {managedUserForm.role === 'driver' && (
+                  <>
+                    <input
+                      value={managedUserForm.licenseNumber}
+                      onChange={(event) => updateManagedUserForm('licenseNumber', event.target.value)}
+                      placeholder="Numero de licencia"
+                    />
+                    <select
+                      value={managedUserForm.accessStatus}
+                      onChange={(event) =>
+                        updateManagedUserForm(
+                          'accessStatus',
+                          event.target.value as 'PENDIENTE' | 'AUTORIZADO' | 'RECHAZADO',
+                        )
+                      }
+                    >
+                      <option value="PENDIENTE">Pendiente</option>
+                      <option value="AUTORIZADO">Autorizado</option>
+                      <option value="RECHAZADO">Rechazado</option>
+                    </select>
+                  </>
+                )}
               </div>
-              <div className="mini-stat-card">
-                <span>Equipos pendientes</span>
-                <strong>{pendingDevices.length}</strong>
+              <div className="action-row">
+                <button className="primary-button" disabled={loading} onClick={saveManagedUser}>
+                  {loading ? 'Guardando...' : userFormMode === 'create' ? 'Crear usuario' : 'Guardar cambios'}
+                </button>
+                <button className="secondary-button" onClick={openCreateUserForm}>
+                  Nuevo formulario
+                </button>
               </div>
-              <div className="mini-stat-card">
-                <span>Reportes vinculados</span>
-                <strong>{supportReports.length}</strong>
-              </div>
-              <div className="mini-stat-card">
-                <span>Dispositivos totales</span>
-                <strong>{allDevices.length}</strong>
-              </div>
-            </div>
+            </article>
           </section>
         </div>
       </section>

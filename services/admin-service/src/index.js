@@ -3,6 +3,7 @@ const cors = require("@fastify/cors");
 const jwt = require("@fastify/jwt");
 const { Pool } = require("pg");
 const Redis = require("ioredis");
+const bcrypt = require("bcryptjs");
 const { z } = require("zod");
 
 const app = Fastify({ logger: true });
@@ -21,6 +22,32 @@ const changeDriverAccessSchema = z.object({
 
 const changeUserPhoneSchema = z.object({
   phone: z.string().min(8)
+});
+
+const adminUserCreateSchema = z.object({
+  phone: z.string().min(8),
+  role: z.enum(["passenger", "driver"]),
+  firstName: z.string().min(2).max(80),
+  lastName: z.string().min(2).max(80).optional().or(z.literal("")),
+  email: z.string().email().optional().or(z.literal("")),
+  address: z.string().max(240).optional().or(z.literal("")),
+  password: z.string().min(8),
+  profileCompleted: z.boolean().optional(),
+  licenseNumber: z.string().min(5).max(64).optional().or(z.literal("")),
+  accessStatus: z.enum(["PENDIENTE", "AUTORIZADO", "RECHAZADO"]).optional()
+});
+
+const adminUserUpdateSchema = z.object({
+  phone: z.string().min(8),
+  role: z.enum(["passenger", "driver"]),
+  firstName: z.string().min(2).max(80),
+  lastName: z.string().min(2).max(80).optional().or(z.literal("")),
+  email: z.string().email().optional().or(z.literal("")),
+  address: z.string().max(240).optional().or(z.literal("")),
+  password: z.string().min(8).optional().or(z.literal("")),
+  profileCompleted: z.boolean().optional(),
+  licenseNumber: z.string().min(5).max(64).optional().or(z.literal("")),
+  accessStatus: z.enum(["PENDIENTE", "AUTORIZADO", "RECHAZADO"]).optional()
 });
 
 const promoSettingsSchema = z.object({
@@ -102,6 +129,44 @@ function getRangeSql(range) {
     default:
       return "NOW() - INTERVAL '1 day'";
   }
+}
+
+async function readAdminUserById(userId, client = pool) {
+  const result = await client.query(
+    `SELECT u.id AS user_id,
+            u.phone,
+            u.full_name,
+            u.first_name,
+            u.last_name,
+            u.email,
+            u.address,
+            u.role,
+            u.profile_completed,
+            u.created_at,
+            u.updated_at,
+            d.id AS driver_id,
+            d.status AS driver_status,
+            d.is_available AS driver_available,
+            d.access_status AS driver_access_status,
+            d.license_number,
+            COALESCE((SELECT COUNT(*) FROM user_devices ud WHERE ud.user_id = u.id), 0)::int AS device_count,
+            COALESCE((SELECT COUNT(*) FROM user_devices ud WHERE ud.user_id = u.id AND ud.status = 'AUTORIZADO'), 0)::int AS authorized_devices,
+            COALESCE((SELECT COUNT(*) FROM user_devices ud WHERE ud.user_id = u.id AND ud.status = 'PENDIENTE'), 0)::int AS pending_devices,
+            COALESCE((SELECT COUNT(*) FROM support_reports sr WHERE sr.user_id = u.id AND sr.status = 'ABIERTO'), 0)::int AS support_open_count,
+            COALESCE((
+              SELECT COUNT(*)
+              FROM trips t
+              WHERE t.passenger_id = u.id
+                 OR (d.id IS NOT NULL AND t.driver_id = d.id)
+            ), 0)::int AS total_trips
+     FROM users u
+     LEFT JOIN drivers d ON d.user_id = u.id
+     WHERE u.id = $1
+     LIMIT 1`,
+    [userId]
+  );
+
+  return result.rows[0] || null;
 }
 
 async function ensureAdminSchema() {
@@ -477,6 +542,236 @@ async function bootstrap() {
     );
 
     return result.rows;
+  });
+
+  app.get("/users", { preHandler: ensureAdmin }, async () => {
+    const result = await pool.query(
+      `SELECT u.id AS user_id,
+              u.phone,
+              u.full_name,
+              u.first_name,
+              u.last_name,
+              u.email,
+              u.address,
+              u.role,
+              u.profile_completed,
+              u.created_at,
+              u.updated_at,
+              d.id AS driver_id,
+              d.status AS driver_status,
+              d.is_available AS driver_available,
+              d.access_status AS driver_access_status,
+              d.license_number,
+              COALESCE((SELECT COUNT(*) FROM user_devices ud WHERE ud.user_id = u.id), 0)::int AS device_count,
+              COALESCE((SELECT COUNT(*) FROM user_devices ud WHERE ud.user_id = u.id AND ud.status = 'AUTORIZADO'), 0)::int AS authorized_devices,
+              COALESCE((SELECT COUNT(*) FROM user_devices ud WHERE ud.user_id = u.id AND ud.status = 'PENDIENTE'), 0)::int AS pending_devices,
+              COALESCE((SELECT COUNT(*) FROM support_reports sr WHERE sr.user_id = u.id AND sr.status = 'ABIERTO'), 0)::int AS support_open_count,
+              COALESCE((
+                SELECT COUNT(*)
+                FROM trips t
+                WHERE t.passenger_id = u.id
+                   OR (d.id IS NOT NULL AND t.driver_id = d.id)
+              ), 0)::int AS total_trips
+       FROM users u
+       LEFT JOIN drivers d ON d.user_id = u.id
+       ORDER BY u.updated_at DESC, u.created_at DESC
+       LIMIT 500`
+    );
+
+    return result.rows;
+  });
+
+  app.post("/users", { preHandler: ensureAdmin }, async (request, reply) => {
+    const payload = adminUserCreateSchema.parse(request.body);
+    const normalizedPhone = normalizePhone(payload.phone);
+
+    if (payload.role === "driver" && !String(payload.licenseNumber || "").trim()) {
+      return reply.code(400).send({ message: "La licencia es obligatoria para crear un conductor." });
+    }
+
+    const existingUser = await pool.query(`SELECT id FROM users WHERE phone = $1 LIMIT 1`, [normalizedPhone]);
+    if (existingUser.rows.length) {
+      return reply.code(409).send({ message: "Ya existe una cuenta con ese telefono." });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const passwordHash = await bcrypt.hash(payload.password, 10);
+      const fullName = [payload.firstName, payload.lastName].filter(Boolean).join(" ").trim();
+
+      const userResult = await client.query(
+        `INSERT INTO users (phone, full_name, first_name, last_name, email, address, password_hash, profile_completed, role, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::user_role, NOW())
+         RETURNING id`,
+        [
+          normalizedPhone,
+          fullName || null,
+          payload.firstName,
+          payload.lastName || null,
+          payload.email || null,
+          payload.address || null,
+          passwordHash,
+          payload.profileCompleted === true,
+          payload.role
+        ]
+      );
+
+      const userId = userResult.rows[0].id;
+      if (payload.role === "driver") {
+        await client.query(
+          `INSERT INTO drivers (user_id, license_number, access_status, access_granted_at)
+           VALUES ($1, $2, $3, CASE WHEN $3 = 'AUTORIZADO' THEN NOW() ELSE NULL END)`,
+          [userId, String(payload.licenseNumber || "").trim(), payload.accessStatus || "PENDIENTE"]
+        );
+      }
+
+      await client.query("COMMIT");
+      return {
+        message: "Usuario creado por central",
+        user: await readAdminUserById(userId)
+      };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  });
+
+  app.patch("/users/:userId", { preHandler: ensureAdmin }, async (request, reply) => {
+    const { userId } = request.params;
+    const payload = adminUserUpdateSchema.parse(request.body);
+    const normalizedPhone = normalizePhone(payload.phone);
+
+    const currentUser = await readAdminUserById(userId);
+    if (!currentUser) {
+      return reply.code(404).send({ message: "Usuario no encontrado" });
+    }
+
+    const phoneConflict = await pool.query(
+      `SELECT id FROM users WHERE phone = $1 AND id <> $2 LIMIT 1`,
+      [normalizedPhone, userId]
+    );
+    if (phoneConflict.rows.length) {
+      return reply.code(409).send({ message: "Ese telefono ya pertenece a otra cuenta." });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const fullName = [payload.firstName, payload.lastName].filter(Boolean).join(" ").trim();
+      let passwordSql = "";
+      const queryParams = [
+        userId,
+        normalizedPhone,
+        fullName || null,
+        payload.firstName,
+        payload.lastName || null,
+        payload.email || null,
+        payload.address || null,
+        payload.profileCompleted === true,
+        payload.role
+      ];
+
+      if (String(payload.password || "").trim()) {
+        const passwordHash = await bcrypt.hash(String(payload.password).trim(), 10);
+        queryParams.push(passwordHash);
+        passwordSql = `, password_hash = $${queryParams.length}`;
+      }
+
+      await client.query(
+        `UPDATE users
+         SET phone = $2,
+             full_name = $3,
+             first_name = $4,
+             last_name = $5,
+             email = $6,
+             address = $7,
+             profile_completed = $8,
+             role = $9::user_role,
+             updated_at = NOW()
+             ${passwordSql}
+         WHERE id = $1`,
+        queryParams
+      );
+
+      const driverResult = await client.query(`SELECT id FROM drivers WHERE user_id = $1 LIMIT 1`, [userId]);
+      const existingDriverId = driverResult.rows[0]?.id || null;
+
+      if (payload.role === "driver") {
+        if (!String(payload.licenseNumber || "").trim()) {
+          await client.query("ROLLBACK");
+          return reply.code(400).send({ message: "La licencia es obligatoria para un usuario conductor." });
+        }
+
+        if (existingDriverId) {
+          await client.query(
+            `UPDATE drivers
+             SET license_number = $2,
+                 access_status = COALESCE($3, access_status),
+                 access_granted_at = CASE WHEN COALESCE($3, access_status) = 'AUTORIZADO' THEN NOW() ELSE access_granted_at END,
+                 updated_at = NOW()
+             WHERE id = $1`,
+            [existingDriverId, String(payload.licenseNumber || "").trim(), payload.accessStatus || null]
+          );
+        } else {
+          await client.query(
+            `INSERT INTO drivers (user_id, license_number, access_status, access_granted_at)
+             VALUES ($1, $2, $3, CASE WHEN $3 = 'AUTORIZADO' THEN NOW() ELSE NULL END)`,
+            [userId, String(payload.licenseNumber || "").trim(), payload.accessStatus || "PENDIENTE"]
+          );
+        }
+      } else if (existingDriverId) {
+        const tripConflict = await client.query(
+          `SELECT COUNT(*)::int AS count
+           FROM trips
+           WHERE driver_id = $1`,
+          [existingDriverId]
+        );
+
+        if (Number(tripConflict.rows[0]?.count || 0) > 0) {
+          await client.query("ROLLBACK");
+          return reply.code(409).send({ message: "No se puede cambiar a pasajero porque el conductor ya tiene viajes registrados." });
+        }
+
+        await client.query(`DELETE FROM drivers WHERE id = $1`, [existingDriverId]);
+      }
+
+      await client.query("COMMIT");
+      return {
+        message: "Usuario actualizado por central",
+        user: await readAdminUserById(userId)
+      };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  });
+
+  app.delete("/users/:userId", { preHandler: ensureAdmin }, async (request, reply) => {
+    const { userId } = request.params;
+    const currentUser = await readAdminUserById(userId);
+    if (!currentUser) {
+      return reply.code(404).send({ message: "Usuario no encontrado" });
+    }
+
+    const tripConflict = await pool.query(
+      `SELECT COUNT(*)::int AS count
+       FROM trips
+       WHERE passenger_id = $1
+          OR ($2::uuid IS NOT NULL AND driver_id = $2::uuid)`,
+      [userId, currentUser.driver_id || null]
+    );
+
+    if (Number(tripConflict.rows[0]?.count || 0) > 0) {
+      return reply.code(409).send({ message: "No se puede eliminar un usuario con viajes registrados." });
+    }
+
+    await pool.query(`DELETE FROM users WHERE id = $1`, [userId]);
+    return { message: "Usuario eliminado por central" };
   });
 
   app.get("/support/reports", { preHandler: ensureUser }, async (request) => {
