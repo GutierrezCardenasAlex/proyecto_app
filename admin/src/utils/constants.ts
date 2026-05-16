@@ -2,6 +2,8 @@ import type { AdminView, ManagedUserForm } from '../types/admin'
 
 const envApiBase = import.meta.env.VITE_API_BASE_URL?.trim()
 const envWsBase = import.meta.env.VITE_WS_URL?.trim()
+const envMonitorUsername = import.meta.env.VITE_MONITOR_USERNAME?.trim()
+const envMonitorPassword = import.meta.env.VITE_MONITOR_PASSWORD?.trim()
 
 export const API_BASE = envApiBase && envApiBase.length > 0 ? envApiBase : '/api'
 export const WS_BASE =
@@ -10,10 +12,16 @@ export const WS_BASE =
     : typeof window !== 'undefined'
       ? window.location.origin
       : 'http://localhost:5173'
+export const MONITORING_CREDENTIALS = {
+  username: envMonitorUsername && envMonitorUsername.length > 0 ? envMonitorUsername : 'monitoreo',
+  password: envMonitorPassword && envMonitorPassword.length > 0 ? envMonitorPassword : 'Monitoreo2026',
+} as const
 export const CITY_CENTER: [number, number] = [-19.5836, -65.7531]
 
 export const APP_ROUTES = {
   login: '/login',
+  monitoringLogin: '/monitoreo/login',
+  monitoring: '/monitoreo',
   dashboard: '/dashboard',
   dashboardMap: '/dashboard/mapa',
   dashboardDrivers: '/dashboard/conductores',
@@ -100,6 +108,7 @@ export const DASHBOARD_NAV_ITEMS = [
 ] as const
 
 export const PAGE_META = {
+  [APP_ROUTES.monitoring]: { title: 'Monitoreo en vivo', subtitle: 'Acceso restringido solo para seguimiento operativo del mapa.' },
   [APP_ROUTES.dashboard]: { title: 'Dashboard', subtitle: 'Vista ejecutiva de movilidad y rendimiento en tiempo real.' },
   [APP_ROUTES.dashboardMap]: { title: 'Mapa en vivo', subtitle: 'Mapa protagonista con unidades, estados y cobertura activa.' },
   [APP_ROUTES.dashboardDrivers]: { title: 'Conductores', subtitle: 'Disponibilidad, acceso y desempeno de la flota humana.' },

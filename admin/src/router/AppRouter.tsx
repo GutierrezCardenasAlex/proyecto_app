@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth'
 import { APP_ROUTES } from '../utils/constants'
 import AuthLayout from '../layouts/AuthLayout'
 import DashboardLayout from '../layouts/DashboardLayout'
+import MonitoringLayout from '../layouts/MonitoringLayout'
 import DashboardHome from '../pages/Dashboard/DashboardHome'
 import DriversPage from '../pages/Dashboard/Drivers'
 import LiveMapPage from '../pages/Dashboard/LiveMap'
@@ -14,6 +15,8 @@ import TripsPage from '../pages/Dashboard/Trips'
 import DashboardUsersPage from '../pages/Dashboard/Users'
 import VehiclesPage from '../pages/Dashboard/Vehicles'
 import Login from '../pages/Login/Login'
+import MonitoringLogin from '../pages/Monitoring/MonitoringLogin'
+import MonitoringMapPage from '../pages/Monitoring/MonitoringMap'
 import NotFound from '../pages/NotFound/NotFound'
 
 function ProtectedRoute() {
@@ -26,6 +29,16 @@ function PublicRoute() {
   return isAuthenticated ? <Navigate to={APP_ROUTES.dashboard} replace /> : <Outlet />
 }
 
+function MonitoringProtectedRoute() {
+  const { isAuthenticated, monitorAuthenticated } = useAuth()
+  return isAuthenticated || monitorAuthenticated ? <Outlet /> : <Navigate to={APP_ROUTES.monitoringLogin} replace />
+}
+
+function MonitoringPublicRoute() {
+  const { isAuthenticated, monitorAuthenticated } = useAuth()
+  return isAuthenticated || monitorAuthenticated ? <Navigate to={APP_ROUTES.monitoring} replace /> : <Outlet />
+}
+
 function RouterTree() {
   return (
     <HashRouter>
@@ -33,6 +46,24 @@ function RouterTree() {
         <Route element={<PublicRoute />}>
           <Route element={<AuthLayout />}>
             <Route path={APP_ROUTES.login} element={<Login />} />
+          </Route>
+        </Route>
+
+        <Route element={<MonitoringPublicRoute />}>
+          <Route element={<AuthLayout />}>
+            <Route path={APP_ROUTES.monitoringLogin} element={<MonitoringLogin />} />
+          </Route>
+        </Route>
+
+        <Route element={<MonitoringProtectedRoute />}>
+          <Route
+            element={
+              <CentralProvider>
+                <MonitoringLayout />
+              </CentralProvider>
+            }
+          >
+            <Route path={APP_ROUTES.monitoring} element={<MonitoringMapPage />} />
           </Route>
         </Route>
 
