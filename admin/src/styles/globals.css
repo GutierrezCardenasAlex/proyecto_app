@@ -294,6 +294,21 @@ a {
   margin-top: 20px;
 }
 
+.access-portal-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.access-portal-card {
+  display: grid;
+  gap: 16px;
+}
+
+.access-portal-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .executive-auth-stats {
   margin-top: 18px;
 }

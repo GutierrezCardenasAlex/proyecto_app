@@ -13,6 +13,8 @@ export const WS_BASE =
 export const CITY_CENTER: [number, number] = [-19.5836, -65.7531]
 
 export const APP_ROUTES = {
+  accessGate: '/acceso',
+  accessHub: '/acceso/portal',
   login: '/login',
   monitoringLogin: '/monitoreo/login',
   monitoring: '/monitoreo',
@@ -102,6 +104,7 @@ export const DASHBOARD_NAV_ITEMS = [
 ] as const
 
 export const PAGE_META = {
+  [APP_ROUTES.accessHub]: { title: 'Portal seguro', subtitle: 'Selecciona el modulo autorizado despues de validar la clave superAdmin.' },
   [APP_ROUTES.monitoring]: { title: 'Monitoreo en vivo', subtitle: 'Acceso restringido solo para seguimiento operativo del mapa.' },
   [APP_ROUTES.dashboard]: { title: 'Dashboard', subtitle: 'Vista ejecutiva de movilidad y rendimiento en tiempo real.' },
   [APP_ROUTES.dashboardMap]: { title: 'Mapa en vivo', subtitle: 'Mapa protagonista con unidades, estados y cobertura activa.' },
@@ -147,7 +150,6 @@ export const NAV_ITEMS: Array<{ view: AdminView; label: string; hint: string; to
 ]
 
 export const DEFAULT_LOGIN = {
-  superAdminKey: 'superAdmin',
   username: 'centralflashgo',
   password: 'FlashGo2026',
   phone: '+59170000001',

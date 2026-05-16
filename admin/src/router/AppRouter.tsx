@@ -7,6 +7,8 @@ import AuthLayout from '../layouts/AuthLayout'
 import DashboardLayout from '../layouts/DashboardLayout'
 import MonitoringLayout from '../layouts/MonitoringLayout'
 import AccessDenied from '../pages/AccessDenied/AccessDenied'
+import AccessGate from '../pages/AccessGate/AccessGate'
+import AccessPortal from '../pages/AccessGate/AccessPortal'
 import DashboardHome from '../pages/Dashboard/DashboardHome'
 import DriversPage from '../pages/Dashboard/Drivers'
 import LiveMapPage from '../pages/Dashboard/LiveMap'
@@ -38,15 +40,37 @@ function ProtectedRoute() {
   )
 }
 
-function PublicRoute() {
-  const { isAdminSession, isMonitorSession } = useAuth()
+function GateRoute() {
+  const { hasAccessGate, isAdminSession, isMonitorSession } = useAuth()
   if (isAdminSession) {
     return <Navigate to={APP_ROUTES.dashboard} replace />
   }
   if (isMonitorSession) {
     return <Navigate to={APP_ROUTES.monitoring} replace />
   }
-  return <Outlet />
+  return hasAccessGate ? <Navigate to={APP_ROUTES.accessHub} replace /> : <Outlet />
+}
+
+function GateProtectedRoute() {
+  const { hasAccessGate, isAdminSession, isMonitorSession } = useAuth()
+  if (isAdminSession) {
+    return <Navigate to={APP_ROUTES.dashboard} replace />
+  }
+  if (isMonitorSession) {
+    return <Navigate to={APP_ROUTES.monitoring} replace />
+  }
+  return hasAccessGate ? <Outlet /> : <Navigate to={APP_ROUTES.accessGate} replace />
+}
+
+function PublicRoute() {
+  const { hasAccessGate, isAdminSession, isMonitorSession } = useAuth()
+  if (isAdminSession) {
+    return <Navigate to={APP_ROUTES.dashboard} replace />
+  }
+  if (isMonitorSession) {
+    return <Navigate to={APP_ROUTES.monitoring} replace />
+  }
+  return hasAccessGate ? <Outlet /> : <Navigate to={APP_ROUTES.accessGate} replace />
 }
 
 function MonitoringProtectedRoute() {
@@ -69,6 +93,20 @@ function RouterTree() {
   return (
     <HashRouter>
       <Routes>
+        <Route path="/" element={<Navigate to={APP_ROUTES.accessGate} replace />} />
+
+        <Route element={<GateRoute />}>
+          <Route element={<AuthLayout />}>
+            <Route path={APP_ROUTES.accessGate} element={<AccessGate />} />
+          </Route>
+        </Route>
+
+        <Route element={<GateProtectedRoute />}>
+          <Route element={<AuthLayout />}>
+            <Route path={APP_ROUTES.accessHub} element={<AccessPortal />} />
+          </Route>
+        </Route>
+
         <Route element={<PublicRoute />}>
           <Route element={<AuthLayout />}>
             <Route path={APP_ROUTES.login} element={<Login />} />
@@ -101,7 +139,6 @@ function RouterTree() {
               </CentralProvider>
             }
           >
-            <Route path="/" element={<Navigate to={APP_ROUTES.dashboard} replace />} />
             <Route path={APP_ROUTES.dashboard} element={<DashboardHome />} />
             <Route path={APP_ROUTES.dashboardMap} element={<LiveMapPage />} />
             <Route path={APP_ROUTES.dashboardDrivers} element={<DriversPage />} />

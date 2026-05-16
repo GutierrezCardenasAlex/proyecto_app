@@ -6,8 +6,7 @@ import { DEFAULT_LOGIN } from '../../utils/constants'
 import { useAuth } from '../../hooks/useAuth'
 
 export default function Login() {
-  const { setAuthenticatedSession, setAdminProfile } = useAuth()
-  const [superAdminKey, setSuperAdminKey] = useState(DEFAULT_LOGIN.superAdminKey)
+  const { gateToken, setAuthenticatedSession, setAdminProfile } = useAuth()
   const [username, setUsername] = useState(DEFAULT_LOGIN.username)
   const [password, setPassword] = useState(DEFAULT_LOGIN.password)
   const [phone, setPhone] = useState(DEFAULT_LOGIN.phone)
@@ -22,7 +21,7 @@ export default function Login() {
     setLoading(true)
     setError(null)
     try {
-      const payload = await loginAdmin(username, password, superAdminKey)
+      const payload = await loginAdmin(username, password, gateToken)
       setCredentialsVerified(true)
       setAdminProfile(payload.admin)
       setPhone(payload.admin.phone || phone)
@@ -69,7 +68,7 @@ export default function Login() {
   }
 
   const canValidateCredentials =
-    superAdminKey.trim().length >= 5 && username.trim().length >= 3 && password.trim().length >= 8
+    username.trim().length >= 3 && password.trim().length >= 8
 
   return (
     <section className="hero-panel auth-card">
@@ -77,12 +76,12 @@ export default function Login() {
         <p className="eyebrow">Central Flash Go</p>
         <h1>Centro ejecutivo de operacion, autorizacion y monitoreo institucional.</h1>
         <p className="subtitle">
-          Primero valida la clave superAdmin. Luego autentica tu usuario de central y finalmente confirma con el numero institucional para abrir el dashboard.
+          La puerta superAdmin ya fue validada. Ahora autentica tu usuario de central y confirma con el numero institucional para abrir el dashboard.
         </p>
         <div className="stats executive-auth-stats">
           <article className="stat-card">
-            <strong>Doble y triple control</strong>
-            <span>Clave superAdmin, credenciales de central y OTP institucional para cerrar puertas no autorizadas.</span>
+            <strong>Triple control</strong>
+            <span>Puerta superAdmin, credenciales de central y OTP institucional para cerrar puertas no autorizadas.</span>
           </article>
           <article className="stat-card">
             <strong>Sesion obligatoria</strong>
@@ -92,11 +91,6 @@ export default function Login() {
       </div>
 
       <Card className="auth-form">
-        <label>
-          <span>Clave superAdmin</span>
-          <input type="password" value={superAdminKey} onChange={(event) => setSuperAdminKey(event.target.value)} />
-        </label>
-
         <label>
           <span>Usuario central</span>
           <input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" />

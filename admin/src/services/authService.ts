@@ -1,12 +1,25 @@
 import { API_BASE } from '../utils/constants'
 import { apiRequest } from './api'
-import type { AdminLoginResponse, AdminOtpRequestResponse, AuthSessionResponse } from '../types/admin'
+import type { AccessGateResponse, AdminLoginResponse, AdminOtpRequestResponse, AuthSessionResponse } from '../types/admin'
 
-export function loginAdmin(username: string, password: string, superAdminKey: string) {
-  return apiRequest<AdminLoginResponse>(`${API_BASE}/auth/admin/login`, {
+const gateHeaders = (gateToken: string) => ({
+  'Content-Type': 'application/json',
+  'X-Access-Gate': gateToken,
+})
+
+export function verifyAccessGate(superAdminKey: string) {
+  return apiRequest<AccessGateResponse>(`${API_BASE}/auth/admin/access/verify`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password, superAdminKey }),
+    body: JSON.stringify({ superAdminKey }),
+  })
+}
+
+export function loginAdmin(username: string, password: string, gateToken: string) {
+  return apiRequest<AdminLoginResponse>(`${API_BASE}/auth/admin/login`, {
+    method: 'POST',
+    headers: gateHeaders(gateToken),
+    body: JSON.stringify({ username, password }),
   })
 }
 

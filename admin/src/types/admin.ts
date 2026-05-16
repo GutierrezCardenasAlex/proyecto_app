@@ -126,6 +126,14 @@ export type AuthSessionResponse = {
   admin: AdminProfile
 }
 
+export type AccessGateResponse = {
+  gateToken: string
+  access: {
+    central: boolean
+    monitoring: boolean
+  }
+}
+
 export type UserSummary = {
   user_id: string
   phone: string

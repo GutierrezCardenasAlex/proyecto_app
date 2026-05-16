@@ -20,8 +20,8 @@ export default function AccessDenied({
           Por seguridad, la central bloquea cualquier vista protegida cuando la sesion no existe, vencio o no tiene el perfil autorizado.
         </p>
         <div className="access-denied-actions">
-          <Link className="primary-button" to={APP_ROUTES.login}>
-            Ingresar a central
+          <Link className="primary-button" to={APP_ROUTES.accessGate}>
+            Abrir portal seguro
           </Link>
           {showMonitoringLink && (
             <Link className="secondary-button" to={APP_ROUTES.monitoringLogin}>

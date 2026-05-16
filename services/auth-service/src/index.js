@@ -81,7 +81,6 @@ const adminVerifyOtpSchema = z.object({
 });
 
 const adminLoginSchema = z.object({
-  superAdminKey: z.string().min(5),
   username: z.string().min(3),
   password: z.string().min(8)
 });
@@ -89,6 +88,10 @@ const adminLoginSchema = z.object({
 const monitorLoginSchema = z.object({
   username: z.string().min(3),
   password: z.string().min(8)
+});
+
+const accessGateSchema = z.object({
+  superAdminKey: z.string().min(5)
 });
 
 function normalizePhone(rawPhone) {
@@ -315,6 +318,38 @@ async function issueMonitorToken() {
     phone: null,
     accountType: "monitor"
   });
+}
+
+async function issueAccessGateToken() {
+  return app.jwt.sign(
+    {
+      sub: `gate:${monitorUsername}`,
+      role: "gate",
+      phone: null,
+      accountType: "access_gate"
+    },
+    { expiresIn: "12h" }
+  );
+}
+
+async function assertAccessGate(request, reply) {
+  const gateToken = String(request.headers["x-access-gate"] || "").trim();
+  if (!gateToken) {
+    reply.code(401).send({ message: "Debes validar primero la clave superAdmin." });
+    return null;
+  }
+
+  try {
+    const payload = await app.jwt.verify(gateToken);
+    if (payload?.role !== "gate" || payload?.accountType !== "access_gate") {
+      reply.code(403).send({ message: "La puerta superAdmin no es valida para este acceso." });
+      return null;
+    }
+    return payload;
+  } catch (error) {
+    reply.code(401).send({ message: "La validacion superAdmin vencio. Vuelve a ingresar el codigo." });
+    return null;
+  }
 }
 
 async function resolveDeviceAccess({ userId, deviceIdentifier, deviceName, platform }) {
@@ -809,10 +844,27 @@ async function bootstrap() {
     });
   });
 
+  app.post("/admin/access/verify", async (request, reply) => {
+    const parsed = accessGateSchema.parse(request.body);
+    if (parsed.superAdminKey.trim() !== superAdminAccessKey) {
+      return reply.code(403).send({ message: "Codigo superAdmin incorrecto." });
+    }
+
+    const gateToken = await issueAccessGateToken();
+    reply.send({
+      gateToken,
+      access: {
+        central: true,
+        monitoring: true,
+      },
+    });
+  });
+
   app.post("/admin/login", async (request, reply) => {
     const parsed = adminLoginSchema.parse(request.body);
-    if (parsed.superAdminKey.trim() !== superAdminAccessKey) {
-      return reply.code(403).send({ message: "Clave superAdmin incorrecta." });
+    const gatePayload = await assertAccessGate(request, reply);
+    if (!gatePayload) {
+      return;
     }
 
     const username = parsed.username.trim().toLowerCase();
