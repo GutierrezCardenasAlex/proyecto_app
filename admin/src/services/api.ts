@@ -12,6 +12,17 @@ export async function apiRequest<T>(url: string, init?: RequestInit, timeoutMs =
     const payload = contentType.includes('application/json') ? await response.json() : await response.text()
 
     if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Tu sesion ya no es valida o no estas autenticado.')
+      }
+
+      if (response.status === 403) {
+        if (typeof payload === 'string' && payload.trim().startsWith('<')) {
+          throw new Error('No tienes permisos suficientes para esta vista.')
+        }
+        throw new Error(typeof payload === 'object' && payload && 'message' in payload ? String(payload.message) : 'No tienes permisos suficientes para esta vista.')
+      }
+
       if (typeof payload === 'string') {
         if (payload.trim().startsWith('<')) {
           throw new Error(`La central devolvio HTML en vez de JSON (${response.status}). Revisa proxy, dominio o API.`)

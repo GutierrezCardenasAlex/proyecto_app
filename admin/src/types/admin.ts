@@ -104,9 +104,10 @@ export type DeviceRow = {
 
 export type AdminProfile = {
   id: string
-  phone: string
-  username?: string
-  fullName?: string
+  phone?: string | null
+  username?: string | null
+  fullName?: string | null
+  accessLevel?: 'admin' | 'monitor'
 }
 
 export type AdminOtpRequestResponse = {
@@ -117,6 +118,11 @@ export type AdminOtpRequestResponse = {
 
 export type AdminLoginResponse = {
   message?: string
+  admin: AdminProfile
+}
+
+export type AuthSessionResponse = {
+  token: string
   admin: AdminProfile
 }
 

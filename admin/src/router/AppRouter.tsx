@@ -6,6 +6,7 @@ import { APP_ROUTES } from '../utils/constants'
 import AuthLayout from '../layouts/AuthLayout'
 import DashboardLayout from '../layouts/DashboardLayout'
 import MonitoringLayout from '../layouts/MonitoringLayout'
+import AccessDenied from '../pages/AccessDenied/AccessDenied'
 import DashboardHome from '../pages/Dashboard/DashboardHome'
 import DriversPage from '../pages/Dashboard/Drivers'
 import LiveMapPage from '../pages/Dashboard/LiveMap'
@@ -20,23 +21,48 @@ import MonitoringMapPage from '../pages/Monitoring/MonitoringMap'
 import NotFound from '../pages/NotFound/NotFound'
 
 function ProtectedRoute() {
-  const { isAuthenticated } = useAuth()
-  return isAuthenticated ? <Outlet /> : <Navigate to={APP_ROUTES.login} replace />
+  const { isAdminSession, isAuthenticated } = useAuth()
+  if (isAdminSession) {
+    return <Outlet />
+  }
+
+  return (
+    <AccessDenied
+      title={isAuthenticated ? 'Tu sesion no tiene acceso a central' : 'No tienes permisos suficientes'}
+      subtitle={
+        isAuthenticated
+          ? 'La URL que intentaste abrir pertenece a central y requiere un perfil administrativo valido.'
+          : 'Debes autenticarte correctamente para entrar a las vistas protegidas de central.'
+      }
+    />
+  )
 }
 
 function PublicRoute() {
-  const { isAuthenticated } = useAuth()
-  return isAuthenticated ? <Navigate to={APP_ROUTES.dashboard} replace /> : <Outlet />
+  const { isAdminSession, isMonitorSession } = useAuth()
+  if (isAdminSession) {
+    return <Navigate to={APP_ROUTES.dashboard} replace />
+  }
+  if (isMonitorSession) {
+    return <Navigate to={APP_ROUTES.monitoring} replace />
+  }
+  return <Outlet />
 }
 
 function MonitoringProtectedRoute() {
-  const { isAuthenticated, monitorAuthenticated } = useAuth()
-  return isAuthenticated || monitorAuthenticated ? <Outlet /> : <Navigate to={APP_ROUTES.monitoringLogin} replace />
+  const { isAdminSession, isMonitorSession } = useAuth()
+  return isAdminSession || isMonitorSession ? <Outlet /> : <Navigate to={APP_ROUTES.monitoringLogin} replace />
 }
 
 function MonitoringPublicRoute() {
-  const { isAuthenticated, monitorAuthenticated } = useAuth()
-  return isAuthenticated || monitorAuthenticated ? <Navigate to={APP_ROUTES.monitoring} replace /> : <Outlet />
+  const { isAdminSession, isMonitorSession } = useAuth()
+  if (isMonitorSession) {
+    return <Navigate to={APP_ROUTES.monitoring} replace />
+  }
+  if (isAdminSession) {
+    return <Navigate to={APP_ROUTES.dashboard} replace />
+  }
+  return <Outlet />
 }
 
 function RouterTree() {

@@ -271,6 +271,23 @@ async function ensureAdmin(request, reply) {
   return null;
 }
 
+async function ensureAdminOrMonitor(request, reply) {
+  try {
+    await request.jwtVerify();
+  } catch (error) {
+    return reply.code(401).send({ message: "No autorizado" });
+  }
+
+  const isAdmin = request.user?.role === "admin" && request.user?.accountType === "admin";
+  const isMonitor = request.user?.role === "monitor" && request.user?.accountType === "monitor";
+
+  if (!isAdmin && !isMonitor) {
+    return reply.code(403).send({ message: "No tienes permisos suficientes para esta vista." });
+  }
+
+  return null;
+}
+
 async function ensureUser(request, reply) {
   try {
     await request.jwtVerify();
@@ -305,7 +322,7 @@ async function bootstrap() {
 
   app.get("/health", async () => ({ status: "ok", service: "admin-service" }));
 
-  app.get("/dashboard", { preHandler: ensureAdmin }, async () => {
+  app.get("/dashboard", { preHandler: ensureAdminOrMonitor }, async () => {
     const [drivers, trips, activeTrips, revenue, pendingDevices] = await Promise.all([
       pool.query("SELECT COUNT(*)::int AS count FROM drivers"),
       pool.query("SELECT COUNT(*)::int AS count FROM trips"),
@@ -327,11 +344,11 @@ async function bootstrap() {
     };
   });
 
-  app.get("/offline/status", { preHandler: ensureAdmin }, async () => {
+  app.get("/offline/status", { preHandler: ensureAdminOrMonitor }, async () => {
     return readOfflineMapStatus();
   });
 
-  app.get("/active-trips", { preHandler: ensureAdmin }, async () => {
+  app.get("/active-trips", { preHandler: ensureAdminOrMonitor }, async () => {
     const result = await pool.query(
       `SELECT id, passenger_id, driver_id, status, requested_at, accepted_at,
               ST_Y(pickup_location::geometry) AS pickup_lat,
@@ -346,7 +363,7 @@ async function bootstrap() {
     return result.rows;
   });
 
-  app.get("/drivers/live", { preHandler: ensureAdmin }, async () => {
+  app.get("/drivers/live", { preHandler: ensureAdminOrMonitor }, async () => {
     const drivers = await pool.query(
       `SELECT d.id,
               d.user_id,

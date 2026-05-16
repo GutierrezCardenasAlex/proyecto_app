@@ -73,6 +73,10 @@ services:
       SMS_TWILIO_AUTH_TOKEN: ${SMS_TWILIO_AUTH_TOKEN:-}
       SMS_TWILIO_FROM: ${SMS_TWILIO_FROM:-}
       AUTH_EXPOSE_OTP: ${AUTH_EXPOSE_OTP:-true}
+      SUPERADMIN_ACCESS_KEY: ${SUPERADMIN_ACCESS_KEY:-superAdmin}
+      MONITOR_USERNAME: ${MONITOR_USERNAME:-monitoreo}
+      MONITOR_PASSWORD: ${MONITOR_PASSWORD:-Monitoreo2026}
+      MONITOR_DISPLAY_NAME: ${MONITOR_DISPLAY_NAME:-Monitoreo Flash Go}
     depends_on:
       postgres:
         condition: service_healthy

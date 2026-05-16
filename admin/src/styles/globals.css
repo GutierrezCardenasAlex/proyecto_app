@@ -275,6 +275,25 @@ a {
   width: min(980px, 100%);
 }
 
+.access-denied-shell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 48px);
+  padding: 24px;
+}
+
+.access-denied-card {
+  width: min(620px, 100%);
+}
+
+.access-denied-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+}
+
 .executive-auth-stats {
   margin-top: 18px;
 }

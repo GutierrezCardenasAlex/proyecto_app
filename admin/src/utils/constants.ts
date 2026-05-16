@@ -2,8 +2,6 @@ import type { AdminView, ManagedUserForm } from '../types/admin'
 
 const envApiBase = import.meta.env.VITE_API_BASE_URL?.trim()
 const envWsBase = import.meta.env.VITE_WS_URL?.trim()
-const envMonitorUsername = import.meta.env.VITE_MONITOR_USERNAME?.trim()
-const envMonitorPassword = import.meta.env.VITE_MONITOR_PASSWORD?.trim()
 
 export const API_BASE = envApiBase && envApiBase.length > 0 ? envApiBase : '/api'
 export const WS_BASE =
@@ -12,10 +10,6 @@ export const WS_BASE =
     : typeof window !== 'undefined'
       ? window.location.origin
       : 'http://localhost:5173'
-export const MONITORING_CREDENTIALS = {
-  username: envMonitorUsername && envMonitorUsername.length > 0 ? envMonitorUsername : 'monitoreo',
-  password: envMonitorPassword && envMonitorPassword.length > 0 ? envMonitorPassword : 'Monitoreo2026',
-} as const
 export const CITY_CENTER: [number, number] = [-19.5836, -65.7531]
 
 export const APP_ROUTES = {
@@ -153,6 +147,7 @@ export const NAV_ITEMS: Array<{ view: AdminView; label: string; hint: string; to
 ]
 
 export const DEFAULT_LOGIN = {
+  superAdminKey: 'superAdmin',
   username: 'centralflashgo',
   password: 'FlashGo2026',
   phone: '+59170000001',

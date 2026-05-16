@@ -1,22 +1,27 @@
 import { useState } from 'react'
 import Button from '../../components/common/Button'
 import Card from '../../components/cards/Card'
+import { loginMonitor } from '../../services/authService'
 import { useAuth } from '../../hooks/useAuth'
-import { MONITORING_CREDENTIALS } from '../../utils/constants'
 
 export default function MonitoringLogin() {
-  const { setMonitorAuthenticated } = useAuth()
-  const [username, setUsername] = useState(MONITORING_CREDENTIALS.username)
-  const [password, setPassword] = useState(MONITORING_CREDENTIALS.password)
+  const { setAuthenticatedSession } = useAuth()
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  function handleLogin() {
-    if (username === MONITORING_CREDENTIALS.username && password === MONITORING_CREDENTIALS.password) {
-      setMonitorAuthenticated(true)
-      setError(null)
-      return
+  async function handleLogin() {
+    setLoading(true)
+    setError(null)
+    try {
+      const payload = await loginMonitor(username.trim(), password)
+      setAuthenticatedSession(payload.token, payload.admin, 'monitor')
+    } catch (loginError) {
+      setError(loginError instanceof Error ? loginError.message : 'No se pudo abrir la sesion de monitoreo.')
+    } finally {
+      setLoading(false)
     }
-    setError('Las credenciales de monitoreo no son correctas.')
   }
 
   return (
@@ -42,17 +47,24 @@ export default function MonitoringLogin() {
       <Card className="auth-form">
         <label>
           <span>Usuario de monitoreo</span>
-          <input value={username} onChange={(event) => setUsername(event.target.value)} />
+          <input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" />
         </label>
 
         <label>
           <span>Contrasena</span>
-          <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+          <input
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            autoComplete="current-password"
+          />
         </label>
 
         {error && <div className="error-box">{error}</div>}
 
-        <Button onClick={handleLogin}>Entrar a monitoreo</Button>
+        <Button disabled={loading || username.trim().length < 3 || password.length < 8} onClick={handleLogin}>
+          {loading ? 'Validando acceso...' : 'Entrar a monitoreo'}
+        </Button>
       </Card>
     </section>
   )

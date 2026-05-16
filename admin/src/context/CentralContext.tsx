@@ -119,8 +119,9 @@ const emptyPerformance: DriverPerformanceResponse = {
 export const CentralContext = createContext<CentralContextValue | null>(null)
 
 export function CentralProvider({ children }: PropsWithChildren) {
-  const { token, logout } = useAuth()
+  const { token, logout, sessionType } = useAuth()
   const mountedRef = useRef(true)
+  const isMonitoringSession = sessionType === 'monitor'
 
   const [dashboard, setDashboard] = useState<Dashboard>(emptyDashboard)
   const [drivers, setDrivers] = useState<Driver[]>([])
@@ -251,7 +252,10 @@ export function CentralProvider({ children }: PropsWithChildren) {
   }
 
   const handleAuthError = (failure: unknown) => {
-    if (failure instanceof Error && failure.message.includes('sesion')) {
+    if (
+      failure instanceof Error &&
+      ['sesion', 'autenticado', 'no autorizado', 'no es valida'].some((keyword) => failure.message.toLowerCase().includes(keyword))
+    ) {
       logout()
     }
   }
@@ -262,47 +266,80 @@ export function CentralProvider({ children }: PropsWithChildren) {
     setLoading(true)
     setError(null)
     try {
-      const results = await Promise.allSettled([
-        adminService.getDashboard(token),
-        adminService.getLiveDrivers(token),
-        adminService.getActiveTrips(token),
-        adminService.getPendingDrivers(token),
-        adminService.getPendingDevices(token),
-        adminService.getDevices(token),
-        adminService.getUsers(token),
-        adminService.getPromoSettings(token),
-        adminService.getSupportReports(token),
-        adminService.getDriverPerformance(token, performanceRange),
-        adminService.getOfflineStatus(token),
-      ])
+      let failures: PromiseRejectedResult[] = []
 
-      const [
-        dashboardResult,
-        driversResult,
-        tripsResult,
-        pendingDriversResult,
-        pendingDevicesResult,
-        devicesResult,
-        usersResult,
-        promoResult,
-        supportResult,
-        performanceResult,
-        offlineResult,
-      ] = results
+      if (isMonitoringSession) {
+        const results = await Promise.allSettled([
+          adminService.getDashboard(token),
+          adminService.getLiveDrivers(token),
+          adminService.getActiveTrips(token),
+          adminService.getOfflineStatus(token),
+        ])
+        const [dashboardResult, driversResult, tripsResult, offlineResult] = results
 
-      if (dashboardResult.status === 'fulfilled') setDashboard(dashboardResult.value)
-      if (driversResult.status === 'fulfilled') setDrivers(driversResult.value)
-      if (tripsResult.status === 'fulfilled') setTrips(tripsResult.value)
-      if (pendingDriversResult.status === 'fulfilled') setPendingDrivers(pendingDriversResult.value)
-      if (pendingDevicesResult.status === 'fulfilled') setPendingDevices(pendingDevicesResult.value)
-      if (devicesResult.status === 'fulfilled') setAllDevices(devicesResult.value)
-      if (usersResult.status === 'fulfilled') setManagedUsers(usersResult.value)
-      if (promoResult.status === 'fulfilled') setPromoSettings(promoResult.value)
-      if (supportResult.status === 'fulfilled') setSupportReports(supportResult.value)
-      if (performanceResult.status === 'fulfilled') setDriverPerformance(performanceResult.value)
-      if (offlineResult.status === 'fulfilled') setOfflineMapStatus(offlineResult.value)
+        if (dashboardResult.status === 'fulfilled') setDashboard(dashboardResult.value)
+        if (driversResult.status === 'fulfilled') setDrivers(driversResult.value)
+        if (tripsResult.status === 'fulfilled') setTrips(tripsResult.value)
+        if (offlineResult.status === 'fulfilled') setOfflineMapStatus(offlineResult.value)
 
-      const failures = results.filter((entry) => entry.status === 'rejected') as PromiseRejectedResult[]
+        if (mountedRef.current) {
+          setPendingDrivers([])
+          setPendingDevices([])
+          setAllDevices([])
+          setManagedUsers([])
+          setSupportReports([])
+          setSelectedDriverTrips(null)
+          setSelectedHistoryUser(null)
+          setSelectedManagedUser(null)
+          setUserHistory([])
+          setDriverPerformance(emptyPerformance)
+          setPromoSettings(emptyPromo)
+        }
+
+        failures = results.filter((entry) => entry.status === 'rejected') as PromiseRejectedResult[]
+      } else {
+        const results = await Promise.allSettled([
+          adminService.getDashboard(token),
+          adminService.getLiveDrivers(token),
+          adminService.getActiveTrips(token),
+          adminService.getPendingDrivers(token),
+          adminService.getPendingDevices(token),
+          adminService.getDevices(token),
+          adminService.getUsers(token),
+          adminService.getPromoSettings(token),
+          adminService.getSupportReports(token),
+          adminService.getDriverPerformance(token, performanceRange),
+          adminService.getOfflineStatus(token),
+        ])
+        const [
+          dashboardResult,
+          driversResult,
+          tripsResult,
+          pendingDriversResult,
+          pendingDevicesResult,
+          devicesResult,
+          usersResult,
+          promoResult,
+          supportResult,
+          performanceResult,
+          offlineResult,
+        ] = results
+
+        if (dashboardResult.status === 'fulfilled') setDashboard(dashboardResult.value)
+        if (driversResult.status === 'fulfilled') setDrivers(driversResult.value)
+        if (tripsResult.status === 'fulfilled') setTrips(tripsResult.value)
+        if (pendingDriversResult.status === 'fulfilled') setPendingDrivers(pendingDriversResult.value)
+        if (pendingDevicesResult.status === 'fulfilled') setPendingDevices(pendingDevicesResult.value)
+        if (devicesResult.status === 'fulfilled') setAllDevices(devicesResult.value)
+        if (usersResult.status === 'fulfilled') setManagedUsers(usersResult.value)
+        if (promoResult.status === 'fulfilled') setPromoSettings(promoResult.value)
+        if (supportResult.status === 'fulfilled') setSupportReports(supportResult.value)
+        if (performanceResult.status === 'fulfilled') setDriverPerformance(performanceResult.value)
+        if (offlineResult.status === 'fulfilled') setOfflineMapStatus(offlineResult.value)
+
+        failures = results.filter((entry) => entry.status === 'rejected') as PromiseRejectedResult[]
+      }
+
       if (failures.length > 0) {
         handleAuthError(failures[0].reason)
         ensureMountedSetError(failures[0].reason instanceof Error ? failures[0].reason.message : 'Parte de la central no respondio.')
@@ -355,7 +392,7 @@ export function CentralProvider({ children }: PropsWithChildren) {
       window.clearInterval(intervalId)
       socket.close()
     }
-  }, [token, performanceRange])
+  }, [isMonitoringSession, performanceRange, token])
 
   const openCreateUserForm = () => {
     setUserFormMode('create')

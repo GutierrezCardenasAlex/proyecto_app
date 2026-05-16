@@ -7,6 +7,7 @@ import { useAuth } from '../../hooks/useAuth'
 
 export default function Login() {
   const { setAuthenticatedSession, setAdminProfile } = useAuth()
+  const [superAdminKey, setSuperAdminKey] = useState(DEFAULT_LOGIN.superAdminKey)
   const [username, setUsername] = useState(DEFAULT_LOGIN.username)
   const [password, setPassword] = useState(DEFAULT_LOGIN.password)
   const [phone, setPhone] = useState(DEFAULT_LOGIN.phone)
@@ -21,7 +22,7 @@ export default function Login() {
     setLoading(true)
     setError(null)
     try {
-      const payload = await loginAdmin(username, password)
+      const payload = await loginAdmin(username, password, superAdminKey)
       setCredentialsVerified(true)
       setAdminProfile(payload.admin)
       setPhone(payload.admin.phone || phone)
@@ -59,7 +60,7 @@ export default function Login() {
     setError(null)
     try {
       const payload = await verifyAdminOtp(phone, otp)
-      setAuthenticatedSession(payload.token, payload.admin)
+      setAuthenticatedSession(payload.token, payload.admin, 'admin')
     } catch (verifyError) {
       setError(verifyError instanceof Error ? verifyError.message : 'No se pudo validar el OTP.')
     } finally {
@@ -67,68 +68,83 @@ export default function Login() {
     }
   }
 
+  const canValidateCredentials =
+    superAdminKey.trim().length >= 5 && username.trim().length >= 3 && password.trim().length >= 8
+
   return (
     <section className="hero-panel auth-card">
       <div>
         <p className="eyebrow">Central Flash Go</p>
         <h1>Centro ejecutivo de operacion, autorizacion y monitoreo institucional.</h1>
         <p className="subtitle">
-          Ingresa con tu usuario y contrasena de central. Luego valida con el numero institucional para abrir el dashboard ejecutivo.
+          Primero valida la clave superAdmin. Luego autentica tu usuario de central y finalmente confirma con el numero institucional para abrir el dashboard.
         </p>
         <div className="stats executive-auth-stats">
           <article className="stat-card">
-            <strong>Acceso institucional</strong>
-            <span>Usuario, contrasena y OTP de la central</span>
+            <strong>Doble y triple control</strong>
+            <span>Clave superAdmin, credenciales de central y OTP institucional para cerrar puertas no autorizadas.</span>
           </article>
           <article className="stat-card">
-            <strong>Control total</strong>
-            <span>Flota, soporte, dispositivos y promociones</span>
+            <strong>Sesion obligatoria</strong>
+            <span>Si la sesion falta o vence, la central bloquea vistas protegidas y expulsa el acceso.</span>
           </article>
         </div>
       </div>
 
       <Card className="auth-form">
         <label>
-          <span>Usuario ejecutivo</span>
-          <input value={username} onChange={(event) => setUsername(event.target.value)} />
+          <span>Clave superAdmin</span>
+          <input type="password" value={superAdminKey} onChange={(event) => setSuperAdminKey(event.target.value)} />
+        </label>
+
+        <label>
+          <span>Usuario central</span>
+          <input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" />
         </label>
 
         <label>
           <span>Contrasena</span>
-          <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+          <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" />
         </label>
 
-        <label>
-          <span>Numero institucional</span>
-          <input value={phone} onChange={(event) => setPhone(event.target.value)} disabled={!credentialsVerified} />
-        </label>
-
-        {credentialsVerified && otpRequested && (
+        {credentialsVerified && (
           <label>
-            <span>OTP</span>
+            <span>Numero institucional</span>
+            <input value={phone} onChange={(event) => setPhone(event.target.value)} />
+          </label>
+        )}
+
+        {otpRequested && (
+          <label>
+            <span>OTP institucional</span>
             <input value={otp} onChange={(event) => setOtp(event.target.value)} />
           </label>
         )}
 
-        {otpFallback && <div className="error-box">OTP de respaldo para central: {otpFallback}</div>}
+        {error && <div className="error-box">{error}</div>}
+
+        {otpFallback && <div className="success-box">OTP de respaldo listo para usar: {otpFallback}</div>}
 
         <Button
-          disabled={loading}
-          onClick={
-            !credentialsVerified ? handleCredentialLogin : otpRequested ? handleVerifyOtp : handleRequestOtp
+          disabled={
+            loading ||
+            (!credentialsVerified && !canValidateCredentials) ||
+            (credentialsVerified && !otpRequested && phone.trim().length < 8) ||
+            (credentialsVerified && otpRequested && otp.trim().length < 6)
           }
+          onClick={!credentialsVerified ? handleCredentialLogin : otpRequested ? handleVerifyOtp : handleRequestOtp}
         >
           {loading
             ? 'Procesando...'
             : !credentialsVerified
-              ? 'Validar credenciales'
+              ? 'Validar superAdmin y credenciales'
               : otpRequested
                 ? 'Ingresar a central'
                 : 'Solicitar OTP institucional'}
         </Button>
 
         {credentialsVerified && !otpRequested && (
-          <div className="success-box">Credenciales validadas. Ahora solicita el OTP del numero institucional para ingresar.</div>
+          <div className="success-box">Acceso superAdmin y credenciales validados. Ahora solicita el OTP institucional para ingresar.</div>
         )}
 
         {credentialsVerified && otpRequested && (
@@ -136,8 +152,6 @@ export default function Login() {
             Reenviar OTP
           </Button>
         )}
-
-        {error && <div className="error-box">{error}</div>}
       </Card>
     </section>
   )

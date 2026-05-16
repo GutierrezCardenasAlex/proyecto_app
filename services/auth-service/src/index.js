@@ -22,6 +22,10 @@ const defaultAdminPasswordHash =
   process.env.ADMIN_DEFAULT_PASSWORD_HASH ||
   "$2b$10$c17Q4cIl8rCYLsBdgwrNP.u.w7RFGViG6Zcmgvfy/dRsYu3fVMDna";
 const defaultAdminFullName = process.env.ADMIN_DEFAULT_FULL_NAME || "Central Flash Go";
+const superAdminAccessKey = String(process.env.SUPERADMIN_ACCESS_KEY || "superAdmin").trim();
+const monitorUsername = String(process.env.MONITOR_USERNAME || "monitoreo").trim().toLowerCase();
+const monitorPassword = String(process.env.MONITOR_PASSWORD || "Monitoreo2026").trim();
+const monitorDisplayName = String(process.env.MONITOR_DISPLAY_NAME || "Monitoreo Flash Go").trim();
 
 const registerRequestSchema = z.object({
   phone: z.string().min(8),
@@ -77,6 +81,12 @@ const adminVerifyOtpSchema = z.object({
 });
 
 const adminLoginSchema = z.object({
+  superAdminKey: z.string().min(5),
+  username: z.string().min(3),
+  password: z.string().min(8)
+});
+
+const monitorLoginSchema = z.object({
   username: z.string().min(3),
   password: z.string().min(8)
 });
@@ -295,6 +305,15 @@ async function issueAdminToken(adminAccount) {
     role: "admin",
     phone: adminAccount.phone,
     accountType: "admin"
+  });
+}
+
+async function issueMonitorToken() {
+  return app.jwt.sign({
+    sub: `monitor:${monitorUsername}`,
+    role: "monitor",
+    phone: null,
+    accountType: "monitor"
   });
 }
 
@@ -792,6 +811,10 @@ async function bootstrap() {
 
   app.post("/admin/login", async (request, reply) => {
     const parsed = adminLoginSchema.parse(request.body);
+    if (parsed.superAdminKey.trim() !== superAdminAccessKey) {
+      return reply.code(403).send({ message: "Clave superAdmin incorrecta." });
+    }
+
     const username = parsed.username.trim().toLowerCase();
 
     const adminResult = await pool.query(
@@ -821,7 +844,29 @@ async function bootstrap() {
         id: adminAccount.id,
         phone: adminAccount.phone,
         username: adminAccount.username,
-        fullName: adminAccount.full_name
+        fullName: adminAccount.full_name,
+        accessLevel: "admin"
+      }
+    });
+  });
+
+  app.post("/admin/monitor/login", async (request, reply) => {
+    const parsed = monitorLoginSchema.parse(request.body);
+    const username = parsed.username.trim().toLowerCase();
+
+    if (username !== monitorUsername || parsed.password !== monitorPassword) {
+      return reply.code(401).send({ message: "Credenciales de monitoreo incorrectas." });
+    }
+
+    const token = await issueMonitorToken();
+    reply.send({
+      token,
+      admin: {
+        id: "monitoring-access",
+        phone: null,
+        username: monitorUsername,
+        fullName: monitorDisplayName,
+        accessLevel: "monitor"
       }
     });
   });
@@ -870,7 +915,8 @@ async function bootstrap() {
       admin: {
         id: adminAccount.id,
         phone: adminAccount.phone,
-        fullName: adminAccount.full_name
+        fullName: adminAccount.full_name,
+        accessLevel: "admin"
       }
     });
   });
