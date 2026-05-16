@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Button from '../../components/common/Button'
 import Card from '../../components/cards/Card'
+import { adminService } from '../../services/adminService'
 import { loginMonitor } from '../../services/authService'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -16,6 +17,7 @@ export default function MonitoringLogin() {
     setError(null)
     try {
       const payload = await loginMonitor(username.trim(), password)
+      await adminService.getLiveDrivers(payload.token)
       setAuthenticatedSession(payload.token, payload.admin, 'monitor')
     } catch (loginError) {
       setError(loginError instanceof Error ? loginError.message : 'No se pudo abrir la sesion de monitoreo.')

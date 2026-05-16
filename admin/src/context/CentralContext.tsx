@@ -251,11 +251,12 @@ export function CentralProvider({ children }: PropsWithChildren) {
     }
   }
 
-  const handleAuthError = (failure: unknown) => {
-    if (
-      failure instanceof Error &&
-      ['sesion', 'autenticado', 'no autorizado', 'no es valida'].some((keyword) => failure.message.toLowerCase().includes(keyword))
-    ) {
+  const isAuthFailure = (failure: unknown) =>
+    failure instanceof Error &&
+    ['sesion', 'autenticado', 'no autorizado', 'no es valida'].some((keyword) => failure.message.toLowerCase().includes(keyword))
+
+  const handleAuthError = (failure: unknown, shouldLogout = true) => {
+    if (shouldLogout && isAuthFailure(failure)) {
       logout()
     }
   }
@@ -341,7 +342,8 @@ export function CentralProvider({ children }: PropsWithChildren) {
       }
 
       if (failures.length > 0) {
-        handleAuthError(failures[0].reason)
+        const authFailures = failures.filter((failure) => isAuthFailure(failure.reason))
+        handleAuthError(failures[0].reason, !isMonitoringSession || authFailures.length === failures.length)
         ensureMountedSetError(failures[0].reason instanceof Error ? failures[0].reason.message : 'Parte de la central no respondio.')
       }
 
