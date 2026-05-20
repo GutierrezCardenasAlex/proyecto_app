@@ -1,5 +1,5 @@
 import Card from '../../components/cards/Card'
-import MetricCard from '../../components/dashboard/MetricCard'
+import StatCard from '../../components/dashboard/StatCard'
 import { useCentral } from '../../hooks/useCentral'
 import { getDriverAvailabilityLabel, getDriverDisplayName, getDriverStatusLabel, getDriverTelemetryDate } from '../../utils/helpers'
 
@@ -9,11 +9,19 @@ export default function DriversPage() {
 
   return (
     <div className="saas-page-stack">
-      <section className="saas-metric-grid">
-        <MetricCard title="Conductores visibles" value={`${central.drivers.length}`} icon="👤" />
-        <MetricCard title="Disponibles" value={`${central.drivers.filter((driver) => driver.is_available).length}`} tone="success" icon="🟢" />
-        <MetricCard title="En viaje" value={`${central.drivers.filter((driver) => driver.current_trip_id).length}`} tone="warning" icon="🚕" />
-        <MetricCard title="Aprobados" value={`${authorized}`} icon="✅" />
+      <section className="admin-section-headline">
+        <div>
+          <span className="eyebrow">Flota humana</span>
+          <h2>Conductores, aprobaciones y disponibilidad</h2>
+          <p>Lectura operativa directa para revisar choferes conectados, estados de viaje y aprobaciones pendientes desde una sola cabina.</p>
+        </div>
+      </section>
+
+      <section className="admin-stats-grid">
+        <StatCard label="Conductores visibles" value={`${central.drivers.length}`} detail="Flota humana reportando al panel" icon="👤" />
+        <StatCard label="Disponibles" value={`${central.drivers.filter((driver) => driver.is_available).length}`} detail="Listos para operar" icon="🟢" tone="success" />
+        <StatCard label="En viaje" value={`${central.drivers.filter((driver) => driver.current_trip_id).length}`} detail="Unidades actualmente en ruta" icon="🚕" tone="warning" />
+        <StatCard label="Aprobados" value={`${authorized}`} detail={`${central.pendingDrivers.length} pendientes de revisar`} icon="✅" tone="neutral" />
       </section>
 
       <section className="saas-two-column">

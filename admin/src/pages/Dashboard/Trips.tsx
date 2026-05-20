@@ -1,5 +1,5 @@
 import Card from '../../components/cards/Card'
-import MetricCard from '../../components/dashboard/MetricCard'
+import StatCard from '../../components/dashboard/StatCard'
 import { useCentral } from '../../hooks/useCentral'
 
 export default function TripsPage() {
@@ -7,11 +7,19 @@ export default function TripsPage() {
 
   return (
     <div className="saas-page-stack">
-      <section className="saas-metric-grid">
-        <MetricCard title="Viajes visibles" value={`${central.trips.length}`} icon="🛣️" />
-        <MetricCard title="Asignados" value={`${central.trips.filter((trip) => trip.driver_id).length}`} tone="success" icon="📌" />
-        <MetricCard title="Pendientes" value={`${central.trips.filter((trip) => !trip.driver_id).length}`} tone="warning" icon="🟠" />
-        <MetricCard title="Autos en ruta" value={`${central.drivers.filter((driver) => driver.current_trip_id).length}`} icon="🚦" />
+      <section className="admin-section-headline">
+        <div>
+          <span className="eyebrow">Operacion activa</span>
+          <h2>Viajes en seguimiento y asignacion</h2>
+          <p>Seguimiento claro de los viajes visibles, las asignaciones activas y las unidades que todavia estan esperando conductor.</p>
+        </div>
+      </section>
+
+      <section className="admin-stats-grid">
+        <StatCard label="Viajes visibles" value={`${central.trips.length}`} detail="Servicio mostrado en tiempo real" icon="🛣️" />
+        <StatCard label="Asignados" value={`${central.trips.filter((trip) => trip.driver_id).length}`} detail="Conductor vinculado actualmente" icon="📌" tone="success" />
+        <StatCard label="Pendientes" value={`${central.trips.filter((trip) => !trip.driver_id).length}`} detail="Esperando asignacion" icon="🟠" tone="warning" />
+        <StatCard label="Autos en ruta" value={`${central.drivers.filter((driver) => driver.current_trip_id).length}`} detail="Conductores ya ocupados" icon="🚦" tone="neutral" />
       </section>
 
       <Card title="Viajes en seguimiento" subtitle="Operacion activa y respuesta rapida" className="saas-panel-dark">

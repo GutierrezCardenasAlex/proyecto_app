@@ -20,9 +20,9 @@ export default function DashboardHome() {
     <div className="saas-page-stack">
       <section className="saas-hero">
         <div className="saas-hero-copy">
-          <span className="eyebrow">Flash Go Fleet Command</span>
-          <h1>Panel SaaS de movilidad para monitorear flota, usuarios y servicio en una sola experiencia.</h1>
-          <p>La central consolida viajes, conductores, ingresos, soporte y visibilidad operativa con una lectura ejecutiva y moderna.</p>
+          <span className="eyebrow">Dashboard central</span>
+          <h1>Vista ejecutiva de movilidad, flota y servicio.</h1>
+          <p>La central consolida viajes, conductores, ingresos, soporte y visibilidad operativa en una lectura compacta y moderna.</p>
         </div>
         <div className="saas-hero-metrics">
           <MetricCard title="Autos activos" value={`${central.drivers.length}`} change={`${activeDrivers.length} disponibles ahora`} icon="🚕" />

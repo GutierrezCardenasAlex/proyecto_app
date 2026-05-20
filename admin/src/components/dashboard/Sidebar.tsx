@@ -64,12 +64,6 @@ export default function DashboardSidebar({
       <div className="saas-sidebar-brand">
         <div className="saas-brand-lockup">
           <div className="saas-logo-mark">FG</div>
-          {isOpen && (
-            <div>
-              <strong>Flash Go Fleet</strong>
-              <span>Executive Mobility Hub</span>
-            </div>
-          )}
         </div>
         <div className="saas-sidebar-brand-actions">
           <button type="button" className="saas-sidebar-rail-toggle" onClick={onToggleCollapse} aria-label="Ajustar ancho del menu">
