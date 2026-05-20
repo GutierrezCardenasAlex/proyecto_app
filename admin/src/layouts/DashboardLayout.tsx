@@ -10,7 +10,7 @@ import { PAGE_META } from '../utils/constants'
 export default function DashboardLayout() {
   const location = useLocation()
   const { logout } = useAuth()
-  const { adminSearch, setAdminSearch, refreshAll, loading, error, clearError } = useCentral()
+  const { adminSearch, setAdminSearch, loading, error, clearError } = useCentral()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
@@ -49,14 +49,10 @@ export default function DashboardLayout() {
   return (
     <div className="saas-shell">
       <DashboardSidebar
-        theme={theme}
         collapsed={sidebarCollapsed}
         mobileOpen={mobileMenuOpen}
-        loading={loading}
         onCloseMobile={() => setMobileMenuOpen(false)}
         onToggleCollapse={() => setSidebarCollapsed((current) => !current)}
-        onToggleTheme={handleToggleTheme}
-        onRefresh={() => void refreshAll()}
         onLogout={logout}
       />
 

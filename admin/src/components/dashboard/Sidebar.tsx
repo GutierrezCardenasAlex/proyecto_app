@@ -2,14 +2,10 @@ import { NavLink } from 'react-router-dom'
 import { DASHBOARD_NAV_ITEMS } from '../../utils/constants'
 
 type Props = {
-  theme: 'dark' | 'light'
   collapsed: boolean
   mobileOpen: boolean
-  loading: boolean
   onCloseMobile: () => void
   onToggleCollapse: () => void
-  onToggleTheme: () => void
-  onRefresh: () => void
   onLogout: () => void
 }
 
@@ -55,14 +51,10 @@ function Icon({ name }: { name: string }) {
 }
 
 export default function DashboardSidebar({
-  theme,
   collapsed,
   mobileOpen,
-  loading,
   onCloseMobile,
   onToggleCollapse,
-  onToggleTheme,
-  onRefresh,
   onLogout,
 }: Props) {
   const isOpen = mobileOpen || !collapsed
@@ -109,22 +101,9 @@ export default function DashboardSidebar({
       </nav>
 
       <div className={isOpen ? 'saas-sidebar-footer' : 'saas-sidebar-footer hidden'}>
-        <div className="saas-sidebar-footer-copy">
-          <strong>Cabina administrativa</strong>
-          <span>Accesos, operacion y trazabilidad centralizada.</span>
-        </div>
         <div className="saas-sidebar-footer-actions">
-          <button type="button" className="saas-ghost-button compact" onClick={onToggleCollapse}>
-            {collapsed ? 'Expandir' : 'Reducir'}
-          </button>
-          <button type="button" className="saas-ghost-button compact" onClick={onToggleTheme}>
-            {theme === 'dark' ? 'Claro' : 'Oscuro'}
-          </button>
-          <button type="button" className="saas-ghost-button compact" onClick={onRefresh} disabled={loading}>
-            {loading ? 'Sync...' : 'Sync'}
-          </button>
           <button type="button" className="saas-danger-link compact" onClick={onLogout}>
-            Salir
+            Cerrar sesion
           </button>
         </div>
       </div>
