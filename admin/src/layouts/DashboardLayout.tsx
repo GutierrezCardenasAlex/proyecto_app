@@ -52,7 +52,6 @@ export default function DashboardLayout() {
         collapsed={sidebarCollapsed}
         mobileOpen={mobileMenuOpen}
         onCloseMobile={() => setMobileMenuOpen(false)}
-        onToggleCollapse={() => setSidebarCollapsed((current) => !current)}
         onLogout={logout}
       />
 

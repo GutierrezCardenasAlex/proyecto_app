@@ -38,15 +38,21 @@ export default function UsersCrudPanel({
   const [formOpen, setFormOpen] = useState(false)
   const [detailUser, setDetailUser] = useState<ManagedUserRow | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ManagedUserRow | null>(null)
+  const [roleFilter, setRoleFilter] = useState<'all' | 'driver' | 'passenger'>('all')
+
+  const filteredUsers = useMemo(() => {
+    if (roleFilter === 'all') return users
+    return users.filter((user) => user.role === roleFilter)
+  }, [roleFilter, users])
 
   const summary = useMemo(
     () => ({
-      drivers: users.filter((user) => user.role === 'driver').length,
-      passengers: users.filter((user) => user.role === 'passenger').length,
-      actives: users.filter((user) => user.profile_completed).length,
-      recent: users.slice(0, 5).length,
+      drivers: filteredUsers.filter((user) => user.role === 'driver').length,
+      passengers: filteredUsers.filter((user) => user.role === 'passenger').length,
+      actives: filteredUsers.filter((user) => user.profile_completed).length,
+      recent: filteredUsers.slice(0, 5).length,
     }),
-    [users],
+    [filteredUsers],
   )
 
   function handleCreate() {
@@ -88,7 +94,7 @@ export default function UsersCrudPanel({
         </div>
 
         <div className="admin-stats-grid">
-          <StatCard label="Usuarios visibles" value={`${users.length}`} detail="Filtrados por la busqueda actual" icon="👥" />
+          <StatCard label="Usuarios visibles" value={`${filteredUsers.length}`} detail="Filtrados por la busqueda actual" icon="👥" />
           <StatCard label="Conductores" value={`${summary.drivers}`} detail="Con ficha operativa asociada" icon="🚕" tone="warning" />
           <StatCard label="Pasajeros" value={`${summary.passengers}`} detail="Listos para gestion comercial" icon="🧑" tone="success" />
           <StatCard label="Perfiles completos" value={`${summary.actives}`} detail={`${summary.recent} registros recientes`} icon="✨" tone="neutral" />
@@ -97,14 +103,27 @@ export default function UsersCrudPanel({
 
       <Card
         title="Directorio administrativo"
-        subtitle={`${users.length} usuarios visibles con acciones rapidas, estados y trazabilidad`}
+        subtitle={`${filteredUsers.length} usuarios visibles con acciones rapidas, estados y trazabilidad`}
         actions={
-          <Button variant="secondary" onClick={handleCreate}>
-            Nuevo usuario
-          </Button>
+          <div className="admin-toolbar-actions">
+            <div className="admin-filter-tabs">
+              <button type="button" className={roleFilter === 'all' ? 'admin-filter-tab active' : 'admin-filter-tab'} onClick={() => setRoleFilter('all')}>
+                Todos
+              </button>
+              <button type="button" className={roleFilter === 'passenger' ? 'admin-filter-tab active' : 'admin-filter-tab'} onClick={() => setRoleFilter('passenger')}>
+                Pasajeros
+              </button>
+              <button type="button" className={roleFilter === 'driver' ? 'admin-filter-tab active' : 'admin-filter-tab'} onClick={() => setRoleFilter('driver')}>
+                Conductores
+              </button>
+            </div>
+            <Button variant="secondary" onClick={handleCreate}>
+              Nuevo usuario
+            </Button>
+          </div>
         }
       >
-        <UserTable users={users} onView={setDetailUser} onEdit={handleEdit} onDelete={setDeleteTarget} onLoadHistory={onLoadHistory} />
+        <UserTable users={filteredUsers} onView={setDetailUser} onEdit={handleEdit} onDelete={setDeleteTarget} onLoadHistory={onLoadHistory} />
       </Card>
 
       <AdminModal

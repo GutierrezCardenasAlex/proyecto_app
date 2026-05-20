@@ -71,7 +71,6 @@ export default function DashboardNavbar({
       <div className="saas-navbar-left">
         <button type="button" className={sidebarCollapsed ? 'saas-burger collapsed' : 'saas-burger'} onClick={onToggleMenu} aria-label="Mostrar u ocultar menu lateral">
           <BurgerIcon />
-          <span className="saas-burger-label">{sidebarCollapsed ? 'Expandir' : 'Panel'}</span>
         </button>
         <div className="saas-navbar-copy">
           <strong>{title}</strong>

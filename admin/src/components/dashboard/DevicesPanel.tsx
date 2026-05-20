@@ -5,6 +5,7 @@ import { formatDateTime } from '../../utils/helpers'
 
 type Props = {
   devices: DeviceRow[]
+  embedded?: boolean
   onLoadHistory: (user: UserSummary) => Promise<void>
   onAuthorize: (deviceId: number) => Promise<void>
   onReplace: (deviceId: number) => Promise<void>
@@ -18,9 +19,9 @@ function getDeviceTone(status: DeviceRow['status']) {
   return 'warning'
 }
 
-export default function DevicesPanel({ devices, onLoadHistory, onAuthorize, onReplace, onBlock, onManageUser }: Props) {
-  return (
-    <Card title="Dispositivos registrados" subtitle={`${devices.length} equipos visibles con trazabilidad y gobierno centralizado`} className="devices-panel">
+export default function DevicesPanel({ devices, embedded = false, onLoadHistory, onAuthorize, onReplace, onBlock, onManageUser }: Props) {
+  const content = (
+    <>
       {!devices.length ? (
         <div className="admin-empty-state">
           <strong>No hay dispositivos registrados</strong>
@@ -105,6 +106,16 @@ export default function DevicesPanel({ devices, onLoadHistory, onAuthorize, onRe
           ))}
         </div>
       )}
+    </>
+  )
+
+  if (embedded) {
+    return content
+  }
+
+  return (
+    <Card title="Dispositivos registrados" subtitle={`${devices.length} equipos visibles con trazabilidad y gobierno centralizado`} className="devices-panel">
+      {content}
     </Card>
   )
 }

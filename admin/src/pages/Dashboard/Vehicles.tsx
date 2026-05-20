@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Card from '../../components/cards/Card'
 import Button from '../../components/common/Button'
 import AdminModal from '../../components/dashboard/AdminModal'
@@ -12,6 +12,7 @@ export default function VehiclesPage() {
   const central = useCentral()
   const [userModalOpen, setUserModalOpen] = useState(false)
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const [roleFilter, setRoleFilter] = useState<'all' | 'driver' | 'passenger'>('all')
   const selectedUser = central.selectedManagedUser
   const selectedName = selectedUser?.full_name || selectedUser?.phone || 'Usuario sin nombre'
   const selectedRoleLabel = central.managedUserForm.role === 'driver' ? 'Conductor' : 'Pasajero'
@@ -23,6 +24,11 @@ export default function VehiclesPage() {
       : deletionRiskTone === 'warning'
         ? 'Existen relaciones parciales con esta cuenta. La eliminacion debe confirmarse conscientemente.'
         : 'No se detectan dependencias relevantes. La eliminacion tiene un impacto menor.'
+
+  const filteredDevices = useMemo(() => {
+    if (roleFilter === 'all') return central.allDevices
+    return central.allDevices.filter((device) => device.role === roleFilter)
+  }, [central.allDevices, roleFilter])
 
   function handleManageUser(userId: string) {
     const user = central.managedUsers.find((item) => item.user_id === userId)
@@ -60,18 +66,18 @@ export default function VehiclesPage() {
       </section>
 
       <section className="admin-stats-grid">
-        <StatCard label="Equipos registrados" value={`${central.allDevices.length}`} detail="Inventario visible en central" icon="🧭" />
+        <StatCard label="Equipos registrados" value={`${filteredDevices.length}`} detail="Inventario visible en central" icon="🧭" />
         <StatCard
           label="Autorizados"
-          value={`${central.allDevices.filter((device) => device.status === 'AUTORIZADO').length}`}
+          value={`${filteredDevices.filter((device) => device.status === 'AUTORIZADO').length}`}
           detail="Listos para operar"
           icon="✅"
           tone="success"
         />
-        <StatCard label="Pendientes" value={`${central.pendingDevices.length}`} detail="Esperando decision de central" icon="⏳" tone="warning" />
+        <StatCard label="Pendientes" value={`${filteredDevices.filter((device) => device.status === 'PENDIENTE').length}`} detail="Esperando decision de central" icon="⏳" tone="warning" />
         <StatCard
           label="Bloqueados"
-          value={`${central.allDevices.filter((device) => device.status === 'RECHAZADO').length}`}
+          value={`${filteredDevices.filter((device) => device.status === 'RECHAZADO').length}`}
           detail="Cuentas restringidas o rechazadas"
           icon="⛔"
           tone="neutral"
@@ -79,14 +85,34 @@ export default function VehiclesPage() {
       </section>
 
       <section className="saas-two-column admin-ops-grid">
-        <DevicesPanel
-          devices={central.allDevices}
-          onManageUser={handleManageUser}
-          onLoadHistory={central.loadUserHistory}
-          onAuthorize={(deviceId) => central.updateDeviceStatus(deviceId, 'AUTORIZADO')}
-          onReplace={central.replaceDevice}
-          onBlock={(deviceId) => central.updateDeviceStatus(deviceId, 'RECHAZADO')}
-        />
+        <Card
+          title="Panel de vehiculos y equipos"
+          subtitle={`${filteredDevices.length} registros visibles con control de acceso, reemplazo y trazabilidad`}
+          className="saas-panel-dark"
+          actions={
+            <div className="admin-filter-tabs">
+              <button type="button" className={roleFilter === 'all' ? 'admin-filter-tab active' : 'admin-filter-tab'} onClick={() => setRoleFilter('all')}>
+                Todos
+              </button>
+              <button type="button" className={roleFilter === 'passenger' ? 'admin-filter-tab active' : 'admin-filter-tab'} onClick={() => setRoleFilter('passenger')}>
+                Pasajeros
+              </button>
+              <button type="button" className={roleFilter === 'driver' ? 'admin-filter-tab active' : 'admin-filter-tab'} onClick={() => setRoleFilter('driver')}>
+                Conductores
+              </button>
+            </div>
+          }
+        >
+          <DevicesPanel
+            devices={filteredDevices}
+            embedded
+            onManageUser={handleManageUser}
+            onLoadHistory={central.loadUserHistory}
+            onAuthorize={(deviceId) => central.updateDeviceStatus(deviceId, 'AUTORIZADO')}
+            onReplace={central.replaceDevice}
+            onBlock={(deviceId) => central.updateDeviceStatus(deviceId, 'RECHAZADO')}
+          />
+        </Card>
 
         <Card title="Control operativo" subtitle="Lectura rapida del impacto sobre la cuenta y sus equipos." className="saas-panel-dark">
           <div className="ops-summary-list">
