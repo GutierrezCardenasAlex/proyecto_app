@@ -1,7 +1,7 @@
 import ActivityPanel from '../../components/dashboard/ActivityPanel'
 import Card from '../../components/cards/Card'
+import DriverReportsPanel from '../../components/dashboard/DriverReportsPanel'
 import StatCard from '../../components/dashboard/StatCard'
-import StatsPanel from '../../components/dashboard/StatsPanel'
 import SupportPanel from '../../components/dashboard/SupportPanel'
 import { useCentral } from '../../hooks/useCentral'
 
@@ -72,7 +72,7 @@ export default function ReportsPage() {
         </Card>
       </section>
 
-      <StatsPanel
+      <DriverReportsPanel
         performanceRange={central.performanceRange}
         driverPerformance={central.driverPerformance}
         selectedDriverTrips={central.selectedDriverTrips}

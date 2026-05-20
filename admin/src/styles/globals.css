@@ -3895,3 +3895,320 @@ body.admin-theme-dark .admin-filter-tab {
 .saas-metric-value {
   font-size: 1.32rem;
 }
+
+.driver-report-shell {
+  display: grid;
+  gap: 18px;
+}
+
+.driver-report-toolbar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, auto));
+  gap: 12px;
+  align-items: end;
+}
+
+.driver-report-periods,
+.driver-report-dates {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.driver-report-search,
+.driver-report-dates label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.driver-report-search span,
+.driver-report-dates span,
+.driver-report-chart-head span,
+.driver-report-chart-head small,
+.driver-report-detail-head span,
+.driver-report-trip-row span,
+.driver-report-bar-copy small {
+  color: var(--text-dim);
+  font-size: 0.76rem;
+}
+
+.driver-report-search input,
+.driver-report-dates input {
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--field-border);
+  background: var(--field-bg);
+  color: var(--field-text);
+  padding: 0 12px;
+  outline: none;
+}
+
+.driver-report-top-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.8fr);
+  gap: 16px;
+}
+
+.driver-report-chart-card,
+.driver-report-detail-card {
+  border-radius: 20px;
+  border: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+  box-shadow: var(--panel-shadow);
+  padding: 16px;
+}
+
+.driver-report-chart-head,
+.driver-report-detail-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.driver-report-chart-head strong,
+.driver-report-detail-head strong {
+  display: block;
+  font-size: 1rem;
+}
+
+.driver-report-chart {
+  display: grid;
+  gap: 12px;
+}
+
+.driver-report-bar-row {
+  display: grid;
+  grid-template-columns: minmax(170px, 0.9fr) minmax(0, 1fr) minmax(110px, auto);
+  gap: 12px;
+  align-items: center;
+}
+
+.driver-report-bar-copy,
+.driver-report-driver-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.driver-report-bar-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.24), rgba(251, 146, 60, 0.12));
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.driver-report-bar-track {
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.18);
+  overflow: hidden;
+}
+
+.driver-report-bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #f97316, #fb923c);
+}
+
+.driver-report-bar-metrics {
+  display: grid;
+  justify-items: end;
+}
+
+.driver-report-bar-metrics strong {
+  font-size: 0.96rem;
+}
+
+.driver-report-kpis {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.driver-report-kpis article,
+.driver-report-detail-kpis article {
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.driver-report-kpis span,
+.driver-report-detail-kpis span {
+  display: block;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  margin-bottom: 6px;
+}
+
+.driver-report-kpis strong,
+.driver-report-detail-kpis strong {
+  display: block;
+  font-size: 1.08rem;
+}
+
+.driver-report-kpis small {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-dim);
+  font-size: 0.76rem;
+}
+
+.driver-report-table-shell {
+  display: grid;
+  gap: 14px;
+}
+
+.driver-report-table-wrap {
+  overflow-x: auto;
+}
+
+.driver-report-table {
+  width: 100%;
+  min-width: 920px;
+  border-collapse: collapse;
+}
+
+.driver-report-table th,
+.driver-report-table td {
+  text-align: left;
+  padding: 12px 10px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.driver-report-table th {
+  color: var(--text-dim);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.driver-report-mobile-list {
+  display: none;
+  gap: 12px;
+}
+
+.driver-report-mobile-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.driver-report-mobile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  color: var(--text-soft);
+  font-size: 0.84rem;
+}
+
+.driver-report-detail-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.driver-report-detail-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.driver-report-trip-list {
+  display: grid;
+  gap: 10px;
+}
+
+.driver-report-trip-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.driver-report-trip-row strong {
+  display: block;
+  font-size: 0.9rem;
+}
+
+.driver-report-empty {
+  padding: 20px;
+  border-radius: 16px;
+  text-align: center;
+  color: var(--text-dim);
+  border: 1px dashed rgba(148, 163, 184, 0.2);
+}
+
+body.admin-theme-light .driver-report-chart-card,
+body.admin-theme-light .driver-report-detail-card {
+  background: #ffffff;
+}
+
+body.admin-theme-light .driver-report-kpis article,
+body.admin-theme-light .driver-report-detail-kpis article,
+body.admin-theme-light .driver-report-mobile-card {
+  background: #ffffff;
+  border-color: rgba(226, 232, 240, 0.92);
+}
+
+body.admin-theme-light .driver-report-search input,
+body.admin-theme-light .driver-report-dates input {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+body.admin-theme-dark .driver-report-chart-head strong,
+body.admin-theme-dark .driver-report-detail-head strong,
+body.admin-theme-dark .driver-report-driver-cell strong,
+body.admin-theme-dark .driver-report-table td,
+body.admin-theme-dark .driver-report-trip-row strong {
+  color: #f8fafc;
+}
+
+@media (max-width: 1180px) {
+  .driver-report-toolbar,
+  .driver-report-top-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .driver-report-detail-kpis,
+  .driver-report-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .driver-report-trip-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .driver-report-table-wrap {
+    display: none;
+  }
+
+  .driver-report-mobile-list {
+    display: grid;
+  }
+
+  .driver-report-dates {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
