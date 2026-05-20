@@ -4521,3 +4521,171 @@ body.admin-theme-dark .driver-report-trip-row strong {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* Final mobile-first safety overrides */
+@media (max-width: 960px) {
+  html,
+  body,
+  #root,
+  .saas-shell,
+  .saas-main,
+  .saas-content,
+  .saas-page-stack {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  .saas-main,
+  .saas-main.collapsed,
+  .saas-main:not(.collapsed) {
+    width: 100%;
+    max-width: 100vw;
+    padding-left: 0 !important;
+  }
+
+  .saas-content {
+    padding: 10px 12px 22px !important;
+  }
+
+  .saas-navbar {
+    padding: 14px 12px 6px !important;
+  }
+
+  .saas-navbar-left,
+  .saas-navbar-right,
+  .saas-navbar-copy,
+  .admin-section-headline,
+  .panel-header,
+  .admin-section-actions,
+  .admin-toolbar-actions,
+  .driver-report-chart-head,
+  .driver-report-detail-head {
+    min-width: 0;
+  }
+
+  .saas-navbar-right {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .saas-search,
+  .saas-search input {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .saas-hero,
+  .saas-two-column,
+  .saas-map-layout,
+  .saas-hero-metrics,
+  .saas-health-grid,
+  .admin-stats-grid,
+  .settings-inline-kpis,
+  .detail-modal-grid,
+  .driver-report-top-grid,
+  .driver-report-kpis,
+  .driver-report-detail-kpis {
+    grid-template-columns: 1fr !important;
+  }
+
+  .panel,
+  .saas-panel-dark,
+  .admin-section-headline,
+  .driver-report-chart-card,
+  .driver-report-detail-card,
+  .admin-user-row,
+  .device-card,
+  .ops-summary-card,
+  .admin-stat-card {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .panel-header,
+  .admin-section-headline,
+  .driver-report-chart-head,
+  .driver-report-detail-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-section-actions > *,
+  .admin-toolbar-actions > *,
+  .driver-report-toolbar > *,
+  .driver-report-detail-actions > * {
+    width: 100%;
+  }
+
+  .admin-filter-tabs {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .admin-filter-tab {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .admin-user-table,
+  .admin-user-table__body,
+  .driver-report-table-shell,
+  .table-wrapper,
+  .driver-report-mobile-list {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  body {
+    overflow-x: hidden;
+  }
+
+  .saas-sidebar.is-expanded {
+    width: 100vw;
+    max-width: 100vw;
+    border-radius: 0;
+  }
+
+  .saas-navbar-copy strong {
+    font-size: 0.96rem;
+  }
+
+  .saas-hero {
+    padding: 12px !important;
+  }
+
+  .saas-hero h1 {
+    font-size: 1.08rem !important;
+  }
+
+  .saas-hero p,
+  .admin-section-headline p,
+  .panel-header span,
+  .driver-report-chart-head span,
+  .driver-report-detail-head span {
+    font-size: 0.8rem !important;
+  }
+
+  .saas-metric-card {
+    min-height: 78px !important;
+    padding: 10px !important;
+  }
+
+  .saas-metric-value {
+    font-size: 1.08rem !important;
+  }
+
+  .driver-report-dates {
+    grid-template-columns: 1fr !important;
+  }
+
+  .driver-report-bar-row,
+  .driver-report-trip-row,
+  .driver-report-mobile-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
