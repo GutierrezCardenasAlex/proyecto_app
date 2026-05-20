@@ -4,11 +4,13 @@ import { DASHBOARD_NAV_ITEMS } from '../../utils/constants'
 
 type Props = {
   adminProfile: AdminProfile | null
+  theme: 'dark' | 'light'
   collapsed: boolean
   mobileOpen: boolean
   loading: boolean
   onCloseMobile: () => void
   onToggleCollapse: () => void
+  onToggleTheme: () => void
   onRefresh: () => void
   onLogout: () => void
 }
@@ -18,6 +20,15 @@ function CloseIcon() {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
       <path d="M18 6 6 18" />
       <path d="m6 6 12 12" />
+    </svg>
+  )
+}
+
+function PanelToggleIcon({ collapsed }: { collapsed: boolean }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="16" rx="3" />
+      <path d={collapsed ? 'M9 4v16' : 'M15 4v16'} />
     </svg>
   )
 }
@@ -47,29 +58,38 @@ function Icon({ name }: { name: string }) {
 
 export default function DashboardSidebar({
   adminProfile,
+  theme,
   collapsed,
   mobileOpen,
   loading,
   onCloseMobile,
   onToggleCollapse,
+  onToggleTheme,
   onRefresh,
   onLogout,
 }: Props) {
   const isOpen = mobileOpen || !collapsed
 
   return (
-    <aside className={isOpen ? 'saas-sidebar mobile-open' : 'saas-sidebar collapsed'}>
+    <aside className={`saas-sidebar ${collapsed ? 'is-collapsed' : 'is-expanded'} ${mobileOpen ? 'mobile-open' : ''}`.trim()}>
       <div className="saas-sidebar-brand">
-        <div className="saas-logo-mark">FG</div>
-        {isOpen && (
-          <div>
-            <strong>Flash Go Fleet</strong>
-            <span>Executive Mobility Hub</span>
-          </div>
-        )}
-        <button type="button" className="saas-sidebar-close" onClick={onCloseMobile} aria-label="Cerrar menu">
-          <CloseIcon />
-        </button>
+        <div className="saas-brand-lockup">
+          <div className="saas-logo-mark">FG</div>
+          {isOpen && (
+            <div>
+              <strong>Flash Go Fleet</strong>
+              <span>Executive Mobility Hub</span>
+            </div>
+          )}
+        </div>
+        <div className="saas-sidebar-brand-actions">
+          <button type="button" className="saas-sidebar-rail-toggle" onClick={onToggleCollapse} aria-label="Ajustar ancho del menu">
+            <PanelToggleIcon collapsed={collapsed} />
+          </button>
+          <button type="button" className="saas-sidebar-close" onClick={onCloseMobile} aria-label="Cerrar menu">
+            <CloseIcon />
+          </button>
+        </div>
       </div>
 
       <div className="saas-sidebar-profile">
@@ -107,7 +127,10 @@ export default function DashboardSidebar({
           <span>Accesos, operacion y trazabilidad centralizada.</span>
         </div>
         <button type="button" className="saas-ghost-button" onClick={onToggleCollapse}>
-          {collapsed ? 'Abrir menu' : 'Ocultar menu'}
+          {collapsed ? 'Expandir panel' : 'Reducir panel'}
+        </button>
+        <button type="button" className="saas-ghost-button" onClick={onToggleTheme}>
+          {theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
         </button>
         <button type="button" className="saas-ghost-button" onClick={onRefresh} disabled={loading}>
           {loading ? 'Actualizando...' : 'Sincronizar'}
