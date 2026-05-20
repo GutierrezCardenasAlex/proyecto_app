@@ -102,6 +102,10 @@ export default function DashboardSidebar({
       </nav>
 
       <div className={isOpen ? 'saas-sidebar-footer' : 'saas-sidebar-footer hidden'}>
+        <div className="saas-sidebar-footer-copy">
+          <strong>Cabina administrativa</strong>
+          <span>Accesos, operacion y trazabilidad centralizada.</span>
+        </div>
         <button type="button" className="saas-ghost-button" onClick={onToggleCollapse}>
           {collapsed ? 'Abrir menu' : 'Ocultar menu'}
         </button>

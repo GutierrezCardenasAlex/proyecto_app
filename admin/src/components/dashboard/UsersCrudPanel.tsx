@@ -1,6 +1,12 @@
+import { useMemo, useState } from 'react'
 import Button from '../common/Button'
 import Card from '../cards/Card'
 import type { ManagedUserForm, ManagedUserRow, UserSummary } from '../../types/admin'
+import AdminModal from './AdminModal'
+import ConfirmDialog from './ConfirmDialog'
+import StatCard from './StatCard'
+import UserForm from './UserForm'
+import UserTable from './UserTable'
 
 type Props = {
   users: ManagedUserRow[]
@@ -29,101 +35,135 @@ export default function UsersCrudPanel({
   onDelete,
   onLoadHistory,
 }: Props) {
+  const [formOpen, setFormOpen] = useState(false)
+  const [detailUser, setDetailUser] = useState<ManagedUserRow | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<ManagedUserRow | null>(null)
+
+  const summary = useMemo(
+    () => ({
+      drivers: users.filter((user) => user.role === 'driver').length,
+      passengers: users.filter((user) => user.role === 'passenger').length,
+      actives: users.filter((user) => user.profile_completed).length,
+      recent: users.slice(0, 5).length,
+    }),
+    [users],
+  )
+
+  function handleCreate() {
+    onOpenCreate()
+    setFormOpen(true)
+  }
+
+  function handleEdit(user: ManagedUserRow) {
+    onOpenEdit(user)
+    setFormOpen(true)
+  }
+
+  async function handleSave() {
+    await onSave()
+    setFormOpen(false)
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    await onDelete(deleteTarget)
+    setDeleteTarget(null)
+  }
+
   return (
-    <div className="double-grid">
-      <Card title="Usuarios de central" subtitle={`${users.length} usuarios visibles`}>
-        <div className="list directory-list">
-          {users.map((user) => (
-            <article key={user.user_id} className="list-card stack-card">
-              <div>
-                <strong>{user.full_name || user.phone}</strong>
-                <p>{user.role} · {user.phone}</p>
-                <p>{user.device_count} equipos · {user.total_trips} viajes · {user.support_open_count} soporte abierto</p>
-              </div>
-              <div className="action-row compact">
-                <span className={user.role === 'driver' ? 'status-pill warning subtle' : 'status-pill success subtle'}>
-                  {user.role === 'driver' ? 'Chofer' : 'Pasajero'}
-                </span>
-                {user.role === 'driver' && user.driver_access_status && (
-                  <span
-                    className={
-                      user.driver_access_status === 'AUTORIZADO'
-                        ? 'status-pill success subtle'
-                        : user.driver_access_status === 'RECHAZADO'
-                          ? 'status-pill danger subtle'
-                          : 'status-pill warning subtle'
-                    }
-                  >
-                    {user.driver_access_status}
-                  </span>
-                )}
-                <Button variant="secondary" onClick={() => onOpenEdit(user)}>
-                  Editar
-                </Button>
-                <Button variant="secondary" onClick={() => onLoadHistory(user)}>
-                  Historial
-                </Button>
-                <Button variant="danger" onClick={() => onDelete(user)}>
-                  Eliminar
-                </Button>
-              </div>
-            </article>
-          ))}
+    <>
+      <section className="admin-section-shell">
+        <div className="admin-section-headline">
+          <div>
+            <span className="eyebrow">Gestion de usuarios</span>
+            <h2>Control administrativo limpio, rapido y con contexto operativo</h2>
+            <p>Visualiza, crea, actualiza y depura cuentas desde una experiencia unificada y lista para produccion.</p>
+          </div>
+          <div className="admin-section-actions">
+            <Button variant="secondary" onClick={() => selectedUser && setDetailUser(selectedUser)} disabled={!selectedUser}>
+              Ver ultimo usuario editado
+            </Button>
+            <Button onClick={handleCreate}>Crear usuario</Button>
+          </div>
         </div>
+
+        <div className="admin-stats-grid">
+          <StatCard label="Usuarios visibles" value={`${users.length}`} detail="Filtrados por la busqueda actual" icon="👥" />
+          <StatCard label="Conductores" value={`${summary.drivers}`} detail="Con ficha operativa asociada" icon="🚕" tone="warning" />
+          <StatCard label="Pasajeros" value={`${summary.passengers}`} detail="Listos para gestion comercial" icon="🧑" tone="success" />
+          <StatCard label="Perfiles completos" value={`${summary.actives}`} detail={`${summary.recent} registros recientes`} icon="✨" tone="neutral" />
+        </div>
+      </section>
+
+      <Card
+        title="Directorio administrativo"
+        subtitle={`${users.length} usuarios visibles con acciones rapidas, estados y trazabilidad`}
+        actions={
+          <Button variant="secondary" onClick={handleCreate}>
+            Nuevo usuario
+          </Button>
+        }
+      >
+        <UserTable users={users} onView={setDetailUser} onEdit={handleEdit} onDelete={setDeleteTarget} onLoadHistory={onLoadHistory} />
       </Card>
 
-      <Card title={mode === 'create' ? 'Crear usuario' : 'Editar usuario'} subtitle={mode === 'create' ? 'Alta directa desde central' : selectedUser?.full_name || selectedUser?.phone}>
-        <article className="list-card stack-card promo-card">
-          <div className="user-form-grid">
-            <input value={form.phone} onChange={(event) => onUpdateForm('phone', event.target.value)} placeholder="+591..." />
-            <select value={form.role} onChange={(event) => onUpdateForm('role', event.target.value as 'passenger' | 'driver')}>
-              <option value="passenger">Pasajero</option>
-              <option value="driver">Conductor</option>
-            </select>
-            <input value={form.firstName} onChange={(event) => onUpdateForm('firstName', event.target.value)} placeholder="Nombre" />
-            <input value={form.lastName} onChange={(event) => onUpdateForm('lastName', event.target.value)} placeholder="Apellido" />
-            <input value={form.email} onChange={(event) => onUpdateForm('email', event.target.value)} placeholder="correo@empresa.com" />
-            <input value={form.address} onChange={(event) => onUpdateForm('address', event.target.value)} placeholder="Direccion o referencia" />
-            <input
-              value={form.password}
-              onChange={(event) => onUpdateForm('password', event.target.value)}
-              placeholder={mode === 'create' ? 'Contrasena inicial' : 'Nueva contrasena (opcional)'}
-              type="password"
-            />
-            <label className="inline-check">
-              <input checked={form.profileCompleted} onChange={(event) => onUpdateForm('profileCompleted', event.target.checked)} type="checkbox" />
-              <span>Perfil completo</span>
-            </label>
-            {form.role === 'driver' && (
-              <>
-                <input
-                  value={form.licenseNumber}
-                  onChange={(event) => onUpdateForm('licenseNumber', event.target.value)}
-                  placeholder="Numero de licencia"
-                />
-                <select
-                  value={form.accessStatus}
-                  onChange={(event) =>
-                    onUpdateForm('accessStatus', event.target.value as 'PENDIENTE' | 'AUTORIZADO' | 'RECHAZADO')
-                  }
-                >
-                  <option value="PENDIENTE">Pendiente</option>
-                  <option value="AUTORIZADO">Autorizado</option>
-                  <option value="RECHAZADO">Rechazado</option>
-                </select>
-              </>
-            )}
+      <AdminModal
+        open={formOpen}
+        onClose={() => setFormOpen(false)}
+        title={mode === 'create' ? 'Crear usuario' : `Editar usuario · ${selectedUser?.full_name || selectedUser?.phone || 'Cuenta seleccionada'}`}
+        subtitle={mode === 'create' ? 'Alta directa desde central con formulario amplio y ordenado.' : 'Actualiza la ficha sin salir del panel.'}
+        actions={null}
+      >
+        <UserForm form={form} mode={mode} loading={loading} onUpdateForm={onUpdateForm} onSubmit={() => void handleSave()} onCancel={() => setFormOpen(false)} />
+      </AdminModal>
+
+      <AdminModal
+        open={Boolean(detailUser)}
+        onClose={() => setDetailUser(null)}
+        title={detailUser?.full_name || detailUser?.phone || 'Detalle del usuario'}
+        subtitle="Resumen rapido para lectura ejecutiva y control operativo."
+        size="lg"
+      >
+        {detailUser && (
+          <div className="detail-modal-grid">
+            <StatCard label="Rol" value={detailUser.role === 'driver' ? 'Conductor' : 'Pasajero'} detail="Tipo de cuenta operativa" tone={detailUser.role === 'driver' ? 'warning' : 'success'} />
+            <StatCard label="Viajes" value={`${detailUser.total_trips}`} detail="Historial total acumulado" />
+            <StatCard label="Equipos" value={`${detailUser.device_count}`} detail={`${detailUser.authorized_devices} autorizados / ${detailUser.pending_devices} pendientes`} />
+            <StatCard label="Soporte" value={`${detailUser.support_open_count}`} detail="Casos abiertos actualmente" tone={detailUser.support_open_count > 0 ? 'warning' : 'success'} />
+
+            <div className="admin-detail-card">
+              <span>Telefono</span>
+              <strong>{detailUser.phone}</strong>
+            </div>
+            <div className="admin-detail-card">
+              <span>Correo</span>
+              <strong>{detailUser.email || 'Sin correo registrado'}</strong>
+            </div>
+            <div className="admin-detail-card">
+              <span>Direccion</span>
+              <strong>{detailUser.address || 'Sin direccion registrada'}</strong>
+            </div>
+            <div className="admin-detail-card">
+              <span>Perfil</span>
+              <strong>{detailUser.profile_completed ? 'Completo' : 'Pendiente'}</strong>
+            </div>
           </div>
-          <div className="action-row">
-            <Button onClick={() => void onSave()} disabled={loading}>
-              {loading ? 'Guardando...' : mode === 'create' ? 'Crear usuario' : 'Guardar cambios'}
-            </Button>
-            <Button variant="secondary" onClick={onOpenCreate}>
-              Nuevo formulario
-            </Button>
-          </div>
-        </article>
-      </Card>
-    </div>
+        )}
+      </AdminModal>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => void handleDelete()}
+        loading={loading}
+        title={deleteTarget ? `Eliminar usuario · ${deleteTarget.full_name || deleteTarget.phone}` : 'Eliminar usuario'}
+        message={
+          deleteTarget
+            ? `Se eliminara la cuenta ${deleteTarget.full_name || deleteTarget.phone}. Tiene ${deleteTarget.total_trips} viajes, ${deleteTarget.device_count} equipos y ${deleteTarget.support_open_count} casos de soporte asociados.`
+            : 'Se eliminara la cuenta seleccionada.'
+        }
+        confirmLabel="Eliminar definitivamente"
+      />
+    </>
   )
 }

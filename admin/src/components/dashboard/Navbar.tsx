@@ -42,6 +42,7 @@ export default function DashboardNavbar({ title, subtitle, search, loading, onLo
 
       <div className="saas-navbar-right">
         <label className="saas-search">
+          <span className="saas-search-icon">⌕</span>
           <input
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}

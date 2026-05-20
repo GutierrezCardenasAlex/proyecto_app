@@ -3,6 +3,7 @@ import Card from '../../components/cards/Card'
 import ActivityPanel from '../../components/dashboard/ActivityPanel'
 import MetricCard from '../../components/dashboard/MetricCard'
 import OverviewSections from '../../components/dashboard/OverviewSections'
+import StatCard from '../../components/dashboard/StatCard'
 import VehicleStatusCard from '../../components/dashboard/VehicleStatusCard'
 import Modal from '../../components/common/Modal'
 import { useCentral } from '../../hooks/useCentral'
@@ -35,15 +36,9 @@ export default function DashboardHome() {
         <Card title="Estado general del sistema" subtitle="Indicadores premium de salud operativa" className="saas-panel-dark">
           <div className="saas-health-grid">
             {central.executiveSignals.map((signal) => (
-              <div key={signal.label} className={`saas-health-card ${signal.tone}`}>
-                <span>{signal.label}</span>
-                <strong>{signal.value}</strong>
-              </div>
+              <StatCard key={signal.label} label={signal.label} value={signal.value} tone={signal.tone === 'danger' ? 'warning' : signal.tone} />
             ))}
-            <div className="saas-health-card accent">
-              <span>Mapa offline</span>
-              <strong>{central.offlineMapStatus.status}</strong>
-            </div>
+            <StatCard label="Mapa offline" value={central.offlineMapStatus.status} detail={central.offlineMapStatus.regionName} />
           </div>
         </Card>
 
