@@ -131,7 +131,7 @@ export default function DriverReportsPanel({
             <tr>
               <th>Viaje</th>
               <th>Estado</th>
-              <th>Pasajero</th>
+              <th>Pasajero llevado</th>
               <th>Fecha</th>
             </tr>
           </thead>
