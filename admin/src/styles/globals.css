@@ -2482,6 +2482,10 @@ a {
   padding-top: 0.35rem;
 }
 
+.admin-form-actions--spread {
+  justify-content: space-between;
+}
+
 .confirm-dialog {
   display: grid;
   gap: 1rem;
@@ -2527,6 +2531,176 @@ a {
   color: #0f172a;
 }
 
+.admin-ops-grid {
+  align-items: start;
+}
+
+.ops-summary-list {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.ops-summary-card {
+  border-radius: 1.2rem;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1rem 1.05rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.ops-summary-card span {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(148, 163, 184, 0.78);
+}
+
+.ops-summary-card strong {
+  font-size: 1.02rem;
+  color: #f8fafc;
+}
+
+.ops-summary-card p {
+  margin: 0;
+  color: rgba(226, 232, 240, 0.72);
+  line-height: 1.55;
+}
+
+.device-collection {
+  display: grid;
+  gap: 1rem;
+}
+
+.device-card {
+  border-radius: 1.35rem;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
+  box-shadow: 0 20px 44px rgba(15, 23, 42, 0.08);
+  padding: 1rem 1.05rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.device-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.device-card__head h3,
+.settings-toggle-panel__copy h3 {
+  margin: 0.2rem 0 0;
+  color: #0f172a;
+}
+
+.device-card__head p,
+.settings-toggle-panel__copy p {
+  margin: 0.35rem 0 0;
+  color: rgba(71, 85, 105, 0.88);
+}
+
+.device-card__meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+
+.device-card__meta-item {
+  border-radius: 1rem;
+  background: rgba(248, 250, 252, 0.98);
+  border: 1px solid rgba(226, 232, 240, 0.96);
+  padding: 0.8rem 0.9rem;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.device-card__meta-item span,
+.device-card__identifier span,
+.settings-inline-kpis__item span {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(71, 85, 105, 0.82);
+}
+
+.device-card__meta-item strong,
+.device-card__identifier strong,
+.settings-inline-kpis__item strong {
+  color: #0f172a;
+}
+
+.device-card__footer {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.device-card__identifier {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.device-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.7rem;
+}
+
+.report-insight-grid,
+.settings-page-grid {
+  align-items: start;
+}
+
+.settings-page-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.settings-stack {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.settings-inline-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.settings-inline-kpis__item {
+  border-radius: 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.95rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.settings-inline-kpis__item strong {
+  font-size: 1.1rem;
+  color: #f8fafc;
+}
+
+.settings-toggle-panel {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.settings-toggle-panel__copy {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.settings-toggle-panel__copy small {
+  color: rgba(148, 163, 184, 0.86);
+}
+
 @media (max-width: 1100px) {
   .admin-user-table__head,
   .admin-user-row {
@@ -2541,7 +2715,8 @@ a {
 
 @media (max-width: 900px) {
   .admin-form-grid,
-  .detail-modal-grid {
+  .detail-modal-grid,
+  .settings-page-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -2590,6 +2765,15 @@ a {
 
   .admin-row-actions {
     justify-content: flex-start;
+  }
+
+  .settings-inline-kpis {
+    grid-template-columns: 1fr;
+  }
+
+  .device-card__head,
+  .settings-toggle-panel {
+    flex-direction: column;
   }
 
   .admin-form-actions,

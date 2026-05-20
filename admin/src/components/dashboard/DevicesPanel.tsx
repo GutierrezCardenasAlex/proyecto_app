@@ -1,6 +1,7 @@
 import Button from '../common/Button'
 import Card from '../cards/Card'
 import type { DeviceRow, UserSummary } from '../../types/admin'
+import { formatDateTime } from '../../utils/helpers'
 
 type Props = {
   devices: DeviceRow[]
@@ -11,76 +12,99 @@ type Props = {
   onManageUser: (userId: string) => void
 }
 
+function getDeviceTone(status: DeviceRow['status']) {
+  if (status === 'AUTORIZADO') return 'success'
+  if (status === 'RECHAZADO') return 'danger'
+  return 'warning'
+}
+
 export default function DevicesPanel({ devices, onLoadHistory, onAuthorize, onReplace, onBlock, onManageUser }: Props) {
   return (
-    <Card title="Dispositivos registrados" subtitle={`${devices.length} en total`} className="devices-panel">
-      <div className="table-wrapper">
-        <table className="devices-table">
-          <thead>
-            <tr>
-              <th>Usuario</th>
-              <th>Rol</th>
-              <th>Equipo</th>
-              <th>Estado</th>
-              <th>Central</th>
-              <th>Accion</th>
-            </tr>
-          </thead>
-          <tbody>
-            {devices.map((device) => (
-              <tr key={device.id}>
-                <td>
-                  <strong>{device.full_name || 'Sin nombre'}</strong>
-                  <div>{device.phone}</div>
-                </td>
-                <td>{device.role}</td>
-                <td>
+    <Card title="Dispositivos registrados" subtitle={`${devices.length} equipos visibles con trazabilidad y gobierno centralizado`} className="devices-panel">
+      {!devices.length ? (
+        <div className="admin-empty-state">
+          <strong>No hay dispositivos registrados</strong>
+          <p>Cuando existan accesos de equipos apareceran aqui con autorizacion, bloqueo, reemplazo e historial.</p>
+        </div>
+      ) : (
+        <div className="device-collection">
+          {devices.map((device) => (
+            <article key={device.id} className="device-card">
+              <div className="device-card__head">
+                <div>
+                  <span className="eyebrow">Usuario vinculado</span>
+                  <h3>{device.full_name || 'Usuario sin nombre'}</h3>
+                  <p>{device.phone}</p>
+                </div>
+                <span className={`status-pill ${getDeviceTone(device.status)}`}>{device.status}</span>
+              </div>
+
+              <div className="device-card__meta">
+                <div className="device-card__meta-item">
+                  <span>Rol</span>
+                  <strong>{device.role === 'driver' ? 'Conductor' : 'Pasajero'}</strong>
+                </div>
+                <div className="device-card__meta-item">
+                  <span>Equipo</span>
                   <strong>{device.device_name || 'Equipo desconocido'}</strong>
-                  <div>{device.platform || 'sin plataforma'}</div>
-                </td>
-                <td>
-                  <span className={device.status === 'AUTORIZADO' ? 'status-pill success' : device.status === 'RECHAZADO' ? 'status-pill danger' : 'status-pill warning'}>
-                    {device.status}
-                  </span>
-                </td>
-                <td>{device.approved_by_name || 'Sin accion'}</td>
-                <td>
-                  <div className="action-row compact devices-actions">
-                    <Button
-                      variant="secondary"
-                      className="table-action-button uniform-button"
-                      onClick={() => onManageUser(device.user_id)}
-                    >
-                      Gestionar usuario
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      className="table-action-button uniform-button"
-                      onClick={() =>
-                        onLoadHistory({
-                          user_id: device.user_id,
-                          phone: device.phone,
-                          full_name: device.full_name,
-                          role: device.role,
-                        })
-                      }
-                    >
-                      Historial
-                    </Button>
-                    <Button variant="success" className="table-action-button uniform-button" onClick={() => onAuthorize(device.id)}>
-                      Autorizar
-                    </Button>
-                    <Button className="table-action-button uniform-button" onClick={() => onReplace(device.id)}>Reemplazar</Button>
-                    <Button variant="danger" className="table-action-button uniform-button" onClick={() => onBlock(device.id)}>
-                      Bloquear
-                    </Button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                </div>
+                <div className="device-card__meta-item">
+                  <span>Plataforma</span>
+                  <strong>{device.platform || 'Sin plataforma'}</strong>
+                </div>
+                <div className="device-card__meta-item">
+                  <span>Central</span>
+                  <strong>{device.approved_by_name || 'Sin accion'}</strong>
+                </div>
+                <div className="device-card__meta-item">
+                  <span>Ultimo acceso</span>
+                  <strong>{formatDateTime(device.last_login_at, 'Sin acceso')}</strong>
+                </div>
+                <div className="device-card__meta-item">
+                  <span>Autorizado</span>
+                  <strong>{formatDateTime(device.approved_at, 'Pendiente')}</strong>
+                </div>
+              </div>
+
+              <div className="device-card__footer">
+                <div className="device-card__identifier">
+                  <span>Identificador</span>
+                  <strong>{device.device_identifier}</strong>
+                </div>
+
+                <div className="device-actions-grid">
+                  <Button variant="secondary" className="uniform-button" onClick={() => onManageUser(device.user_id)}>
+                    Gestionar usuario
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    className="uniform-button"
+                    onClick={() =>
+                      onLoadHistory({
+                        user_id: device.user_id,
+                        phone: device.phone,
+                        full_name: device.full_name,
+                        role: device.role,
+                      })
+                    }
+                  >
+                    Historial
+                  </Button>
+                  <Button variant="success" className="uniform-button" onClick={() => onAuthorize(device.id)}>
+                    Autorizar
+                  </Button>
+                  <Button className="uniform-button" onClick={() => onReplace(device.id)}>
+                    Reemplazar
+                  </Button>
+                  <Button variant="danger" className="uniform-button" onClick={() => onBlock(device.id)}>
+                    Bloquear
+                  </Button>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
     </Card>
   )
 }
