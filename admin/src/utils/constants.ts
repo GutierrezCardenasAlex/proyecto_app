@@ -101,6 +101,14 @@ export const DASHBOARD_NAV_ITEMS = [
     icon: 'settings',
     description: 'Perfil institucional, modo offline y parametros clave.',
   },
+  {
+    key: 'perfil',
+    label: 'Perfil',
+    hint: 'Central y sesion',
+    to: APP_ROUTES.profile,
+    icon: 'users',
+    description: 'Datos institucionales de la central y lectura operativa.',
+  },
 ] as const
 
 export const PAGE_META = {

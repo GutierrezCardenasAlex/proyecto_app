@@ -1,9 +1,7 @@
 import { NavLink } from 'react-router-dom'
-import type { AdminProfile } from '../../types/admin'
 import { DASHBOARD_NAV_ITEMS } from '../../utils/constants'
 
 type Props = {
-  adminProfile: AdminProfile | null
   theme: 'dark' | 'light'
   collapsed: boolean
   mobileOpen: boolean
@@ -57,7 +55,6 @@ function Icon({ name }: { name: string }) {
 }
 
 export default function DashboardSidebar({
-  adminProfile,
   theme,
   collapsed,
   mobileOpen,
@@ -92,16 +89,6 @@ export default function DashboardSidebar({
         </div>
       </div>
 
-      <div className="saas-sidebar-profile">
-        <div className="saas-avatar">{(adminProfile?.fullName || adminProfile?.username || 'C').charAt(0).toUpperCase()}</div>
-        {isOpen && (
-          <div>
-            <strong>{adminProfile?.fullName || adminProfile?.username || 'Central Flash Go'}</strong>
-            <span>{adminProfile?.phone || 'Sin telefono'}</span>
-          </div>
-        )}
-      </div>
-
       <nav className="saas-nav">
         {DASHBOARD_NAV_ITEMS.map((item) => (
           <NavLink
@@ -126,18 +113,20 @@ export default function DashboardSidebar({
           <strong>Cabina administrativa</strong>
           <span>Accesos, operacion y trazabilidad centralizada.</span>
         </div>
-        <button type="button" className="saas-ghost-button" onClick={onToggleCollapse}>
-          {collapsed ? 'Expandir panel' : 'Reducir panel'}
-        </button>
-        <button type="button" className="saas-ghost-button" onClick={onToggleTheme}>
-          {theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
-        </button>
-        <button type="button" className="saas-ghost-button" onClick={onRefresh} disabled={loading}>
-          {loading ? 'Actualizando...' : 'Sincronizar'}
-        </button>
-        <button type="button" className="saas-danger-link" onClick={onLogout}>
-          Cerrar sesion
-        </button>
+        <div className="saas-sidebar-footer-actions">
+          <button type="button" className="saas-ghost-button compact" onClick={onToggleCollapse}>
+            {collapsed ? 'Expandir' : 'Reducir'}
+          </button>
+          <button type="button" className="saas-ghost-button compact" onClick={onToggleTheme}>
+            {theme === 'dark' ? 'Claro' : 'Oscuro'}
+          </button>
+          <button type="button" className="saas-ghost-button compact" onClick={onRefresh} disabled={loading}>
+            {loading ? 'Sync...' : 'Sync'}
+          </button>
+          <button type="button" className="saas-danger-link compact" onClick={onLogout}>
+            Salir
+          </button>
+        </div>
       </div>
     </aside>
   )

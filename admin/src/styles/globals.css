@@ -3430,3 +3430,180 @@ body.admin-theme-light .saas-sidebar-rail-toggle {
     grid-template-columns: 1fr;
   }
 }
+
+.saas-sidebar-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.saas-ghost-button.compact,
+.saas-danger-link.compact {
+  min-height: 38px;
+  padding: 0.6rem 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.saas-sidebar-footer-copy {
+  margin-bottom: 0.15rem;
+}
+
+.saas-nav-item {
+  min-height: 66px;
+}
+
+.saas-nav-copy strong {
+  font-size: 0.92rem;
+}
+
+.saas-nav-copy small {
+  font-size: 0.76rem;
+}
+
+body.admin-theme-dark .panel,
+body.admin-theme-dark .hero-panel,
+body.admin-theme-dark .map-card,
+body.admin-theme-dark .panel h2,
+body.admin-theme-dark .panel h3,
+body.admin-theme-dark .panel p,
+body.admin-theme-dark .panel span,
+body.admin-theme-dark .panel strong,
+body.admin-theme-dark .saas-panel-dark,
+body.admin-theme-dark .saas-panel-dark h1,
+body.admin-theme-dark .saas-panel-dark h2,
+body.admin-theme-dark .saas-panel-dark h3,
+body.admin-theme-dark .saas-panel-dark p,
+body.admin-theme-dark .saas-panel-dark span,
+body.admin-theme-dark .saas-panel-dark strong,
+body.admin-theme-dark .device-card,
+body.admin-theme-dark .device-card h3,
+body.admin-theme-dark .device-card p,
+body.admin-theme-dark .device-card span,
+body.admin-theme-dark .device-card strong,
+body.admin-theme-dark .device-card__meta-item,
+body.admin-theme-dark .device-card__meta-item strong,
+body.admin-theme-dark .device-card__identifier strong,
+body.admin-theme-dark .admin-detail-card,
+body.admin-theme-dark .admin-detail-card strong,
+body.admin-theme-dark .admin-detail-card span,
+body.admin-theme-dark .ops-summary-card,
+body.admin-theme-dark .ops-summary-card strong,
+body.admin-theme-dark .ops-summary-card p,
+body.admin-theme-dark .settings-inline-kpis__item,
+body.admin-theme-dark .settings-inline-kpis__item strong,
+body.admin-theme-dark .settings-inline-kpis__item span,
+body.admin-theme-dark .admin-stat-card,
+body.admin-theme-dark .admin-stat-card__value,
+body.admin-theme-dark .admin-stat-card__detail,
+body.admin-theme-dark .admin-stat-card__label,
+body.admin-theme-dark .admin-form-section,
+body.admin-theme-dark .admin-form-section h3,
+body.admin-theme-dark .admin-form-section p,
+body.admin-theme-dark .admin-form-section label,
+body.admin-theme-dark .admin-section-headline,
+body.admin-theme-dark .admin-section-headline h2,
+body.admin-theme-dark .admin-section-headline h3,
+body.admin-theme-dark .admin-section-headline p,
+body.admin-theme-dark .modal-shell,
+body.admin-theme-dark .modal-shell h2,
+body.admin-theme-dark .modal-shell h3,
+body.admin-theme-dark .modal-shell p,
+body.admin-theme-dark .modal-shell span,
+body.admin-theme-dark .modal-shell strong {
+  color: #f8fafc;
+}
+
+body.admin-theme-dark .device-card__meta-item,
+body.admin-theme-dark .admin-detail-card,
+body.admin-theme-dark .admin-form-section,
+body.admin-theme-dark .ops-summary-card,
+body.admin-theme-dark .settings-inline-kpis__item {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+body.admin-theme-dark .device-card__meta-item span,
+body.admin-theme-dark .device-card__head p,
+body.admin-theme-dark .device-card__identifier span,
+body.admin-theme-dark .admin-detail-card span,
+body.admin-theme-dark .ops-summary-card span,
+body.admin-theme-dark .ops-summary-card p,
+body.admin-theme-dark .settings-inline-kpis__item span,
+body.admin-theme-dark .admin-stat-card__detail,
+body.admin-theme-dark .admin-stat-card__label,
+body.admin-theme-dark .admin-form-section__head p,
+body.admin-theme-dark .admin-section-headline p,
+body.admin-theme-dark .modal-title-wrap p {
+  color: rgba(226, 232, 240, 0.78);
+}
+
+body.admin-theme-dark .admin-field input,
+body.admin-theme-dark .admin-field select,
+body.admin-theme-dark .admin-field textarea {
+  background: rgba(255, 255, 255, 0.06);
+  color: #f8fafc;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+body.admin-theme-dark .admin-field input::placeholder,
+body.admin-theme-dark .admin-field textarea::placeholder {
+  color: rgba(226, 232, 240, 0.48);
+}
+
+body.admin-theme-light .saas-panel-dark,
+body.admin-theme-light .ops-summary-card,
+body.admin-theme-light .settings-inline-kpis__item,
+body.admin-theme-light .device-card,
+body.admin-theme-light .device-card__meta-item,
+body.admin-theme-light .admin-detail-card,
+body.admin-theme-light .admin-form-section,
+body.admin-theme-light .admin-stat-card,
+body.admin-theme-light .admin-user-table,
+body.admin-theme-light .admin-user-row,
+body.admin-theme-light .modal-shell,
+body.admin-theme-light .saas-navbar,
+body.admin-theme-light .saas-sidebar,
+body.admin-theme-light .saas-search,
+body.admin-theme-light .saas-ghost-button,
+body.admin-theme-light .saas-nav-icon,
+body.admin-theme-light .saas-icon-button,
+body.admin-theme-light .saas-status-badge,
+body.admin-theme-light .saas-sidebar-close,
+body.admin-theme-light .saas-sidebar-rail-toggle {
+  background: #ffffff;
+}
+
+body.admin-theme-light .saas-panel-dark,
+body.admin-theme-light .saas-sidebar,
+body.admin-theme-light .saas-navbar,
+body.admin-theme-light .modal-shell {
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+}
+
+body.admin-theme-light .saas-shell,
+body.admin-theme-light .saas-content {
+  color: #0f172a;
+}
+
+body.admin-theme-light .ops-summary-card,
+body.admin-theme-light .settings-inline-kpis__item {
+  border-color: rgba(148, 163, 184, 0.16);
+}
+
+body.admin-theme-light .saas-navbar {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.65), transparent);
+}
+
+@media (max-width: 960px) {
+  .saas-sidebar-footer-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
