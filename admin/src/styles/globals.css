@@ -3896,6 +3896,255 @@ body.admin-theme-dark .admin-filter-tab {
   font-size: 1.32rem;
 }
 
+/* Responsive hardening */
+@media (max-width: 1280px) {
+  .saas-content {
+    padding: 10px 18px 24px;
+  }
+
+  .admin-section-headline,
+  .panel-header,
+  .driver-report-detail-head {
+    gap: 12px;
+  }
+
+  .admin-section-actions,
+  .panel-header > :last-child,
+  .driver-report-detail-actions {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 1024px) {
+  .saas-navbar {
+    gap: 12px;
+  }
+
+  .saas-navbar-left,
+  .saas-navbar-right {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .saas-navbar-right {
+    justify-content: flex-start;
+  }
+
+  .saas-search {
+    order: 3;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .admin-stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  }
+
+  .admin-toolbar-actions {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  .admin-filter-tabs {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 900px) {
+  .saas-content {
+    padding: 10px 14px 22px;
+  }
+
+  .admin-section-headline,
+  .panel-header,
+  .driver-report-chart-head,
+  .driver-report-detail-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .saas-navbar-copy span {
+    display: none;
+  }
+
+  .saas-status-badge,
+  .saas-logout-button {
+    min-height: 42px;
+  }
+
+  .admin-section-actions,
+  .panel-header > :last-child {
+    width: 100%;
+  }
+
+  .admin-section-actions > *,
+  .admin-toolbar-actions > *,
+  .driver-report-toolbar > * {
+    width: 100%;
+  }
+
+  .admin-filter-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .admin-filter-tab {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .saas-metric-grid,
+  .saas-hero-metrics,
+  .admin-stats-grid,
+  .settings-inline-kpis,
+  .modal-summary-grid,
+  .detail-modal-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .driver-report-dates {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .saas-navbar {
+    padding: 14px 14px 6px;
+  }
+
+  .saas-burger,
+  .saas-icon-button,
+  .saas-theme-button {
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+  }
+
+  .saas-navbar-copy strong {
+    font-size: 1.02rem;
+  }
+
+  .saas-content {
+    padding: 8px 12px 20px;
+  }
+
+  .saas-page-stack {
+    gap: 14px;
+  }
+
+  .panel,
+  .saas-panel-dark,
+  .driver-report-chart-card,
+  .driver-report-detail-card,
+  .admin-section-headline {
+    border-radius: 16px;
+  }
+
+  .panel-header {
+    margin-bottom: 10px;
+  }
+
+  .panel-header h2 {
+    font-size: 0.96rem;
+  }
+
+  .panel-header span,
+  .admin-section-headline p,
+  .driver-report-chart-head span,
+  .driver-report-detail-head span {
+    font-size: 0.82rem;
+  }
+
+  .saas-hero {
+    padding: 12px;
+  }
+
+  .saas-hero h1 {
+    font-size: 1.16rem;
+  }
+
+  .saas-hero p {
+    font-size: 0.84rem;
+  }
+
+  .saas-metric-card {
+    min-height: 84px;
+    padding: 10px;
+  }
+
+  .saas-metric-value {
+    font-size: 1.18rem;
+  }
+
+  .driver-report-bar-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .driver-report-bar-metrics {
+    justify-items: start;
+  }
+
+  .driver-report-detail-kpis,
+  .driver-report-kpis,
+  .driver-report-mobile-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-filter-tabs {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-shell {
+    width: min(100vw - 12px, 100%);
+    max-height: calc(100dvh - 12px);
+  }
+}
+
+@media (max-width: 560px) {
+  .saas-sidebar.is-expanded {
+    width: min(92vw, 260px);
+  }
+
+  .saas-navbar-right {
+    gap: 8px;
+  }
+
+  .saas-status-badge {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .saas-logout-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .driver-report-dates {
+    grid-template-columns: 1fr;
+  }
+
+  .driver-report-chart-card,
+  .driver-report-detail-card,
+  .admin-stat-card,
+  .ops-summary-card,
+  .device-card,
+  .admin-user-row {
+    padding: 12px;
+  }
+
+  .modal-header,
+  .modal-body,
+  .modal-footer {
+    padding-left: 0.9rem;
+    padding-right: 0.9rem;
+  }
+}
+
 .driver-report-shell {
   display: grid;
   gap: 18px;

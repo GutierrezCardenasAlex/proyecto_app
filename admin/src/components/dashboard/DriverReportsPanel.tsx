@@ -117,7 +117,6 @@ export default function DriverReportsPanel({
             <td>${row.totalTrips}</td>
             <td>${row.completedTrips}</td>
             <td>${row.cancelledTrips}</td>
-            <td>${formatCurrency(row.revenue)}</td>
             <td>${formatDateTime(row.lastTripAt, 'Sin viaje visible')}</td>
           </tr>
         `,
@@ -133,7 +132,6 @@ export default function DriverReportsPanel({
               <th>Viaje</th>
               <th>Estado</th>
               <th>Pasajero</th>
-              <th>Monto</th>
               <th>Fecha</th>
             </tr>
           </thead>
@@ -145,7 +143,6 @@ export default function DriverReportsPanel({
                   <td>${trip.id.slice(0, 8)}</td>
                   <td>${trip.status}</td>
                   <td>${trip.passengerName || trip.passengerPhone || 'Sin dato'}</td>
-                  <td>${formatCurrency(Number(trip.fareAmount || 0))}</td>
                   <td>${formatDateTime(trip.completedAt || trip.acceptedAt || trip.requestedAt, 'Sin fecha')}</td>
                 </tr>
               `,
@@ -184,7 +181,7 @@ export default function DriverReportsPanel({
             <article><span>Conductores visibles</span><strong>${visibleSummary.drivers}</strong></article>
             <article><span>Viajes visibles</span><strong>${visibleSummary.trips}</strong></article>
             <article><span>Completados</span><strong>${visibleSummary.completed}</strong></article>
-            <article><span>Ingresos visibles</span><strong>${formatCurrency(visibleSummary.revenue)}</strong></article>
+            <article><span>Cancelados visibles</span><strong>${filteredRows.reduce((acc, row) => acc + row.cancelledTrips, 0)}</strong></article>
           </div>
           <table>
             <thead>
@@ -194,7 +191,6 @@ export default function DriverReportsPanel({
                 <th>Viajes</th>
                 <th>Completados</th>
                 <th>Cancelados</th>
-                <th>Ingresos</th>
                 <th>Ultimo viaje</th>
               </tr>
             </thead>
