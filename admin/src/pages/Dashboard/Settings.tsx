@@ -38,11 +38,11 @@ export default function SettingsPage() {
           <div className="settings-stack">
             <div className="admin-detail-card">
               <span>Usuario</span>
-              <strong>{adminProfile?.username || 'centralflashgo'}</strong>
+              <strong>{adminProfile?.username || 'centralrapigo'}</strong>
             </div>
             <div className="admin-detail-card">
               <span>Nombre</span>
-              <strong>{adminProfile?.fullName || 'Central Flash Go'}</strong>
+              <strong>{adminProfile?.fullName || 'Central RAPIGO'}</strong>
             </div>
             <div className="admin-detail-card">
               <span>Telefono</span>

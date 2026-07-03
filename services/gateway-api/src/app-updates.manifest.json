@@ -9,7 +9,7 @@
         "mandatory": false,
         "title": "Actualizacion disponible",
         "message": "Hay una nueva version de RAPIGO disponible para instalar.",
-        "apkUrl": "https://tu-vps.com/downloads/rapigo-passenger.apk",
+        "apkUrl": "https://rapigo.cybernovatech.space/downloads/rapigo-passenger.apk",
         "notes": [
           "Mejoras visuales",
           "Optimizacion de mapas",
@@ -26,7 +26,7 @@
         "mandatory": false,
         "title": "Actualizacion disponible",
         "message": "Hay una nueva version de RAPIGO PRO disponible para instalar.",
-        "apkUrl": "https://tu-vps.com/downloads/rapigo-driver-pro.apk",
+        "apkUrl": "https://rapigo.cybernovatech.space/downloads/rapigo-driver-pro.apk",
         "notes": [
           "Mejoras de rendimiento",
           "Optimizacion offline",

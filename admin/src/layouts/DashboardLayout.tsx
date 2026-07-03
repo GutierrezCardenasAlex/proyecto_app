@@ -15,7 +15,7 @@ export default function DashboardLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     if (typeof window === 'undefined') return 'dark'
-    const stored = window.localStorage.getItem('flashgo-admin-theme')
+    const stored = window.localStorage.getItem('rapigo-admin-theme')
     return stored === 'light' ? 'light' : 'dark'
   })
 
@@ -43,7 +43,7 @@ export default function DashboardLayout() {
     if (typeof document === 'undefined') return
     document.body.classList.remove('admin-theme-dark', 'admin-theme-light')
     document.body.classList.add(theme === 'dark' ? 'admin-theme-dark' : 'admin-theme-light')
-    window.localStorage.setItem('flashgo-admin-theme', theme)
+    window.localStorage.setItem('rapigo-admin-theme', theme)
   }, [theme])
 
   return (

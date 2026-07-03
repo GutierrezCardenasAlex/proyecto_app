@@ -368,7 +368,7 @@ class PromotionsPage extends ConsumerWidget {
           ),
           const _SettingsInfoCard(
             title: 'Uso del viaje premiado',
-            subtitle: 'El beneficio es valido solo para el cliente registrado en Flash Go que gano la promocion. Cuando usas el viaje gratis, el ciclo vuelve a 0/5 y el conteo total sigue acumulando normal.',
+            subtitle: 'El beneficio es valido solo para el cliente registrado en RAPIGO que gano la promocion. Cuando usas el viaje gratis, el ciclo vuelve a 0/5 y el conteo total sigue acumulando normal.',
           ),
           const _SettingsInfoCard(
             title: 'Acompanantes',
@@ -376,7 +376,7 @@ class PromotionsPage extends ConsumerWidget {
           ),
           const _SettingsInfoCard(
             title: 'Notificacion',
-            subtitle: 'Cuando consigas el beneficio, Flash Go te avisara automaticamente en la app.',
+            subtitle: 'Cuando consigas el beneficio, RAPIGO te avisara automaticamente en la app.',
           ),
         ],
       ),

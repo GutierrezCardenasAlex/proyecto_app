@@ -285,7 +285,7 @@ class AuthRepository {
     return SessionStatusResult(
       deviceStatus: payload['deviceStatus']?.toString() ?? 'PENDIENTE',
       profileCompleted: user['profileCompleted'] == true,
-      fullName: user['fullName']?.toString() ?? 'Pasajero Flash Go',
+      fullName: user['fullName']?.toString() ?? 'Pasajero RAPIGO',
       firstName: user['firstName']?.toString() ?? '',
       lastName: user['lastName']?.toString() ?? '',
       email: user['email']?.toString() ?? '',
@@ -322,9 +322,9 @@ class AuthRepository {
     try {
       return await request();
     } on SocketException {
-      throw Exception('No se pudo conectar con Flash Go. Revisa internet o el acceso al servidor.');
+      throw Exception('No se pudo conectar con RAPIGO. Revisa internet o el acceso al servidor.');
     } on http.ClientException {
-      throw Exception('No se pudo conectar con Flash Go. Revisa internet o el acceso al servidor.');
+      throw Exception('No se pudo conectar con RAPIGO. Revisa internet o el acceso al servidor.');
     }
   }
 
@@ -340,7 +340,7 @@ class AuthRepository {
     return AuthResult(
       userId: user['id']?.toString() ?? '',
       phone: user['phone']?.toString() ?? fallbackPhone,
-      fullName: user['fullName']?.toString() ?? 'Pasajero Flash Go',
+      fullName: user['fullName']?.toString() ?? 'Pasajero RAPIGO',
       firstName: user['firstName']?.toString() ?? '',
       lastName: user['lastName']?.toString() ?? '',
       email: user['email']?.toString() ?? '',
@@ -366,7 +366,7 @@ class SessionController extends Notifier<Session> {
     final initial = const Session(
       userId: '',
       phone: '',
-      fullName: 'Pasajero Flash Go',
+      fullName: 'Pasajero RAPIGO',
       firstName: '',
       lastName: '',
       email: '',
@@ -484,7 +484,7 @@ class SessionController extends Notifier<Session> {
     state = const Session(
       userId: '',
       phone: '',
-      fullName: 'Pasajero Flash Go',
+      fullName: 'Pasajero RAPIGO',
       firstName: '',
       lastName: '',
       email: '',
@@ -553,7 +553,7 @@ class SessionController extends Notifier<Session> {
     state = state.copyWith(
       userId: prefs.getString('session_user_id') ?? '',
       phone: prefs.getString('session_phone') ?? '',
-      fullName: prefs.getString('session_full_name') ?? 'Pasajero Flash Go',
+      fullName: prefs.getString('session_full_name') ?? 'Pasajero RAPIGO',
       firstName: prefs.getString('session_first_name') ?? '',
       lastName: prefs.getString('session_last_name') ?? '',
       email: prefs.getString('session_email') ?? '',

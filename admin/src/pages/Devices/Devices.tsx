@@ -11,7 +11,7 @@ export default function DevicesPage() {
   return (
     <>
       <PageHero
-        eyebrow="Central Flash Go / Potosi"
+        eyebrow="Central RAPIGO / Potosi"
         title={VIEW_LABELS.devices}
         description={VIEW_DESCRIPTIONS.devices}
         metrics={[

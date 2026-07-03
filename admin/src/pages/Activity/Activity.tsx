@@ -10,7 +10,7 @@ export default function ActivityPage() {
   return (
     <>
       <PageHero
-        eyebrow="Central Flash Go / Potosi"
+        eyebrow="Central RAPIGO / Potosi"
         title={VIEW_LABELS.activity}
         description={VIEW_DESCRIPTIONS.activity}
         metrics={[

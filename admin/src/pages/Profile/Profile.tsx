@@ -33,7 +33,7 @@ export default function ProfilePage() {
             </div>
             <div className="admin-detail-card">
               <span>Nombre</span>
-              <strong>{adminProfile?.fullName || 'Central Flash Go'}</strong>
+              <strong>{adminProfile?.fullName || 'Central RAPIGO'}</strong>
             </div>
             <div className="admin-detail-card">
               <span>Telefono</span>

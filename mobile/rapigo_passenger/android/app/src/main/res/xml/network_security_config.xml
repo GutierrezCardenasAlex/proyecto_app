@@ -3,7 +3,7 @@
     <base-config cleartextTrafficPermitted="true" />
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">62.171.186.246</domain>
-        <domain includeSubdomains="true">taxis.cybernovatech.space</domain>
+        <domain includeSubdomains="true">rapigo.cybernovatech.space</domain>
         <domain includeSubdomains="true">cybernovatech.space</domain>
     </domain-config>
 </network-security-config>

@@ -113,7 +113,7 @@ chmod +x ./scripts/seed-demo-data.sh ./scripts/simulate-driver-locations.sh
 
 ## Offline maps
 
-Flash Go already supports configurable tiles through `MAP_TILES_URL_TEMPLATE`.
+RAPIGO already supports configurable tiles through `MAP_TILES_URL_TEMPLATE`.
 
 - `MAP_TILES_URL_TEMPLATE` keeps the normal online map source.
 - `MAP_OFFLINE_TILES_URL_TEMPLATE` enables the dedicated offline cache source.
@@ -121,7 +121,7 @@ Flash Go already supports configurable tiles through `MAP_TILES_URL_TEMPLATE`.
 - Quick Flutter launch with a custom tile server:
 
 ```powershell
-.\scripts\run-flashgo-offline.ps1
+.\scripts\run-rapigo-offline.ps1
 ```
 
 - Optional local tile server in Docker:

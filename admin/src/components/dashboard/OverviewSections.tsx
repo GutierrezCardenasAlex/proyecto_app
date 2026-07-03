@@ -32,7 +32,7 @@ export default function OverviewSections(props: Props) {
   return (
     <section className="content-grid">
       <div className="side-column side-column-full">
-        <Card title="Promociones Flash Go" subtitle={props.promoSettings.enabled ? 'Activa' : 'Pausada'}>
+        <Card title="Promociones RAPIGO" subtitle={props.promoSettings.enabled ? 'Activa' : 'Pausada'}>
           <article className="list-card stack-card promo-card">
             <div>
               <strong>{props.promoSettings.enabled ? 'Promo habilitada' : 'Promo detenida'}</strong>

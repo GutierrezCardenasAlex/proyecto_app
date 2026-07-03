@@ -73,7 +73,7 @@ export default function Login() {
   return (
     <section className="hero-panel auth-card">
       <div>
-        <p className="eyebrow">Central Flash Go</p>
+        <p className="eyebrow">Central RAPIGO</p>
         <h1>Centro ejecutivo de operacion, autorizacion y monitoreo institucional.</h1>
         <p className="subtitle">
           La puerta superAdmin ya fue validada. Ahora autentica tu usuario de central y confirma con el numero institucional para abrir el dashboard.

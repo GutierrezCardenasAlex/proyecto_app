@@ -243,7 +243,7 @@ class OfflineMapController extends Notifier<OfflineMapState> {
         maxZoom: _offlineMaxZoom,
         options: TileLayer(
           urlTemplate: AppConfig.effectiveOfflineTilesUrlTemplate,
-          userAgentPackageName: 'bo.flashgo.offline',
+          userAgentPackageName: 'bo.rapigo.driver.offline',
           tileDimension: AppConfig.mapTileDimension,
           zoomOffset: AppConfig.mapTileZoomOffset,
           minZoom: _offlineMinZoom.toDouble(),

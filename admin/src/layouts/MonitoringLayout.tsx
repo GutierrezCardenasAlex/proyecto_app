@@ -15,7 +15,7 @@ export default function MonitoringLayout() {
     <div className="monitor-shell">
       <header className="monitor-topbar">
         <div>
-          <span className="eyebrow">Monitoreo Flash Go</span>
+          <span className="eyebrow">Monitoreo RAPIGO</span>
           <strong>{pageMeta.title}</strong>
           <p>{pageMeta.subtitle}</p>
         </div>

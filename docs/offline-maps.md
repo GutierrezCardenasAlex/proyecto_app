@@ -1,4 +1,4 @@
-# Flash Go offline maps
+# RAPIGO offline maps
 
 ## Opcion 1: URL configurable rapida
 
@@ -20,19 +20,19 @@ O usando el script preparado:
 
 ```powershell
 cd "C:\Users\maylex\Documents\New project\app_potosi"
-.\scripts\run-flashgo-offline.ps1
+.\scripts\run-rapigo-offline.ps1
 ```
 
 Si usas telefono fisico, cambia `10.0.2.2` por la IP LAN de tu computadora:
 
 ```powershell
-.\scripts\run-flashgo-offline.ps1 -DeviceHost 192.168.1.50
+.\scripts\run-rapigo-offline.ps1 -DeviceHost 192.168.1.50
 ```
 
 Si tu servidor expone otra ruta de estilo, pasala completa:
 
 ```powershell
-.\scripts\run-flashgo-offline.ps1 -TileTemplate "http://192.168.1.50:8082/styles/klokantech-basic/{z}/{x}/{y}.png"
+.\scripts\run-rapigo-offline.ps1 -TileTemplate "http://192.168.1.50:8082/styles/klokantech-basic/{z}/{x}/{y}.png"
 ```
 
 ## Opcion 2: servidor local de tiles en Docker

@@ -3371,8 +3371,8 @@ class _DriverHistoryCard extends ConsumerWidget {
     }
     final passengerName = (trip.passengerName ?? '').trim().isEmpty ? 'pasajero' : trip.passengerName!.trim();
     final message = trip.status == 'at_pickup'
-        ? 'Hola $passengerName, ya llegue al punto de recojo en Flash Go.'
-        : 'Hola $passengerName, te escribo por tu viaje de Flash Go.';
+        ? 'Hola $passengerName, ya llegue al punto de recojo en RAPIGO PRO.'
+        : 'Hola $passengerName, te escribo por tu viaje de RAPIGO PRO.';
     final uri = Uri.parse(
       'https://wa.me/$normalizedPhone?text=${Uri.encodeComponent(message)}',
     );

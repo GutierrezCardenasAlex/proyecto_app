@@ -150,7 +150,7 @@ export const NAV_ITEMS: Array<{ view: AdminView; label: string; hint: string; to
 ]
 
 export const DEFAULT_LOGIN = {
-  username: 'centralflashgo',
+  username: 'centralrapigo',
   password: 'FlashGo2026',
   phone: '+59170000001',
   otp: '123456',

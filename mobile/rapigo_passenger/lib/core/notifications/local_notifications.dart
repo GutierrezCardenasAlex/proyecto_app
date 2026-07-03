@@ -33,7 +33,7 @@ class LocalNotifications {
       NotificationDetails(
         android: AndroidNotificationDetails(
           'taxiya_passenger_channel',
-          'Flash Go pasajero',
+          'RAPIGO pasajero',
           channelDescription: 'Notificaciones del pasajero',
           importance: Importance.high,
           priority: Priority.high,
@@ -44,7 +44,7 @@ class LocalNotifications {
           styleInformation: BigTextStyleInformation(
             body,
             contentTitle: title,
-            summaryText: 'Flash Go',
+            summaryText: 'RAPIGO',
           ),
         ),
       ),

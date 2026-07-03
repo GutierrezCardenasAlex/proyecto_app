@@ -254,7 +254,7 @@ class PassengerLocationController extends Notifier<PassengerLocationState> {
         distanceFilter: 3,
         intervalDuration: const Duration(seconds: 2),
         foregroundNotificationConfig: const ForegroundNotificationConfig(
-          notificationTitle: 'Flash Go activo',
+          notificationTitle: 'RAPIGO activo',
           notificationText: 'Seguimos actualizando tu ubicacion para viajes y alertas.',
           enableWakeLock: true,
           setOngoing: true,

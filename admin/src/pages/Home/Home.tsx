@@ -10,7 +10,7 @@ export default function Home() {
   return (
     <>
       <PageHero
-        eyebrow="Central Flash Go / Potosi"
+        eyebrow="Central RAPIGO / Potosi"
         title={VIEW_LABELS.overview}
         description={VIEW_DESCRIPTIONS.overview}
         metrics={[

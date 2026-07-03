@@ -127,7 +127,7 @@ class _JourneyCard extends ConsumerWidget {
     }
     final driverName = (trip.driverName ?? '').trim().isEmpty ? 'conductor' : trip.driverName!.trim();
     final uri = Uri.parse(
-      'https://wa.me/$normalizedPhone?text=${Uri.encodeComponent('Hola $driverName, te escribo por mi viaje de Flash Go.')}',
+      'https://wa.me/$normalizedPhone?text=${Uri.encodeComponent('Hola $driverName, te escribo por mi viaje de RAPIGO.')}',
     );
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

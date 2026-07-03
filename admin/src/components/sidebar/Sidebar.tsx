@@ -14,7 +14,7 @@ export default function Sidebar({ adminProfile, onRefresh, onLogout, loading }: 
   return (
     <aside className="panel nav-shell">
       <div className="nav-brand">
-        <p className="eyebrow">Flash Go Executive</p>
+        <p className="eyebrow">RAPIGO Executive</p>
         <h2>Cabina central</h2>
         <p>{adminProfile?.fullName || adminProfile?.username || 'Central'} · {adminProfile?.phone}</p>
       </div>

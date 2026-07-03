@@ -881,7 +881,7 @@ async function bootstrap() {
       user?.full_name ||
       [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim() ||
       user?.phone ||
-      "Usuario Flash Go";
+      "Usuario RAPIGO";
 
     const result = await pool.query(
       `INSERT INTO support_reports (user_id, role, phone, full_name, category, message)

@@ -58,10 +58,10 @@ class RideTab extends ConsumerStatefulWidget {
 enum RideFlowState { reposo, busquedaTexto, seleccionManual, rutaConfirmacion }
 
 class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
-  static const String _lastPassengerLatKey = 'flashgo_passenger_last_lat';
-  static const String _lastPassengerLngKey = 'flashgo_passenger_last_lng';
+  static const String _lastPassengerLatKey = 'rapigo_passenger_last_lat';
+  static const String _lastPassengerLngKey = 'rapigo_passenger_last_lng';
   static const String _backgroundNoticeSeenKey =
-      'flashgo_passenger_background_notice_seen';
+      'rapigo_passenger_background_notice_seen';
   static const String _rideUiStateKey = 'rapigo_passenger_ride_ui_state_v1';
   static const String _customDestinationLabel = 'Destino marcado en mapa';
   final TextEditingController _destinationController = TextEditingController();

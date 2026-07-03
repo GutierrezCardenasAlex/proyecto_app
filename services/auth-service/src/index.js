@@ -17,15 +17,15 @@ const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
 const smsProvider = (process.env.SMS_PROVIDER || "").toLowerCase();
 const exposeOtpInResponse = String(process.env.AUTH_EXPOSE_OTP || "true").toLowerCase() === "true";
 const defaultAdminPhone = process.env.ADMIN_DEFAULT_PHONE || "+59170000001";
-const defaultAdminUsername = (process.env.ADMIN_DEFAULT_USERNAME || "centralflashgo").trim().toLowerCase();
+const defaultAdminUsername = (process.env.ADMIN_DEFAULT_USERNAME || "centralrapigo").trim().toLowerCase();
 const defaultAdminPasswordHash =
   process.env.ADMIN_DEFAULT_PASSWORD_HASH ||
   "$2b$10$c17Q4cIl8rCYLsBdgwrNP.u.w7RFGViG6Zcmgvfy/dRsYu3fVMDna";
-const defaultAdminFullName = process.env.ADMIN_DEFAULT_FULL_NAME || "Central Flash Go";
+const defaultAdminFullName = process.env.ADMIN_DEFAULT_FULL_NAME || "Central RAPIGO";
 const superAdminAccessKey = String(process.env.SUPERADMIN_ACCESS_KEY || "superAdmin").trim();
 const monitorUsername = String(process.env.MONITOR_USERNAME || "monitoreo").trim().toLowerCase();
 const monitorPassword = String(process.env.MONITOR_PASSWORD || "Monitoreo2026").trim();
-const monitorDisplayName = String(process.env.MONITOR_DISPLAY_NAME || "Monitoreo Flash Go").trim();
+const monitorDisplayName = String(process.env.MONITOR_DISPLAY_NAME || "Monitoreo RAPIGO").trim();
 
 const registerRequestSchema = z.object({
   phone: z.string().min(8),

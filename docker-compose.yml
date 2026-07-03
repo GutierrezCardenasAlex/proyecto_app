@@ -76,7 +76,7 @@ services:
       SUPERADMIN_ACCESS_KEY: ${SUPERADMIN_ACCESS_KEY:-superAdmin}
       MONITOR_USERNAME: ${MONITOR_USERNAME:-monitoreo}
       MONITOR_PASSWORD: ${MONITOR_PASSWORD:-Monitoreo2026}
-      MONITOR_DISPLAY_NAME: ${MONITOR_DISPLAY_NAME:-Monitoreo Flash Go}
+      MONITOR_DISPLAY_NAME: ${MONITOR_DISPLAY_NAME:-Monitoreo RAPIGO}
     depends_on:
       postgres:
         condition: service_healthy
@@ -176,8 +176,8 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://:taxiyaRedis2026@redis:6379}
       RABBITMQ_URL: ${RABBITMQ_URL:-amqp://taxiya:taxiya@rabbitmq:5672}
       JWT_SECRET: ${JWT_SECRET:-super-secret}
-      MAP_TILES_URL_TEMPLATE: ${MAP_TILES_URL_TEMPLATE:-https://taxis.cybernovatech.space/tiles/styles/flashgo-navigation/512/{z}/{x}/{y}.png}
-      MAP_OFFLINE_TILES_URL_TEMPLATE: ${MAP_OFFLINE_TILES_URL_TEMPLATE:-https://taxis.cybernovatech.space/tiles/styles/flashgo-navigation/512/{z}/{x}/{y}.png}
+      MAP_TILES_URL_TEMPLATE: ${MAP_TILES_URL_TEMPLATE:-https://rapigo.cybernovatech.space/tiles/styles/rapigo-navigation/512/{z}/{x}/{y}.png}
+      MAP_OFFLINE_TILES_URL_TEMPLATE: ${MAP_OFFLINE_TILES_URL_TEMPLATE:-https://rapigo.cybernovatech.space/tiles/styles/rapigo-navigation/512/{z}/{x}/{y}.png}
       MAP_OFFLINE_REGION_NAME: ${MAP_OFFLINE_REGION_NAME:-Potosi ciudad}
     depends_on:
       postgres:
@@ -214,7 +214,7 @@ services:
 
   tileserver:
     image: maptiler/tileserver-gl:latest
-    container_name: flashgo-tileserver
+    container_name: rapigo-tileserver
     ports:
       - "${TILES_PORT:-8082}:8080"
     volumes:
@@ -223,12 +223,13 @@ services:
 
   nginx:
     image: nginx:1.27-alpine
-    container_name: flashgo-nginx
+    container_name: rapigo-nginx
     ports:
       - "${NGINX_HTTP_PORT:-8088}:80"
       - "${NGINX_HTTPS_PORT:-8444}:443"
     volumes:
       - ./infra/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./infra/downloads:/usr/share/nginx/html/downloads:ro
       - certbot_www:/var/www/certbot
       - letsencrypt:/etc/letsencrypt
     depends_on:
@@ -239,7 +240,7 @@ services:
 
   certbot:
     image: certbot/certbot:latest
-    container_name: flashgo-certbot
+    container_name: rapigo-certbot
     profiles: ["ssl"]
     volumes:
       - certbot_www:/var/www/certbot

@@ -11,7 +11,7 @@ export default function UsersPage() {
   return (
     <>
       <PageHero
-        eyebrow="Central Flash Go / Potosi"
+        eyebrow="Central RAPIGO / Potosi"
         title={VIEW_LABELS.users}
         description={VIEW_DESCRIPTIONS.users}
         metrics={[

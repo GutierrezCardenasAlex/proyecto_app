@@ -89,7 +89,7 @@ class AdminCenterRepository {
           (item) => AdminNotificationItem(
             id: item['id'] is num ? (item['id'] as num).toInt() : 0,
             kind: item['kind']?.toString() ?? 'nuevo',
-            title: item['title']?.toString() ?? 'Aviso Flash Go',
+            title: item['title']?.toString() ?? 'Aviso RAPIGO',
             message: item['message']?.toString() ?? '',
             createdAt: item['created_at']?.toString() ?? '',
           ),

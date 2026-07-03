@@ -11,7 +11,7 @@ export default function MapPage() {
   return (
     <>
       <PageHero
-        eyebrow="Central Flash Go / Potosi"
+        eyebrow="Central RAPIGO / Potosi"
         title={VIEW_LABELS.map}
         description={VIEW_DESCRIPTIONS.map}
         metrics={[

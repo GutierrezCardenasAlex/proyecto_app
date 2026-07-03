@@ -182,7 +182,7 @@ export default function StatsPanel({
               <article key={trip.id} className="support-card">
                 <div className="support-card-top">
                   <div>
-                    <strong>{trip.passengerName || 'Pasajero Flash Go'}</strong>
+                    <strong>{trip.passengerName || 'Pasajero RAPIGO'}</strong>
                     <p>{trip.passengerPhone || 'Sin telefono visible'} · viaje {trip.id.slice(0, 8)}</p>
                   </div>
                   <div className="support-badges">
