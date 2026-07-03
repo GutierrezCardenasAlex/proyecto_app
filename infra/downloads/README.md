@@ -1,15 +1,11 @@
-Coloca aqui los APKs publicados para actualizacion manual/automatica.
+Carpetas de descargas RAPIGO:
 
-Archivos esperados:
+- `infra/downloads/passenger/android/1.0.1/rapigo-passenger.apk`
+- `infra/downloads/driver/android/1.0.3/rapigo-driver-pro.apk`
 
-- `rapigo-passenger.apk`
-- `rapigo-driver-pro.apk`
+URLs publicas:
 
-Estos archivos se sirven desde Nginx en:
+- `https://rapigo.cybernovatech.space/downloads/passenger/android/1.0.1/rapigo-passenger.apk`
+- `https://rapigo.cybernovatech.space/downloads/driver/android/1.0.3/rapigo-driver-pro.apk`
 
-- `https://rapigo.cybernovatech.space/downloads/rapigo-passenger.apk`
-- `https://rapigo.cybernovatech.space/downloads/rapigo-driver-pro.apk`
-
-Si cambias el dominio, actualiza tambien:
-
-- `services/gateway-api/src/app-updates.manifest.json`
+Sube cada APK solo en su carpeta y version correspondiente para evitar cruces entre pasajero y conductor y para conservar historico de versiones.
