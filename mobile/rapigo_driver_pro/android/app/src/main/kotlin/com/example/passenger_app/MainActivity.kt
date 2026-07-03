@@ -37,6 +37,20 @@ class MainActivity : FlutterActivity() {
                         }
                     }
 
+                    "getAppInstallInfo" -> {
+                        try {
+                            val packageInfo = packageManager.getPackageInfo(packageName, 0)
+                            result.success(
+                                mapOf(
+                                    "firstInstallTime" to packageInfo.firstInstallTime,
+                                    "lastUpdateTime" to packageInfo.lastUpdateTime,
+                                )
+                            )
+                        } catch (error: Throwable) {
+                            result.error("install_info_failed", error.message, null)
+                        }
+                    }
+
                     else -> result.notImplemented()
                 }
             }

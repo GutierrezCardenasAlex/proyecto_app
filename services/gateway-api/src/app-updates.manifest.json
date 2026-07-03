@@ -1,10 +1,11 @@
 {
-  "updatedAt": "2026-07-02T00:00:00Z",
   "apps": {
     "rapigo_passenger": {
       "android": {
         "version": "1.0.0",
         "buildNumber": 1,
+        "releasedAt": "2026-07-01T00:00:00Z",
+        "updatedAt": "2026-07-02T00:00:00Z",
         "mandatory": false,
         "title": "Actualizacion disponible",
         "message": "Hay una nueva version de RAPIGO disponible para instalar.",
@@ -20,6 +21,8 @@
       "android": {
         "version": "1.0.0",
         "buildNumber": 1,
+        "releasedAt": "2026-07-03T00:00:00Z",
+        "updatedAt": "2026-07-03T00:00:00Z",
         "mandatory": false,
         "title": "Actualizacion disponible",
         "message": "Hay una nueva version de RAPIGO PRO disponible para instalar.",

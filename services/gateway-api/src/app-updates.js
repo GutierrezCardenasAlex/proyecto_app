@@ -39,7 +39,6 @@ async function registerAppUpdatesRoutes(app) {
       });
     }
     return {
-      updatedAt: manifest.updatedAt,
       appId,
       platform,
       ...appManifest,

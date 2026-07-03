@@ -9,6 +9,7 @@ class AppUpdateManifest {
     required this.title,
     required this.message,
     required this.notes,
+    required this.releasedAt,
     required this.updatedAt,
   });
 
@@ -21,6 +22,7 @@ class AppUpdateManifest {
   final String title;
   final String message;
   final List<String> notes;
+  final String? releasedAt;
   final String? updatedAt;
 
   factory AppUpdateManifest.fromJson(Map<String, dynamic> json) {
@@ -35,6 +37,7 @@ class AppUpdateManifest {
       title: (json['title'] ?? 'Actualizacion disponible').toString(),
       message: (json['message'] ?? 'Hay una nueva version disponible.').toString(),
       notes: rawNotes is List ? rawNotes.map((item) => item.toString()).toList() : const [],
+      releasedAt: json['releasedAt']?.toString(),
       updatedAt: json['updatedAt']?.toString(),
     );
   }

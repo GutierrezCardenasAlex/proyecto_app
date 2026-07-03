@@ -36,14 +36,23 @@ class AppUpdateService {
 
   static String _ignoredBuildKey(String appId) => 'rapigo_update_ignored_build_$appId';
 
-  Future<AppUpdateCheckResult> checkForUpdate() async {
-    final info = await PackageInfo.fromPlatform();
-    final localBuild = int.tryParse(info.buildNumber) ?? 0;
+  Future<AppUpdateManifest?> fetchLatestManifest() async {
     final uri = Uri.parse(
       AppConfig.appUpdateManifestUrl(appId: appId, platform: 'android'),
     );
     final response = await _client.get(uri, headers: const {'accept': 'application/json'});
     if (response.statusCode != 200) {
+      return null;
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return AppUpdateManifest.fromJson(data);
+  }
+
+  Future<AppUpdateCheckResult> checkForUpdate() async {
+    final info = await PackageInfo.fromPlatform();
+    final localBuild = int.tryParse(info.buildNumber) ?? 0;
+    final manifest = await fetchLatestManifest();
+    if (manifest == null) {
       return AppUpdateCheckResult(
         localBuildNumber: localBuild,
         localVersion: info.version,
@@ -51,8 +60,6 @@ class AppUpdateService {
         update: null,
       );
     }
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    final manifest = AppUpdateManifest.fromJson(data);
     if (manifest.apkUrl.trim().isEmpty || manifest.buildNumber <= localBuild) {
       return AppUpdateCheckResult(
         localBuildNumber: localBuild,

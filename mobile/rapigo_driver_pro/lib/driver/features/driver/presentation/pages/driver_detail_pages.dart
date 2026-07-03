@@ -3,10 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart' hide Path;
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../../../core/admin_center/admin_center_repository.dart';
 import '../../../../../core/map/offline_map.dart';
 import '../../../../../core/ui/top_notice.dart';
+import '../../../../../core/update/app_install_info.dart';
+import '../../../../../core/update/app_update_service.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../trip/data/trip_repository.dart';
 import '../../../trip/domain/driver_trip.dart';
@@ -234,6 +237,30 @@ class DriverProfilePage extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  height: 64,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _openPage(context, const DriverAppInfoPage()),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: Color(0xFF2A3340)),
+                      backgroundColor: const Color(0xFF11151D),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(22),
+                      ),
+                    ),
+                    icon: const Icon(Icons.info_outline_rounded, color: Color(0xFFFACC15)),
+                    label: const Text(
+                      'Abrir información',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),
@@ -327,6 +354,232 @@ class DriverProfilePage extends ConsumerWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class DriverAppInfoPage extends StatefulWidget {
+  const DriverAppInfoPage({super.key});
+
+  @override
+  State<DriverAppInfoPage> createState() => _DriverAppInfoPageState();
+}
+
+class _DriverAppInfoPageState extends State<DriverAppInfoPage> {
+  late final Future<_DriverAppInfoData> _future = _load();
+
+  Future<_DriverAppInfoData> _load() async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    final installInfo = await AndroidAppInstallInfo.read();
+    final updateManifest = await AppUpdateService(appId: 'rapigo_driver_pro').fetchLatestManifest();
+    return _DriverAppInfoData(
+      packageInfo: packageInfo,
+      installInfo: installInfo,
+      manifestReleasedAt: updateManifest?.releasedAt,
+      manifestUpdatedAt: updateManifest?.updatedAt,
+      latestVersion: updateManifest == null
+          ? null
+          : '${updateManifest.version}+${updateManifest.buildNumber}',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _DetailScaffold(
+      title: 'Acerca de',
+      child: Scaffold(
+        backgroundColor: const Color(0xFF090D14),
+        body: FutureBuilder<_DriverAppInfoData>(
+          future: _future,
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const Center(
+                child: CircularProgressIndicator(color: Color(0xFFFACC15)),
+              );
+            }
+            final data = snapshot.data!;
+            return SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(22, 18, 22, 28),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(22),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF11151D),
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(color: const Color(0xFF262D37)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 68,
+                          height: 68,
+                          decoration: BoxDecoration(
+                            color: const Color(0x19FACC15),
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(color: const Color(0x33FACC15)),
+                          ),
+                          child: const Icon(
+                            Icons.info_outline_rounded,
+                            color: Color(0xFFFACC15),
+                            size: 34,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'RAPIGO PRO',
+                                style: GoogleFonts.plusJakartaSans(
+                                  color: Colors.white,
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Información técnica y datos de la versión instalada.',
+                                style: const TextStyle(
+                                  color: Color(0xFFB8C0CC),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  _DriverInfoSection(
+                    title: 'Acerca de',
+                    children: [
+                      _DriverInfoRow(label: 'Versión instalada', value: '${data.packageInfo.version}+${data.packageInfo.buildNumber}'),
+                      _DriverInfoRow(label: 'Paquete', value: data.packageInfo.packageName),
+                      _DriverInfoRow(label: 'Fecha de lanzamiento', value: _formatInfoDate(data.installInfo?.firstInstallDate) ?? 'No disponible'),
+                      _DriverInfoRow(label: 'Fecha de actualización', value: _formatInfoDate(data.installInfo?.lastUpdateDate) ?? 'No disponible'),
+                      _DriverInfoRow(label: 'Última versión publicada', value: data.latestVersion ?? 'No disponible'),
+                      _DriverInfoRow(label: 'Lanzamiento publicado', value: _formatInfoDate(_tryParseDate(data.manifestReleasedAt)) ?? 'No disponible'),
+                      _DriverInfoRow(label: 'Actualización publicada', value: _formatInfoDate(_tryParseDate(data.manifestUpdatedAt)) ?? 'No disponible'),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _DriverAppInfoData {
+  const _DriverAppInfoData({
+    required this.packageInfo,
+    required this.installInfo,
+    required this.manifestReleasedAt,
+    required this.manifestUpdatedAt,
+    required this.latestVersion,
+  });
+
+  final PackageInfo packageInfo;
+  final AppInstallInfo? installInfo;
+  final String? manifestReleasedAt;
+  final String? manifestUpdatedAt;
+  final String? latestVersion;
+}
+
+class _DriverInfoSection extends StatelessWidget {
+  const _DriverInfoSection({
+    required this.title,
+    required this.children,
+  });
+
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF11151D),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: const Color(0xFF262D37)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: GoogleFonts.plusJakartaSans(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 10),
+          ...children,
+        ],
+      ),
+    );
+  }
+}
+
+class _DriverInfoRow extends StatelessWidget {
+  const _DriverInfoRow({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0C121B),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFF232D3A)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: Color(0xFFB8C0CC),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Flexible(
+              child: Text(
+                value,
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -2147,6 +2400,36 @@ String _formatEndTime(String raw, int minutesToAdd) {
   final minutes = end.minute.toString().padLeft(2, '0');
   final suffix = end.hour >= 12 ? 'p. m.' : 'a. m.';
   return '$hour:$minutes $suffix';
+}
+
+DateTime? _tryParseDate(String? raw) {
+  if (raw == null || raw.trim().isEmpty) {
+    return null;
+  }
+  return DateTime.tryParse(raw)?.toLocal();
+}
+
+String? _formatInfoDate(DateTime? date) {
+  if (date == null) {
+    return null;
+  }
+  const months = [
+    'ene',
+    'feb',
+    'mar',
+    'abr',
+    'may',
+    'jun',
+    'jul',
+    'ago',
+    'sep',
+    'oct',
+    'nov',
+    'dic',
+  ];
+  final hour = date.hour.toString().padLeft(2, '0');
+  final minute = date.minute.toString().padLeft(2, '0');
+  return '${date.day} ${months[date.month - 1]} ${date.year} • $hour:$minute';
 }
 
 class _DetailScaffold extends StatelessWidget {
