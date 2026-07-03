@@ -105,6 +105,8 @@ CREATE TABLE IF NOT EXISTS trips (
   passenger_id UUID NOT NULL REFERENCES users(id),
   driver_id UUID REFERENCES drivers(id),
   status trip_status NOT NULL DEFAULT 'requested',
+  dispatch_mode VARCHAR(16) NOT NULL DEFAULT 'broadcast',
+  preferred_driver_id UUID REFERENCES drivers(id),
   pickup_address TEXT,
   destination_address TEXT,
   pickup_location GEOGRAPHY(POINT, 4326) NOT NULL,

@@ -60,6 +60,17 @@ async function emitRealtime(event, room, data) {
   }
 }
 
+async function clearTripOffers(tripId) {
+  const offeredDriversKey = `trip:${tripId}:offered_drivers`;
+  const offeredDriverIds = await redis.smembers(offeredDriversKey);
+  if (offeredDriverIds.length) {
+    for (const offeredDriverId of offeredDriverIds) {
+      await redis.srem(`driver:${offeredDriverId}:offers`, tripId);
+    }
+  }
+  await redis.del(offeredDriversKey);
+}
+
 async function bootstrap() {
   await app.register(cors, { origin: true, credentials: true });
 
@@ -69,6 +80,7 @@ async function bootstrap() {
     const { tripId, pickupLat, pickupLng, dispatchMode, preferredDriverId } = searchSchema.parse(request.body);
     const radiusMeters = preferredDriverId ? null : dispatchMode === "nearby" ? 1000 : null;
     const limit = preferredDriverId ? 1 : dispatchMode === "nearby" ? 8 : 1000;
+    await clearTripOffers(tripId);
     await pool.query(
       `UPDATE trips
        SET status = 'searching', updated_at = NOW()
@@ -121,6 +133,8 @@ async function bootstrap() {
     for (const candidate of candidates) {
       await redis.sadd(`driver:${candidate.driver_id}:offers`, tripId);
       await redis.expire(`driver:${candidate.driver_id}:offers`, 600);
+      await redis.sadd(`trip:${tripId}:offered_drivers`, candidate.driver_id);
+      await redis.expire(`trip:${tripId}:offered_drivers`, 600);
       await publish("dispatch.trip.offer", {
         tripId,
         driverId: candidate.driver_id,
@@ -161,6 +175,8 @@ async function bootstrap() {
     const result = await pool.query(
       `SELECT t.id,
               t.status,
+              t.dispatch_mode,
+              t.preferred_driver_id,
               t.pickup_address,
               t.destination_address,
               t.requested_at,
@@ -277,7 +293,7 @@ async function bootstrap() {
       );
 
       await client.query("COMMIT");
-      await redis.del(`driver:${driverId}:offers`);
+      await clearTripOffers(tripId);
       const etaResult = await pool.query(
         `WITH latest_location AS (
            SELECT DISTINCT ON (dl.driver_id)
@@ -330,6 +346,7 @@ async function bootstrap() {
   app.post("/reject", async (request, reply) => {
     const { tripId, driverId } = rejectSchema.parse(request.body);
     await redis.srem(`driver:${driverId}:offers`, tripId);
+    await redis.srem(`trip:${tripId}:offered_drivers`, driverId);
     await emitRealtime("driver:trip_rejected", `driver:${driverId}`, {
       tripId,
       driverId

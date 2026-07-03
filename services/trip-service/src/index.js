@@ -107,6 +107,11 @@ async function ensureSchema() {
   `);
   await pool.query(`
     ALTER TABLE trips
+      ADD COLUMN IF NOT EXISTS dispatch_mode VARCHAR(16) NOT NULL DEFAULT 'broadcast',
+      ADD COLUMN IF NOT EXISTS preferred_driver_id UUID REFERENCES drivers(id)
+  `);
+  await pool.query(`
+    ALTER TABLE trips
       ALTER COLUMN destination_location DROP NOT NULL
   `);
   await pool.query(`
@@ -210,7 +215,39 @@ async function bootstrap() {
       if (existingTripResult.rows.length) {
         const existingTrip = existingTripResult.rows[0];
         if (["requested", "searching"].includes(existingTrip.status)) {
-          trip = existingTrip;
+          const refreshedExistingTrip = await client.query(
+            `UPDATE trips
+             SET dispatch_mode = $2,
+                 preferred_driver_id = $3,
+                 pickup_address = $4,
+                 destination_address = $5,
+                 pickup_location = ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography,
+                 destination_location = CASE
+                   WHEN $8::double precision IS NULL OR $9::double precision IS NULL THEN NULL
+                   ELSE ST_SetSRID(ST_MakePoint($8, $9), 4326)::geography
+                 END,
+                 estimated_distance_meters = $10,
+                 estimated_duration_seconds = $11,
+                 fare_amount = $12,
+                 updated_at = NOW()
+             WHERE id = $1
+             RETURNING *`,
+            [
+              existingTrip.id,
+              input.dispatchMode,
+              input.preferredDriverId ?? null,
+              input.pickupAddress,
+              input.destinationAddress,
+              input.pickupLng,
+              input.pickupLat,
+              input.destinationLng ?? null,
+              input.destinationLat ?? null,
+              input.estimatedDistanceMeters,
+              input.estimatedDurationSeconds,
+              existingTrip.promotional_trip === true ? existingTrip.fare_amount : input.fareAmount
+            ]
+          );
+          trip = refreshedExistingTrip.rows[0];
           rewardApplied = existingTrip.promotional_trip === true;
           shouldTriggerDispatch = true;
           await client.query("COMMIT");
@@ -259,6 +296,8 @@ async function bootstrap() {
            estimated_duration_seconds,
            fare_amount,
            promotional_trip,
+           dispatch_mode,
+           preferred_driver_id,
            status
          ) VALUES (
            $1, $2, $3,
@@ -267,7 +306,7 @@ async function bootstrap() {
              WHEN $6::double precision IS NULL OR $7::double precision IS NULL THEN NULL
              ELSE ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography
            END,
-          $8, $9, $10, $11, 'requested'
+          $8, $9, $10, $11, $12, $13, 'requested'
          )
          RETURNING *`,
           [
@@ -281,7 +320,9 @@ async function bootstrap() {
             input.estimatedDistanceMeters,
             input.estimatedDurationSeconds,
             effectiveFare,
-            rewardApplied
+            rewardApplied,
+            input.dispatchMode,
+            input.preferredDriverId ?? null
           ]
         );
         trip = result.rows[0];
