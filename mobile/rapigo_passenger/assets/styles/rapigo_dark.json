@@ -1,0 +1,25 @@
+{
+  "version": 8,
+  "name": "RAPIGO Dark",
+  "metadata": {
+    "description": "Future-ready dark style definition for RAPIGO passenger.",
+    "brand": "RAPIGO",
+    "background": "#050A16",
+    "water": "#071B2C",
+    "roads": "#1D3B63",
+    "main_roads": "#2A5C91",
+    "labels": "#DCE6F2",
+    "parks": "#0A2A1A",
+    "route": "#2979FF"
+  },
+  "sources": {},
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#050A16"
+      }
+    }
+  ]
+}

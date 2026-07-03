@@ -2,6 +2,7 @@ const Fastify = require("fastify");
 const cors = require("@fastify/cors");
 const jwt = require("@fastify/jwt");
 const proxy = require("@fastify/http-proxy");
+const { registerAppUpdatesRoutes } = require("./app-updates");
 
 const app = Fastify({ logger: true });
 const port = Number(process.env.PORT || 3000);
@@ -34,6 +35,7 @@ async function bootstrap() {
   });
 
   app.get("/health", async () => ({ status: "ok", service: "gateway-api" }));
+  await registerAppUpdatesRoutes(app);
 
   for (const [prefix, upstream] of Object.entries(serviceMap)) {
     await app.register(proxy, {

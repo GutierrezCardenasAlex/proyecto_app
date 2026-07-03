@@ -1,0 +1,2179 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:latlong2/latlong.dart' hide Path;
+
+import '../../../../../core/admin_center/admin_center_repository.dart';
+import '../../../../../core/map/offline_map.dart';
+import '../../../../../core/ui/top_notice.dart';
+import '../../../auth/data/auth_repository.dart';
+import '../../../trip/data/trip_repository.dart';
+import '../../../trip/domain/driver_trip.dart';
+import '../widgets/driver_ui_kit.dart';
+
+class DriverProfilePage extends ConsumerWidget {
+  const DriverProfilePage({super.key});
+
+  Future<void> _handleLogout(BuildContext context, WidgetRef ref) async {
+    await ref.read(driverSessionProvider.notifier).logout();
+    if (!context.mounted) {
+      return;
+    }
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
+  Future<void> _openPage(BuildContext context, Widget page) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => page),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(driverSessionProvider);
+    final trips = ref.watch(driverTripHistoryProvider).value ?? const <DriverTrip>[];
+    final completedTrips = trips.where((trip) => trip.status == 'completed').length;
+    final displayName = session.firstName.trim().isNotEmpty
+        ? session.firstName.trim()
+        : (session.fullName.trim().isNotEmpty ? session.fullName.trim().split(' ').first : 'alex');
+    final vehicleSummary =
+        session.vehicleType.trim().isNotEmpty ? session.vehicleType.trim() : '';
+
+    return _DetailScaffold(
+      title: 'Perfil',
+      child: Scaffold(
+        backgroundColor: const Color(0xFF090D14),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(22, 18, 22, 26),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '¡Hola, $displayName!',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 34,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              height: 1.05,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              const Text(
+                                'Conductor verificado',
+                                style: TextStyle(
+                                  color: Color(0xFFB8C0CC),
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                width: 26,
+                                height: 26,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFFACC15),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.verified_rounded,
+                                  size: 18,
+                                  color: Color(0xFF111827),
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (vehicleSummary.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF111722),
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(color: const Color(0xFF232C3A)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.directions_car_filled_rounded,
+                                    size: 18,
+                                    color: Color(0xFFFACC15),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Flexible(
+                                    child: Text(
+                                      vehicleSummary,
+                                      style: const TextStyle(
+                                        color: Color(0xFFE5E7EB),
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 13,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Container(
+                      width: 82,
+                      height: 82,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF111722),
+                        borderRadius: BorderRadius.circular(28),
+                        border: Border.all(color: const Color(0xFF232C3A)),
+                      ),
+                      child: const Icon(
+                        Icons.person_outline_rounded,
+                        size: 40,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF11151D),
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: const Color(0xFF262D37)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _DriverProfileStatTile(
+                          icon: Icons.workspace_premium_outlined,
+                          value: '+${completedTrips < 120 ? 120 : completedTrips}',
+                          label: 'Prioridad',
+                        ),
+                      ),
+                      Container(
+                        width: 1,
+                        height: 112,
+                        color: const Color(0xFF242B35),
+                      ),
+                      const Expanded(
+                        child: _DriverProfileStatTile(
+                          icon: Icons.star_border_rounded,
+                          value: '5.0',
+                          label: 'Calificación',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF11151D),
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: const Color(0xFF262D37)),
+                  ),
+                  child: Column(
+                    children: [
+                      _DriverProfileMenuTile(
+                        icon: Icons.bar_chart_rounded,
+                        title: 'Ganancias',
+                        subtitle: 'Revisa tu rendimiento, viajes completados y cobro estimado.',
+                        onTap: () => _openPage(context, const DriverStatisticsPage()),
+                      ),
+                      _DriverProfileDivider(),
+                      _DriverProfileMenuTile(
+                        icon: Icons.local_taxi_outlined,
+                        title: 'Historial',
+                        subtitle: 'Consulta el historial y el estado de tus recorridos.',
+                        onTap: () {
+                          showTopNotice(
+                            context,
+                            'Revisa el historial completo desde la pestaña Viajes.',
+                            tone: NoticeTone.info,
+                          );
+                        },
+                      ),
+                      _DriverProfileDivider(),
+                      _DriverProfileMenuTile(
+                        icon: Icons.notifications_none_rounded,
+                        title: 'Notificaciones',
+                        subtitle: 'Avisos de central, autorizaciones y mensajes operativos.',
+                        onTap: () => _openPage(context, const DriverNotificationsPage()),
+                      ),
+                      _DriverProfileDivider(),
+                      _DriverProfileMenuTile(
+                        icon: Icons.settings_outlined,
+                        title: 'Configuraciones',
+                        subtitle: 'Mapa offline, preferencias y herramientas del conductor.',
+                        onTap: () => _openPage(context, const DriverSettingsPage()),
+                      ),
+                      _DriverProfileDivider(),
+                      _DriverProfileMenuTile(
+                        icon: Icons.support_agent_rounded,
+                        title: 'Soporte',
+                        subtitle: 'Reporta fallas de la app o incidentes del servicio a central.',
+                        onTap: () => _openPage(context, const DriverSupportPage()),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF11151D),
+                    borderRadius: BorderRadius.circular(26),
+                    border: Border.all(color: const Color(0xFF262D37)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 54,
+                        height: 54,
+                        decoration: BoxDecoration(
+                          color: const Color(0x19FACC15),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: const Color(0x33FACC15)),
+                        ),
+                        child: const Icon(
+                          Icons.shield_outlined,
+                          color: Color(0xFFFACC15),
+                          size: 28,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Sesión protegida activa',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Tu cuenta está segura y monitoreada.',
+                              style: TextStyle(
+                                color: Color(0xFFB8C0CC),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        width: 18,
+                        height: 18,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF32D74B),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF32D74B).withValues(alpha: 0.35),
+                              blurRadius: 12,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 72,
+                  child: FilledButton.icon(
+                    onPressed: () => _handleLogout(context, ref),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFFACC15),
+                      foregroundColor: const Color(0xFF111827),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                    ),
+                    icon: const Icon(Icons.logout_rounded, size: 30),
+                    label: const Text(
+                      'Cerrar sesión',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DriverProfileStatTile extends StatelessWidget {
+  const _DriverProfileStatTile({
+    required this.icon,
+    required this.value,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Column(
+        children: [
+          Icon(icon, color: const Color(0xFFFACC15), size: 40),
+          const SizedBox(height: 18),
+          Text(
+            value,
+            style: GoogleFonts.plusJakartaSans(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFFB8C0CC),
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DriverProfileMenuTile extends StatelessWidget {
+  const _DriverProfileMenuTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(22),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 18),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 68,
+              height: 68,
+              decoration: BoxDecoration(
+                color: const Color(0xFF121923),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFF29313C)),
+              ),
+              child: Icon(icon, color: const Color(0xFFFACC15), size: 32),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.plusJakartaSans(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: Color(0xFFB8C0CC),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Padding(
+              padding: EdgeInsets.only(top: 18),
+              child: Icon(
+                Icons.chevron_right_rounded,
+                color: Colors.white,
+                size: 34,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DriverProfileDivider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return const Divider(
+      height: 1,
+      thickness: 1,
+      color: Color(0xFF232A34),
+    );
+  }
+}
+
+class DriverSettingsPage extends StatelessWidget {
+  const DriverSettingsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return _DetailScaffold(
+      title: 'Configuraciones',
+      child: DriverPageShell(
+        eyebrow: 'Preferencias',
+        title: 'Configuraciones',
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF0C1830),
+                    Color(0xFF09111F),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFF1A3A66)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Mapa offline',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Descarga o actualiza Potosi ciudad para mantener el mapa listo aun con señal baja.',
+                    style: TextStyle(
+                      color: Color(0xFFDCE6F2),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () => showOfflineMapSheet(context),
+                      icon: const Icon(Icons.download_for_offline_rounded),
+                      label: const Text('Abrir mapa offline'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class DriverNotificationsPage extends ConsumerWidget {
+  const DriverNotificationsPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(driverSessionProvider);
+    final repository = const AdminCenterRepository();
+
+    return _DetailScaffold(
+      title: 'Notificaciones',
+      child: FutureBuilder<List<AdminNotificationItem>>(
+        future: session.token.isEmpty ? Future.value(const <AdminNotificationItem>[]) : repository.fetchNotifications(session.token),
+        builder: (context, snapshot) {
+          final items = snapshot.data ?? const <AdminNotificationItem>[];
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: Padding(
+              padding: EdgeInsets.only(top: 80),
+              child: CircularProgressIndicator(color: Color(0xFFFACC15)),
+            ));
+          }
+
+          return DriverPageShell(
+            eyebrow: 'Bandeja',
+            title: 'Notificaciones',
+            child: Column(
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFF123E8A),
+                        Color(0xFF0C1830),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: const Color(0x551D4ED8)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF2563EB).withValues(alpha: 0.16),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 58,
+                        height: 58,
+                        decoration: BoxDecoration(
+                          color: const Color(0x19FACC15),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: const Color(0x55FACC15)),
+                        ),
+                        child: const Icon(
+                          Icons.notifications_active_rounded,
+                          color: Color(0xFFFACC15),
+                          size: 30,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              items.isEmpty ? 'Bandeja limpia' : '${items.length} aviso(s) disponible(s)',
+                              style: GoogleFonts.plusJakartaSans(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              items.isEmpty
+                                  ? 'Solicitudes de pasajeros y promociones prioritarias pueden llegar al telefono. El resto aparecera aqui.'
+                                  : 'Las solicitudes prioritarias y promociones pueden sonar en el telefono. Cambios operativos y avisos internos se consultan aqui.',
+                              style: const TextStyle(
+                                color: Color(0xFFDCE6F2),
+                                fontWeight: FontWeight.w600,
+                                height: 1.35,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                if (items.isEmpty)
+                  const _DriverSettingsInfoCard(
+                    title: 'Sin avisos nuevos',
+                    subtitle: 'Aqui veras cambios de estado, avisos operativos, autorizaciones y mensajes internos de RAPIGO - PRO.',
+                  ),
+                ...items.map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: _DriverNotificationCard(
+                      kind: item.kind,
+                      title: item.title,
+                      message: item.message,
+                      createdAt: item.createdAt,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class DriverSupportPage extends ConsumerStatefulWidget {
+  const DriverSupportPage({super.key});
+
+  @override
+  ConsumerState<DriverSupportPage> createState() => _DriverSupportPageState();
+}
+
+class _DriverSupportPageState extends ConsumerState<DriverSupportPage> {
+  final _messageController = TextEditingController();
+  String _category = 'Falla de app';
+  bool _sending = false;
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final session = ref.watch(driverSessionProvider);
+    final repository = const AdminCenterRepository();
+
+    return _DetailScaffold(
+      title: 'Soporte',
+      child: FutureBuilder<List<SupportReportItem>>(
+        future: session.token.isEmpty ? Future.value(const <SupportReportItem>[]) : repository.fetchSupportReports(session.token),
+        builder: (context, snapshot) {
+          final reports = snapshot.data ?? const <SupportReportItem>[];
+          return DriverPageShell(
+            eyebrow: 'Soporte',
+            title: 'Reporta un problema',
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1B1B1F),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: const Color(0xFF2C2C31)),
+                  ),
+                  child: Column(
+                    children: [
+                      DropdownButtonFormField<String>(
+                        initialValue: _category,
+                        dropdownColor: const Color(0xFF0C1830),
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                        decoration: InputDecoration(
+                          labelText: 'Tipo de reporte',
+                          labelStyle: const TextStyle(color: Color(0xFFFACC15)),
+                          filled: true,
+                          fillColor: const Color(0xFF0A1323),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: const BorderSide(color: Color(0xFF1A3A66)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: const BorderSide(color: Color(0xFFFACC15), width: 1.4),
+                          ),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'Falla de app', child: Text('Falla de app', style: TextStyle(color: Colors.white))),
+                          DropdownMenuItem(value: 'Problema con viaje', child: Text('Problema con viaje', style: TextStyle(color: Colors.white))),
+                          DropdownMenuItem(value: 'Cuenta o acceso', child: Text('Cuenta o acceso', style: TextStyle(color: Colors.white))),
+                          DropdownMenuItem(value: 'Mapa o GPS', child: Text('Mapa o GPS', style: TextStyle(color: Colors.white))),
+                        ],
+                        onChanged: (value) => setState(() => _category = value ?? 'Falla de app'),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: _messageController,
+                        maxLines: 5,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          labelText: 'Detalle del problema',
+                          hintText: 'Describe lo que pasó para que central pueda ayudarte mejor.',
+                          hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                          labelStyle: const TextStyle(color: Color(0xFFFACC15)),
+                          filled: true,
+                          fillColor: const Color(0xFF0A1323),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: const BorderSide(color: Color(0xFF1A3A66)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: const BorderSide(color: Color(0xFFFACC15), width: 1.4),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: _sending
+                              ? null
+                              : () async {
+                                  if (_messageController.text.trim().length < 8) {
+                                    showTopNotice(
+                                      context,
+                                      'Describe mejor el problema para enviarlo a central.',
+                                      tone: NoticeTone.error,
+                                    );
+                                    return;
+                                  }
+                                  setState(() => _sending = true);
+                                  try {
+                                    await repository.submitSupportReport(
+                                      token: session.token,
+                                      category: _category,
+                                      message: _messageController.text.trim(),
+                                    );
+                                    _messageController.clear();
+                                    if (!context.mounted) return;
+                                    setState(() {});
+                                    showTopNotice(
+                                      context,
+                                      'Reporte enviado correctamente a central.',
+                                      tone: NoticeTone.success,
+                                    );
+                                  } catch (error) {
+                                    if (!context.mounted) return;
+                                    showTopNotice(
+                                      context,
+                                      error.toString().replaceFirst('Exception: ', ''),
+                                      tone: NoticeTone.error,
+                                    );
+                                  } finally {
+                                    if (mounted) {
+                                      setState(() => _sending = false);
+                                    }
+                                  }
+                                },
+                          icon: const Icon(Icons.send_rounded),
+                          label: Text(_sending ? 'Enviando...' : 'Enviar reporte'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+                if (reports.isEmpty)
+                  const _DriverSettingsInfoCard(
+                    title: 'Sin reportes todavía',
+                    subtitle: 'Cuando envíes un reporte desde aquí, central podrá verlo con tus datos del conductor.',
+                  ),
+                ...reports.map(
+                  (report) => Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: DriverMenuTile(
+                      icon: Icons.support_agent,
+                      title: '${report.category} · ${report.status}',
+                      subtitle: '${report.message}\n${_formatShortDate(report.createdAt)}',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class DriverStatisticsPage extends ConsumerStatefulWidget {
+  const DriverStatisticsPage({super.key});
+
+  @override
+  ConsumerState<DriverStatisticsPage> createState() => _DriverStatisticsPageState();
+}
+
+class _DriverStatisticsPageState extends ConsumerState<DriverStatisticsPage> {
+  String _range = 'Dia';
+
+  @override
+  Widget build(BuildContext context) {
+    final history = ref.watch(driverTripHistoryProvider).value ?? const <DriverTrip>[];
+    final now = DateTime.now();
+    final filtered = history.where((trip) {
+      final date = DateTime.tryParse(trip.requestedAt ?? '');
+      if (date == null) {
+        return false;
+      }
+      final local = date.toLocal();
+      if (_range == 'Dia') {
+        return local.year == now.year && local.month == now.month && local.day == now.day;
+      }
+      if (_range == 'Semana') {
+        return now.difference(local).inDays < 7;
+      }
+      return local.year == now.year && local.month == now.month;
+    }).toList(growable: false);
+
+    final completed = filtered.where((trip) => trip.status == 'completed').length;
+    final promoTrips = filtered.where((trip) => trip.isPromotional).length;
+    final estimatedRevenue = filtered
+        .where((trip) => trip.status == 'completed' && !trip.isPromotional)
+        .fold<double>(0, (sum, trip) => sum + trip.fareAmount);
+
+    return _DetailScaffold(
+      title: 'Estadistica',
+      child: DriverPageShell(
+        eyebrow: 'Rendimiento',
+        title: 'Estadistica',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SegmentedButton<String>(
+              style: ButtonStyle(
+                backgroundColor: WidgetStateProperty.resolveWith((states) {
+                  if (states.contains(WidgetState.selected)) {
+                    return const Color(0xFFFACC15);
+                  }
+                  return const Color(0xFF0C1830);
+                }),
+                foregroundColor: WidgetStateProperty.resolveWith((states) {
+                  if (states.contains(WidgetState.selected)) {
+                    return const Color(0xFF07111F);
+                  }
+                  return Colors.white;
+                }),
+                side: const WidgetStatePropertyAll(
+                  BorderSide(color: Color(0xFF1A3A66)),
+                ),
+                shape: WidgetStatePropertyAll(
+                  RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+              segments: const [
+                ButtonSegment(value: 'Dia', label: Text('Dia')),
+                ButtonSegment(value: 'Semana', label: Text('Semana')),
+                ButtonSegment(value: 'Mes', label: Text('Mes')),
+              ],
+              selected: {_range},
+              onSelectionChanged: (selection) => setState(() => _range = selection.first),
+            ),
+            const SizedBox(height: 18),
+            _DriverSettingsInfoCard(
+              title: 'Viajes completados',
+              subtitle: '$completed viaje(s) cerrados en este periodo.',
+            ),
+            _DriverSettingsInfoCard(
+              title: 'Viajes promocionales',
+              subtitle: '$promoTrips viaje(s) promo en este periodo.',
+            ),
+            _DriverSettingsInfoCard(
+              title: 'Cobro estimado',
+              subtitle: 'Bs ${estimatedRevenue.toStringAsFixed(2)} en viajes no promocionales.',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _formatShortDate(String raw) {
+  final date = DateTime.tryParse(raw)?.toLocal();
+  if (date == null) {
+    return raw;
+  }
+  String two(int value) => value.toString().padLeft(2, '0');
+  return '${two(date.day)}/${two(date.month)}/${date.year} ${two(date.hour)}:${two(date.minute)}';
+}
+
+class _DriverNotificationCard extends StatelessWidget {
+  const _DriverNotificationCard({
+    required this.kind,
+    required this.title,
+    required this.message,
+    required this.createdAt,
+  });
+
+  final String kind;
+  final String title;
+  final String message;
+  final String createdAt;
+
+  @override
+  Widget build(BuildContext context) {
+    final visual = _driverNotificationVisual(kind);
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF0C1830),
+            Color(0xFF09111F),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: visual.borderColor),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x22000000),
+            blurRadius: 18,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              color: visual.backgroundColor,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: visual.borderColor),
+            ),
+            child: Icon(visual.icon, color: visual.accentColor, size: 26),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: visual.backgroundColor,
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: visual.borderColor),
+                      ),
+                      child: Text(
+                        visual.label,
+                        style: TextStyle(
+                          color: visual.accentColor,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0A1323),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: const Color(0x331D4ED8)),
+                      ),
+                      child: Text(
+                        _formatShortDate(createdAt),
+                        style: const TextStyle(
+                          color: Color(0xFFDCE6F2),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  message,
+                  style: const TextStyle(
+                    color: Color(0xFFDCE6F2),
+                    fontWeight: FontWeight.w600,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+({Color accentColor, Color backgroundColor, Color borderColor, IconData icon, String label}) _driverNotificationVisual(String kind) {
+  switch (kind.toLowerCase()) {
+    case 'importante':
+      return (
+        accentColor: const Color(0xFFEF4444),
+        backgroundColor: const Color(0x22EF4444),
+        borderColor: const Color(0x44EF4444),
+        icon: Icons.priority_high_rounded,
+        label: 'IMPORTANTE',
+      );
+    case 'sistema':
+      return (
+        accentColor: const Color(0xFF38BDF8),
+        backgroundColor: const Color(0x2238BDF8),
+        borderColor: const Color(0x4438BDF8),
+        icon: Icons.settings_suggest_rounded,
+        label: 'SISTEMA',
+      );
+    default:
+      return (
+        accentColor: const Color(0xFFFACC15),
+        backgroundColor: const Color(0x19FACC15),
+        borderColor: const Color(0xFF1A3A66),
+        icon: Icons.notifications_active_outlined,
+        label: 'NUEVO',
+      );
+  }
+}
+
+class _DriverSettingsInfoCard extends StatelessWidget {
+  const _DriverSettingsInfoCard({
+    required this.title,
+    required this.subtitle,
+  });
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF0C1830),
+              Color(0xFF09111F),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFF1A3A66)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x22000000),
+              blurRadius: 18,
+              offset: Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: const Color(0x191D4ED8),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0x551D4ED8)),
+              ),
+              child: const Icon(Icons.check_circle_outline, color: Color(0xFFFACC15)),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: Color(0xFFDCE6F2),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class DriverTripDetailPage extends StatelessWidget {
+  const DriverTripDetailPage({
+    super.key,
+    required this.trip,
+  });
+
+  final DriverTrip trip;
+
+  @override
+  Widget build(BuildContext context) {
+    final passengerName = (trip.passengerName ?? '').trim().isEmpty ? 'Pasajero RAPIGO' : trip.passengerName!.trim();
+    final distanceKm = driverTripDistanceKm(trip);
+    final durationMinutes = driverTripEstimatedMinutes(trip);
+    final fareText = 'Bs ${trip.fareAmount.toStringAsFixed(2)}';
+    final requestedAt = trip.requestedAt ?? '';
+    final routeDate = _formatTripDate(requestedAt);
+    final routeTime = _formatTripTime(requestedAt);
+    final vehicleLabel = _tripVehicleLabel(trip);
+    final vehicleChip = trip.vehicleLabel?.trim().isNotEmpty == true ? trip.vehicleLabel!.trim() : vehicleLabel;
+    final statusLabel = driverTripStatusLabel(trip.status);
+    final statusColor = driverTripStatusColor(trip.status);
+
+    return _DetailScaffold(
+      title: 'Detalle del viaje',
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(18, 10, 18, 28),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF091425),
+                  Color(0xFF08111E),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: const Color(0xFF15335A)),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x24000000),
+                  blurRadius: 24,
+                  offset: Offset(0, 14),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 62,
+                      height: 62,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF092114),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0xFF14532D)),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        _driverInitials(passengerName),
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: const Color(0xFF22C55E),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            passengerName,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 19,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _TripCapsule(
+                                icon: Icons.verified_outlined,
+                                label: 'Viaje realizado',
+                              ),
+                              _TripCapsule(
+                                icon: Icons.local_taxi_rounded,
+                                label: vehicleChip,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: statusColor.withValues(alpha: 0.24)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.check_circle_rounded, color: statusColor, size: 18),
+                          const SizedBox(width: 8),
+                          Text(
+                            statusLabel,
+                            style: TextStyle(
+                              color: statusColor,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _TripMetaLine(
+                        icon: Icons.calendar_month_rounded,
+                        color: const Color(0xFFFACC15),
+                        text: routeDate,
+                      ),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 24,
+                      color: const Color(0xFF173056),
+                    ),
+                    Expanded(
+                      child: _TripMetaLine(
+                        icon: Icons.access_time_rounded,
+                        color: const Color(0xFFFACC15),
+                        text: routeTime,
+                        alignEnd: true,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                DriverTripRoutePreview(
+                  trip: trip,
+                  height: 238,
+                  showLabels: true,
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF08111E),
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: const Color(0xFF13335A)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _TripMetricItem(
+                          icon: Icons.place_rounded,
+                          value: '${distanceKm.toStringAsFixed(1)} km',
+                          label: 'Distancia',
+                          color: const Color(0xFF22C55E),
+                        ),
+                      ),
+                      const _TripMetricDivider(),
+                      Expanded(
+                        child: _TripMetricItem(
+                          icon: Icons.schedule_rounded,
+                          value: '$durationMinutes min',
+                          label: 'Duracion',
+                          color: const Color(0xFF2979FF),
+                        ),
+                      ),
+                      const _TripMetricDivider(),
+                      Expanded(
+                        child: _TripMetricItem(
+                          icon: Icons.account_balance_wallet_rounded,
+                          value: fareText,
+                          label: 'Ganancia',
+                          color: const Color(0xFFFACC15),
+                        ),
+                      ),
+                      const _TripMetricDivider(),
+                      Expanded(
+                        child: _TripMetricItem(
+                          icon: Icons.payments_rounded,
+                          value: 'Efectivo',
+                          label: 'Metodo de pago',
+                          color: const Color(0xFF22C55E),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          _TripTimelineCard(
+            requestedAt: requestedAt,
+            trip: trip,
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF091425),
+                  Color(0xFF08111E),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(color: const Color(0xFF15335A)),
+            ),
+            child: Column(
+              children: [
+                _TripInfoRow(
+                  icon: Icons.person_outline_rounded,
+                  label: 'Pasajero',
+                  value: passengerName,
+                  trailing: Icons.chevron_right_rounded,
+                ),
+                const _TripInfoDivider(),
+                _TripInfoRow(
+                  icon: Icons.directions_car_filled_outlined,
+                  label: 'Vehiculo',
+                  value: vehicleChip,
+                  trailing: Icons.chevron_right_rounded,
+                ),
+                const _TripInfoDivider(),
+                _TripInfoRow(
+                  icon: Icons.sell_outlined,
+                  label: 'Tipo de servicio',
+                  value: 'RAPIGO PRO',
+                  trailing: Icons.chevron_right_rounded,
+                ),
+                const _TripInfoDivider(),
+                _TripInfoRow(
+                  icon: Icons.receipt_long_outlined,
+                  label: 'ID del viaje',
+                  value: '#${trip.id}',
+                  trailing: Icons.copy_rounded,
+                  onTap: () async {
+                    await Clipboard.setData(ClipboardData(text: trip.id));
+                    if (context.mounted) {
+                      showTopNotice(context, 'ID del viaje copiado.');
+                    }
+                  },
+                ),
+                const _TripInfoDivider(),
+                _TripInfoRow(
+                  icon: Icons.verified_user_outlined,
+                  label: 'Estado',
+                  value: statusLabel,
+                  valueColor: statusColor,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const DriverSupportPage(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.support_agent_rounded),
+                  label: const Text('Soporte'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: const BorderSide(color: Color(0xFF1A3A66)),
+                    minimumSize: const Size.fromHeight(60),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: () {
+                    showTopNotice(context, 'Muy pronto podras descargar el recibo del viaje.');
+                  },
+                  icon: const Icon(Icons.download_rounded),
+                  label: const Text('Descargar recibo'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF2979FF),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(60),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class DriverTripRoutePreview extends StatelessWidget {
+  const DriverTripRoutePreview({
+    super.key,
+    required this.trip,
+    this.height = 180,
+    this.showLabels = false,
+  });
+
+  final DriverTrip trip;
+  final double height;
+  final bool showLabels;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(26),
+      child: Container(
+        height: height,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF09111E),
+              Color(0xFF0A1425),
+            ],
+          ),
+        ),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: CustomPaint(
+                painter: _TripMapGridPainter(),
+              ),
+            ),
+            Positioned.fill(
+              child: CustomPaint(
+                painter: _TripRoutePainter(),
+              ),
+            ),
+            Positioned(
+              left: 26,
+              bottom: 28,
+              child: _TripMapPin(
+                color: const Color(0xFF22C55E),
+                innerColor: Colors.white,
+              ),
+            ),
+            Positioned(
+              right: 26,
+              top: 28,
+              child: _TripMapPin(
+                color: const Color(0xFFFF4D5D),
+                innerColor: Colors.white,
+                glow: const Color(0x55FF4D5D),
+              ),
+            ),
+            if (showLabels) ...[
+              Positioned(
+                left: 20,
+                bottom: 8,
+                child: Text(
+                  _shortPlaceLabel(trip.passengerPickup),
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF86EFAC),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 18,
+                top: 96,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 138),
+                  child: Text(
+                    _shortPlaceLabel(trip.destination),
+                    textAlign: TextAlign.right,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFFFFD9DE),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TripCapsule extends StatelessWidget {
+  const _TripCapsule({
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0B1628),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFF17345E)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: const Color(0xFFFACC15)),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TripMetaLine extends StatelessWidget {
+  const _TripMetaLine({
+    required this.icon,
+    required this.color,
+    required this.text,
+    this.alignEnd = false,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String text;
+  final bool alignEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: alignEnd ? MainAxisAlignment.end : MainAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            text,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFFE8F0FF),
+              fontWeight: FontWeight.w700,
+              fontSize: 15,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TripMetricItem extends StatelessWidget {
+  const _TripMetricItem({
+    required this.icon,
+    required this.value,
+    required this.label,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String value;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                value,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFFA8B7CC),
+            fontWeight: FontWeight.w600,
+            fontSize: 12,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TripMetricDivider extends StatelessWidget {
+  const _TripMetricDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 42,
+      margin: const EdgeInsets.symmetric(horizontal: 10),
+      color: const Color(0xFF173056),
+    );
+  }
+}
+
+class _TripTimelineCard extends StatelessWidget {
+  const _TripTimelineCard({
+    required this.requestedAt,
+    required this.trip,
+  });
+
+  final String requestedAt;
+  final DriverTrip trip;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF091425),
+            Color(0xFF08111E),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: const Color(0xFF15335A)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 28,
+            child: Column(
+              children: [
+                _TripWaypoint(color: const Color(0xFF22C55E), outlined: true),
+                Container(
+                  width: 2,
+                  height: 78,
+                  margin: const EdgeInsets.symmetric(vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF314968),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                _TripWaypoint(color: const Color(0xFFFF4D5D), outlined: true),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Origen',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF4ADE80),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  trip.passengerPickup,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${_formatTripDate(requestedAt)}  •  ${_formatTripTime(requestedAt)}',
+                  style: const TextStyle(
+                    color: Color(0xFFAAB7CA),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Destino',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFFFF4D5D),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  trip.destination,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${_formatTripDate(requestedAt)}  •  ${_formatEndTime(requestedAt, driverTripEstimatedMinutes(trip))}',
+                  style: const TextStyle(
+                    color: Color(0xFFAAB7CA),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TripWaypoint extends StatelessWidget {
+  const _TripWaypoint({
+    required this.color,
+    this.outlined = false,
+  });
+
+  final Color color;
+  final bool outlined;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 22,
+      height: 22,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: outlined ? Colors.transparent : color,
+        border: Border.all(color: color, width: 3),
+      ),
+      child: outlined
+          ? Center(
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: color,
+                ),
+              ),
+            )
+          : null,
+    );
+  }
+}
+
+class _TripInfoRow extends StatelessWidget {
+  const _TripInfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.trailing,
+    this.onTap,
+    this.valueColor,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final IconData? trailing;
+  final VoidCallback? onTap;
+  final Color? valueColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = Row(
+      children: [
+        Icon(icon, color: const Color(0xFFC5CFDF), size: 22),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFFDCE6F2),
+              fontWeight: FontWeight.w600,
+              fontSize: 16,
+            ),
+          ),
+        ),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: valueColor ?? Colors.white,
+            ),
+          ),
+        ),
+        if (trailing != null) ...[
+          const SizedBox(width: 10),
+          Icon(trailing, color: const Color(0xFFAAB7CA), size: 20),
+        ],
+      ],
+    );
+
+    if (onTap == null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: content,
+      );
+    }
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: content,
+      ),
+    );
+  }
+}
+
+class _TripInfoDivider extends StatelessWidget {
+  const _TripInfoDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Divider(
+      height: 1,
+      color: Color(0xFF143050),
+    );
+  }
+}
+
+class _TripMapPin extends StatelessWidget {
+  const _TripMapPin({
+    required this.color,
+    required this.innerColor,
+    this.glow,
+  });
+
+  final Color color;
+  final Color innerColor;
+  final Color? glow;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 30,
+      height: 30,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color,
+        boxShadow: [
+          BoxShadow(
+            color: glow ?? color.withValues(alpha: 0.35),
+            blurRadius: 16,
+            spreadRadius: 3,
+          ),
+        ],
+      ),
+      child: Center(
+        child: Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: innerColor,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TripMapGridPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final major = Paint()
+      ..color = const Color(0xFF142640)
+      ..strokeWidth = 1.4;
+    final minor = Paint()
+      ..color = const Color(0xFF0F1E34)
+      ..strokeWidth = 0.7;
+    for (double x = 0; x <= size.width; x += 22) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), minor);
+    }
+    for (double y = 0; y <= size.height; y += 22) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), minor);
+    }
+    for (double x = 0; x <= size.width; x += 72) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), major);
+    }
+    for (double y = 0; y <= size.height; y += 72) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), major);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _TripRoutePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final shadow = Paint()
+      ..color = const Color(0x882979FF)
+      ..strokeWidth = 14
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
+    final route = Paint()
+      ..color = const Color(0xFF2979FF)
+      ..strokeWidth = 7
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    final path = Path()
+      ..moveTo(size.width * 0.10, size.height * 0.74)
+      ..cubicTo(
+        size.width * 0.24,
+        size.height * 0.72,
+        size.width * 0.36,
+        size.height * 0.55,
+        size.width * 0.48,
+        size.height * 0.56,
+      )
+      ..cubicTo(
+        size.width * 0.62,
+        size.height * 0.57,
+        size.width * 0.73,
+        size.height * 0.48,
+        size.width * 0.82,
+        size.height * 0.38,
+      )
+      ..cubicTo(
+        size.width * 0.88,
+        size.height * 0.30,
+        size.width * 0.90,
+        size.height * 0.25,
+        size.width * 0.92,
+        size.height * 0.21,
+      );
+
+    canvas.drawPath(path, shadow);
+    canvas.drawPath(path, route);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+double driverTripDistanceKm(DriverTrip trip) {
+  final destinationLat = trip.destinationLat ?? trip.pickupLat + 0.028;
+  final destinationLng = trip.destinationLng ?? trip.pickupLng + 0.018;
+  final km = const Distance().as(
+    LengthUnit.Kilometer,
+    LatLng(trip.pickupLat, trip.pickupLng),
+    LatLng(destinationLat, destinationLng),
+  );
+  return km.isFinite ? km : 0;
+}
+
+int driverTripEstimatedMinutes(DriverTrip trip) {
+  final km = driverTripDistanceKm(trip);
+  return (km * 2.7).round().clamp(4, 90);
+}
+
+Color driverTripStatusColor(String status) {
+  return switch (status) {
+    'completed' => const Color(0xFF22C55E),
+    'cancelled' => const Color(0xFFEF4444),
+    'in_progress' => const Color(0xFF2979FF),
+    'accepted' || 'arriving' || 'at_pickup' => const Color(0xFFFACC15),
+    _ => const Color(0xFF22C55E),
+  };
+}
+
+String driverTripStatusLabel(String status) {
+  return switch (status) {
+    'requested' => 'Solicitado',
+    'searching' => 'Buscando',
+    'accepted' => 'Aceptado',
+    'arriving' => 'En camino',
+    'at_pickup' => 'Llego',
+    'in_progress' => 'En curso',
+    'completed' => 'Finalizado',
+    'cancelled' => 'Cancelado',
+    _ => 'Finalizado',
+  };
+}
+
+String _driverInitials(String name) {
+  final parts = name.trim().split(RegExp(r'\s+')).where((part) => part.isNotEmpty).toList();
+  if (parts.isEmpty) {
+    return 'RP';
+  }
+  if (parts.length == 1) {
+    return parts.first.substring(0, parts.first.length >= 2 ? 2 : 1).toUpperCase();
+  }
+  return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+}
+
+String _tripVehicleLabel(DriverTrip trip) {
+  final plate = trip.vehiclePlate?.trim();
+  final type = (trip.vehicleType ?? 'Taxi').trim();
+  if (plate != null && plate.isNotEmpty) {
+    return plate;
+  }
+  return type[0].toUpperCase() + type.substring(1);
+}
+
+String _shortPlaceLabel(String raw) {
+  final cleaned = raw.trim();
+  if (cleaned.length <= 24) {
+    return cleaned;
+  }
+  return '${cleaned.substring(0, 24)}...';
+}
+
+String _formatTripDate(String raw) {
+  final date = DateTime.tryParse(raw)?.toLocal();
+  if (date == null) {
+    return '17 jun 2026';
+  }
+  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  return '${date.day} ${months[date.month - 1]} ${date.year}';
+}
+
+String _formatTripTime(String raw) {
+  final date = DateTime.tryParse(raw)?.toLocal();
+  if (date == null) {
+    return '03:08 p. m.';
+  }
+  final hour = date.hour > 12 ? date.hour - 12 : (date.hour == 0 ? 12 : date.hour);
+  final minutes = date.minute.toString().padLeft(2, '0');
+  final suffix = date.hour >= 12 ? 'p. m.' : 'a. m.';
+  return '$hour:$minutes $suffix';
+}
+
+String _formatEndTime(String raw, int minutesToAdd) {
+  final date = DateTime.tryParse(raw)?.toLocal();
+  if (date == null) {
+    return '--:--';
+  }
+  final end = date.add(Duration(minutes: minutesToAdd));
+  final hour = end.hour > 12 ? end.hour - 12 : (end.hour == 0 ? 12 : end.hour);
+  final minutes = end.minute.toString().padLeft(2, '0');
+  final suffix = end.hour >= 12 ? 'p. m.' : 'a. m.';
+  return '$hour:$minutes $suffix';
+}
+
+class _DetailScaffold extends StatelessWidget {
+  const _DetailScaffold({
+    required this.title,
+    required this.child,
+  });
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF111214),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF111214),
+        foregroundColor: const Color(0xFFFFF4EC),
+        title: Text(
+          title,
+          style: GoogleFonts.plusJakartaSans(
+            fontWeight: FontWeight.w800,
+            color: const Color(0xFFFFF4EC),
+          ),
+        ),
+      ),
+      body: child,
+    );
+  }
+}

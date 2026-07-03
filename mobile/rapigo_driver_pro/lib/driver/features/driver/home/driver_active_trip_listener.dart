@@ -1,0 +1,84 @@
+part of 'driver_home_page.dart';
+
+class DriverActiveTripListener extends ConsumerStatefulWidget {
+  const DriverActiveTripListener({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  ConsumerState<DriverActiveTripListener> createState() =>
+      _DriverActiveTripListenerState();
+}
+
+class _DriverActiveTripListenerState
+    extends ConsumerState<DriverActiveTripListener> {
+  bool _tripFlowRouteOpen = false;
+  String? _lastOpenedTripId;
+  bool _initialCheckDone = false;
+
+  bool _shouldOpenTripFlow(DriverTrip? trip) {
+    return trip != null &&
+        const {'accepted', 'arriving', 'at_pickup', 'in_progress', 'completed'}
+            .contains(trip.status);
+  }
+
+  void _handleTrip(DriverTrip? trip) {
+    final previewTripId = ref.read(driverOfferPreviewTripIdProvider);
+    if (previewTripId != null && trip?.id == previewTripId) {
+      return;
+    }
+    if (!_shouldOpenTripFlow(trip)) {
+      if (!_tripFlowRouteOpen) {
+        _lastOpenedTripId = null;
+      }
+      return;
+    }
+    if (_tripFlowRouteOpen || !mounted || _lastOpenedTripId == trip!.id) {
+      return;
+    }
+
+    _tripFlowRouteOpen = true;
+    _lastOpenedTripId = trip.id;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) {
+        _tripFlowRouteOpen = false;
+        return;
+      }
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (context) => DriverProgressPage(
+            onClosed: () {
+              _tripFlowRouteOpen = false;
+            },
+          ),
+        ),
+      );
+      if (mounted) {
+        setState(() {
+          _tripFlowRouteOpen = false;
+        });
+      } else {
+        _tripFlowRouteOpen = false;
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen<AsyncValue<DriverTrip?>>(
+      offeredTripProvider,
+      (previous, next) => _handleTrip(next.value),
+    );
+
+    if (!_initialCheckDone) {
+      _initialCheckDone = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _handleTrip(ref.read(offeredTripProvider).value);
+        }
+      });
+    }
+
+    return widget.child;
+  }
+}
