@@ -67,6 +67,51 @@ Que hace el script:
 - recarga Nginx automaticamente
 - imprime URLs finales de verificacion
 
+## Script completo de build + deploy
+
+Si quieres construir y desplegar en un solo paso, usa:
+
+```bash
+chmod +x scripts/release.sh
+```
+
+Construir y desplegar ambas apps:
+
+```bash
+./scripts/release.sh
+```
+
+Solo conductor:
+
+```bash
+./scripts/release.sh --target driver
+```
+
+Solo pasajero:
+
+```bash
+./scripts/release.sh --target passenger
+```
+
+Forzando version manual:
+
+```bash
+./scripts/release.sh \
+  --target driver \
+  --driver-build-name 1.0.2 \
+  --driver-build-number 3 \
+  --released-at 2026-07-08T00:00:00Z
+```
+
+Que hace `release.sh`:
+
+- corre `flutter pub get`
+- construye APK release
+- toma version y build desde `pubspec.yaml` si no mandas overrides
+- guarda copia en `build/releases/...`
+- llama a `deploy-updates.sh`
+- actualiza el manifest y recarga nginx
+
 Si compilas directamente desde este repo, usa estos comandos:
 
 ```bash
