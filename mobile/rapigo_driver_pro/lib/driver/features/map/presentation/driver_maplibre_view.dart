@@ -33,7 +33,11 @@ class DriverMapLibreView extends ConsumerStatefulWidget {
     this.focusBounds,
     this.focusSignal = 0,
     this.onRouteUpdated,
+    this.onOfflineRouteRetained,
     this.routePersistenceKey,
+    this.routePersistenceReadKeys,
+    this.routePersistenceWriteKeys,
+    this.prefetchRoutePersistenceKey,
     this.idleZoomLevel,
     this.maxZoomPreference,
     this.idleTilt,
@@ -69,7 +73,11 @@ class DriverMapLibreView extends ConsumerStatefulWidget {
   final LatLngBounds? focusBounds;
   final int focusSignal;
   final VoidCallback? onRouteUpdated;
+  final VoidCallback? onOfflineRouteRetained;
   final String? routePersistenceKey;
+  final List<String>? routePersistenceReadKeys;
+  final List<String>? routePersistenceWriteKeys;
+  final String? prefetchRoutePersistenceKey;
   final double? idleZoomLevel;
   final double? maxZoomPreference;
   final double? idleTilt;
@@ -105,6 +113,8 @@ class DriverMapLibreView extends ConsumerStatefulWidget {
 
 class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
     with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
+  static const Duration _followLoopInterval = Duration(milliseconds: 110);
+  static const Duration _idleRoadSnapCooldown = Duration(milliseconds: 850);
   ml.MapLibreMapController? _controller;
   RoutePathBundle? _routeBundle;
   String? _routeKey;
@@ -114,6 +124,7 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
   Timer? _failSafeTimer;
   Timer? _resumeSettleTimer;
   Timer? _followLoopTimer;
+  DateTime? _lastIdleRoadSnapAt;
   String? _resolvedStyleString;
   final Set<String> _loadedDriverMarkerImageIds = <String>{};
   bool _pickupMarkerImageLoaded = false;
@@ -160,7 +171,40 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
   static const String _routeMainLayerId = 'rapigo_driver_route_main';
 
   String get _activeDriverMarkerImageId =>
-      '${_driverMarkerImageId}_${widget.driverMarkerStyle ?? 'arrow'}';
+      '${_driverMarkerImageId}_${widget.driverMarkerStyle ?? 'rapigo'}_${_driverMarkerVisualStateKey()}';
+
+  String _driverMarkerVisualStateKey() {
+    final status = widget.tripStatus;
+    if (status == 'completed') {
+      return 'finalizando';
+    }
+    if (status == 'at_pickup' || status == 'in_progress') {
+      return 'con_pasajero';
+    }
+    if (status == 'accepted' || status == 'arriving') {
+      return 'en_camino';
+    }
+    if (widget.available) {
+      return 'libre';
+    }
+    return 'desconectado';
+  }
+
+  Color _driverMarkerHaloColor() {
+    switch (_driverMarkerVisualStateKey()) {
+      case 'en_camino':
+        return const Color(0xFFFACC15);
+      case 'con_pasajero':
+        return const Color(0xFF22C55E);
+      case 'finalizando':
+        return const Color(0xFFEF4444);
+      case 'desconectado':
+        return const Color(0xFF94A3B8);
+      case 'libre':
+      default:
+        return const Color(0xFF12A8FF);
+    }
+  }
   static const double _defaultMaxZoom = 16.35;
 
   @override
@@ -463,6 +507,87 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
 
   ll.LatLng? get _routePoint => _isOnDestinationStage ? _destinationPoint : _pickupPoint;
 
+  List<String> _normalizedRouteReadKeys() {
+    final keys = <String>[];
+    final primary = widget.routePersistenceKey?.trim();
+    if (primary != null && primary.isNotEmpty) {
+      keys.add(primary);
+    }
+    for (final item in widget.routePersistenceReadKeys ?? const <String>[]) {
+      final normalized = item.trim();
+      if (normalized.isNotEmpty && !keys.contains(normalized)) {
+        keys.add(normalized);
+      }
+    }
+    return keys;
+  }
+
+  List<String> _normalizedRouteWriteKeys() {
+    final keys = <String>[];
+    final primary = widget.routePersistenceKey?.trim();
+    if (primary != null && primary.isNotEmpty) {
+      keys.add(primary);
+    }
+    for (final item in widget.routePersistenceWriteKeys ?? const <String>[]) {
+      final normalized = item.trim();
+      if (normalized.isNotEmpty && !keys.contains(normalized)) {
+        keys.add(normalized);
+      }
+    }
+    return keys;
+  }
+
+  Future<RoutePathBundle?> _readFirstPersistedBundle(
+    RouteService routeService,
+    List<String> keys,
+  ) async {
+    for (final key in keys) {
+      final bundle = await routeService.readNamedBundle(key);
+      if (bundle != null && bundle.primary.length >= 2) {
+        return bundle;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _writePersistedBundle(
+    RouteService routeService,
+    List<String> keys,
+    RoutePathBundle bundle,
+  ) async {
+    for (final key in keys) {
+      await routeService.writeNamedBundle(key, bundle);
+    }
+  }
+
+  Future<void> _prefetchStageDestinationRoute(RouteService routeService) async {
+    final prefetchKey = widget.prefetchRoutePersistenceKey?.trim();
+    if (prefetchKey == null || prefetchKey.isEmpty) {
+      return;
+    }
+    final pickup = _pickupPoint;
+    final destination = _destinationPoint;
+    if (pickup == null || destination == null) {
+      return;
+    }
+    final existing = await routeService.readNamedBundle(prefetchKey);
+    if (existing != null && existing.primary.length >= 2) {
+      return;
+    }
+    try {
+      final bundle = await routeService.fetchRouteBundle(
+        start: pickup,
+        end: destination,
+        allowDirectFallback: false,
+      );
+      if (bundle.primary.length >= 2) {
+        await routeService.writeNamedBundle(prefetchKey, bundle);
+      }
+    } catch (_) {
+      // Keep silent: prefetch is best-effort and must never break the current map.
+    }
+  }
+
   ll.LatLng _visualDriverPoint() {
     final animated = _displayDriverPoint;
     if (animated != null) {
@@ -560,7 +685,7 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
 
   void _startFollowLoop() {
     _followLoopTimer?.cancel();
-    _followLoopTimer = Timer.periodic(const Duration(milliseconds: 90), (_) {
+    _followLoopTimer = Timer.periodic(_followLoopInterval, (_) {
       _tickFollowLoop();
     });
   }
@@ -874,10 +999,11 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
     }
 
     final routeService = ref.read(routeServiceProvider);
-    final persistenceKey = widget.routePersistenceKey?.trim();
-    if (persistenceKey != null && persistenceKey.isNotEmpty) {
-      final cachedBundle = await routeService.readNamedBundle(persistenceKey);
-      if (cachedBundle != null && cachedBundle.primary.length >= 2 && mounted) {
+    final readKeys = _normalizedRouteReadKeys();
+    final writeKeys = _normalizedRouteWriteKeys();
+    if (readKeys.isNotEmpty) {
+      final cachedBundle = await _readFirstPersistedBundle(routeService, readKeys);
+      if (cachedBundle != null && mounted) {
         setState(() {
           _routeBundle = cachedBundle;
           _lastRouteRefreshDriverPoint = _driverPoint;
@@ -886,11 +1012,14 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
       }
     }
 
+    final preserveCachedRoute = readKeys.isNotEmpty;
+
     try {
       final bundle = await routeService.fetchRouteBundle(
-            start: routeStart,
-            end: routeEnd,
-          );
+        start: routeStart,
+        end: routeEnd,
+        allowDirectFallback: !preserveCachedRoute,
+      );
       if (!mounted) {
         return;
       }
@@ -899,18 +1028,18 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
         _routeBundle = bundle;
         _lastRouteRefreshDriverPoint = _driverPoint;
       });
-      if (persistenceKey != null && persistenceKey.isNotEmpty) {
-        await routeService.writeNamedBundle(persistenceKey, bundle);
+      if (writeKeys.isNotEmpty) {
+        await _writePersistedBundle(routeService, writeKeys, bundle);
       }
+      await _prefetchStageDestinationRoute(routeService);
       widget.onRouteUpdated?.call();
       await _syncScene();
     } catch (_) {
       if (!mounted) {
         return;
       }
-      final cachedBundle = persistenceKey == null || persistenceKey.isEmpty
-          ? null
-          : await routeService.readNamedBundle(persistenceKey);
+      final cachedBundle =
+          readKeys.isEmpty ? null : await _readFirstPersistedBundle(routeService, readKeys);
       setState(() {
         _routeKey = nextKey;
         _routeBundle = cachedBundle ??
@@ -921,6 +1050,9 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
             );
         _lastRouteRefreshDriverPoint = _driverPoint;
       });
+      if (cachedBundle != null && cachedBundle.primary.length >= 2) {
+        widget.onOfflineRouteRetained?.call();
+      }
       await _syncScene();
     }
   }
@@ -939,33 +1071,6 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
         _routeSourceId,
         _routeGeoJson(route != null && route.length >= 2 ? route : const <ll.LatLng>[]),
       );
-      await controller.setLayerProperties(
-        _routeCasingLayerId,
-        const ml.LineLayerProperties(
-          lineColor: '#0B3A72',
-          lineOpacity: 0.96,
-          lineWidth: 12.8,
-          lineBlur: 0.12,
-        ),
-      );
-      await controller.setLayerProperties(
-        _routeGlowLayerId,
-        const ml.LineLayerProperties(
-          lineColor: '#5FE8FF',
-          lineOpacity: 0.26,
-          lineWidth: 16.4,
-          lineBlur: 1.02,
-        ),
-      );
-      await controller.setLayerProperties(
-        _routeMainLayerId,
-        const ml.LineLayerProperties(
-          lineColor: '#35D7FF',
-          lineOpacity: 0.98,
-          lineWidth: 7.9,
-          lineBlur: 0.08,
-        ),
-      );
 
       await _upsertDriverMarker(controller);
       await _upsertTripMarkers(controller);
@@ -982,6 +1087,12 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
       _idleRoadSnapPoint = null;
       return;
     }
+    final now = DateTime.now();
+    if (!force &&
+        _lastIdleRoadSnapAt != null &&
+        now.difference(_lastIdleRoadSnapAt!) < _idleRoadSnapCooldown) {
+      return;
+    }
     final previous = _lastRoadSnapSourcePoint;
     if (!force && previous != null) {
       final delta = const ll.Distance().as(
@@ -989,7 +1100,7 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
         previous,
         _driverPoint,
       );
-      if (delta < 2.2) {
+      if (delta < 3.5) {
         return;
       }
     }
@@ -999,6 +1110,7 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
     _isRefreshingIdleRoadSnap = true;
     final sourcePoint = _driverPoint;
     final previousSnapped = _idleRoadSnapPoint;
+    _lastIdleRoadSnapAt = now;
     _lastRoadSnapSourcePoint = sourcePoint;
     try {
       final snapped = await ref.read(routeServiceProvider).snapToRoadIfPossible(sourcePoint);
@@ -1115,64 +1227,219 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     const center = Offset(size / 2, size / 2);
-    final style = widget.driverMarkerStyle ?? 'arrow';
+    final style = widget.driverMarkerStyle ?? 'rapigo';
 
-    final softShadow =
+    if (style == 'rapigo') {
+      final haloColor = _driverMarkerHaloColor();
+      final haloOuter =
+          Paint()
+            ..color = haloColor.withValues(alpha: 0.16)
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 24);
+      final haloInner =
+          Paint()
+            ..color = haloColor.withValues(alpha: 0.28)
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
+      canvas.drawCircle(center, 38, haloOuter);
+      canvas.drawCircle(center, 30, haloInner);
+      canvas.drawCircle(
+        center,
+        28,
         Paint()
-          ..color = const Color(0x4064748B)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 22);
-    canvas.drawCircle(center, 38, softShadow);
+          ..color = Colors.white.withValues(alpha: 0.08)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.2,
+      );
 
-    canvas.drawCircle(
-      center,
-      34,
-      Paint()..color = const Color(0x3F94A3B8),
-    );
+      final arrowPath =
+          Path()
+            ..moveTo(center.dx, center.dy - 53)
+            ..lineTo(center.dx + 13, center.dy - 25)
+            ..lineTo(center.dx + 3, center.dy - 29)
+            ..lineTo(center.dx, center.dy - 11)
+            ..lineTo(center.dx - 3, center.dy - 29)
+            ..lineTo(center.dx - 13, center.dy - 25)
+            ..close();
+      canvas.drawPath(
+        arrowPath.shift(const Offset(0, 3)),
+        Paint()
+          ..color = const Color(0x44000000)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10),
+      );
+      canvas.drawPath(
+        arrowPath,
+        Paint()
+          ..shader = ui.Gradient.linear(
+            Offset(center.dx, center.dy - 53),
+            Offset(center.dx, center.dy - 11),
+            const [Color(0xFF6FE8FF), Color(0xFF1A7BFF)],
+          ),
+      );
+      canvas.drawPath(
+        arrowPath,
+        Paint()
+          ..color = Colors.white.withValues(alpha: 0.92)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.4,
+      );
 
-    canvas.drawCircle(center, 29, Paint()..color = const Color(0x19FFFFFF));
-
-    final triangleShadow =
+      final bodyRect = RRect.fromRectAndRadius(
+        Rect.fromCenter(center: center.translate(0, 6), width: 44, height: 78),
+        const Radius.circular(18),
+      );
+      canvas.drawRRect(
+        bodyRect.shift(const Offset(0, 4)),
         Paint()
           ..color = const Color(0x33000000)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 11);
-    Path markerPath;
-    if (style == 'triangle') {
-      markerPath =
-          Path()
-            ..moveTo(center.dx, center.dy - 28)
-            ..lineTo(center.dx + 23, center.dy + 18)
-            ..lineTo(center.dx - 23, center.dy + 18)
-            ..close();
-    } else if (style == 'dart') {
-      markerPath =
-          Path()
-            ..moveTo(center.dx, center.dy - 30)
-            ..lineTo(center.dx + 16, center.dy + 10)
-            ..lineTo(center.dx + 2, center.dy + 6)
-            ..lineTo(center.dx, center.dy + 26)
-            ..lineTo(center.dx - 2, center.dy + 6)
-            ..lineTo(center.dx - 16, center.dy + 10)
-            ..close();
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
+      );
+      canvas.drawRRect(
+        bodyRect,
+        Paint()
+          ..shader = ui.Gradient.linear(
+            bodyRect.outerRect.topCenter,
+            bodyRect.outerRect.bottomCenter,
+            const [Color(0xFF2DA7FF), Color(0xFF0D64F2)],
+          ),
+      );
+      canvas.drawRRect(
+        bodyRect,
+        Paint()
+          ..color = const Color(0xFF0B5DE2)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.0,
+      );
+
+      final cabinRect = RRect.fromRectAndRadius(
+        Rect.fromCenter(center: center.translate(0, 6), width: 29, height: 50),
+        const Radius.circular(12),
+      );
+      canvas.drawRRect(cabinRect, Paint()..color = Colors.white);
+
+      final windshieldRect = RRect.fromRectAndRadius(
+        Rect.fromCenter(center: center.translate(0, -4), width: 22, height: 16),
+        const Radius.circular(8),
+      );
+      final rearGlassRect = RRect.fromRectAndRadius(
+        Rect.fromCenter(center: center.translate(0, 18), width: 22, height: 16),
+        const Radius.circular(8),
+      );
+      final glassPaint =
+          Paint()
+            ..shader = ui.Gradient.linear(
+              windshieldRect.outerRect.topCenter,
+              windshieldRect.outerRect.bottomCenter,
+              const [Color(0xFF14263D), Color(0xFF0A1220)],
+            );
+      canvas.drawRRect(windshieldRect, glassPaint);
+      canvas.drawRRect(rearGlassRect, glassPaint);
+
+      final sideShadow =
+          Paint()
+            ..color = const Color(0x14000000)
+            ..style = PaintingStyle.fill;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(bodyRect.left + 3, bodyRect.top + 8, 5, 48),
+          const Radius.circular(4),
+        ),
+        sideShadow,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(bodyRect.right - 8, bodyRect.top + 8, 5, 48),
+          const Radius.circular(4),
+        ),
+        sideShadow,
+      );
+
+      final lightPaintFront = Paint()..color = const Color(0xFF8CEBFF);
+      final lightPaintRear = Paint()..color = const Color(0xFFFF7043);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(center: center.translate(-11, -24), width: 8, height: 6),
+          const Radius.circular(3),
+        ),
+        lightPaintFront,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(center: center.translate(11, -24), width: 8, height: 6),
+          const Radius.circular(3),
+        ),
+        lightPaintFront,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(center: center.translate(-11, 36), width: 8, height: 6),
+          const Radius.circular(3),
+        ),
+        lightPaintRear,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(center: center.translate(11, 36), width: 8, height: 6),
+          const Radius.circular(3),
+        ),
+        lightPaintRear,
+      );
     } else {
-      markerPath =
-          Path()
-            ..moveTo(center.dx, center.dy - 34)
-            ..lineTo(center.dx + 21, center.dy + 14)
-            ..lineTo(center.dx + 6, center.dy + 10)
-            ..lineTo(center.dx, center.dy + 28)
-            ..lineTo(center.dx - 6, center.dy + 10)
-            ..lineTo(center.dx - 21, center.dy + 14)
-            ..close();
+      final softShadow =
+          Paint()
+            ..color = const Color(0x4064748B)
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 22);
+      canvas.drawCircle(center, 38, softShadow);
+
+      canvas.drawCircle(
+        center,
+        34,
+        Paint()..color = const Color(0x3F94A3B8),
+      );
+
+      canvas.drawCircle(center, 29, Paint()..color = const Color(0x19FFFFFF));
+
+      final triangleShadow =
+          Paint()
+            ..color = const Color(0x33000000)
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 11);
+      Path markerPath;
+      if (style == 'triangle') {
+        markerPath =
+            Path()
+              ..moveTo(center.dx, center.dy - 28)
+              ..lineTo(center.dx + 23, center.dy + 18)
+              ..lineTo(center.dx - 23, center.dy + 18)
+              ..close();
+      } else if (style == 'dart') {
+        markerPath =
+            Path()
+              ..moveTo(center.dx, center.dy - 30)
+              ..lineTo(center.dx + 16, center.dy + 10)
+              ..lineTo(center.dx + 2, center.dy + 6)
+              ..lineTo(center.dx, center.dy + 26)
+              ..lineTo(center.dx - 2, center.dy + 6)
+              ..lineTo(center.dx - 16, center.dy + 10)
+              ..close();
+      } else {
+        markerPath =
+            Path()
+              ..moveTo(center.dx, center.dy - 34)
+              ..lineTo(center.dx + 21, center.dy + 14)
+              ..lineTo(center.dx + 6, center.dy + 10)
+              ..lineTo(center.dx, center.dy + 28)
+              ..lineTo(center.dx - 6, center.dy + 10)
+              ..lineTo(center.dx - 21, center.dy + 14)
+              ..close();
+      }
+      canvas.drawPath(markerPath.shift(const Offset(0, 3)), triangleShadow);
+      canvas.drawPath(markerPath, Paint()..color = const Color(0xFF14C6E8));
+      canvas.drawPath(
+        markerPath,
+        Paint()
+          ..color = Colors.white
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3.0,
+      );
     }
-    canvas.drawPath(markerPath.shift(const Offset(0, 3)), triangleShadow);
-    canvas.drawPath(markerPath, Paint()..color = const Color(0xFF14C6E8));
-    canvas.drawPath(
-      markerPath,
-      Paint()
-        ..color = Colors.white
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3.0,
-    );
 
     final picture = recorder.endRecording();
     final image = await picture.toImage(size.toInt(), size.toInt());
@@ -1617,9 +1884,9 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
                       ll.LatLng(_lastPersistedCenterLat!, _lastPersistedCenterLng!),
                       ll.LatLng(lat, lng),
                     ) >
-                    3.5 ||
-                (_lastPersistedZoom! - zoom).abs() > 0.05 ||
-                (_lastPersistedBearing! - bearing).abs() > 1.0;
+                    8.0 ||
+                (_lastPersistedZoom! - zoom).abs() > 0.10 ||
+                (_lastPersistedBearing! - bearing).abs() > 2.0;
             if (!shouldPersist) {
               return;
             }

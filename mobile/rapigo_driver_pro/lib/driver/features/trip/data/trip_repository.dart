@@ -285,7 +285,11 @@ class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
   }
 
   Future<void> _persistTrip() async {
-    await _cache.writeActiveTrip(state.value);
+    final trip = state.value;
+    await _cache.writeActiveTrip(trip);
+    await _cache.writeFlowMetadata(
+      trip == null ? null : DriverTripStateCache.metadataFromTrip(trip),
+    );
   }
 
   Future<void> loadOffer() async {

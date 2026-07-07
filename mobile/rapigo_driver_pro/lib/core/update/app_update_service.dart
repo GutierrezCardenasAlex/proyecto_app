@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
@@ -36,16 +37,54 @@ class AppUpdateService {
 
   static String _ignoredBuildKey(String appId) => 'rapigo_update_ignored_build_$appId';
 
-  Future<AppUpdateManifest?> fetchLatestManifest() async {
-    final uri = Uri.parse(
+  List<Uri> _manifestCandidates() {
+    final primary = Uri.parse(
       AppConfig.appUpdateManifestUrl(appId: appId, platform: 'android'),
     );
-    final response = await _client.get(uri, headers: const {'accept': 'application/json'});
-    if (response.statusCode != 200) {
-      return null;
+    final fallback = Uri.parse(
+      'https://rapigo.cybernovatech.space/api/app-updates/manifest/$appId/android',
+    );
+    final unique = <String>{};
+    final ordered = <Uri>[];
+    for (final uri in [primary, fallback]) {
+      final key = uri.toString();
+      if (unique.add(key)) {
+        ordered.add(uri);
+      }
     }
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    return AppUpdateManifest.fromJson(data);
+    return ordered;
+  }
+
+  Future<AppUpdateManifest?> fetchLatestManifest() async {
+    for (final uri in _manifestCandidates()) {
+      try {
+        final response = await _client
+            .get(uri, headers: const {'accept': 'application/json'})
+            .timeout(const Duration(seconds: 8));
+        if (response.statusCode != 200) {
+          if (kDebugMode) {
+            debugPrint(
+              '[Updater][$appId] Manifest no disponible en $uri (${response.statusCode})',
+            );
+          }
+          continue;
+        }
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final manifest = AppUpdateManifest.fromJson(data);
+        if (kDebugMode) {
+          debugPrint(
+            '[Updater][$appId] Manifest cargado desde $uri -> version=${manifest.version} build=${manifest.buildNumber}',
+          );
+        }
+        return manifest;
+      } catch (error) {
+        if (kDebugMode) {
+          debugPrint('[Updater][$appId] Error consultando $uri -> $error');
+        }
+        continue;
+      }
+    }
+    return null;
   }
 
   Future<AppUpdateCheckResult> checkForUpdate() async {
@@ -61,6 +100,11 @@ class AppUpdateService {
       );
     }
     if (manifest.apkUrl.trim().isEmpty || manifest.buildNumber <= localBuild) {
+      if (kDebugMode) {
+        debugPrint(
+          '[Updater][$appId] Sin update. Local ${info.version}+$localBuild, remoto ${manifest.version}+${manifest.buildNumber}.',
+        );
+      }
       return AppUpdateCheckResult(
         localBuildNumber: localBuild,
         localVersion: info.version,

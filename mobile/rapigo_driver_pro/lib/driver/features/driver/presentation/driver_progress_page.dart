@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/ui/top_notice.dart';
 import '../../auth/data/auth_repository.dart';
+import 'route_persistence_keys.dart';
 import '../data/driver_repository.dart';
 import '../../map/presentation/driver_map_surface.dart';
 import '../../trip/data/trip_repository.dart';
@@ -512,7 +513,10 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
             Positioned.fill(
               child: DriverMapSurface(
                 viewportCacheKey: 'driver_shared_premium_map',
-                routePersistenceKey: 'driver_trip_route_${trip.id}_${trip.status}',
+                routePersistenceKey: 'driver_trip_route_${trip.id}',
+                routePersistenceReadKeys: driverTripRouteReadKeys(trip.id, trip.status),
+                routePersistenceWriteKeys: driverTripRouteWriteKeys(trip.id, trip.status),
+                prefetchRoutePersistenceKey: driverTripRoutePrefetchKey(trip.id, trip.status),
                 available: available,
                 tripAccepted: true,
                 driverLat: driverLat,
@@ -530,6 +534,21 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
                 focusBounds: focusBounds,
                 focusSignal: 0,
                 showStatusBadge: false,
+                onOfflineRouteRetained: () {
+                  if (!mounted) {
+                    return;
+                  }
+                  showTopNotice(
+                    context,
+                    'Modo offline activo. La ruta del viaje sigue trazada.',
+                    tone: NoticeTone.info,
+                    compact: true,
+                    centered: true,
+                    duration: const Duration(seconds: 3),
+                    backgroundColor: const Color(0xF40B1220),
+                    foregroundColor: const Color(0xFFF8FAFC),
+                  );
+                },
               ),
             ),
             Positioned.fill(

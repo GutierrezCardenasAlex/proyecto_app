@@ -29,7 +29,11 @@ class DriverMapSurface extends ConsumerStatefulWidget {
     this.focusBounds,
     this.focusSignal = 0,
     this.onRouteUpdated,
+    this.onOfflineRouteRetained,
     this.routePersistenceKey,
+    this.routePersistenceReadKeys,
+    this.routePersistenceWriteKeys,
+    this.prefetchRoutePersistenceKey,
     this.viewportCacheKey,
     this.idleZoomLevel,
     this.maxZoomPreference,
@@ -60,7 +64,11 @@ class DriverMapSurface extends ConsumerStatefulWidget {
   final LatLngBounds? focusBounds;
   final int focusSignal;
   final VoidCallback? onRouteUpdated;
+  final VoidCallback? onOfflineRouteRetained;
   final String? routePersistenceKey;
+  final List<String>? routePersistenceReadKeys;
+  final List<String>? routePersistenceWriteKeys;
+  final String? prefetchRoutePersistenceKey;
   final String? viewportCacheKey;
   final double? idleZoomLevel;
   final double? maxZoomPreference;
@@ -199,7 +207,11 @@ class _DriverMapSurfaceState extends ConsumerState<DriverMapSurface>
                   focusBounds: widget.focusBounds,
                   focusSignal: widget.focusSignal,
                   onRouteUpdated: widget.onRouteUpdated,
+                  onOfflineRouteRetained: widget.onOfflineRouteRetained,
                   routePersistenceKey: widget.routePersistenceKey,
+                  routePersistenceReadKeys: widget.routePersistenceReadKeys,
+                  routePersistenceWriteKeys: widget.routePersistenceWriteKeys,
+                  prefetchRoutePersistenceKey: widget.prefetchRoutePersistenceKey,
                   idleZoomLevel: widget.idleZoomLevel,
                   maxZoomPreference: widget.maxZoomPreference,
                   idleTilt: widget.idleTilt,

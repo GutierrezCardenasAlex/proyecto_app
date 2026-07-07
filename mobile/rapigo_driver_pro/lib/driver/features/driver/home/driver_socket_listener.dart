@@ -66,9 +66,19 @@ class _DriverSocketListenerState extends ConsumerState<DriverSocketListener>
       tone: tone,
       icon: icon,
       compact: true,
-      topOffset: 34,
-      horizontalInset: 38,
-      duration: const Duration(seconds: 3),
+      centered: true,
+      horizontalInset: 28,
+      duration: const Duration(seconds: 4),
+      backgroundColor: const Color(0xF40B1220),
+      foregroundColor: const Color(0xFFF8FAFC),
+      onTap: () {
+        if (!mounted) {
+          return;
+        }
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const DriverNotificationsPage()),
+        );
+      },
     );
   }
 

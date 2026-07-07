@@ -15,6 +15,7 @@ class _DriverActiveTripListenerState
   bool _tripFlowRouteOpen = false;
   String? _lastOpenedTripId;
   bool _initialCheckDone = false;
+  bool _metadataRestored = false;
 
   bool _shouldOpenTripFlow(DriverTrip? trip) {
     return trip != null &&
@@ -63,6 +64,23 @@ class _DriverActiveTripListenerState
     });
   }
 
+  Future<void> _restoreTripFlowFromMetadata() async {
+    if (_metadataRestored) {
+      return;
+    }
+    _metadataRestored = true;
+    final cache = DriverTripStateCache();
+    final metadata = await cache.readFlowMetadata();
+    if (!mounted || metadata == null || !metadata.restoreProgressPage) {
+      return;
+    }
+    final trip = ref.read(offeredTripProvider).value;
+    if (trip == null || trip.id != metadata.tripId) {
+      return;
+    }
+    _handleTrip(trip);
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen<AsyncValue<DriverTrip?>>(
@@ -75,6 +93,7 @@ class _DriverActiveTripListenerState
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _handleTrip(ref.read(offeredTripProvider).value);
+          unawaited(_restoreTripFlowFromMetadata());
         }
       });
     }

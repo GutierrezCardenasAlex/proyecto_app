@@ -324,8 +324,8 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
   int _mapFocusSignal = 0;
   bool _mapReadyLogged = false;
   bool _wideMapMode = false;
-  final String _debugMarkerStyle = 'arrow';
-  final double _debugMarkerScale = 1.56;
+  final String _debugMarkerStyle = 'rapigo';
+  final double _debugMarkerScale = 1.22;
   final double _debugMarkerOffsetX = 0;
   final double _debugMarkerOffsetY = 0;
   String _streetChipLabel = 'Ubicacion actual';
@@ -1335,13 +1335,6 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
     final availableOffersCount = pendingOffers.length;
     final homeIdleZoom = _wideMapMode ? (_kFixedZoom - 0.33) : _kFixedZoom;
     final homeIdleTilt = _kFixedTilt;
-    if (_wideMapMode) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          unawaited(_refreshStreetChip());
-        }
-      });
-    }
     final routeColor = trip?.status == 'in_progress'
         ? const Color(0xFF0EA5E9)
         : const Color(0xFFF97316);
@@ -1369,7 +1362,13 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
             child: DriverMapSurface(
               viewportCacheKey: 'driver_shared_premium_map',
               routePersistenceKey:
-                  trip == null ? null : 'driver_home_trip_route_${trip.id}_${trip.status}',
+                  trip == null ? null : 'driver_trip_route_${trip.id}',
+              routePersistenceReadKeys:
+                  trip == null ? null : driverTripRouteReadKeys(trip.id, trip.status),
+              routePersistenceWriteKeys:
+                  trip == null ? null : driverTripRouteWriteKeys(trip.id, trip.status),
+              prefetchRoutePersistenceKey:
+                  trip == null ? null : driverTripRoutePrefetchKey(trip.id, trip.status),
               available: available,
               tripAccepted: const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(trip?.status),
               driverLat: driverLat,
@@ -1404,6 +1403,21 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                   context,
                   'Ruta actualizada. La app ya corrigio el camino.',
                   tone: NoticeTone.info,
+                );
+              },
+              onOfflineRouteRetained: () {
+                if (!mounted) {
+                  return;
+                }
+                showTopNotice(
+                  context,
+                  'Modo offline activo. La ruta sigue trazada desde cache.',
+                  tone: NoticeTone.info,
+                  compact: true,
+                  centered: true,
+                  duration: const Duration(seconds: 3),
+                  backgroundColor: const Color(0xF40B1220),
+                  foregroundColor: const Color(0xFFF8FAFC),
                 );
               },
             ),

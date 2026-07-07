@@ -76,6 +76,7 @@ class RouteService {
   Future<RoutePathBundle> fetchRouteBundle({
     required LatLng start,
     required LatLng end,
+    bool allowDirectFallback = true,
   }) async {
     final cacheKey = _keyFor(start, end);
     final cached = _cache[cacheKey];
@@ -90,6 +91,9 @@ class RouteService {
     }
 
     if (!AppConfig.hasRoutingSource) {
+      if (!allowDirectFallback) {
+        throw Exception('Routing offline fallback preserved');
+      }
       return _directBundle(
         start: start,
         end: end,
@@ -113,6 +117,9 @@ class RouteService {
       final payload = jsonDecode(response.body) as Map<String, dynamic>;
       final routes = payload['routes'] as List<dynamic>? ?? const [];
       if (routes.isEmpty) {
+        if (!allowDirectFallback) {
+          throw Exception('Routing returned no routes');
+        }
         return _directBundle(
           start: start,
           end: end,
@@ -127,6 +134,9 @@ class RouteService {
           .toList(growable: false);
 
       if (decodedRoutes.isEmpty) {
+        if (!allowDirectFallback) {
+          throw Exception('Routing returned invalid geometry');
+        }
         return _directBundle(
           start: start,
           end: end,
@@ -152,6 +162,9 @@ class RouteService {
     } catch (_) {
       if (persisted != null && persisted.primary.isNotEmpty) {
         return persisted;
+      }
+      if (!allowDirectFallback) {
+        rethrow;
       }
       return _directBundle(
         primary: <LatLng>[start, end],

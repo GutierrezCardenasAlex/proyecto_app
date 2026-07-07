@@ -4,10 +4,29 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/driver_trip.dart';
 
+class DriverTripFlowMetadata {
+  const DriverTripFlowMetadata({
+    required this.tripId,
+    required this.status,
+    required this.stage,
+    required this.routeStage,
+    required this.restoreProgressPage,
+    required this.savedAtIso,
+  });
+
+  final String tripId;
+  final String status;
+  final String stage;
+  final String routeStage;
+  final bool restoreProgressPage;
+  final String savedAtIso;
+}
+
 class DriverTripStateCache {
   static const _activeTripKey = 'rapigo_driver_active_trip_v1';
   static const _offersKey = 'rapigo_driver_offers_v1';
   static const _previewTripIdKey = 'rapigo_driver_preview_trip_id_v1';
+  static const _flowMetadataKey = 'rapigo_driver_trip_flow_metadata_v1';
 
   Future<DriverTrip?> readActiveTrip() async {
     final prefs = await SharedPreferences.getInstance();
@@ -77,6 +96,53 @@ class DriverTripStateCache {
     await prefs.setString(_previewTripIdKey, tripId);
   }
 
+  Future<DriverTripFlowMetadata?> readFlowMetadata() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_flowMetadataKey);
+    if (raw == null || raw.isEmpty) {
+      return null;
+    }
+    try {
+      final payload = jsonDecode(raw);
+      if (payload is! Map<String, dynamic>) {
+        return null;
+      }
+      final tripId = payload['tripId']?.toString() ?? '';
+      if (tripId.isEmpty) {
+        return null;
+      }
+      return DriverTripFlowMetadata(
+        tripId: tripId,
+        status: payload['status']?.toString() ?? 'requested',
+        stage: payload['stage']?.toString() ?? 'offer',
+        routeStage: payload['routeStage']?.toString() ?? 'pickup',
+        restoreProgressPage: payload['restoreProgressPage'] == true,
+        savedAtIso: payload['savedAtIso']?.toString() ?? '',
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> writeFlowMetadata(DriverTripFlowMetadata? metadata) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (metadata == null) {
+      await prefs.remove(_flowMetadataKey);
+      return;
+    }
+    await prefs.setString(
+      _flowMetadataKey,
+      jsonEncode(<String, dynamic>{
+        'tripId': metadata.tripId,
+        'status': metadata.status,
+        'stage': metadata.stage,
+        'routeStage': metadata.routeStage,
+        'restoreProgressPage': metadata.restoreProgressPage,
+        'savedAtIso': metadata.savedAtIso,
+      }),
+    );
+  }
+
   Map<String, dynamic> _tripToMap(DriverTrip trip) {
     return <String, dynamic>{
       'id': trip.id,
@@ -141,5 +207,34 @@ class DriverTripStateCache {
       return value.toDouble();
     }
     return double.tryParse(value.toString());
+  }
+
+  static DriverTripFlowMetadata metadataFromTrip(DriverTrip trip) {
+    final status = trip.status.trim().toLowerCase();
+    final routeStage =
+        status == 'in_progress' || status == 'completed' ? 'destination' : 'pickup';
+    final stage = switch (status) {
+      'accepted' => 'accepted',
+      'arriving' => 'pickup_navigation',
+      'at_pickup' => 'pickup_arrived',
+      'in_progress' => 'destination_navigation',
+      'completed' => 'summary',
+      _ => 'offer',
+    };
+    final restoreProgressPage = const {
+      'accepted',
+      'arriving',
+      'at_pickup',
+      'in_progress',
+      'completed',
+    }.contains(status);
+    return DriverTripFlowMetadata(
+      tripId: trip.id,
+      status: trip.status,
+      stage: stage,
+      routeStage: routeStage,
+      restoreProgressPage: restoreProgressPage,
+      savedAtIso: DateTime.now().toIso8601String(),
+    );
   }
 }

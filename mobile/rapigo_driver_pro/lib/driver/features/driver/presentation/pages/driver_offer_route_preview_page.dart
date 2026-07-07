@@ -183,7 +183,10 @@ class _DriverOfferRoutePreviewPageState
             Positioned.fill(
               child: DriverMapSurface(
                 viewportCacheKey: 'driver_offer_preview_${trip.id}',
-                routePersistenceKey: 'driver_offer_preview_route_${trip.id}',
+                routePersistenceKey: 'driver_trip_route_${trip.id}',
+                routePersistenceReadKeys: driverTripRouteReadKeys(trip.id, 'accepted'),
+                routePersistenceWriteKeys: driverTripRouteWriteKeys(trip.id, 'accepted'),
+                prefetchRoutePersistenceKey: driverTripRoutePrefetchKey(trip.id, 'accepted'),
                 available: driverState.available,
                 tripAccepted: true,
                 driverLat: driverState.lat,

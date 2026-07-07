@@ -263,8 +263,8 @@ class DriverRepository {
     if (Platform.isAndroid) {
       return AndroidSettings(
         accuracy: LocationAccuracy.bestForNavigation,
-        distanceFilter: 3,
-        intervalDuration: const Duration(seconds: 2),
+        distanceFilter: 2,
+        intervalDuration: const Duration(seconds: 1),
         foregroundNotificationConfig: const ForegroundNotificationConfig(
           notificationTitle: 'RAPIGO - PRO activo',
           notificationText: 'Seguimos enviando tu ubicacion para viajes y alertas prioritarias.',
@@ -276,14 +276,14 @@ class DriverRepository {
     if (Platform.isIOS || Platform.isMacOS) {
       return AppleSettings(
         accuracy: LocationAccuracy.bestForNavigation,
-        distanceFilter: 3,
+        distanceFilter: 2,
         pauseLocationUpdatesAutomatically: false,
         showBackgroundLocationIndicator: true,
       );
     }
     return const LocationSettings(
       accuracy: LocationAccuracy.bestForNavigation,
-      distanceFilter: 3,
+      distanceFilter: 2,
     );
   }
 }

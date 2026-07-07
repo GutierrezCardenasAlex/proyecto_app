@@ -2,6 +2,10 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 class AppConfig {
+  static const appUpdatesBaseUrl = String.fromEnvironment(
+    'APP_UPDATES_BASE_URL',
+    defaultValue: 'https://rapigo.cybernovatech.space/api',
+  );
   static const serverScheme = String.fromEnvironment('SERVER_SCHEME', defaultValue: 'http');
   static const serverHost = String.fromEnvironment(
     'SERVER_HOST',
@@ -55,7 +59,9 @@ class AppConfig {
     required String appId,
     String platform = 'android',
   }) {
-    return '$apiBaseUrl/app-updates/manifest/$appId/$platform';
+    final explicitBase = appUpdatesBaseUrl.trim();
+    final resolvedBase = explicitBase.isNotEmpty ? explicitBase : apiBaseUrl;
+    return '$resolvedBase/app-updates/manifest/$appId/$platform';
   }
 
   static String _formatPort(String scheme, String port) {
