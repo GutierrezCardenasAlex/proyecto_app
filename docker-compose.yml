@@ -40,6 +40,7 @@ services:
     environment:
       PORT: ${GATEWAY_PORT:-3000}
       JWT_SECRET: ${JWT_SECRET:-super-secret}
+      APP_UPDATES_MANIFEST_PATH: "/app/src/app-updates.manifest.json"
       AUTH_SERVICE_URL: "http://auth-service:3001"
       DRIVER_SERVICE_URL: "http://driver-service:3002"
       TRIP_SERVICE_URL: "http://trip-service:3003"
@@ -50,6 +51,8 @@ services:
       WEBSOCKET_SERVICE_URL: "http://websocket-service:3008"
     ports:
       - "${GATEWAY_PORT:-3000}:${GATEWAY_PORT:-3000}"
+    volumes:
+      - ./services/gateway-api/src/app-updates.manifest.json:/app/src/app-updates.manifest.json
     depends_on:
       - auth-service
       - driver-service

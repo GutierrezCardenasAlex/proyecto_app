@@ -19,14 +19,14 @@
     },
     "rapigo_driver_pro": {
       "android": {
-        "version": "1.0.1",
-        "buildNumber": 2,
+        "version": "1.0.3",
+        "buildNumber": 3,
         "releasedAt": "2026-07-07T00:00:00Z",
         "updatedAt": "2026-07-07T00:00:00Z",
         "mandatory": false,
         "title": "Actualizacion disponible",
         "message": "Hay una nueva version de RAPIGO PRO disponible para instalar.",
-        "apkUrl": "https://rapigo.cybernovatech.space/downloads/driver/android/1.0.1/rapigo-driver-pro.apk",
+        "apkUrl": "https://rapigo.cybernovatech.space/downloads/driver/android/1.0.3/rapigo-driver-pro.apk",
         "notes": [
           "Mejoras de rendimiento",
           "Optimizacion offline",

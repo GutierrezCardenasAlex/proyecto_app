@@ -6,7 +6,7 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 MANIFEST_PATH="${PROJECT_ROOT}/services/gateway-api/src/app-updates.manifest.json"
 DOWNLOADS_ROOT="${PROJECT_ROOT}/infra/downloads"
 BASE_URL="${BASE_URL:-https://rapigo.cybernovatech.space}"
-RESTART_MODE="${RESTART_MODE:-reload-nginx}"
+RESTART_MODE="${RESTART_MODE:-restart-gateway}"
 
 PASSENGER_APK=""
 PASSENGER_VERSION=""
@@ -386,6 +386,20 @@ EOF
 
 update_manifest
 
+sync_manifest_to_gateway() {
+  local gateway_container_path="/app/src/app-updates.manifest.json"
+
+  if docker compose ps gateway-api >/dev/null 2>&1; then
+    if docker compose cp "${MANIFEST_PATH}" "gateway-api:${gateway_container_path}" >/dev/null 2>&1; then
+      echo "Manifest sincronizado dentro de gateway-api (${gateway_container_path})."
+      return
+    fi
+  fi
+
+  echo "No se pudo sincronizar el manifest dentro de gateway-api con docker compose cp." >&2
+  echo "Se intentará continuar con el reinicio normal del servicio." >&2
+}
+
 run_restart() {
   case "${RESTART_MODE}" in
     reload-nginx)
@@ -410,7 +424,31 @@ run_restart() {
   esac
 }
 
+sync_manifest_to_gateway
 run_restart
+
+show_manifest_summary() {
+  local label="$1"
+  local app_id="$2"
+
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - "${MANIFEST_PATH}" "${app_id}" "${label}" <<'EOF'
+import json
+import sys
+
+manifest_path, app_id, label = sys.argv[1:4]
+with open(manifest_path, "r", encoding="utf-8") as fh:
+    manifest = json.load(fh)
+
+data = manifest["apps"][app_id]["android"]
+print(f"{label}:")
+print(f"  version: {data.get('version')}")
+print(f"  build: {data.get('buildNumber')}")
+print(f"  updatedAt: {data.get('updatedAt')}")
+print(f"  apkUrl: {data.get('apkUrl')}")
+EOF
+  fi
+}
 
 echo ""
 echo "Despliegue completado."
@@ -423,6 +461,8 @@ if [[ -n "${PASSENGER_APK}" ]]; then
   echo "  URL: ${BASE_URL}/downloads/passenger/android/${PASSENGER_VERSION}/rapigo-passenger.apk"
   echo "  Manifest: ${BASE_URL}/api/app-updates/manifest/rapigo_passenger/android"
   echo ""
+  show_manifest_summary "Manifest pasajero" "rapigo_passenger"
+  echo ""
 fi
 
 if [[ -n "${DRIVER_APK}" ]]; then
@@ -430,6 +470,8 @@ if [[ -n "${DRIVER_APK}" ]]; then
   echo "  APK: ${DOWNLOADS_ROOT}/driver/android/${DRIVER_VERSION}/rapigo-driver-pro.apk"
   echo "  URL: ${BASE_URL}/downloads/driver/android/${DRIVER_VERSION}/rapigo-driver-pro.apk"
   echo "  Manifest: ${BASE_URL}/api/app-updates/manifest/rapigo_driver_pro/android"
+  echo ""
+  show_manifest_summary "Manifest conductor" "rapigo_driver_pro"
   echo ""
 fi
 

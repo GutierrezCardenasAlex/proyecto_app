@@ -9,7 +9,7 @@ param(
   [string]$RemoteProjectPath = "/root/app/proyecto_app",
   [string]$BaseUrl = "https://rapigo.cybernovatech.space",
   [ValidateSet("reload-nginx", "restart-nginx", "restart-gateway", "restart-all", "none")]
-  [string]$RestartMode = "reload-nginx",
+  [string]$RestartMode = "restart-gateway",
   [string]$ReleasedAt = "",
   [string]$UpdatedAt = "",
   [string]$Mandatory = "false",
@@ -17,6 +17,7 @@ param(
   [string]$PassengerBuildNumber = "",
   [string]$DriverBuildName = "",
   [string]$DriverBuildNumber = "",
+  [switch]$UpdatePubspecVersion,
   [switch]$SkipPubGet,
   [switch]$SkipBuild
 )
@@ -66,6 +67,22 @@ function Get-PubspecVersionParts {
   }
 }
 
+function Set-PubspecVersion {
+  param(
+    [string]$PubspecPath,
+    [string]$BuildName,
+    [string]$BuildNumber
+  )
+
+  $content = Get-Content $PubspecPath -Raw
+  $newVersionLine = "version: $BuildName+$BuildNumber"
+  $updated = [regex]::Replace($content, '(?m)^version:\s*.+$', $newVersionLine, 1)
+  if ($updated -eq $content) {
+    throw "No se pudo actualizar la version en $PubspecPath"
+  }
+  Write-Utf8NoBomFile -Path $PubspecPath -Content $updated
+}
+
 function Invoke-FlutterBuild {
   param(
     [string]$AppDir,
@@ -113,6 +130,31 @@ if ($Target -eq "driver" -or $Target -eq "both") {
   $driverVersion = Get-PubspecVersionParts -PubspecPath (Join-Path $driverAppDir "pubspec.yaml")
   if (-not $DriverBuildName) { $DriverBuildName = $driverVersion.BuildName }
   if (-not $DriverBuildNumber) { $DriverBuildNumber = $driverVersion.BuildNumber }
+}
+
+$shouldUpdatePassengerPubspec = $false
+$shouldUpdateDriverPubspec = $false
+
+if ($Target -eq "passenger" -or $Target -eq "both") {
+  if ($UpdatePubspecVersion.IsPresent -or ($PassengerBuildName -and $PassengerBuildName -ne $passengerVersion.BuildName) -or ($PassengerBuildNumber -and $PassengerBuildNumber -ne $passengerVersion.BuildNumber)) {
+    $shouldUpdatePassengerPubspec = $true
+  }
+}
+
+if ($Target -eq "driver" -or $Target -eq "both") {
+  if ($UpdatePubspecVersion.IsPresent -or ($DriverBuildName -and $DriverBuildName -ne $driverVersion.BuildName) -or ($DriverBuildNumber -and $DriverBuildNumber -ne $driverVersion.BuildNumber)) {
+    $shouldUpdateDriverPubspec = $true
+  }
+}
+
+if ($shouldUpdatePassengerPubspec) {
+  Write-Step "Actualizando pubspec de pasajero a $PassengerBuildName+$PassengerBuildNumber"
+  Set-PubspecVersion -PubspecPath (Join-Path $passengerAppDir "pubspec.yaml") -BuildName $PassengerBuildName -BuildNumber $PassengerBuildNumber
+}
+
+if ($shouldUpdateDriverPubspec) {
+  Write-Step "Actualizando pubspec de conductor a $DriverBuildName+$DriverBuildNumber"
+  Set-PubspecVersion -PubspecPath (Join-Path $driverAppDir "pubspec.yaml") -BuildName $DriverBuildName -BuildNumber $DriverBuildNumber
 }
 
 if (-not $ReleasedAt) {

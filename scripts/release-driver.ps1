@@ -2,7 +2,10 @@ param(
   [string]$RemoteUser = "root",
   [string]$RemoteHost = "rapigo.cybernovatech.space",
   [int]$RemotePort = 22,
-  [string]$RemoteProjectPath = "/root/app/proyecto_app"
+  [string]$RemoteProjectPath = "/root/app/proyecto_app",
+  [string]$DriverBuildName = "",
+  [string]$DriverBuildNumber = "",
+  [switch]$UpdatePubspecVersion
 )
 
 $ErrorActionPreference = "Stop"
@@ -12,7 +15,10 @@ $ErrorActionPreference = "Stop"
   -RemoteUser $RemoteUser `
   -RemoteHost $RemoteHost `
   -RemotePort $RemotePort `
-  -RemoteProjectPath $RemoteProjectPath
+  -RemoteProjectPath $RemoteProjectPath `
+  -DriverBuildName $DriverBuildName `
+  -DriverBuildNumber $DriverBuildNumber `
+  -UpdatePubspecVersion:$UpdatePubspecVersion
 
 if ($LASTEXITCODE -ne 0) {
   exit $LASTEXITCODE

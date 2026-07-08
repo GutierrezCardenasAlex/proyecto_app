@@ -175,6 +175,30 @@ Pasajero:
 .\scripts\release-passenger.ps1
 ```
 
+Conductor con nueva version:
+
+```powershell
+.\scripts\release-driver.ps1 `
+  -DriverBuildName 1.0.3 `
+  -DriverBuildNumber 3 `
+  -UpdatePubspecVersion
+```
+
+Atajo fijo para conductor 1.0.3:
+
+```powershell
+.\scripts\release-driver-1.0.3.ps1
+```
+
+Pasajero con nueva version:
+
+```powershell
+.\scripts\release-passenger.ps1 `
+  -PassengerBuildName 1.0.3 `
+  -PassengerBuildNumber 3 `
+  -UpdatePubspecVersion
+```
+
 Si quieres especificar host y ruta:
 
 ```powershell
