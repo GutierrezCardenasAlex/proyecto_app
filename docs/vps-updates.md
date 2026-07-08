@@ -112,6 +112,78 @@ Que hace `release.sh`:
 - llama a `deploy-updates.sh`
 - actualiza el manifest y recarga nginx
 
+## Script completo desde tu PC Windows
+
+Si quieres construir en tu PC y mandar el release directo a la VPS por SSH:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+```
+
+```powershell
+.\scripts\release.ps1
+```
+
+Solo conductor:
+
+```powershell
+.\scripts\release.ps1 -Target driver
+```
+
+Solo pasajero:
+
+```powershell
+.\scripts\release.ps1 -Target passenger
+```
+
+Con host y ruta remota personalizados:
+
+```powershell
+.\scripts\release.ps1 `
+  -RemoteUser root `
+  -RemoteHost rapigo.cybernovatech.space `
+  -RemoteProjectPath /root/app/proyecto_app
+```
+
+Que hace `release.ps1`:
+
+- construye localmente las APK release
+- lee version y build desde cada `pubspec.yaml`
+- sube las APK a la VPS con `scp`
+- ejecuta `deploy-updates.sh` por `ssh`
+- actualiza manifest y publica la nueva version
+- limpia los temporales remotos
+
+Requisitos en Windows:
+
+- `flutter` en PATH
+- `ssh` en PATH
+- `scp` en PATH
+- acceso SSH funcional a la VPS
+
+## Scripts separados por app desde Windows
+
+Conductor:
+
+```powershell
+.\scripts\release-driver.ps1
+```
+
+Pasajero:
+
+```powershell
+.\scripts\release-passenger.ps1
+```
+
+Si quieres especificar host y ruta:
+
+```powershell
+.\scripts\release-driver.ps1 `
+  -RemoteHost rapigo.cybernovatech.space `
+  -RemoteUser root `
+  -RemoteProjectPath /root/app/proyecto_app
+```
+
 Si compilas directamente desde este repo, usa estos comandos:
 
 ```bash

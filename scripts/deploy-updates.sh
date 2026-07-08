@@ -255,64 +255,136 @@ export DRIVER_RELEASED_AT
 export DRIVER_UPDATED_AT
 export DRIVER_MANDATORY
 
-node <<'EOF'
-const fs = require("fs");
+update_manifest_with_python() {
+  python3 <<'EOF'
+import json
+import os
 
-const manifestPath = process.env.MANIFEST_PATH;
-const baseUrl = String(process.env.BASE_URL || "").replace(/\/+$/, "");
+manifest_path = os.environ["MANIFEST_PATH"]
+base_url = os.environ.get("BASE_URL", "").rstrip("/")
 
-const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-manifest.apps ??= {};
-manifest.apps.rapigo_passenger ??= {};
-manifest.apps.rapigo_passenger.android ??= {};
-manifest.apps.rapigo_driver_pro ??= {};
-manifest.apps.rapigo_driver_pro.android ??= {};
+with open(manifest_path, "r", encoding="utf-8") as fh:
+    manifest = json.load(fh)
 
-function updatePassenger() {
-  if (!process.env.PASSENGER_APK) return;
-  manifest.apps.rapigo_passenger.android = {
-    ...manifest.apps.rapigo_passenger.android,
-    version: process.env.PASSENGER_VERSION,
-    buildNumber: Number(process.env.PASSENGER_BUILD),
-    releasedAt: process.env.PASSENGER_RELEASED_AT,
-    updatedAt: process.env.PASSENGER_UPDATED_AT,
-    mandatory: process.env.PASSENGER_MANDATORY === "true",
-    title: "Actualizacion disponible",
-    message: "Hay una nueva version de RAPIGO disponible para instalar.",
-    apkUrl: `${baseUrl}/downloads/passenger/android/${process.env.PASSENGER_VERSION}/rapigo-passenger.apk`,
-    notes: [
-      "Mejoras de estabilidad",
-      "Optimizacion de mapas",
-      "Correcciones generales",
-    ],
-  };
-}
+manifest.setdefault("apps", {})
+manifest["apps"].setdefault("rapigo_passenger", {})
+manifest["apps"]["rapigo_passenger"].setdefault("android", {})
+manifest["apps"].setdefault("rapigo_driver_pro", {})
+manifest["apps"]["rapigo_driver_pro"].setdefault("android", {})
 
-function updateDriver() {
-  if (!process.env.DRIVER_APK) return;
-  manifest.apps.rapigo_driver_pro.android = {
-    ...manifest.apps.rapigo_driver_pro.android,
-    version: process.env.DRIVER_VERSION,
-    buildNumber: Number(process.env.DRIVER_BUILD),
-    releasedAt: process.env.DRIVER_RELEASED_AT,
-    updatedAt: process.env.DRIVER_UPDATED_AT,
-    mandatory: process.env.DRIVER_MANDATORY === "true",
-    title: "Actualizacion disponible",
-    message: "Hay una nueva version de RAPIGO PRO disponible para instalar.",
-    apkUrl: `${baseUrl}/downloads/driver/android/${process.env.DRIVER_VERSION}/rapigo-driver-pro.apk`,
-    notes: [
-      "Mejoras de rendimiento",
-      "Optimizacion offline",
-      "Correcciones del flujo operativo",
-    ],
-  };
-}
+if os.environ.get("PASSENGER_APK"):
+    manifest["apps"]["rapigo_passenger"]["android"] = {
+        **manifest["apps"]["rapigo_passenger"]["android"],
+        "version": os.environ["PASSENGER_VERSION"],
+        "buildNumber": int(os.environ["PASSENGER_BUILD"]),
+        "releasedAt": os.environ["PASSENGER_RELEASED_AT"],
+        "updatedAt": os.environ["PASSENGER_UPDATED_AT"],
+        "mandatory": os.environ["PASSENGER_MANDATORY"] == "true",
+        "title": "Actualizacion disponible",
+        "message": "Hay una nueva version de RAPIGO disponible para instalar.",
+        "apkUrl": f"{base_url}/downloads/passenger/android/{os.environ['PASSENGER_VERSION']}/rapigo-passenger.apk",
+        "notes": [
+            "Mejoras de estabilidad",
+            "Optimizacion de mapas",
+            "Correcciones generales",
+        ],
+    }
 
-updatePassenger();
-updateDriver();
+if os.environ.get("DRIVER_APK"):
+    manifest["apps"]["rapigo_driver_pro"]["android"] = {
+        **manifest["apps"]["rapigo_driver_pro"]["android"],
+        "version": os.environ["DRIVER_VERSION"],
+        "buildNumber": int(os.environ["DRIVER_BUILD"]),
+        "releasedAt": os.environ["DRIVER_RELEASED_AT"],
+        "updatedAt": os.environ["DRIVER_UPDATED_AT"],
+        "mandatory": os.environ["DRIVER_MANDATORY"] == "true",
+        "title": "Actualizacion disponible",
+        "message": "Hay una nueva version de RAPIGO PRO disponible para instalar.",
+        "apkUrl": f"{base_url}/downloads/driver/android/{os.environ['DRIVER_VERSION']}/rapigo-driver-pro.apk",
+        "notes": [
+            "Mejoras de rendimiento",
+            "Optimizacion offline",
+            "Correcciones del flujo operativo",
+        ],
+    }
 
-fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+with open(manifest_path, "w", encoding="utf-8") as fh:
+    json.dump(manifest, fh, indent=2, ensure_ascii=False)
+    fh.write("\n")
 EOF
+}
+
+update_manifest() {
+  if command -v python3 >/dev/null 2>&1; then
+    update_manifest_with_python
+    return
+  fi
+
+  if command -v python >/dev/null 2>&1; then
+    python <<'EOF'
+import json
+import os
+
+manifest_path = os.environ["MANIFEST_PATH"]
+base_url = os.environ.get("BASE_URL", "").rstrip("/")
+
+with open(manifest_path, "r", encoding="utf-8") as fh:
+    manifest = json.load(fh)
+
+manifest.setdefault("apps", {})
+manifest["apps"].setdefault("rapigo_passenger", {})
+manifest["apps"]["rapigo_passenger"].setdefault("android", {})
+manifest["apps"].setdefault("rapigo_driver_pro", {})
+manifest["apps"]["rapigo_driver_pro"].setdefault("android", {})
+
+if os.environ.get("PASSENGER_APK"):
+    manifest["apps"]["rapigo_passenger"]["android"] = {
+        **manifest["apps"]["rapigo_passenger"]["android"],
+        "version": os.environ["PASSENGER_VERSION"],
+        "buildNumber": int(os.environ["PASSENGER_BUILD"]),
+        "releasedAt": os.environ["PASSENGER_RELEASED_AT"],
+        "updatedAt": os.environ["PASSENGER_UPDATED_AT"],
+        "mandatory": os.environ["PASSENGER_MANDATORY"] == "true",
+        "title": "Actualizacion disponible",
+        "message": "Hay una nueva version de RAPIGO disponible para instalar.",
+        "apkUrl": f"{base_url}/downloads/passenger/android/{os.environ['PASSENGER_VERSION']}/rapigo-passenger.apk",
+        "notes": [
+            "Mejoras de estabilidad",
+            "Optimizacion de mapas",
+            "Correcciones generales",
+        ],
+    }
+
+if os.environ.get("DRIVER_APK"):
+    manifest["apps"]["rapigo_driver_pro"]["android"] = {
+        **manifest["apps"]["rapigo_driver_pro"]["android"],
+        "version": os.environ["DRIVER_VERSION"],
+        "buildNumber": int(os.environ["DRIVER_BUILD"]),
+        "releasedAt": os.environ["DRIVER_RELEASED_AT"],
+        "updatedAt": os.environ["DRIVER_UPDATED_AT"],
+        "mandatory": os.environ["DRIVER_MANDATORY"] == "true",
+        "title": "Actualizacion disponible",
+        "message": "Hay una nueva version de RAPIGO PRO disponible para instalar.",
+        "apkUrl": f"{base_url}/downloads/driver/android/{os.environ['DRIVER_VERSION']}/rapigo-driver-pro.apk",
+        "notes": [
+            "Mejoras de rendimiento",
+            "Optimizacion offline",
+            "Correcciones del flujo operativo",
+        ],
+    }
+
+with open(manifest_path, "w", encoding="utf-8") as fh:
+    json.dump(manifest, fh, indent=2, ensure_ascii=False)
+    fh.write("\n")
+EOF
+    return
+  fi
+
+  echo "No se encontro ni python3 ni python en la VPS para actualizar el manifest." >&2
+  exit 1
+}
+
+update_manifest
 
 run_restart() {
   case "${RESTART_MODE}" in
