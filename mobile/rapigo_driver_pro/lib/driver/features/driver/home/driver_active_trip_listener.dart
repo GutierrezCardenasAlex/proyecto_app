@@ -19,7 +19,7 @@ class _DriverActiveTripListenerState
 
   bool _shouldOpenTripFlow(DriverTrip? trip) {
     return trip != null &&
-        const {'accepted', 'arriving', 'at_pickup', 'in_progress', 'completed'}
+        const {'accepted', 'arriving', 'at_pickup', 'in_progress'}
             .contains(trip.status);
   }
 

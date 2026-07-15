@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -8,7 +10,7 @@ import 'core/map/rapigo_map_runtime.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await OfflineMapBootstrap.ensureInitialized();
-  await MapStyleCache.preload(rapigoLightStyle.assetPath);
+  unawaited(OfflineMapBootstrap.ensureInitialized());
+  unawaited(MapStyleCache.preload(rapigoLightStyle.assetPath));
   runApp(const ProviderScope(child: RapigoPassengerApp()));
 }

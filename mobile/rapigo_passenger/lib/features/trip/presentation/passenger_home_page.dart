@@ -10,11 +10,7 @@ import '../../auth/presentation/passenger_profile_completion_page.dart';
 import '../../../core/config/app_brand.dart';
 import '../../../core/notifications/local_notifications.dart';
 import '../../map/data/location_controller.dart';
-import '../data/trip_repository.dart';
-import '../domain/trip_request.dart';
-import 'pages/detail_pages.dart';
 import 'pages/profile_hub_page.dart';
-import 'widgets/account_tab.dart';
 import 'widgets/destination_search_sheet.dart';
 import 'widgets/activity_tab.dart';
 import 'widgets/ride_launcher_view.dart';
@@ -59,29 +55,18 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
   }
 
   Future<void> _refreshPassengerSession() async {
-    final earnedFreeTrip = await ref.read(sessionProvider.notifier).refreshSessionStatus();
+    final earnedFreeTrip = await ref
+        .read(sessionProvider.notifier)
+        .refreshSessionStatus();
     if (earnedFreeTrip) {
       await LocalNotifications.ensureInitialized();
       await LocalNotifications.show(
         id: 3001,
         title: 'Tienes un viaje gratis',
-        body: 'Completaste 5 viajes. Tu siguiente viaje sera gratis a donde sea.',
+        body:
+            'Completaste 5 viajes. Tu siguiente viaje sera gratis a donde sea.',
       );
     }
-  }
-
-  void _openPage(Widget page) {
-    Navigator.of(context).push(
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => page,
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return FadeTransition(
-            opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
-            child: child,
-          );
-        },
-      ),
-    );
   }
 
   void _goHomeFromSection() {
@@ -134,25 +119,15 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
 
   Future<void> _restoreShellState() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_shellStateKey);
-    if (raw == null || raw.isEmpty || !mounted) {
+    await prefs.remove(_shellStateKey);
+    if (!mounted) {
       return;
     }
-    final parts = raw.split('|');
-    if (parts.length < 4) {
-      return;
-    }
-    final selectedIndex = int.tryParse(parts[0]) ?? 0;
-    final showRideLauncher = parts[1] == '1';
-    final pendingRideMode = parts[2] == RideMode.cercano.name
-        ? RideMode.cercano
-        : RideMode.destino;
-    final startInMapPicker = parts[3] == '1';
     setState(() {
-      _selectedIndex = selectedIndex.clamp(0, 2);
-      _showRideLauncher = showRideLauncher;
-      _pendingRideMode = pendingRideMode;
-      _pendingStartInMapPicker = startInMapPicker;
+      _selectedIndex = 0;
+      _showRideLauncher = true;
+      _pendingRideMode = RideMode.destino;
+      _pendingStartInMapPicker = false;
     });
   }
 
@@ -165,13 +140,6 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
       _pendingStartInMapPicker ? '1' : '0',
     ].join('|');
     await prefs.setString(_shellStateKey, raw);
-  }
-
-  bool _hasActiveRideRequest(TripRequest request) {
-    return request.activeTripId != null &&
-        request.activeTripId!.isNotEmpty &&
-        request.status != 'idle' &&
-        request.status != 'cancelled';
   }
 
   Future<void> _handleRootBack() async {
@@ -250,11 +218,6 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
               _selectedIndex = 1;
             });
           },
-          onGoAccount: () {
-            setState(() {
-              _selectedIndex = 2;
-            });
-          },
           onLogout: () => ref.read(sessionProvider.notifier).signOut(),
         ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
@@ -270,8 +233,6 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(sessionProvider);
-    final activeRequest = ref.watch(tripProvider.select((state) => state.request));
-
     if (session.isRestoring) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -288,7 +249,7 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
       return const PassengerProfileCompletionPage();
     }
 
-    final showRideFlow = !_showRideLauncher || _hasActiveRideRequest(activeRequest);
+    final showRideFlow = !_showRideLauncher;
     final shellSignature =
         '$_selectedIndex|${_showRideLauncher ? 1 : 0}|${_pendingRideMode.name}|${_pendingStartInMapPicker ? 1 : 0}|${showRideFlow ? 1 : 0}';
     if (_lastShellSignature != shellSignature) {
@@ -304,9 +265,16 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
               onChooseMode: _openRideFlow,
               onOpenProfile: _openProfileHub,
               onOpenDestinationSearch: _openDestinationSearchSheet,
+              onOpenTrips: () {
+                setState(() {
+                  _selectedIndex = 1;
+                });
+              },
             )
           : RideTab(
-              key: ValueKey('ride-flow-$_rideFlowVersion-${_pendingRideMode.name}'),
+              key: ValueKey(
+                'ride-flow-$_rideFlowVersion-${_pendingRideMode.name}',
+              ),
               onMenuTap: _openProfileHub,
               initialMode: _pendingRideMode,
               openFlowOnStart: true,
@@ -315,16 +283,7 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
               startInMapPicker: _pendingStartInMapPicker,
               onBackToLauncher: _backToRideLauncher,
             ),
-      ActivityTab(
-        onBack: _goHomeFromSection,
-      ),
-      AccountTab(
-        onBack: _goHomeFromSection,
-        onOpenProfile: () => _openPage(const ProfilePage()),
-        onOpenNotifications: () => _openPage(const NotificationsPage()),
-        onOpenSettings: () => _openPage(const SettingsPage()),
-        onOpenSupport: () => _openPage(const SupportPage()),
-      ),
+      ActivityTab(onBack: _goHomeFromSection),
     ];
 
     return PopScope(
@@ -346,9 +305,7 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
 }
 
 class _PassengerAccessPendingShell extends StatelessWidget {
-  const _PassengerAccessPendingShell({
-    required this.deviceStatus,
-  });
+  const _PassengerAccessPendingShell({required this.deviceStatus});
 
   final String deviceStatus;
 
@@ -380,7 +337,9 @@ class _PassengerAccessPendingShell extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(
-                    rejected ? Icons.block_rounded : Icons.hourglass_top_rounded,
+                    rejected
+                        ? Icons.block_rounded
+                        : Icons.hourglass_top_rounded,
                     color: rejected ? AppBrand.danger : AppBrand.primaryBlue,
                     size: 40,
                   ),

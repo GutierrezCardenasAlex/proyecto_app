@@ -76,6 +76,13 @@ function Set-PubspecVersion {
 
   $content = Get-Content $PubspecPath -Raw
   $newVersionLine = "version: $BuildName+$BuildNumber"
+  $currentVersion = Select-String -Path $PubspecPath -Pattern '^version:\s*(.+)$' | Select-Object -First 1
+  if ($currentVersion) {
+    $currentVersionLine = "version: " + $currentVersion.Matches[0].Groups[1].Value.Trim()
+    if ($currentVersionLine -eq $newVersionLine) {
+      return
+    }
+  }
   $updated = [regex]::Replace($content, '(?m)^version:\s*.+$', $newVersionLine, 1)
   if ($updated -eq $content) {
     throw "No se pudo actualizar la version en $PubspecPath"

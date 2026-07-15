@@ -24,6 +24,7 @@ import '../../../core/notifications/local_notifications.dart';
 import '../../../../core/map/offline_map.dart';
 import '../../../../core/map/geocoding_service.dart';
 import '../../../../core/ui/top_notice.dart';
+import '../../../../shared/theme/rapigo_theme.dart';
 import '../presentation/driver_progress_page.dart';
 import '../presentation/pages/driver_detail_pages.dart';
 import '../presentation/route_persistence_keys.dart';
@@ -31,6 +32,7 @@ import '../presentation/widgets/driver_ui_kit.dart';
 import '../../map/presentation/driver_map_surface.dart';
 import '../data/driver_repository.dart';
 import 'driver_initial_bootstrap.dart';
+import 'driver_offer_preview_provider.dart';
 
 part '../presentation/driver_home_page.dart';
 part 'driver_session_gate.dart';
@@ -46,39 +48,6 @@ part 'tabs/driver_account_tab.dart';
 part 'widgets/driver_loading_splash.dart';
 part 'widgets/device_blocked_view.dart';
 part 'widgets/pending_authorization_view.dart';
-
-final driverOfferPreviewTripIdProvider =
-    NotifierProvider<DriverOfferPreviewTripIdController, String?>(
-      DriverOfferPreviewTripIdController.new,
-    );
-
-class DriverOfferPreviewTripIdController extends Notifier<String?> {
-  late final DriverTripStateCache _cache;
-  bool _restoredPersistedPreviewTripId = false;
-
-  @override
-  String? build() {
-    _cache = DriverTripStateCache();
-    if (!_restoredPersistedPreviewTripId) {
-      _restoredPersistedPreviewTripId = true;
-      Future<void>.microtask(_restorePersistedPreviewTripId);
-    }
-    return null;
-  }
-
-  Future<void> _restorePersistedPreviewTripId() async {
-    final cached = await _cache.readPreviewTripId();
-    if (cached == null) {
-      return;
-    }
-    state = cached;
-  }
-
-  void setTrip(String? tripId) {
-    state = tripId;
-    unawaited(_cache.writePreviewTripId(tripId));
-  }
-}
 
 class DriverHomePage extends StatelessWidget {
   const DriverHomePage({super.key});

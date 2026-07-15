@@ -249,6 +249,13 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
         oldWidget.pickupLng != widget.pickupLng ||
         oldWidget.destinationLat != widget.destinationLat ||
         oldWidget.destinationLng != widget.destinationLng;
+    final cameraProfileChanged =
+        oldWidget.tripAccepted != widget.tripAccepted ||
+        oldWidget.idleZoomLevel != widget.idleZoomLevel ||
+        oldWidget.maxZoomPreference != widget.maxZoomPreference ||
+        oldWidget.idleTilt != widget.idleTilt ||
+        oldWidget.idleBearingOverride != widget.idleBearingOverride ||
+        oldWidget.navigationTilt != widget.navigationTilt;
     if (routeStructureChanged) {
       _initialViewportLocked = false;
       _refreshRoute();
@@ -280,9 +287,12 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
       }
     } else if (markerVisualChanged) {
       unawaited(_updateDriverVisuals());
+    } else if (cameraProfileChanged) {
+      _initialViewportLocked = false;
+      unawaited(_syncCamera(force: true));
     } else if (oldWidget.focusSignal != widget.focusSignal) {
       _initialViewportLocked = false;
-      _syncCamera();
+      unawaited(_syncCamera(force: true));
     }
   }
 
@@ -1009,6 +1019,7 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
           _lastRouteRefreshDriverPoint = _driverPoint;
         });
         await _syncScene();
+        widget.onRouteUpdated?.call();
       }
     }
 
@@ -1052,6 +1063,9 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
       });
       if (cachedBundle != null && cachedBundle.primary.length >= 2) {
         widget.onOfflineRouteRetained?.call();
+        widget.onRouteUpdated?.call();
+      } else {
+        widget.onRouteUpdated?.call();
       }
       await _syncScene();
     }
@@ -1656,7 +1670,7 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
     return data!.buffer.asUint8List();
   }
 
-  Future<void> _syncCamera() async {
+  Future<void> _syncCamera({bool force = false}) async {
     final controller = _controller;
     if (controller == null ||
         !_styleLoaded ||
@@ -1667,7 +1681,8 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
 
     try {
       final now = DateTime.now();
-      if (_lastCameraAnimationAt != null &&
+      if (!force &&
+          _lastCameraAnimationAt != null &&
           now.difference(_lastCameraAnimationAt!) < const Duration(milliseconds: 140)) {
         return;
       }
@@ -1710,6 +1725,7 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
           _isOnDestinationStage ? 18.15 : 17.85,
           widget.maxZoomPreference ?? _defaultMaxZoom,
         );
+        final nextTilt = widget.navigationTilt ?? 56;
         final rawBearing = route != null && route.length >= 2
             ? _navigationCameraBearing(currentVisualPoint, route)
             : 0.0;
@@ -1732,8 +1748,11 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
                 }
                 return delta.abs();
               })();
-        if (targetDelta < 2.2 &&
+        final tiltDelta = (_currentCameraTilt - nextTilt).abs();
+        if (!force &&
+            targetDelta < 2.2 &&
             bearingDelta < 2.2 &&
+            tiltDelta < 0.8 &&
             _lastAnimatedCameraZoom != null &&
             (_lastAnimatedCameraZoom! - nextZoom).abs() < 0.08) {
           return;
@@ -1744,7 +1763,7 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
               target: _toMlLatLng(desiredTarget),
               zoom: nextZoom,
               bearing: nextBearing,
-              tilt: widget.navigationTilt ?? 56,
+              tilt: nextTilt,
             ),
           ),
         );
@@ -1758,6 +1777,7 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
           widget.idleZoomLevel ?? 16.15,
           widget.maxZoomPreference ?? _defaultMaxZoom,
         );
+        final nextTilt = widget.idleTilt ?? 48;
         final nextBearing = widget.idleBearingOverride ?? 0;
         final targetDelta = _lastAnimatedCameraTarget == null
             ? double.infinity
@@ -1777,8 +1797,11 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
                 }
                 return delta.abs();
               })();
-        if (targetDelta < 2.2 &&
+        final tiltDelta = (_currentCameraTilt - nextTilt).abs();
+        if (!force &&
+            targetDelta < 2.2 &&
             bearingDelta < 2.2 &&
+            tiltDelta < 0.8 &&
             _lastAnimatedCameraZoom != null &&
             (_lastAnimatedCameraZoom! - nextZoom).abs() < 0.08) {
           return;
@@ -1789,7 +1812,7 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
               target: _toMlLatLng(desiredTarget),
               zoom: nextZoom,
               bearing: nextBearing,
-              tilt: widget.idleTilt ?? 48,
+              tilt: nextTilt,
             ),
           ),
         );

@@ -226,7 +226,6 @@ class DriverTripStateCache {
       'arriving',
       'at_pickup',
       'in_progress',
-      'completed',
     }.contains(status);
     return DriverTripFlowMetadata(
       tripId: trip.id,

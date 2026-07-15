@@ -55,10 +55,7 @@ class AppUpdateService {
     return ordered;
   }
 
-  Future<AppUpdateCheckResult> checkForUpdate() async {
-    final info = await PackageInfo.fromPlatform();
-    final localBuild = int.tryParse(info.buildNumber) ?? 0;
-    AppUpdateManifest? manifest;
+  Future<AppUpdateManifest?> fetchLatestManifest() async {
     for (final uri in _manifestCandidates()) {
       try {
         final response = await _client
@@ -73,20 +70,26 @@ class AppUpdateService {
           continue;
         }
         final data = jsonDecode(response.body) as Map<String, dynamic>;
-        manifest = AppUpdateManifest.fromJson(data);
+        final manifest = AppUpdateManifest.fromJson(data);
         if (kDebugMode) {
           debugPrint(
             '[Updater][$appId] Manifest cargado desde $uri -> version=${manifest.version} build=${manifest.buildNumber}',
           );
         }
-        break;
+        return manifest;
       } catch (error) {
         if (kDebugMode) {
           debugPrint('[Updater][$appId] Error consultando $uri -> $error');
         }
       }
     }
+    return null;
+  }
 
+  Future<AppUpdateCheckResult> checkForUpdate() async {
+    final info = await PackageInfo.fromPlatform();
+    final localBuild = int.tryParse(info.buildNumber) ?? 0;
+    final manifest = await fetchLatestManifest();
     if (manifest == null) {
       return AppUpdateCheckResult(
         localBuildNumber: localBuild,

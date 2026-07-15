@@ -8,10 +8,12 @@ import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../shared/theme/rapigo_theme.dart';
 import '../../../../core/ui/top_notice.dart';
 import '../../auth/data/auth_repository.dart';
 import 'route_persistence_keys.dart';
 import '../data/driver_repository.dart';
+import '../home/driver_offer_preview_provider.dart';
 import '../../map/presentation/driver_map_surface.dart';
 import '../../trip/data/trip_repository.dart';
 import '../../trip/domain/driver_trip.dart';
@@ -33,7 +35,13 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
   bool _detailsExpanded = false;
   bool _didNotifyClosed = false;
   bool _isClosingToHome = false;
+  bool _homePopScheduled = false;
+  bool _isPreparingRoute = true;
+  bool _showHomeReturnButton = false;
+  double _closingOpacity = 0;
+  String _closingMessage = 'Volviendo al mapa principal...';
   String? _restoredDetailsTripId;
+  String? _routePreparedTripId;
 
   @override
   void dispose() {
@@ -42,6 +50,34 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
       widget.onClosed();
     }
     super.dispose();
+  }
+
+  void _markRouteReady([String? tripId]) {
+    if (!mounted) {
+      return;
+    }
+    if (tripId != null) {
+      _routePreparedTripId = tripId;
+    }
+    if (!_isPreparingRoute) {
+      return;
+    }
+    setState(() => _isPreparingRoute = false);
+  }
+
+  void _ensureRoutePreparingForTrip(DriverTrip trip) {
+    if (_routePreparedTripId == trip.id || _isClosingToHome) {
+      return;
+    }
+    if (_isPreparingRoute) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _isClosingToHome || _routePreparedTripId == trip.id) {
+        return;
+      }
+      setState(() => _isPreparingRoute = true);
+    });
   }
 
   Future<void> _restoreDetailsExpanded(String tripId) async {
@@ -350,15 +386,43 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
   }
 
   Future<void> _returnToHome() async {
-    if (_isClosingToHome || !mounted) {
+    if (_homePopScheduled || !mounted) {
       return;
     }
-    setState(() => _isClosingToHome = true);
+    _homePopScheduled = true;
+    if (!_isClosingToHome) {
+      setState(() {
+        _isClosingToHome = true;
+        _closingOpacity = 1;
+        _closingMessage = 'Cargando inicio...';
+      });
+    }
     if (!_didNotifyClosed) {
       _didNotifyClosed = true;
       widget.onClosed();
     }
+    if (mounted && _showHomeReturnButton) {
+      setState(() => _showHomeReturnButton = false);
+    }
+    ref.read(driverHomeResumeOverlayProvider.notifier).showOnce();
+    ref.read(driverSuppressIncomingOfferOverlayProvider.notifier).suppressOnce();
+    await Future<void>.delayed(const Duration(milliseconds: 90));
+    if (!mounted) {
+      return;
+    }
     Navigator.of(context).pop();
+  }
+
+  void _refreshHomeStateAfterClose() {
+    final tripNotifier = ref.read(offeredTripProvider.notifier);
+    final offersNotifier = ref.read(driverOffersProvider.notifier);
+    unawaited(
+      Future<void>(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 180));
+        await tripNotifier.loadOffer();
+        await offersNotifier.loadOffers();
+      }),
+    );
   }
 
   Future<void> _handlePrimaryAction(DriverTrip trip) async {
@@ -394,7 +458,6 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
     }
     if (trip.status == 'in_progress') {
       await ref.read(offeredTripProvider.notifier).updateTripStatus('completed');
-      await ref.read(driverOffersProvider.notifier).loadOffers();
       if (mounted) {
         setState(() => _detailsExpanded = true);
       }
@@ -412,12 +475,40 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
 
   Future<void> _closeSummaryAndReturnHome() async {
     final tripId = ref.read(offeredTripProvider).value?.id;
+    if (mounted) {
+      setState(() {
+        _isClosingToHome = true;
+        _closingOpacity = 0;
+        _closingMessage = 'Cargando inicio...';
+        _showHomeReturnButton = false;
+      });
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() => _closingOpacity = 1);
+      }
+    });
     if (tripId != null && tripId.isNotEmpty) {
       await _clearDetailsExpanded(tripId);
     }
+    ref.read(driverOfferPreviewTripIdProvider.notifier).setTrip(null);
+    ref.read(driverSuppressIncomingOfferOverlayProvider.notifier).suppressOnce();
+    ref.read(driverIgnoredIncomingTripIdProvider.notifier).ignore(tripId);
+    ref.read(driverHomeResumeOverlayProvider.notifier).showOnce();
+    if (tripId != null && tripId.isNotEmpty) {
+      ref.read(driverOffersProvider.notifier).removeOfferLocally(tripId);
+    }
+    await ref.read(driverOffersProvider.notifier).clearOffers();
     await ref.read(offeredTripProvider.notifier).clearTrip();
-    await ref.read(driverOffersProvider.notifier).loadOffers();
-    await _returnToHome();
+    _refreshHomeStateAfterClose();
+    await Future<void>.delayed(const Duration(seconds: 3));
+    if (!mounted || _homePopScheduled) {
+      return;
+    }
+    setState(() {
+      _closingMessage = 'Viaje completado correctamente';
+      _showHomeReturnButton = true;
+    });
   }
 
   @override
@@ -433,6 +524,7 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
     final session = ref.watch(driverSessionProvider);
 
     if (trip != null) {
+      _ensureRoutePreparingForTrip(trip);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           unawaited(_restoreDetailsExpanded(trip.id));
@@ -445,11 +537,82 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
         if (!mounted) {
           return;
         }
-        await _returnToHome();
+        if (!_isClosingToHome) {
+          await _returnToHome();
+        }
       });
-      return const Scaffold(
-        backgroundColor: Color(0xFF040B17),
-        body: SizedBox.expand(),
+      return Scaffold(
+        backgroundColor: const Color(0xFF040B17),
+        body: AnimatedOpacity(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOut,
+          opacity: _closingOpacity,
+          child: Center(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 28),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 22),
+              decoration: BoxDecoration(
+                color: const Color(0xFF08111E),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFF1E293B)),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF020617).withValues(alpha: 0.5),
+                    blurRadius: 26,
+                    offset: const Offset(0, 16),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(
+                    width: 30,
+                    height: 30,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.8,
+                      color: Color(0xFF3B82F6),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    _closingMessage,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.plusJakartaSans(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  if (_showHomeReturnButton) ...[
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: _returnToHome,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF2563EB),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                        ),
+                        child: Text(
+                          'Ir al inicio',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
       );
     }
 
@@ -534,7 +697,9 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
                 focusBounds: focusBounds,
                 focusSignal: 0,
                 showStatusBadge: false,
+                onRouteUpdated: () => _markRouteReady(trip.id),
                 onOfflineRouteRetained: () {
+                  _markRouteReady(trip.id);
                   if (!mounted) {
                     return;
                   }
@@ -569,6 +734,57 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
                 ),
               ),
             ),
+            if (_isPreparingRoute && !_isClosingToHome)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF040B17).withValues(alpha: 0.62),
+                    ),
+                    child: Center(
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 28),
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 22),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF08111E),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: const Color(0xFF1E293B)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF020617).withValues(alpha: 0.45),
+                              blurRadius: 24,
+                              offset: const Offset(0, 14),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox(
+                              width: 30,
+                              height: 30,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.8,
+                                color: Color(0xFF3B82F6),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Cargando ruta del viaje...',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.plusJakartaSans(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
@@ -604,7 +820,9 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
                       setState(() => _detailsExpanded = nextValue);
                       unawaited(_persistDetailsExpanded(trip.id, nextValue));
                     },
-                    onPrimary: tripAsync.isLoading ? null : () => _handlePrimaryAction(trip),
+                    onPrimary: (tripAsync.isLoading || _isPreparingRoute)
+                        ? null
+                        : () => _handlePrimaryAction(trip),
                   ),
                 ),
               ),
@@ -692,16 +910,18 @@ class _DriverNavigationHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.rapigoPalette;
+    final textTheme = Theme.of(context).textTheme;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
       decoration: BoxDecoration(
-        color: const Color(0xF3000000),
+        color: palette.surfacePrimary.withValues(alpha: 0.95),
         borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: const Color(0x1FFFFFFF)),
-        boxShadow: const [
+        border: Border.all(color: palette.outlineSoft),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x66000000),
+            color: palette.shadowSoft,
             blurRadius: 22,
             offset: Offset(0, 10),
           ),
@@ -725,8 +945,8 @@ class _DriverNavigationHeader extends StatelessWidget {
               children: [
                 Text(
                   distanceLabel,
-                  style: GoogleFonts.plusJakartaSans(
-                    color: Colors.white,
+                  style: textTheme.headlineSmall?.copyWith(
+                    color: palette.textPrimary,
                     fontSize: 28,
                     fontWeight: FontWeight.w900,
                     height: 1,
@@ -737,8 +957,8 @@ class _DriverNavigationHeader extends StatelessWidget {
                   title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.plusJakartaSans(
-                    color: const Color(0xFF38BDF8),
+                  style: textTheme.titleLarge?.copyWith(
+                    color: palette.accentBlueSoft,
                     fontSize: 24,
                     fontWeight: FontWeight.w900,
                     height: 1.08,
@@ -750,8 +970,8 @@ class _DriverNavigationHeader extends StatelessWidget {
                     subtitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.plusJakartaSans(
-                      color: const Color(0xFFCBD5E1),
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: palette.textSecondary,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -806,17 +1026,20 @@ class _DriverNavigationCompactDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.rapigoPalette;
+    final metrics = context.rapigoMetrics;
+    final textTheme = Theme.of(context).textTheme;
     return Material(
-      color: const Color(0xF6222328),
-      borderRadius: BorderRadius.circular(30),
+      color: palette.surfacePrimary.withValues(alpha: 0.96),
+      borderRadius: BorderRadius.circular(metrics.radiusLarge),
       child: Container(
         padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: const Color(0x1FFFFFFF)),
-          boxShadow: const [
+          borderRadius: BorderRadius.circular(metrics.radiusLarge),
+          border: Border.all(color: palette.outlineSoft),
+          boxShadow: [
             BoxShadow(
-              color: Color(0x80020812),
+              color: palette.shadowSoft,
               blurRadius: 26,
               offset: Offset(0, 14),
             ),
@@ -829,7 +1052,7 @@ class _DriverNavigationCompactDrawer extends StatelessWidget {
               width: 64,
               height: 6,
               decoration: BoxDecoration(
-                color: const Color(0xFF6B7280),
+                color: palette.textMuted.withValues(alpha: 0.72),
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
@@ -845,8 +1068,8 @@ class _DriverNavigationCompactDrawer extends StatelessWidget {
                     children: [
                       Text(
                         etaLabel,
-                        style: GoogleFonts.plusJakartaSans(
-                          color: Colors.white,
+                        style: textTheme.headlineSmall?.copyWith(
+                          color: palette.textPrimary,
                           fontSize: 28,
                           fontWeight: FontWeight.w900,
                           height: 1,
@@ -855,8 +1078,8 @@ class _DriverNavigationCompactDrawer extends StatelessWidget {
                       const SizedBox(height: 6),
                       Text(
                         '$distanceLabel • $statusLabel',
-                        style: GoogleFonts.plusJakartaSans(
-                          color: const Color(0xFFE5E7EB),
+                        style: textTheme.bodyLarge?.copyWith(
+                          color: palette.textSecondary,
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
                         ),
@@ -912,8 +1135,9 @@ class _CompactRoundButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.rapigoPalette;
     return Material(
-      color: const Color(0xFF4B5563),
+      color: palette.surfaceSecondary,
       borderRadius: BorderRadius.circular(24),
       child: InkWell(
         borderRadius: BorderRadius.circular(24),
@@ -921,7 +1145,7 @@ class _CompactRoundButton extends StatelessWidget {
         child: SizedBox(
           width: 58,
           height: 58,
-          child: Icon(icon, color: Colors.white, size: 28),
+          child: Icon(icon, color: palette.textPrimary, size: 28),
         ),
       ),
     );
@@ -995,8 +1219,7 @@ class _DriverTripFlowPanel extends StatelessWidget {
 
   bool get _isNearDestination => _distanceToDestinationMeters <= 450;
 
-  String get _secondaryRequestLabel =>
-      trip.isDirectedRequest ? 'Cancelar' : 'Ignorar';
+  String get _secondaryRequestLabel => 'Ignorar';
 
   IconData get _headlineIcon {
     if (_isRequest) return Icons.access_time_rounded;
@@ -1181,20 +1404,23 @@ class _DriverTripFlowPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.rapigoPalette;
+    final metrics = context.rapigoMetrics;
+    final textTheme = Theme.of(context).textTheme;
     final passengerName = trip.passengerName?.trim().isNotEmpty == true ? trip.passengerName!.trim() : 'Pasajero';
     final vehicleLabel = (trip.vehicleType ?? 'taxi').toUpperCase();
 
     return Material(
-      color: const Color(0xFF060D18).withValues(alpha: 0.97),
-      borderRadius: BorderRadius.circular(32),
+      color: palette.surfacePrimary.withValues(alpha: 0.97),
+      borderRadius: BorderRadius.circular(metrics.radiusLarge + 4),
       child: Container(
         padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(32),
-          border: Border.all(color: const Color(0xFF1F2937)),
+          borderRadius: BorderRadius.circular(metrics.radiusLarge + 4),
+          border: Border.all(color: palette.outlineStrong),
           boxShadow: [
             BoxShadow(
-              color: const Color(0x9C020812),
+              color: palette.shadowSoft,
               blurRadius: 28,
               offset: const Offset(0, 16),
             ),
@@ -1238,7 +1464,7 @@ class _DriverTripFlowPanel extends StatelessWidget {
                           children: [
                             Text(
                               _headlineTitle,
-                              style: GoogleFonts.plusJakartaSans(
+                              style: textTheme.titleLarge?.copyWith(
                                 color: _headlineColor,
                                 fontSize: 20,
                                 fontWeight: FontWeight.w800,
@@ -1248,8 +1474,8 @@ class _DriverTripFlowPanel extends StatelessWidget {
                             const SizedBox(height: 4),
                             Text(
                               _headlineSubtitle,
-                              style: GoogleFonts.plusJakartaSans(
-                                color: Color(0xFF9CA3AF),
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: palette.textMuted,
                                 fontSize: 13.5,
                                 fontWeight: FontWeight.w600,
                                 height: 1.3,
@@ -1263,7 +1489,7 @@ class _DriverTripFlowPanel extends StatelessWidget {
                 ),
                 if (onCollapse != null && !_isCompleted) ...[
                   Material(
-                    color: const Color(0xFF151E2A),
+                    color: palette.surfaceSecondary,
                     shape: const CircleBorder(),
                     child: InkWell(
                       customBorder: const CircleBorder(),
@@ -1284,7 +1510,7 @@ class _DriverTripFlowPanel extends StatelessWidget {
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFFFACC15), width: 5),
+                      border: Border.all(color: palette.accentYellow, width: 5),
                     ),
                     child: const Icon(
                       Icons.route_rounded,
@@ -1297,16 +1523,16 @@ class _DriverTripFlowPanel extends StatelessWidget {
                     width: 58,
                     height: 58,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: palette.surfaceInteractive,
                       shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFF1D4ED8), width: 2),
+                      border: Border.all(color: palette.accentBlue, width: 2),
                     ),
                     child: const Icon(Icons.person, color: Color(0xFF111827), size: 34),
                   ),
                   if (!_isCompleted) ...[
                     const SizedBox(width: 12),
                     Material(
-                      color: const Color(0xFF1B2430),
+                      color: palette.surfaceSecondary,
                       shape: const CircleBorder(),
                       child: InkWell(
                         customBorder: const CircleBorder(),
@@ -1337,8 +1563,8 @@ class _DriverTripFlowPanel extends StatelessWidget {
                     children: [
                       Text(
                         passengerName,
-                        style: GoogleFonts.plusJakartaSans(
-                          color: Colors.white,
+                        style: textTheme.titleLarge?.copyWith(
+                          color: palette.textPrimary,
                           fontSize: 20,
                           fontWeight: FontWeight.w800,
                         ),
@@ -1348,8 +1574,8 @@ class _DriverTripFlowPanel extends StatelessWidget {
                         trip.passengerPhone?.trim().isNotEmpty == true
                             ? trip.passengerPhone!.trim()
                             : 'Sin telefono',
-                        style: GoogleFonts.plusJakartaSans(
-                          color: Color(0xFF9CA3AF),
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: palette.textMuted,
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                         ),
@@ -1361,7 +1587,7 @@ class _DriverTripFlowPanel extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
-            const Divider(color: Color(0xFF1F2937)),
+            Divider(color: palette.outlineStrong),
             const SizedBox(height: 12),
             _buildLocationLine(
               color: const Color(0xFF22C55E),
@@ -1400,7 +1626,7 @@ class _DriverTripFlowPanel extends StatelessWidget {
               trailingBottom: _isCompleted ? null : destinationEtaLabel,
             ),
             const SizedBox(height: 14),
-            const Divider(color: Color(0xFF1F2937)),
+            Divider(color: palette.outlineStrong),
             const SizedBox(height: 12),
             Row(
               children: [

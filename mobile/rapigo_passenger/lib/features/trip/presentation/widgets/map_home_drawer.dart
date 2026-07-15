@@ -250,18 +250,13 @@ class _PremiumMapHomeDrawerLayout extends StatelessWidget {
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(18, 12, 18, 14 + bottomInset),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFFFFF9D9), Color(0xFFFFF5C2)],
-        ),
+        color: Colors.white.withValues(alpha: 0.985),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
-        border: Border.all(color: const Color(0xFF1D4ED8), width: 3),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x261D4ED8),
-            blurRadius: 30,
-            offset: Offset(0, -8),
+            color: Color(0x140F172A),
+            blurRadius: 32,
+            offset: Offset(0, -6),
           ),
         ],
       ),
@@ -271,10 +266,10 @@ class _PremiumMapHomeDrawerLayout extends StatelessWidget {
         children: [
           Center(
             child: Container(
-              width: 56,
-              height: 6,
+              width: 54,
+              height: 5,
               decoration: BoxDecoration(
-                color: const Color(0xFF1D4ED8),
+                color: const Color(0xFFD5DBE7),
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
@@ -298,6 +293,10 @@ class _PremiumMapHomeDrawerLayout extends StatelessWidget {
           ),
           if (expanded) ...[
             const SizedBox(height: 14),
+            const _PremiumCurrentLocationTile(),
+            const SizedBox(height: 18),
+            const _PremiumShortcutRow(),
+            const SizedBox(height: 16),
             _PremiumSettingsTile(onTap: onTapSettings),
           ],
         ],
@@ -507,12 +506,12 @@ class _PremiumWhereToGoCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.52),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: const Color(0xFF1D4ED8), width: 3),
+            border: Border.all(color: const Color(0xFFE4EAF3)),
             boxShadow: const [
               BoxShadow(
-                color: Color(0x201D4ED8),
+                color: Color(0x120F172A),
                 blurRadius: 16,
                 offset: Offset(0, 8),
               ),
@@ -543,8 +542,7 @@ class _PremiumWhereToGoCard extends StatelessWidget {
               const SizedBox(width: 14),
               Expanded(
                 child: Text(
-                  label,
-                  textAlign: TextAlign.center,
+                  label == '¿A dónde vas?' ? '¿A dónde quieres ir?' : label,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.plusJakartaSans(
@@ -574,25 +572,136 @@ class _PremiumToggleActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: const Color(0xFF1D4ED8),
+      color: Colors.white,
       shape: const CircleBorder(),
-      elevation: 14,
-      shadowColor: const Color(0x331D4ED8),
+      elevation: 0,
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: onTap,
         child: SizedBox(
-          width: 78,
-          height: 78,
+          width: 62,
+          height: 62,
           child: Center(
             child: Icon(
-              expanded ? Icons.close_rounded : Icons.more_horiz_rounded,
-              color: Colors.white,
-              size: 34,
+              expanded ? Icons.close_rounded : Icons.keyboard_arrow_up_rounded,
+              color: const Color(0xFF111827),
+              size: 28,
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _PremiumCurrentLocationTile extends StatelessWidget {
+  const _PremiumCurrentLocationTile();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFDFEFF),
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEAF2FF),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Center(
+              child: Container(
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2563EB),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 3),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Mi ubicación actual',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: AppBrand.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  'Cerca de ti',
+                  style: TextStyle(
+                    color: AppBrand.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PremiumShortcutRow extends StatelessWidget {
+  const _PremiumShortcutRow();
+
+  @override
+  Widget build(BuildContext context) {
+    const items = <({IconData icon, String label, Color color})>[
+      (icon: Icons.local_taxi_rounded, label: 'Taxi', color: Color(0xFFEAF2FF)),
+      (icon: Icons.two_wheeler_rounded, label: 'Moto', color: Color(0xFFFFF2BF)),
+      (icon: Icons.inventory_2_outlined, label: 'Envíos', color: Color(0xFFE5F8E9)),
+      (icon: Icons.history_rounded, label: 'Historial', color: Color(0xFFF2EAFE)),
+    ];
+
+    return Row(
+      children: [
+        for (var i = 0; i < items.length; i++) ...[
+          Expanded(
+            child: Column(
+              children: [
+                Container(
+                  height: 78,
+                  decoration: BoxDecoration(
+                    color: items[i].color,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Icon(
+                    items[i].icon,
+                    size: 34,
+                    color: AppBrand.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  items[i].label,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppBrand.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (i != items.length - 1) const SizedBox(width: 12),
+        ],
+      ],
     );
   }
 }
@@ -613,9 +722,9 @@ class _PremiumSettingsTile extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.52),
+            color: const Color(0xFFF8FBFF),
             borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: const Color(0xFF1D4ED8), width: 2.5),
+            border: Border.all(color: const Color(0xFFE1E8F3)),
           ),
           child: Row(
             children: [
@@ -623,23 +732,19 @@ class _PremiumSettingsTile extends StatelessWidget {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFFFACC15), Color(0xFFFFD84D)],
-                  ),
+                  color: const Color(0xFFEAF2FF),
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: const Icon(
                   Icons.settings_rounded,
-                  color: Color(0xFF1D4ED8),
+                  color: Color(0xFF2563EB),
                   size: 30,
                 ),
               ),
               const SizedBox(width: 14),
               Expanded(
                 child: Text(
-                  'Configuraciones',
+                  'Más opciones',
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
@@ -649,7 +754,7 @@ class _PremiumSettingsTile extends StatelessWidget {
               ),
               const Icon(
                 Icons.chevron_right_rounded,
-                color: Color(0xFF1D4ED8),
+                color: Color(0xFF2563EB),
                 size: 34,
               ),
             ],

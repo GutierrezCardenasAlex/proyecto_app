@@ -46,9 +46,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
           Container(
             padding: const EdgeInsets.all(22),
             decoration: BoxDecoration(
-              color: const Color(0xFF1B1B1F),
+              color: const Color(0xFFFFFFFF),
               borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: const Color(0xFF2C2C31)),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
             ),
             child: Column(
               children: [
@@ -56,23 +56,36 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                   width: 92,
                   height: 92,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF2A2A31),
+                    color: const Color(0xFFEFF6FF),
                     borderRadius: BorderRadius.circular(28),
                   ),
-                  child: const Icon(Icons.person, size: 42, color: Color(0xFFFFF4EC)),
+                  child: const Icon(
+                    Icons.person,
+                    size: 42,
+                    color: Color(0xFF0F172A),
+                  ),
                 ),
                 const SizedBox(height: 20),
                 const _FieldLabel('Nombre completo'),
                 const SizedBox(height: 8),
-                _SettingsField(controller: _nameController, icon: Icons.badge_outlined),
+                _SettingsField(
+                  controller: _nameController,
+                  icon: Icons.badge_outlined,
+                ),
                 const SizedBox(height: 16),
                 const _FieldLabel('Telefono'),
                 const SizedBox(height: 8),
-                _SettingsField(controller: _phoneController, icon: Icons.phone_outlined),
+                _SettingsField(
+                  controller: _phoneController,
+                  icon: Icons.phone_outlined,
+                ),
                 const SizedBox(height: 16),
                 const _FieldLabel('Correo'),
                 const SizedBox(height: 8),
-                _SettingsField(controller: _emailController, icon: Icons.mail_outline),
+                _SettingsField(
+                  controller: _emailController,
+                  icon: Icons.mail_outline,
+                ),
                 const SizedBox(height: 20),
                 SizedBox(
                   width: double.infinity,
@@ -81,13 +94,13 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
                       showTopNotice(
                         context,
                         'Actualizaste tus datos visuales correctamente.',
-                        backgroundColor: const Color(0xFFF97316),
-                        foregroundColor: const Color(0xFF0F0F10),
+                        backgroundColor: const Color(0xFF0F6CBD),
+                        foregroundColor: const Color(0xFFFFFFFF),
                       );
                     },
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFFF97316),
-                      foregroundColor: const Color(0xFF0F0F10),
+                      backgroundColor: const Color(0xFF0F6CBD),
+                      foregroundColor: const Color(0xFFFFFFFF),
                     ),
                     child: const Text('Guardar cambios'),
                   ),
@@ -112,13 +125,17 @@ class NotificationsPage extends ConsumerWidget {
     return _DetailScaffold(
       title: 'Notificaciones',
       child: FutureBuilder<List<AdminNotificationItem>>(
-        future: session.token.isEmpty ? Future.value(const <AdminNotificationItem>[]) : repository.fetchNotifications(session.token),
+        future: session.token.isEmpty
+            ? Future.value(const <AdminNotificationItem>[])
+            : repository.fetchNotifications(session.token),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: Padding(
-              padding: EdgeInsets.only(top: 80),
-              child: CircularProgressIndicator(),
-            ));
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.only(top: 80),
+                child: CircularProgressIndicator(),
+              ),
+            );
           }
 
           final items = snapshot.data ?? const <AdminNotificationItem>[];
@@ -127,7 +144,12 @@ class NotificationsPage extends ConsumerWidget {
             children: [
               const Text(
                 'BANDEJA',
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.4, color: Color(0xFFF97316)),
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.4,
+                  color: Color(0xFF0F6CBD),
+                ),
               ),
               const SizedBox(height: 8),
               Text(
@@ -135,14 +157,15 @@ class NotificationsPage extends ConsumerWidget {
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 32,
                   fontWeight: FontWeight.w800,
-                  color: const Color(0xFFFFF4EC),
+                  color: const Color(0xFF0F172A),
                 ),
               ),
               const SizedBox(height: 18),
               if (items.isEmpty)
                 const _SettingsInfoCard(
                   title: 'Sin avisos nuevos',
-                  subtitle: 'Cuando central te envie una notificacion o cambie algo importante, aparecera aqui.',
+                  subtitle:
+                      'Cuando central te envie una notificacion o cambie algo importante, aparecera aqui.',
                 ),
               ...items.map(
                 (item) => Padding(
@@ -186,13 +209,21 @@ class PromotionsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
-    final safeCycleLength = session.promoCycleLength <= 0 ? 5 : session.promoCycleLength;
-    final progress = session.promoProgressCount.clamp(0, safeCycleLength).toInt();
+    final safeCycleLength = session.promoCycleLength <= 0
+        ? 5
+        : session.promoCycleLength;
+    final progress = session.promoProgressCount
+        .clamp(0, safeCycleLength)
+        .toInt();
     final hasFreeTrip = session.freeTripCredits > 0;
     final promoEnabled = session.promoEnabled;
     final cycleProgress = hasFreeTrip ? 0 : progress;
-    final progressValue = safeCycleLength == 0 ? 0.0 : cycleProgress / safeCycleLength;
-    final nextCycleTarget = hasFreeTrip ? '0/$safeCycleLength' : '$cycleProgress/$safeCycleLength';
+    final progressValue = safeCycleLength == 0
+        ? 0.0
+        : cycleProgress / safeCycleLength;
+    final nextCycleTarget = hasFreeTrip
+        ? '0/$safeCycleLength'
+        : '$cycleProgress/$safeCycleLength';
     final totalTrips = session.completedTripCount;
 
     return _DetailScaffold(
@@ -206,7 +237,7 @@ class PromotionsPage extends ConsumerWidget {
               fontSize: 10,
               fontWeight: FontWeight.w900,
               letterSpacing: 1.4,
-              color: Color(0xFFF97316),
+              color: Color(0xFF0F6CBD),
             ),
           ),
           const SizedBox(height: 8),
@@ -215,7 +246,7 @@ class PromotionsPage extends ConsumerWidget {
             style: GoogleFonts.plusJakartaSans(
               fontSize: 32,
               fontWeight: FontWeight.w800,
-              color: const Color(0xFFFFF4EC),
+              color: const Color(0xFF0F172A),
             ),
           ),
           const SizedBox(height: 18),
@@ -223,14 +254,14 @@ class PromotionsPage extends ConsumerWidget {
             padding: const EdgeInsets.all(22),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFF97316), Color(0xFFC2410C)],
+                colors: [Color(0xFF0F6CBD), Color(0xFF38BDF8)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(30),
               boxShadow: const [
                 BoxShadow(
-                  color: Color(0x33F97316),
+                  color: Color(0x220F6CBD),
                   blurRadius: 24,
                   offset: Offset(0, 12),
                 ),
@@ -245,26 +276,29 @@ class PromotionsPage extends ConsumerWidget {
                       width: 54,
                       height: 54,
                       decoration: BoxDecoration(
-                        color: const Color(0x22FFFFFF),
+                        color: Colors.white.withValues(alpha: 0.18),
                         borderRadius: BorderRadius.circular(18),
                       ),
-                      child: const Icon(Icons.card_giftcard_rounded, color: Color(0xFFFFF4EC)),
+                      child: const Icon(
+                        Icons.card_giftcard_rounded,
+                        color: Colors.white,
+                      ),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
-                          child: Column(
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             !promoEnabled
                                 ? 'Promocion pausada por central'
                                 : hasFreeTrip
-                                    ? 'Ya tienes viaje gratis'
-                                    : 'Te acercas a un viaje gratis',
+                                ? 'Ya tienes viaje gratis'
+                                : 'Te acercas a un viaje gratis',
                             style: GoogleFonts.plusJakartaSans(
                               fontSize: 20,
                               fontWeight: FontWeight.w800,
-                              color: const Color(0xFFFFF4EC),
+                              color: Colors.white,
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -272,10 +306,10 @@ class PromotionsPage extends ConsumerWidget {
                             !promoEnabled
                                 ? 'La promo esta desactivada por ahora. Tu historial de viajes se sigue guardando normal.'
                                 : hasFreeTrip
-                                    ? 'Tu viaje gratis ya esta listo y el nuevo ciclo comenzo desde 0/$safeCycleLength.'
-                                    : 'Cada $safeCycleLength viajes pagados desbloqueas 1 viaje gratis.',
+                                ? 'Tu viaje gratis ya esta listo y el nuevo ciclo comenzo desde 0/$safeCycleLength.'
+                                : 'Cada $safeCycleLength viajes pagados desbloqueas 1 viaje gratis.',
                             style: const TextStyle(
-                              color: Color(0xFFFFE3D0),
+                              color: Color(0xFFEFF6FF),
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -286,7 +320,10 @@ class PromotionsPage extends ConsumerWidget {
                 ),
                 const SizedBox(height: 18),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0x1AFFFFFF),
                     borderRadius: BorderRadius.circular(18),
@@ -294,11 +331,15 @@ class PromotionsPage extends ConsumerWidget {
                   child: Row(
                     children: [
                       Text(
-                        !promoEnabled ? 'Pausada' : hasFreeTrip ? 'Gratis listo' : nextCycleTarget,
+                        !promoEnabled
+                            ? 'Pausada'
+                            : hasFreeTrip
+                            ? 'Gratis listo'
+                            : nextCycleTarget,
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 24,
                           fontWeight: FontWeight.w900,
-                          color: const Color(0xFFFFF4EC),
+                          color: Colors.white,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -306,11 +347,15 @@ class PromotionsPage extends ConsumerWidget {
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(999),
                           child: LinearProgressIndicator(
-                            value: promoEnabled ? (hasFreeTrip ? 1 : progressValue) : 0,
+                            value: promoEnabled
+                                ? (hasFreeTrip ? 1 : progressValue)
+                                : 0,
                             minHeight: 10,
                             backgroundColor: const Color(0x33FFFFFF),
                             valueColor: AlwaysStoppedAnimation(
-                              promoEnabled ? const Color(0xFFFFF4EC) : const Color(0xFFFFE3D0),
+                              promoEnabled
+                                  ? Colors.white
+                                  : const Color(0xFFEFF6FF),
                             ),
                           ),
                         ),
@@ -323,10 +368,10 @@ class PromotionsPage extends ConsumerWidget {
                   !promoEnabled
                       ? 'Cuando la central reactive la promo, tu progreso volvera a mostrarse aqui.'
                       : hasFreeTrip
-                          ? 'Tienes ${session.freeTripCredits} viaje(s) gratis disponible(s) y tu siguiente ciclo comenzo en 0/$safeCycleLength.'
-                          : 'Te faltan ${safeCycleLength - cycleProgress} viaje(s) para ganar el proximo gratis.',
+                      ? 'Tienes ${session.freeTripCredits} viaje(s) gratis disponible(s) y tu siguiente ciclo comenzo en 0/$safeCycleLength.'
+                      : 'Te faltan ${safeCycleLength - cycleProgress} viaje(s) para ganar el proximo gratis.',
                   style: const TextStyle(
-                    color: Color(0xFFFFF4EC),
+                    color: Colors.white,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -337,9 +382,9 @@ class PromotionsPage extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: const Color(0xFF1B1B1F),
+              color: const Color(0xFFFFFFFF),
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: const Color(0xFF2C2C31)),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -349,34 +394,53 @@ class PromotionsPage extends ConsumerWidget {
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
-                    color: const Color(0xFFFFF4EC),
+                    color: const Color(0xFF0F172A),
                   ),
                 ),
                 const SizedBox(height: 12),
-                _PromoMetricRow(label: 'Viajes completados en total', value: '$totalTrips'),
-                _PromoMetricRow(label: 'Avance del ciclo actual', value: nextCycleTarget),
-                _PromoMetricRow(label: 'Viajes gratis disponibles', value: '${session.freeTripCredits}'),
-                _PromoMetricRow(label: 'Estado de la promo', value: promoEnabled ? 'Activa' : 'Pausada'),
-                _PromoMetricRow(label: 'Regla del beneficio', value: '$safeCycleLength viajes pagados = 1 gratis'),
+                _PromoMetricRow(
+                  label: 'Viajes completados en total',
+                  value: '$totalTrips',
+                ),
+                _PromoMetricRow(
+                  label: 'Avance del ciclo actual',
+                  value: nextCycleTarget,
+                ),
+                _PromoMetricRow(
+                  label: 'Viajes gratis disponibles',
+                  value: '${session.freeTripCredits}',
+                ),
+                _PromoMetricRow(
+                  label: 'Estado de la promo',
+                  value: promoEnabled ? 'Activa' : 'Pausada',
+                ),
+                _PromoMetricRow(
+                  label: 'Regla del beneficio',
+                  value: '$safeCycleLength viajes pagados = 1 gratis',
+                ),
               ],
             ),
           ),
           const SizedBox(height: 14),
           const _SettingsInfoCard(
             title: 'Como funciona',
-            subtitle: 'Cada 5 viajes completados desbloqueas 1 viaje gratis para usarlo en tu siguiente pedido.',
+            subtitle:
+                'Cada 5 viajes completados desbloqueas 1 viaje gratis para usarlo en tu siguiente pedido.',
           ),
           const _SettingsInfoCard(
             title: 'Uso del viaje premiado',
-            subtitle: 'El beneficio es valido solo para el cliente registrado en RAPIGO que gano la promocion. Cuando usas el viaje gratis, el ciclo vuelve a 0/5 y el conteo total sigue acumulando normal.',
+            subtitle:
+                'El beneficio es valido solo para el cliente registrado en RAPIGO que gano la promocion. Cuando usas el viaje gratis, el ciclo vuelve a 0/5 y el conteo total sigue acumulando normal.',
           ),
           const _SettingsInfoCard(
             title: 'Acompanantes',
-            subtitle: 'La promocion no cubre acompanantes. Si viajas con otra persona, el conductor puede realizar el cobro normal correspondiente por ese pasajero adicional.',
+            subtitle:
+                'La promocion no cubre acompanantes. Si viajas con otra persona, el conductor puede realizar el cobro normal correspondiente por ese pasajero adicional.',
           ),
           const _SettingsInfoCard(
             title: 'Notificacion',
-            subtitle: 'Cuando consigas el beneficio, RAPIGO te avisara automaticamente en la app.',
+            subtitle:
+                'Cuando consigas el beneficio, RAPIGO te avisara automaticamente en la app.',
           ),
         ],
       ),
@@ -393,9 +457,18 @@ class SecurityPage extends StatelessWidget {
       title: 'Seguridad',
       eyebrow: 'Seguridad',
       items: [
-        ('Verificacion OTP', 'Tu acceso sigue protegido por codigo OTP al cerrar sesion.'),
-        ('Viaje seguro', 'Comparte ruta y revisa datos del conductor antes de subir.'),
-        ('Zona operativa', 'La plataforma valida que el servicio se use solo dentro de Potosi.'),
+        (
+          'Verificacion OTP',
+          'Tu acceso sigue protegido por codigo OTP al cerrar sesion.',
+        ),
+        (
+          'Viaje seguro',
+          'Comparte ruta y revisa datos del conductor antes de subir.',
+        ),
+        (
+          'Zona operativa',
+          'La plataforma valida que el servicio se use solo dentro de Potosi.',
+        ),
       ],
     );
   }
@@ -417,7 +490,7 @@ class SettingsPage extends StatelessWidget {
               fontSize: 10,
               fontWeight: FontWeight.w900,
               letterSpacing: 1.4,
-              color: Color(0xFFF97316),
+              color: Color(0xFF0F6CBD),
             ),
           ),
           const SizedBox(height: 8),
@@ -426,7 +499,7 @@ class SettingsPage extends StatelessWidget {
             style: GoogleFonts.plusJakartaSans(
               fontSize: 32,
               fontWeight: FontWeight.w800,
-              color: const Color(0xFFFFF4EC),
+              color: const Color(0xFF0F172A),
             ),
           ),
           const SizedBox(height: 18),
@@ -435,9 +508,9 @@ class SettingsPage extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: const Color(0xFF1B1B1F),
+                color: const Color(0xFFFFFFFF),
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: const Color(0xFF2C2C31)),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -447,14 +520,14 @@ class SettingsPage extends StatelessWidget {
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 20,
                       fontWeight: FontWeight.w800,
-                      color: const Color(0xFFFFF4EC),
+                      color: const Color(0xFF0F172A),
                     ),
                   ),
                   const SizedBox(height: 8),
                   const Text(
                     'Descarga o actualiza Potosi ciudad para seguir usando el mapa cuando la señal baje.',
                     style: TextStyle(
-                      color: Color(0xFFFFD8BF),
+                      color: Color(0xFF64748B),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -464,8 +537,8 @@ class SettingsPage extends StatelessWidget {
                     child: FilledButton.icon(
                       onPressed: () => showOfflineMapSheet(context),
                       style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFFF97316),
-                        foregroundColor: const Color(0xFF0F0F10),
+                        backgroundColor: const Color(0xFF0F6CBD),
+                        foregroundColor: const Color(0xFFFFFFFF),
                       ),
                       icon: const Icon(Icons.download_for_offline_rounded),
                       label: const Text('Abrir mapa offline'),
@@ -507,7 +580,9 @@ class _SupportPageState extends ConsumerState<SupportPage> {
     return _DetailScaffold(
       title: 'Soporte',
       child: FutureBuilder<List<SupportReportItem>>(
-        future: session.token.isEmpty ? Future.value(const <SupportReportItem>[]) : repository.fetchSupportReports(session.token),
+        future: session.token.isEmpty
+            ? Future.value(const <SupportReportItem>[])
+            : repository.fetchSupportReports(session.token),
         builder: (context, snapshot) {
           final reports = snapshot.data ?? const <SupportReportItem>[];
           return ListView(
@@ -515,7 +590,12 @@ class _SupportPageState extends ConsumerState<SupportPage> {
             children: [
               const Text(
                 'SOPORTE',
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.4, color: Color(0xFFF97316)),
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.4,
+                  color: Color(0xFF0F6CBD),
+                ),
               ),
               const SizedBox(height: 8),
               Text(
@@ -523,73 +603,112 @@ class _SupportPageState extends ConsumerState<SupportPage> {
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 32,
                   fontWeight: FontWeight.w800,
-                  color: const Color(0xFFFFF4EC),
+                  color: const Color(0xFF0F172A),
                 ),
               ),
               const SizedBox(height: 18),
               Container(
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1B1B1F),
+                  color: const Color(0xFFFFFFFF),
                   borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: const Color(0xFF2C2C31)),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     DropdownButtonFormField<String>(
                       initialValue: _category,
-                      dropdownColor: const Color(0xFF1B1B1F),
-                      style: const TextStyle(color: Color(0xFFFFF4EC), fontWeight: FontWeight.w700),
+                      dropdownColor: const Color(0xFFFFFFFF),
+                      style: const TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontWeight: FontWeight.w700,
+                      ),
                       decoration: InputDecoration(
                         labelText: 'Tipo de reporte',
-                        labelStyle: const TextStyle(color: Color(0xFFFFC89B)),
+                        labelStyle: const TextStyle(color: Color(0xFF0F6CBD)),
                         filled: true,
-                        fillColor: const Color(0xFF25252B),
+                        fillColor: const Color(0xFFF8FAFC),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(18),
                           borderSide: BorderSide.none,
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(18),
-                          borderSide: const BorderSide(color: Color(0xFF303035)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE2E8F0),
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(18),
-                          borderSide: const BorderSide(color: Color(0xFFF97316), width: 1.4),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF0F6CBD),
+                            width: 1.4,
+                          ),
                         ),
                       ),
                       items: const [
-                        DropdownMenuItem(value: 'Falla de app', child: Text('Falla de app', style: TextStyle(color: Color(0xFFFFF4EC)))),
-                        DropdownMenuItem(value: 'Problema con viaje', child: Text('Problema con viaje', style: TextStyle(color: Color(0xFFFFF4EC)))),
-                        DropdownMenuItem(value: 'Cuenta o acceso', child: Text('Cuenta o acceso', style: TextStyle(color: Color(0xFFFFF4EC)))),
-                        DropdownMenuItem(value: 'Mapa o GPS', child: Text('Mapa o GPS', style: TextStyle(color: Color(0xFFFFF4EC)))),
+                        DropdownMenuItem(
+                          value: 'Falla de app',
+                          child: Text(
+                            'Falla de app',
+                            style: TextStyle(color: Color(0xFF0F172A)),
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Problema con viaje',
+                          child: Text(
+                            'Problema con viaje',
+                            style: TextStyle(color: Color(0xFF0F172A)),
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Cuenta o acceso',
+                          child: Text(
+                            'Cuenta o acceso',
+                            style: TextStyle(color: Color(0xFF0F172A)),
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Mapa o GPS',
+                          child: Text(
+                            'Mapa o GPS',
+                            style: TextStyle(color: Color(0xFF0F172A)),
+                          ),
+                        ),
                       ],
-                      onChanged: (value) => setState(() => _category = value ?? 'Falla de app'),
+                      onChanged: (value) =>
+                          setState(() => _category = value ?? 'Falla de app'),
                     ),
                     const SizedBox(height: 14),
                     TextField(
                       controller: _messageController,
                       maxLines: 5,
-                      style: const TextStyle(color: Color(0xFFFFF4EC)),
+                      style: const TextStyle(color: Color(0xFF0F172A)),
                       decoration: InputDecoration(
                         labelText: 'Cuéntanos qué pasó',
-                        hintText: 'Describe la falla, cuándo ocurrió y qué estabas haciendo.',
-                        hintStyle: const TextStyle(color: Color(0xFFB9A79A)),
-                        labelStyle: const TextStyle(color: Color(0xFFFFC89B)),
+                        hintText:
+                            'Describe la falla, cuándo ocurrió y qué estabas haciendo.',
+                        hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                        labelStyle: const TextStyle(color: Color(0xFF0F6CBD)),
                         filled: true,
-                        fillColor: const Color(0xFF25252B),
+                        fillColor: const Color(0xFFF8FAFC),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(18),
                           borderSide: BorderSide.none,
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(18),
-                          borderSide: const BorderSide(color: Color(0xFF303035)),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE2E8F0),
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(18),
-                          borderSide: const BorderSide(color: Color(0xFFF97316), width: 1.4),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF0F6CBD),
+                            width: 1.4,
+                          ),
                         ),
                       ),
                     ),
@@ -627,7 +746,10 @@ class _SupportPageState extends ConsumerState<SupportPage> {
                                   if (!context.mounted) return;
                                   showTopNotice(
                                     context,
-                                    error.toString().replaceFirst('Exception: ', ''),
+                                    error.toString().replaceFirst(
+                                      'Exception: ',
+                                      '',
+                                    ),
                                     tone: NoticeTone.error,
                                   );
                                 } finally {
@@ -637,7 +759,9 @@ class _SupportPageState extends ConsumerState<SupportPage> {
                                 }
                               },
                         icon: const Icon(Icons.send_rounded),
-                        label: Text(_sending ? 'Enviando...' : 'Enviar reporte'),
+                        label: Text(
+                          _sending ? 'Enviando...' : 'Enviar reporte',
+                        ),
                       ),
                     ),
                   ],
@@ -649,21 +773,23 @@ class _SupportPageState extends ConsumerState<SupportPage> {
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
-                  color: const Color(0xFFFFF4EC),
+                  color: const Color(0xFF0F172A),
                 ),
               ),
               const SizedBox(height: 12),
               if (reports.isEmpty)
                 const _SettingsInfoCard(
                   title: 'Aún no enviaste reportes',
-                  subtitle: 'Cuando mandes un reporte desde aquí, central podrá verlo con tus datos y darle seguimiento.',
+                  subtitle:
+                      'Cuando mandes un reporte desde aquí, central podrá verlo con tus datos y darle seguimiento.',
                 ),
               ...reports.map(
                 (report) => Padding(
                   padding: const EdgeInsets.only(bottom: 14),
                   child: _SettingsInfoCard(
                     title: '${report.category} · ${report.status}',
-                    subtitle: '${report.message}\n\n${_formatShortDate(report.createdAt)}',
+                    subtitle:
+                        '${report.message}\n\n${_formatShortDate(report.createdAt)}',
                   ),
                 ),
               ),
@@ -703,7 +829,7 @@ class _NotificationCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFF1B1B1F),
+        color: const Color(0xFFFFFFFF),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: visual.borderColor),
         boxShadow: const [
@@ -736,12 +862,15 @@ class _NotificationCard extends StatelessWidget {
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 17,
                     fontWeight: FontWeight.w800,
-                    color: const Color(0xFFFFF4EC),
+                    color: const Color(0xFF0F172A),
                   ),
                 ),
                 const SizedBox(height: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: visual.backgroundColor,
                     borderRadius: BorderRadius.circular(999),
@@ -759,22 +888,25 @@ class _NotificationCard extends StatelessWidget {
                 Text(
                   message,
                   style: const TextStyle(
-                    color: Color(0xFFFFD8BF),
+                    color: Color(0xFF64748B),
                     fontWeight: FontWeight.w600,
                     height: 1.35,
                   ),
                 ),
                 const SizedBox(height: 10),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF25252B),
+                    color: const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
                     _formatShortDate(createdAt),
                     style: const TextStyle(
-                      color: Color(0xFFFFC89B),
+                      color: Color(0xFF0F6CBD),
                       fontWeight: FontWeight.w700,
                       fontSize: 11,
                     ),
@@ -789,7 +921,14 @@ class _NotificationCard extends StatelessWidget {
   }
 }
 
-({Color accentColor, Color backgroundColor, Color borderColor, IconData icon, String label}) _notificationVisual(String kind) {
+({
+  Color accentColor,
+  Color backgroundColor,
+  Color borderColor,
+  IconData icon,
+  String label,
+})
+_notificationVisual(String kind) {
   switch (kind.toLowerCase()) {
     case 'importante':
       return (
@@ -809,9 +948,9 @@ class _NotificationCard extends StatelessWidget {
       );
     default:
       return (
-        accentColor: const Color(0xFFF97316),
-        backgroundColor: const Color(0x33F97316),
-        borderColor: const Color(0xFF2C2C31),
+        accentColor: const Color(0xFF0F6CBD),
+        backgroundColor: const Color(0x220F6CBD),
+        borderColor: const Color(0xFFE5E7EB),
         icon: Icons.notifications_active_outlined,
         label: 'NUEVO',
       );
@@ -842,7 +981,7 @@ class _SimpleInfoPage extends StatelessWidget {
               fontSize: 10,
               fontWeight: FontWeight.w900,
               letterSpacing: 1.4,
-              color: Color(0xFFF97316),
+              color: Color(0xFF0F6CBD),
             ),
           ),
           const SizedBox(height: 8),
@@ -851,7 +990,7 @@ class _SimpleInfoPage extends StatelessWidget {
             style: GoogleFonts.plusJakartaSans(
               fontSize: 32,
               fontWeight: FontWeight.w800,
-              color: const Color(0xFFFFF4EC),
+              color: const Color(0xFF0F172A),
             ),
           ),
           const SizedBox(height: 18),
@@ -861,9 +1000,9 @@ class _SimpleInfoPage extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1B1B1F),
+                  color: const Color(0xFFFFFFFF),
                   borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: const Color(0xFF2C2C31)),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
                 ),
                 child: Row(
                   children: [
@@ -871,10 +1010,13 @@ class _SimpleInfoPage extends StatelessWidget {
                       width: 52,
                       height: 52,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF2A2A31),
+                        color: const Color(0xFFEFF6FF),
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: const Icon(Icons.check_circle_outline, color: Color(0xFFF97316)),
+                      child: const Icon(
+                        Icons.check_circle_outline,
+                        color: Color(0xFF0F6CBD),
+                      ),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -886,14 +1028,14 @@ class _SimpleInfoPage extends StatelessWidget {
                             style: GoogleFonts.plusJakartaSans(
                               fontWeight: FontWeight.w800,
                               fontSize: 16,
-                              color: const Color(0xFFFFF4EC),
+                              color: const Color(0xFF0F172A),
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             item.$2,
                             style: const TextStyle(
-                              color: Color(0xFFFFC89B),
+                              color: Color(0xFF0F6CBD),
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -912,10 +1054,7 @@ class _SimpleInfoPage extends StatelessWidget {
 }
 
 class _SettingsInfoCard extends StatelessWidget {
-  const _SettingsInfoCard({
-    required this.title,
-    required this.subtitle,
-  });
+  const _SettingsInfoCard({required this.title, required this.subtitle});
 
   final String title;
   final String subtitle;
@@ -927,9 +1066,9 @@ class _SettingsInfoCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: const Color(0xFF1B1B1F),
+          color: const Color(0xFFFFFFFF),
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: const Color(0xFF2C2C31)),
+          border: Border.all(color: const Color(0xFFE5E7EB)),
         ),
         child: Row(
           children: [
@@ -937,10 +1076,13 @@ class _SettingsInfoCard extends StatelessWidget {
               width: 52,
               height: 52,
               decoration: BoxDecoration(
-                color: const Color(0xFF2A2A31),
+                color: const Color(0xFFEFF6FF),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: const Icon(Icons.check_circle_outline, color: Color(0xFFF97316)),
+              child: const Icon(
+                Icons.check_circle_outline,
+                color: Color(0xFF0F6CBD),
+              ),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -952,14 +1094,14 @@ class _SettingsInfoCard extends StatelessWidget {
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
-                      color: const Color(0xFFFFF4EC),
+                      color: const Color(0xFF0F172A),
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     subtitle,
                     style: const TextStyle(
-                      color: Color(0xFFFFD8BF),
+                      color: Color(0xFF64748B),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -974,10 +1116,7 @@ class _SettingsInfoCard extends StatelessWidget {
 }
 
 class _PromoMetricRow extends StatelessWidget {
-  const _PromoMetricRow({
-    required this.label,
-    required this.value,
-  });
+  const _PromoMetricRow({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -992,7 +1131,7 @@ class _PromoMetricRow extends StatelessWidget {
             child: Text(
               label,
               style: const TextStyle(
-                color: Color(0xFFFFD8BF),
+                color: Color(0xFF64748B),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -1000,7 +1139,7 @@ class _PromoMetricRow extends StatelessWidget {
           Text(
             value,
             style: GoogleFonts.plusJakartaSans(
-              color: const Color(0xFFFFF4EC),
+              color: const Color(0xFF0F172A),
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -1011,10 +1150,7 @@ class _PromoMetricRow extends StatelessWidget {
 }
 
 class _DetailScaffold extends StatelessWidget {
-  const _DetailScaffold({
-    required this.title,
-    required this.child,
-  });
+  const _DetailScaffold({required this.title, required this.child});
 
   final String title;
   final Widget child;
@@ -1022,17 +1158,22 @@ class _DetailScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF111214),
+      backgroundColor: const Color(0xFFF5F5F7),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF111214),
-        foregroundColor: const Color(0xFFFFF4EC),
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF0F172A),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: false,
+        iconTheme: const IconThemeData(color: Color(0xFF0F172A)),
         title: Text(
           title,
           style: GoogleFonts.plusJakartaSans(
             fontWeight: FontWeight.w800,
-            color: const Color(0xFFFFF4EC),
+            color: const Color(0xFF0F172A),
           ),
         ),
+        shape: const Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
       ),
       body: child,
     );
@@ -1051,7 +1192,7 @@ class _FieldLabel extends StatelessWidget {
       child: Text(
         text,
         style: const TextStyle(
-          color: Color(0xFFFFC89B),
+          color: Color(0xFF0F6CBD),
           fontWeight: FontWeight.w800,
           fontSize: 12,
         ),
@@ -1061,10 +1202,7 @@ class _FieldLabel extends StatelessWidget {
 }
 
 class _SettingsField extends StatelessWidget {
-  const _SettingsField({
-    required this.controller,
-    required this.icon,
-  });
+  const _SettingsField({required this.controller, required this.icon});
 
   final TextEditingController controller;
   final IconData icon;
@@ -1074,23 +1212,23 @@ class _SettingsField extends StatelessWidget {
     return TextField(
       controller: controller,
       decoration: InputDecoration(
-        prefixIcon: Icon(icon, color: const Color(0xFFFFC89B)),
+        prefixIcon: Icon(icon, color: const Color(0xFF0F6CBD)),
         filled: true,
-        fillColor: const Color(0xFF25252B),
+        fillColor: const Color(0xFFF8FAFC),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(color: Color(0xFF303035)),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
-          borderSide: const BorderSide(color: Color(0xFFF97316), width: 1.4),
+          borderSide: const BorderSide(color: Color(0xFF0F6CBD), width: 1.4),
         ),
       ),
-      style: const TextStyle(color: Color(0xFFFFF4EC)),
+      style: const TextStyle(color: Color(0xFF0F172A)),
     );
   }
 }

@@ -15,6 +15,18 @@ class _DriverOfferRoutePreviewPageState
   int _mapFocusSignal = 0;
   bool _busy = false;
   bool _routeReviewed = false;
+  bool _routeReady = false;
+  String _busyMessage = 'Procesando viaje...';
+  final Completer<void> _routeReadyCompleter = Completer<void>();
+
+  void _markRouteReady() {
+    if (!_routeReady) {
+      setState(() => _routeReady = true);
+    }
+    if (!_routeReadyCompleter.isCompleted) {
+      _routeReadyCompleter.complete();
+    }
+  }
 
   double _distanceMeters({
     required double startLat,
@@ -72,21 +84,18 @@ class _DriverOfferRoutePreviewPageState
     if (_busy) {
       return;
     }
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _busyMessage = 'Ignorando solicitud...';
+    });
     try {
-      if (widget.trip.isDirectedRequest) {
-        await ref.read(driverOffersProvider.notifier).cancelDirectedOffer(widget.trip);
-        await ref.read(offeredTripProvider.notifier).loadOffer();
-        await ref.read(driverOffersProvider.notifier).loadOffers();
-      } else {
-        await ref.read(offeredTripProvider.notifier).clearTrip();
-      }
+      await ref.read(driverOffersProvider.notifier).rejectOffer(widget.trip.id);
+      await ref.read(offeredTripProvider.notifier).clearTrip();
+      await ref.read(driverOffersProvider.notifier).loadOffers();
       if (mounted) {
         showTopNotice(
           context,
-          widget.trip.isDirectedRequest
-              ? 'Solicitud cancelada para este conductor.'
-              : 'Solicitud ignorada. Sigue visible en viajes disponibles.',
+          'Solicitud ignorada para tu conductor.',
           tone: NoticeTone.info,
         );
         Navigator.of(context).pop();
@@ -102,10 +111,19 @@ class _DriverOfferRoutePreviewPageState
     if (_busy) {
       return;
     }
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _busyMessage = 'Cargando ruta del viaje...';
+    });
     try {
       ref.read(driverOfferPreviewTripIdProvider.notifier).setTrip(widget.trip.id);
-      await ref.read(offeredTripProvider.notifier).acceptTrip(widget.trip);
+      await Future.wait<void>([
+        ref.read(offeredTripProvider.notifier).acceptTrip(widget.trip),
+        _routeReadyCompleter.future.timeout(
+          const Duration(milliseconds: 1800),
+          onTimeout: () {},
+        ),
+      ]);
       ref.read(driverOffersProvider.notifier).removeOfferLocally(widget.trip.id);
       if (!mounted) {
         return;
@@ -119,13 +137,15 @@ class _DriverOfferRoutePreviewPageState
           ),
         ),
       );
-    } catch (_) {
+    } catch (error) {
       ref.read(driverOfferPreviewTripIdProvider.notifier).setTrip(null);
+      await ref.read(offeredTripProvider.notifier).loadOffer();
+      await ref.read(driverOffersProvider.notifier).loadOffers();
       if (mounted) {
         showTopNotice(
           context,
-          'No se pudo aceptar el viaje. Intenta nuevamente.',
-          tone: NoticeTone.error,
+          error.toString().replaceFirst('Exception: ', ''),
+          tone: NoticeTone.warning,
         );
       }
     } finally {
@@ -147,7 +167,7 @@ class _DriverOfferRoutePreviewPageState
   Widget build(BuildContext context) {
     final driverState = ref.watch(driverStateProvider);
     final trip = widget.trip;
-    final rejectLabel = trip.isDirectedRequest ? 'Cancelar' : 'Ignorar';
+    const rejectLabel = 'Ignorar';
     final pickupDistance = _distanceMeters(
       startLat: driverState.lat,
       startLng: driverState.lng,
@@ -207,7 +227,8 @@ class _DriverOfferRoutePreviewPageState
                   driverLng: driverState.lng,
                 ),
                 focusSignal: _mapFocusSignal,
-                onRouteUpdated: null,
+                onRouteUpdated: _markRouteReady,
+                onOfflineRouteRetained: _markRouteReady,
               ),
             ),
             Positioned.fill(
@@ -229,6 +250,60 @@ class _DriverOfferRoutePreviewPageState
                 ),
               ),
             ),
+            if (_busy)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: const Color(0xCC020817),
+                    ),
+                    child: Center(
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 28),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 22,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF08111E),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: const Color(0xFF22304A)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF020617).withValues(alpha: 0.45),
+                              blurRadius: 24,
+                              offset: const Offset(0, 14),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox(
+                              width: 28,
+                              height: 28,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.8,
+                                color: Color(0xFF3B82F6),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              _busyMessage,
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.plusJakartaSans(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             SafeArea(
               child: Column(
                 children: [
@@ -277,9 +352,7 @@ class _DriverOfferRoutePreviewPageState
                         const SizedBox(width: 10),
                         _DriverMapCircleButton(
                           icon: Icons.my_location_rounded,
-                          onTap: () {
-                            setState(() => _mapFocusSignal++);
-                          },
+                          onTap: _busy ? () {} : () => setState(() => _mapFocusSignal++),
                         ),
                       ],
                     ),
@@ -402,7 +475,9 @@ class _DriverOfferRoutePreviewPageState
                           const SizedBox(height: 14),
                           Text(
                             _routeReviewed
-                                ? 'La ruta ya esta lista. Si confirmas, entras directo al flujo del viaje activo.'
+                                ? (_routeReady
+                                    ? 'La ruta ya esta lista. Si confirmas, entras directo al flujo del viaje activo.'
+                                    : 'Preparando el trazado final para entrar directo al viaje...')
                                 : 'Primero revisa el recorrido completo con los puntos A y B. Luego podras aceptar el viaje.',
                             style: const TextStyle(
                               color: Color(0xFFB8C4D6),

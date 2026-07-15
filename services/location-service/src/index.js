@@ -1,6 +1,7 @@
 const Fastify = require("fastify");
 const cors = require("@fastify/cors");
 const axios = require("axios");
+const crypto = require("crypto");
 const { Pool } = require("pg");
 const Redis = require("ioredis");
 const amqp = require("amqplib");
@@ -66,6 +67,89 @@ async function emitRealtime(event, room, data) {
   }
 }
 
+function base64UrlDecode(value) {
+  return Buffer.from(String(value).replace(/-/g, "+").replace(/_/g, "/"), "base64");
+}
+
+function verifyJwtFromRequest(request, reply) {
+  const authorization = String(request.headers.authorization || "");
+  const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+  if (!token) {
+    reply.code(401).send({ message: "No autorizado" });
+    return null;
+  }
+
+  const [encodedHeader, encodedPayload, signature] = token.split(".");
+  if (!encodedHeader || !encodedPayload || !signature) {
+    reply.code(401).send({ message: "Token invalido" });
+    return null;
+  }
+
+  const expectedSignature = crypto
+    .createHmac("sha256", process.env.JWT_SECRET || "super-secret")
+    .update(`${encodedHeader}.${encodedPayload}`)
+    .digest("base64url");
+
+  const received = Buffer.from(signature);
+  const expected = Buffer.from(expectedSignature);
+  if (received.length !== expected.length || !crypto.timingSafeEqual(received, expected)) {
+    reply.code(401).send({ message: "Token invalido" });
+    return null;
+  }
+
+  try {
+    const payload = JSON.parse(base64UrlDecode(encodedPayload).toString("utf8"));
+    if (payload.exp && Date.now() >= payload.exp * 1000) {
+      reply.code(401).send({ message: "Token vencido" });
+      return null;
+    }
+    return payload;
+  } catch (error) {
+    reply.code(401).send({ message: "Token invalido" });
+    return null;
+  }
+}
+
+async function requireOwnDriverId(request, reply, driverId) {
+  const user = verifyJwtFromRequest(request, reply);
+  if (!user) {
+    return null;
+  }
+  if (user.accountType !== "user" || user.role !== "driver") {
+    reply.code(403).send({ message: "Acceso solo para conductores" });
+    return null;
+  }
+
+  const result = await pool.query(
+    "SELECT id FROM drivers WHERE id = $1 AND user_id = $2 LIMIT 1",
+    [driverId, user.sub]
+  );
+  if (!result.rows.length) {
+    reply.code(403).send({ message: "No puedes operar con otro conductor" });
+    return null;
+  }
+
+  request.user = user;
+  return user;
+}
+
+async function requireOwnActiveTrip(reply, driverId, tripId) {
+  const result = await pool.query(
+    `SELECT id
+     FROM trips
+     WHERE id = $1
+       AND driver_id = $2
+       AND status IN ('accepted', 'arriving', 'at_pickup', 'in_progress')
+     LIMIT 1`,
+    [tripId, driverId]
+  );
+  if (!result.rows.length) {
+    reply.code(403).send({ message: "No puedes enviar ubicacion para otro viaje" });
+    return false;
+  }
+  return true;
+}
+
 async function bootstrap() {
   await app.register(cors, { origin: true, credentials: true });
 
@@ -73,6 +157,14 @@ async function bootstrap() {
 
   app.post("/drivers", async (request, reply) => {
     const payload = locationSchema.parse(request.body);
+    const user = await requireOwnDriverId(request, reply, payload.driverId);
+    if (!user) return;
+
+    if (payload.tripId) {
+      const ownsTrip = await requireOwnActiveTrip(reply, payload.driverId, payload.tripId);
+      if (!ownsTrip) return;
+    }
+
     if (!isInsidePotosi(payload.lat, payload.lng)) {
       return reply.code(400).send({
         message: "Driver location rejected outside Potosi service radius"
@@ -125,8 +217,11 @@ async function bootstrap() {
     reply.send({ success: true });
   });
 
-  app.get("/drivers/:driverId", async (request) => {
+  app.get("/drivers/:driverId", async (request, reply) => {
     const { driverId } = request.params;
+    const user = await requireOwnDriverId(request, reply, driverId);
+    if (!user) return;
+
     return redis.hgetall(`driver:last_location:${driverId}`);
   });
 

@@ -1,51 +1,120 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../auth/data/auth_repository.dart';
+import '../../../map/data/location_controller.dart';
 import '../../data/trip_repository.dart';
 import '../../domain/trip_request.dart';
 import 'ui_kit.dart';
 
-class ActivityTab extends ConsumerWidget {
-  const ActivityTab({
-    super.key,
-    this.onBack,
-  });
+class ActivityTab extends ConsumerStatefulWidget {
+  const ActivityTab({super.key, this.onBack});
 
   final VoidCallback? onBack;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ActivityTab> createState() => _ActivityTabState();
+}
+
+class _ActivityTabState extends ConsumerState<ActivityTab> {
+  Timer? _refreshTimer;
+  bool _refreshing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_refreshHistory());
+    });
+    _refreshTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+      unawaited(_refreshHistory(silent: true));
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _refreshHistory({bool silent = false}) async {
+    if (_refreshing || !mounted) {
+      return;
+    }
+    final session = ref.read(sessionProvider);
+    if (!session.isAuthenticated ||
+        session.token.isEmpty ||
+        session.userId.isEmpty) {
+      return;
+    }
+    final location = ref.read(passengerLocationProvider).position;
+    if (location == null) {
+      return;
+    }
+    _refreshing = true;
+    try {
+      await ref
+          .read(tripProvider.notifier)
+          .loadDashboard(
+            token: session.token,
+            passengerId: session.userId,
+            userLocation: location,
+          );
+    } finally {
+      _refreshing = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final session = ref.watch(sessionProvider);
     final tripState = ref.watch(tripProvider);
 
     return PageShell(
       eyebrow: 'Historial',
       title: 'Tus viajes',
-      leading: onBack == null
+      leading: widget.onBack == null
           ? null
           : IconButton.filledTonal(
-              onPressed: onBack,
+              onPressed: widget.onBack,
               icon: const Icon(Icons.arrow_back_rounded),
             ),
+      trailing: IconButton.filledTonal(
+        onPressed: () => unawaited(_refreshHistory()),
+        icon: const Icon(Icons.refresh_rounded),
+      ),
       child: Column(
         children: [
+          if (tripState.isLoading)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 14),
+              child: LinearProgressIndicator(
+                minHeight: 3,
+                color: Color(0xFF0F6CBD),
+                backgroundColor: Color(0xFFEFF6FF),
+              ),
+            ),
           if (tripState.history.isEmpty)
             const EmptyCard(
               title: 'Sin historial aun',
-              subtitle: 'Tus viajes confirmados apareceran aqui cuando empieces a moverte por Potosi.',
+              subtitle:
+                  'Tus viajes confirmados apareceran aqui cuando empieces a moverte por Potosi.',
             )
           else
-            ...tripState.history.map((trip) => Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: _JourneyCard(
-                    trip: trip,
-                    passengerName: session.fullName,
-                    token: session.token,
-                  ),
-                )),
+            ...tripState.history.map(
+              (trip) => Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: _JourneyCard(
+                  trip: trip,
+                  passengerName: session.fullName,
+                  token: session.token,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -65,12 +134,15 @@ class _JourneyCard extends ConsumerWidget {
 
   Color get _statusColor {
     return switch (trip.status) {
-      'requested' || 'searching' || 'accepted' || 'arriving' => const Color(0xFFF97316),
-      'at_pickup' => const Color(0xFF22C55E),
-      'in_progress' => const Color(0xFF0EA5E9),
-      'completed' => const Color(0xFF9CA3AF),
+      'requested' ||
+      'searching' ||
+      'accepted' ||
+      'arriving' => const Color(0xFF0F6CBD),
+      'at_pickup' => const Color(0xFF16A34A),
+      'in_progress' => const Color(0xFF2563EB),
+      'completed' => const Color(0xFF64748B),
       'cancelled' => const Color(0xFFEF4444),
-      _ => const Color(0xFFF97316),
+      _ => const Color(0xFF0F6CBD),
     };
   }
 
@@ -97,14 +169,27 @@ class _JourneyCard extends ConsumerWidget {
   bool get _canChat {
     final phone = (trip.driverPhone ?? '').trim();
     return phone.isNotEmpty &&
-        const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(trip.status);
+        const {
+          'accepted',
+          'arriving',
+          'at_pickup',
+          'in_progress',
+        }.contains(trip.status);
   }
 
   bool get _canCancel {
-    return const {'requested', 'searching', 'accepted', 'arriving', 'at_pickup'}.contains(trip.status);
+    return const {
+      'requested',
+      'searching',
+      'accepted',
+      'arriving',
+      'at_pickup',
+    }.contains(trip.status);
   }
 
-  String get _promoLabel => trip.status == 'completed' ? 'Viaje gratis aplicado' : 'Viaje promocional activo';
+  String get _promoLabel => trip.status == 'completed'
+      ? 'Viaje gratis aplicado'
+      : 'Viaje promocional activo';
 
   String? _normalizeWhatsAppPhone(String? rawPhone) {
     final digits = (rawPhone ?? '').replaceAll(RegExp(r'[^0-9]'), '');
@@ -121,33 +206,40 @@ class _JourneyCard extends ConsumerWidget {
     final normalizedPhone = _normalizeWhatsAppPhone(trip.driverPhone);
     if (normalizedPhone == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No hay numero valido del conductor para WhatsApp.')),
+        const SnackBar(
+          content: Text('No hay numero valido del conductor para WhatsApp.'),
+        ),
       );
       return;
     }
-    final driverName = (trip.driverName ?? '').trim().isEmpty ? 'conductor' : trip.driverName!.trim();
+    final driverName = (trip.driverName ?? '').trim().isEmpty
+        ? 'conductor'
+        : trip.driverName!.trim();
     final uri = Uri.parse(
       'https://wa.me/$normalizedPhone?text=${Uri.encodeComponent('Hola $driverName, te escribo por mi viaje de RAPIGO.')}',
     );
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && context.mounted) {
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) &&
+        context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se pudo abrir WhatsApp en este momento.')),
+        const SnackBar(
+          content: Text('No se pudo abrir WhatsApp en este momento.'),
+        ),
       );
     }
   }
 
   Future<void> _cancelTrip(BuildContext context, WidgetRef ref) async {
-    await ref.read(tripProvider.notifier).updateTripStatus(
-          token: token,
-          tripId: trip.id,
-          status: 'cancelled',
-        );
+    await ref
+        .read(tripProvider.notifier)
+        .updateTripStatus(token: token, tripId: trip.id, status: 'cancelled');
     if (context.mounted) {
       final error = ref.read(tripProvider).errorMessage;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            error == null ? 'Viaje cancelado.' : error.replaceFirst('Exception: ', ''),
+            error == null
+                ? 'Viaje cancelado.'
+                : error.replaceFirst('Exception: ', ''),
           ),
         ),
       );
@@ -173,7 +265,7 @@ class _JourneyCard extends ConsumerWidget {
             child: Container(
               padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
               decoration: const BoxDecoration(
-                color: Color(0xFF121214),
+                color: Color(0xFFF5F5F7),
                 borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
               ),
               child: SingleChildScrollView(
@@ -185,7 +277,7 @@ class _JourneyCard extends ConsumerWidget {
                         width: 44,
                         height: 5,
                         decoration: BoxDecoration(
-                          color: const Color(0x55F97316),
+                          color: const Color(0x550F6CBD),
                           borderRadius: BorderRadius.circular(999),
                         ),
                       ),
@@ -196,7 +288,7 @@ class _JourneyCard extends ConsumerWidget {
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 24,
                         fontWeight: FontWeight.w800,
-                        color: const Color(0xFFFFF4EC),
+                        color: const Color(0xFF0F172A),
                       ),
                     ),
                     if (trip.isPromotional) ...[
@@ -212,14 +304,14 @@ class _JourneyCard extends ConsumerWidget {
                       icon: Icons.radio_button_checked_rounded,
                       label: 'Recojo',
                       value: trip.pickupAddress,
-                      iconColor: const Color(0xFFF97316),
+                      iconColor: const Color(0xFF0F6CBD),
                     ),
                     const SizedBox(height: 12),
                     _HistoryRouteRow(
                       icon: Icons.location_on_rounded,
                       label: 'Destino',
                       value: trip.destinationAddress,
-                      iconColor: const Color(0xFF22C55E),
+                      iconColor: const Color(0xFF16A34A),
                     ),
                     if (driverName.isNotEmpty) ...[
                       const SizedBox(height: 12),
@@ -227,7 +319,7 @@ class _JourneyCard extends ConsumerWidget {
                         icon: Icons.badge_outlined,
                         label: 'Conductor',
                         value: driverName,
-                        iconColor: const Color(0xFFF97316),
+                        iconColor: const Color(0xFF0F6CBD),
                       ),
                     ],
                     if (driverPhone.isNotEmpty) ...[
@@ -236,7 +328,7 @@ class _JourneyCard extends ConsumerWidget {
                         icon: Icons.phone_outlined,
                         label: 'Telefono',
                         value: driverPhone,
-                        iconColor: const Color(0xFFF97316),
+                        iconColor: const Color(0xFF0F6CBD),
                       ),
                     ],
                     if (vehicleLabel.isNotEmpty) ...[
@@ -245,7 +337,7 @@ class _JourneyCard extends ConsumerWidget {
                         icon: _vehicleIcon,
                         label: 'Vehiculo',
                         value: vehicleLabel,
-                        iconColor: const Color(0xFFF97316),
+                        iconColor: const Color(0xFF0F6CBD),
                       ),
                     ],
                     if (vehiclePlate.isNotEmpty) ...[
@@ -254,7 +346,7 @@ class _JourneyCard extends ConsumerWidget {
                         icon: Icons.pin_outlined,
                         label: 'Placa',
                         value: vehiclePlate,
-                        iconColor: const Color(0xFFF97316),
+                        iconColor: const Color(0xFF0F6CBD),
                       ),
                     ],
                     if (vehicleColor.isNotEmpty) ...[
@@ -263,7 +355,7 @@ class _JourneyCard extends ConsumerWidget {
                         icon: Icons.palette_outlined,
                         label: 'Color',
                         value: vehicleColor,
-                        iconColor: const Color(0xFFF97316),
+                        iconColor: const Color(0xFF0F6CBD),
                       ),
                     ],
                   ],
@@ -286,9 +378,16 @@ class _JourneyCard extends ConsumerWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1B1B1F),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: _statusColor.withValues(alpha: 0.22)),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x120F172A),
+            blurRadius: 20,
+            offset: Offset(0, 10),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -296,11 +395,13 @@ class _JourneyCard extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
             decoration: BoxDecoration(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(30),
+              ),
               gradient: LinearGradient(
                 colors: [
-                  _statusColor.withValues(alpha: 0.24),
-                  const Color(0xFF232329),
+                  _statusColor.withValues(alpha: 0.14),
+                  const Color(0xFFEFF6FF),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -313,8 +414,11 @@ class _JourneyCard extends ConsumerWidget {
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF121214),
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: _statusColor.withValues(alpha: 0.18),
+                    ),
                   ),
                   child: Icon(_vehicleIcon, color: _statusColor),
                 ),
@@ -324,11 +428,16 @@ class _JourneyCard extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF121214),
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: _statusColor.withValues(alpha: 0.26)),
+                          border: Border.all(
+                            color: _statusColor.withValues(alpha: 0.26),
+                          ),
                         ),
                         child: Text(
                           _statusLabel,
@@ -350,9 +459,11 @@ class _JourneyCard extends ConsumerWidget {
                       ],
                       const SizedBox(height: 10),
                       Text(
-                        trip.requestedAt.isEmpty ? 'Fecha no disponible' : trip.requestedAt,
+                        trip.requestedAt.isEmpty
+                            ? 'Fecha no disponible'
+                            : trip.requestedAt,
                         style: const TextStyle(
-                          color: Color(0xFFFFD8BF),
+                          color: Color(0xFF64748B),
                           fontWeight: FontWeight.w700,
                           fontSize: 12,
                         ),
@@ -363,7 +474,7 @@ class _JourneyCard extends ConsumerWidget {
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
-                          color: const Color(0xFFFFF4EC),
+                          color: const Color(0xFF0F172A),
                         ),
                       ),
                     ],
@@ -381,17 +492,32 @@ class _JourneyCard extends ConsumerWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    _HistoryBadge(icon: Icons.person_outline_rounded, label: passengerName),
+                    _HistoryBadge(
+                      icon: Icons.person_outline_rounded,
+                      label: passengerName,
+                    ),
                     if (driverName.isNotEmpty)
-                      _HistoryBadge(icon: Icons.badge_outlined, label: driverName),
+                      _HistoryBadge(
+                        icon: Icons.badge_outlined,
+                        label: driverName,
+                      ),
                     if (driverPhone.isNotEmpty)
-                      _HistoryBadge(icon: Icons.phone_outlined, label: driverPhone),
+                      _HistoryBadge(
+                        icon: Icons.phone_outlined,
+                        label: driverPhone,
+                      ),
                     if (vehicleLabel.isNotEmpty)
                       _HistoryBadge(icon: _vehicleIcon, label: vehicleLabel),
                     if (vehiclePlate.isNotEmpty)
-                      _HistoryBadge(icon: Icons.pin_outlined, label: 'Placa $vehiclePlate'),
+                      _HistoryBadge(
+                        icon: Icons.pin_outlined,
+                        label: 'Placa $vehiclePlate',
+                      ),
                     if (vehicleColor.isNotEmpty)
-                      _HistoryBadge(icon: Icons.palette_outlined, label: vehicleColor),
+                      _HistoryBadge(
+                        icon: Icons.palette_outlined,
+                        label: vehicleColor,
+                      ),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -399,8 +525,9 @@ class _JourneyCard extends ConsumerWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF25252B),
+                    color: const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -408,7 +535,7 @@ class _JourneyCard extends ConsumerWidget {
                       const Text(
                         'Detalle del recorrido',
                         style: TextStyle(
-                          color: Color(0xFFFFD8BF),
+                          color: Color(0xFF64748B),
                           fontSize: 11,
                           fontWeight: FontWeight.w900,
                           letterSpacing: 1,
@@ -419,14 +546,14 @@ class _JourneyCard extends ConsumerWidget {
                         icon: Icons.radio_button_checked_rounded,
                         label: 'Recojo',
                         value: trip.pickupAddress,
-                        iconColor: const Color(0xFFF97316),
+                        iconColor: const Color(0xFF0F6CBD),
                       ),
                       const SizedBox(height: 10),
                       _HistoryRouteRow(
                         icon: Icons.location_on_rounded,
                         label: 'Destino',
                         value: trip.destinationAddress,
-                        iconColor: const Color(0xFF22C55E),
+                        iconColor: const Color(0xFF16A34A),
                       ),
                     ],
                   ),
@@ -439,8 +566,10 @@ class _JourneyCard extends ConsumerWidget {
                     OutlinedButton.icon(
                       onPressed: () => _showDetails(context),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFFFFD8BF),
-                        side: BorderSide(color: _statusColor.withValues(alpha: 0.32)),
+                        foregroundColor: const Color(0xFF0F6CBD),
+                        side: BorderSide(
+                          color: _statusColor.withValues(alpha: 0.32),
+                        ),
                       ),
                       icon: const Icon(Icons.visibility_outlined),
                       label: const Text('Detalle'),
@@ -449,8 +578,8 @@ class _JourneyCard extends ConsumerWidget {
                       FilledButton.tonalIcon(
                         onPressed: () => _openWhatsApp(context),
                         style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF1F3A2A),
-                          foregroundColor: const Color(0xFFB6F5C8),
+                          backgroundColor: const Color(0xFFEFF6FF),
+                          foregroundColor: const Color(0xFF0F6CBD),
                         ),
                         icon: const Icon(Icons.chat_bubble_rounded),
                         label: const Text('WhatsApp'),
@@ -459,8 +588,8 @@ class _JourneyCard extends ConsumerWidget {
                       FilledButton.tonalIcon(
                         onPressed: () => _cancelTrip(context, ref),
                         style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF3A1F1F),
-                          foregroundColor: const Color(0xFFFFC9C9),
+                          backgroundColor: const Color(0xFFFEE2E2),
+                          foregroundColor: const Color(0xFFB91C1C),
                         ),
                         icon: const Icon(Icons.close_rounded),
                         label: const Text('Cancelar'),
@@ -480,7 +609,7 @@ class _HistoryBadge extends StatelessWidget {
   const _HistoryBadge({
     required this.icon,
     required this.label,
-    this.color = const Color(0xFFF97316),
+    this.color = const Color(0xFF0F6CBD),
   });
 
   final IconData icon;
@@ -503,10 +632,7 @@ class _HistoryBadge extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             label,
-            style: TextStyle(
-              color: color == const Color(0xFFF97316) ? const Color(0xFFFFF4EC) : color,
-              fontWeight: FontWeight.w700,
-            ),
+            style: TextStyle(color: color, fontWeight: FontWeight.w700),
           ),
         ],
       ),
@@ -549,7 +675,7 @@ class _HistoryRouteRow extends StatelessWidget {
               Text(
                 label,
                 style: const TextStyle(
-                  color: Color(0xFF9F978F),
+                  color: Color(0xFF64748B),
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
                 ),
@@ -558,7 +684,7 @@ class _HistoryRouteRow extends StatelessWidget {
               Text(
                 value,
                 style: const TextStyle(
-                  color: Color(0xFFFFF4EC),
+                  color: Color(0xFF0F172A),
                   fontWeight: FontWeight.w700,
                 ),
               ),

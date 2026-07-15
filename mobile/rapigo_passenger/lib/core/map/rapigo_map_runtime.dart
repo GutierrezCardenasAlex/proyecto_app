@@ -4,14 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config/app_config.dart';
 
-enum RapigoMapEngine {
-  flutterMapRaster,
-  mapLibreVector,
-}
+enum RapigoMapEngine { flutterMapRaster, mapLibreVector }
 
-enum RapigoMapThemeMode {
-  lightProfessional,
-}
+enum RapigoMapThemeMode { lightProfessional }
 
 @immutable
 class RapigoMapStyleManifest {
@@ -86,12 +81,12 @@ const rapigoLightStyle = RapigoMapStyleManifest(
   id: 'rapigo_light',
   assetPath: 'assets/styles/rapigo_light.json',
   vectorStyleUrl: null,
-  background: Color(0xFFAFC9E8),
-  water: Color(0xFF82ABD8),
-  roads: Color(0xFFFCFEFF),
-  mainRoads: Color(0xFFF8C85E),
-  labels: Color(0xFF0E3158),
-  parks: Color(0xFFA9D19B),
+  background: Color(0xFFE7E9EC),
+  water: Color(0xFFD3D7DC),
+  roads: Color(0xFFFFFFFF),
+  mainRoads: Color(0xFFE5E7EB),
+  labels: Color(0xFF3F4650),
+  parks: Color(0xFFDADFDC),
   route: Color(0xFF2979FF),
 );
 
@@ -105,7 +100,10 @@ final potosiCityPack = RapigoOfflineCityPack(
 );
 
 RapigoMapEngine _resolveEngine() {
-  const raw = String.fromEnvironment('RAPIGO_MAP_ENGINE', defaultValue: 'maplibre');
+  const raw = String.fromEnvironment(
+    'RAPIGO_MAP_ENGINE',
+    defaultValue: 'maplibre',
+  );
   switch (raw.trim().toLowerCase()) {
     case 'maplibre':
     case 'maplibre_gl':

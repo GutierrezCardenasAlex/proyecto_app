@@ -17,7 +17,6 @@ import '../../../../core/config/app_config.dart';
 import '../../../../core/config/app_brand.dart';
 import '../../../../core/config/potosi_places.dart';
 import '../../../../core/map/geocoding_service.dart';
-import '../../../../core/map/map_navigation_banner.dart';
 import '../../../../core/map/offline_map.dart';
 import '../../../../core/notifications/local_notifications.dart';
 import '../../../../core/ui/top_notice.dart';
@@ -69,13 +68,10 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
   final DraggableScrollableController _sheetController =
       DraggableScrollableController();
   Timer? _refreshTimer;
-  Timer? _notificationTimer;
   Timer? _scheduledDashboardSync;
   Timer? _destinationMoveDebounce;
   ProviderSubscription<TripState>? _tripSubscription;
   io.Socket? _socket;
-  String? _floatingNotification;
-  NoticeTone _floatingNotificationTone = NoticeTone.info;
   RideMode _rideMode = RideMode.destino;
   String? _joinedTripId;
   String? _selectedDriverId;
@@ -87,7 +83,6 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
   bool _isSyncingDashboard = false;
   bool _isPreparingExperience = false;
   bool _isDraggingDestinationMap = false;
-  bool _topActionsExpanded = false;
   bool _homeDrawerExpanded = false;
   bool _isRoutePreviewPageOpen = false;
   bool _isTakeTaxiPageOpen = false;
@@ -100,7 +95,10 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
   LatLng? _movingDestinationCenter;
   String _currentAddressText = 'Buscando ubicación...';
   final Map<String, String> _reverseGeocodeCache = <String, String>{};
+  LatLng? _manualCameraCenterTarget;
   int _mapCenterSignal = 0;
+  int _mapZoomSignal = 0;
+  double _mapZoomDelta = 0;
   int _destinationLookupRequestId = 0;
   RideFlowState _flowState = RideFlowState.reposo;
   String? _lastUiStateSignature;
@@ -377,7 +375,6 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _refreshTimer?.cancel();
     _scheduledDashboardSync?.cancel();
-    _notificationTimer?.cancel();
     _tripSubscription?.close();
     _socket?.dispose();
     _destinationMoveDebounce?.cancel();
@@ -581,9 +578,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
               vehicleType: current?.vehicleType ?? 'taxi',
               vehicleLabel: current?.vehicleLabel ?? 'RAPIGO',
               vehicleDetail: current?.vehicleDetail ?? 'Disponible',
-              priceLabel:
-                  current?.priceLabel ??
-                  'Bs ${(8 + distanceMeters / 300).toStringAsFixed(0)}',
+              priceLabel: '',
             ),
           );
     });
@@ -1162,7 +1157,6 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     setState(() {
       _rideMode = RideMode.cercano;
       _flowState = RideFlowState.rutaConfirmacion;
-      _topActionsExpanded = false;
       _homeDrawerExpanded = false;
     });
     unawaited(_expandSheet(0.58));
@@ -1178,7 +1172,6 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       _selectedDestinationPlace = null;
       _customDestinationPoint = null;
       _flowState = RideFlowState.busquedaTexto;
-      _topActionsExpanded = false;
       _homeDrawerExpanded = false;
     });
     if (focusSearch) {
@@ -1201,7 +1194,6 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       _selectedDestinationPlace = null;
       _customDestinationPoint = point;
       _flowState = RideFlowState.rutaConfirmacion;
-      _topActionsExpanded = false;
       _homeDrawerExpanded = false;
     });
     unawaited(_expandSheet(0.58));
@@ -1217,7 +1209,6 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       _selectedDestinationPlace = null;
       _customDestinationPoint = point;
       _flowState = RideFlowState.rutaConfirmacion;
-      _topActionsExpanded = false;
       _homeDrawerExpanded = false;
     });
     if (_canChooseDestinationForActiveTrip(ref.read(tripProvider).request)) {
@@ -1356,7 +1347,6 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       _selectedDestinationPlace = null;
       _customDestinationPoint = null;
       _selectedDriverId = null;
-      _topActionsExpanded = false;
       _homeDrawerExpanded = false;
     });
     if (_sheetController.isAttached) {
@@ -2021,21 +2011,22 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     String message, {
     NoticeTone tone = NoticeTone.info,
   }) {
-    _notificationTimer?.cancel();
-    setState(() {
-      _floatingNotification = message;
-      _floatingNotificationTone = tone;
-    });
+    if (mounted) {
+      showTopNotice(
+        context,
+        message,
+        tone: tone,
+        icon: tone == NoticeTone.error
+            ? Icons.error_outline_rounded
+            : Icons.local_taxi_rounded,
+        duration: const Duration(seconds: 5),
+      );
+    }
     LocalNotifications.show(
       id: message.hashCode,
       title: 'RAPIGO',
       body: message,
     );
-    _notificationTimer = Timer(const Duration(seconds: 5), () {
-      if (mounted) {
-        setState(() => _floatingNotification = null);
-      }
-    });
   }
 
   void _handleTripStatusChange(TripRequest request) {
@@ -2596,9 +2587,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
         3,
         90,
       );
-      final fareAmount = ((distanceMeters / 700).ceil() * 3).clamp(10, 120);
       items.add('$durationMinutes min');
-      items.add('Bs $fareAmount');
     }
 
     if ((request.driverName ?? '').trim().isNotEmpty &&
@@ -2640,17 +2629,13 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     final durationMinutes = ((distanceMeters / metersPerSecond) / 60)
         .round()
         .clamp(3, 90);
-    final fareDivisor = _selectedServiceType == 'moto' ? 900 : 700;
-    final fareMultiplier = _selectedServiceType == 'moto' ? 2 : 3;
-    final fareAmount = ((distanceMeters / fareDivisor).ceil() * fareMultiplier)
-        .clamp(8, 120);
     return _RoutePreviewData(
       distanceMeters: distanceMeters,
       distanceLabel: distanceKm < 1
           ? '${distanceMeters.round()} m'
           : '${distanceKm.toStringAsFixed(1)} km',
       durationLabel: '$durationMinutes min',
-      fareLabel: 'Bs $fareAmount',
+      fareLabel: '',
       serviceLabel: _selectedServiceType == 'moto' ? 'Moto' : 'Taxi',
     );
   }
@@ -2983,7 +2968,9 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
         Positioned.fill(
           child: RepaintBoundary(
             child: PotosiMapSurface(
-              viewportCacheKey: _mainMapViewportKey(hasActiveTrip: hasActiveTrip),
+              viewportCacheKey: _mainMapViewportKey(
+                hasActiveTrip: hasActiveTrip,
+              ),
               drivers: driverPoints,
               userLocation: userLocation,
               userAccuracyMeters: locationState.accuracyMeters,
@@ -3003,8 +2990,10 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
               focusSignal: _mapFocusSignal,
               cameraCenterTarget: _destinationMoveMode
                   ? _movingDestinationCenter
-                  : null,
+                  : _manualCameraCenterTarget,
               cameraCenterSignal: _mapCenterSignal,
+              zoomActionSignal: _mapZoomSignal,
+              zoomActionDelta: _mapZoomDelta,
               showTargetEditBadge: editingDestination,
               showUtilityControls: false,
               showLiveNavigationMode: isRideInProgress,
@@ -3034,10 +3023,10 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    const Color(0xFF9FC5F2).withValues(alpha: 0.34),
+                    const Color(0xFFFFFFFF).withValues(alpha: 0.22),
                     Colors.transparent,
                     Colors.transparent,
-                    const Color(0xFF0B2C4D).withValues(alpha: 0.22),
+                    const Color(0xFFFFFFFF).withValues(alpha: 0.10),
                   ],
                   stops: const [0, 0.18, 0.72, 1],
                 ),
@@ -3051,106 +3040,6 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
               padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
               child: Stack(
                 children: [
-                  if (_floatingNotification != null)
-                    Positioned(
-                      top: 88,
-                      left: 0,
-                      right: 0,
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                        decoration: BoxDecoration(
-                          color:
-                              _floatingNotificationTone == NoticeTone.success
-                              ? const Color(0xFFE8FFF1)
-                              : _floatingNotificationTone == NoticeTone.error
-                              ? const Color(0xFFFFEFF1)
-                              : _floatingNotificationTone ==
-                                    NoticeTone.warning
-                              ? const Color(0xFFFFF3E6)
-                              : const Color(0xFFEFF6FF),
-                          borderRadius: BorderRadius.circular(22),
-                          border: Border.all(
-                            color:
-                                _floatingNotificationTone ==
-                                    NoticeTone.success
-                                ? const Color(
-                                    0xFF22C55E,
-                                  ).withValues(alpha: 0.24)
-                                : _floatingNotificationTone ==
-                                      NoticeTone.error
-                                ? const Color(
-                                    0xFFF87171,
-                                  ).withValues(alpha: 0.26)
-                                : _floatingNotificationTone ==
-                                      NoticeTone.warning
-                                ? const Color(
-                                    0xFFF97316,
-                                  ).withValues(alpha: 0.24)
-                                : const Color(
-                                    0xFF60A5FA,
-                                  ).withValues(alpha: 0.24),
-                          ),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x1F000003),
-                              blurRadius: 24,
-                              offset: Offset(0, 10),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              _floatingNotificationTone == NoticeTone.success
-                                  ? Icons.check_circle_outline_rounded
-                                  : _floatingNotificationTone ==
-                                        NoticeTone.error
-                                  ? Icons.error_outline_rounded
-                                  : _floatingNotificationTone ==
-                                        NoticeTone.warning
-                                  ? Icons.notifications_active_rounded
-                                  : Icons.info_outline_rounded,
-                              color:
-                                  _floatingNotificationTone ==
-                                      NoticeTone.success
-                                  ? const Color(0xFF86EFAC)
-                                  : _floatingNotificationTone ==
-                                        NoticeTone.error
-                                  ? const Color(0xFFFCA5A5)
-                                  : _floatingNotificationTone ==
-                                        NoticeTone.warning
-                                  ? const Color(0xFFF97316)
-                                  : const Color(0xFF93C5FD),
-                              size: 18,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                _floatingNotification!,
-                                style: TextStyle(
-                                  color:
-                                      _floatingNotificationTone ==
-                                          NoticeTone.success
-                                      ? const Color(0xFF14532D)
-                                      : _floatingNotificationTone ==
-                                            NoticeTone.error
-                                      ? const Color(0xFF991B1B)
-                                      : _floatingNotificationTone ==
-                                            NoticeTone.warning
-                                      ? const Color(0xFF9A3412)
-                                      : const Color(0xFF1D4ED8),
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
                   if (showLandingOverlay)
                     Positioned(
                       top: 10,
@@ -3242,78 +3131,47 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                       right: 0,
                       child: _PremiumRequestTaxiTopBar(
                         onBack: _reopenServiceLauncher,
-                        expanded: _topActionsExpanded,
-                        hasActiveTrip: hasActiveTrip,
-                        onToggleExpanded: () {
-                          setState(() {
-                            _topActionsExpanded = !_topActionsExpanded;
-                          });
+                        onProfile: () {
+                          widget.onMenuTap();
                         },
-                        onOffline: () async {
-                          setState(() {
-                            _topActionsExpanded = false;
-                          });
-                          await showOfflineMapSheet(context);
-                        },
-                        onDetails: () {
-                          setState(() {
-                            _topActionsExpanded = false;
-                          });
-                          showMapNavigationSheet(
-                            context,
-                            currentLabel: 'Potosí',
-                            currentDetail: 'Ubicación actual',
-                            targetLabel: mapRouteTarget != null
-                                ? (_destinationController.text.trim().isEmpty
-                                      ? _currentAddressText
-                                      : _destinationController.text.trim())
-                                : null,
-                            targetDetail: mapRouteTarget != null
-                                ? 'Destino del viaje'
-                                : null,
-                            remainingDistanceLabel: routePreview?.distanceLabel,
-                            remainingDurationLabel: routePreview?.durationLabel,
-                            onOpenOfflineInfo: () =>
-                                showOfflineMapSheet(context),
+                        onHistory: () {
+                          _showFloatingNotification(
+                            'Historial muy pronto disponible.',
+                            tone: NoticeTone.info,
                           );
                         },
-                        onRequest: !hasActiveTrip
-                            ? () async {
-                                setState(() {
-                                  _topActionsExpanded = false;
-                                });
-                                await _requestRide();
-                              }
-                            : null,
-                        onDashboard: !hasActiveTrip
-                            ? () async {
-                                setState(() {
-                                  _topActionsExpanded = false;
-                                });
-                                await _reopenServiceLauncher();
-                              }
-                            : null,
-                        onRadar: hasActiveTrip
-                            ? () {
-                                setState(() {
-                                  _topActionsExpanded = false;
-                                });
-                                _showTripRequestSheet(tripState);
-                              }
-                            : null,
-                        onRecenter: () async {
+                        onWallet: () {
+                          _showUpcomingOptionsSheet();
+                        },
+                        onZoomIn: () {
                           setState(() {
-                            _topActionsExpanded = false;
+                            _mapZoomDelta = 0.6;
+                            _mapZoomSignal++;
                           });
+                        },
+                        onZoomOut: () {
+                          setState(() {
+                            _mapZoomDelta = -0.6;
+                            _mapZoomSignal++;
+                          });
+                        },
+                        onRecenter: () async {
                           await ref
                               .read(passengerLocationProvider.notifier)
                               .loadCurrentLocation();
                           await _syncDashboard();
                           if (mounted) {
-                            setState(() => _mapFocusSignal++);
+                            final location =
+                                ref.read(passengerLocationProvider).position ??
+                                _lastKnownLocation;
+                            if (location != null) {
+                              setState(() {
+                                _manualCameraCenterTarget = location;
+                                _mapCenterSignal++;
+                              });
+                            }
                           }
                         },
-                        onSearch: _openDestinationSearchSheetFromMap,
                       ),
                     ),
                   if (showLandingOverlay)
@@ -3464,7 +3322,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                             : _destinationController.text.trim(),
                         summaryLabel:
                             routeSummaryLabel ?? _compactStatusText(tripState),
-                        fareLabel: routePreview?.fareLabel ?? 'Bs --',
+                        fareLabel: routePreview?.fareLabel ?? '',
                         durationLabel:
                             routePreview?.durationLabel ??
                             (tripState.request.etaMinutes == null
@@ -3574,138 +3432,44 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
           Positioned(
             right: 20,
             top: 28,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_topActionsExpanded) ...[
-                      _GlassIconButton(
-                        icon: Icons.offline_bolt_rounded,
-                        onTap: () async {
-                          setState(() {
-                            _topActionsExpanded = false;
-                          });
-                          await showOfflineMapSheet(context);
-                        },
-                      ),
-                      const SizedBox(width: 10),
-                      _GlassIconButton(
-                        icon: Icons.explore_rounded,
-                        onTap: () {
-                          setState(() {
-                            _topActionsExpanded = false;
-                          });
-                          showMapNavigationSheet(
-                            context,
-                            currentLabel: 'Potosí',
-                            currentDetail: 'Ubicación actual',
-                            targetLabel: mapRouteTarget != null
-                                ? (_destinationController.text.trim().isEmpty
-                                      ? _currentAddressText
-                                      : _destinationController.text.trim())
-                                : null,
-                            targetDetail: mapRouteTarget != null
-                                ? 'Destino del viaje'
-                                : null,
-                            remainingDistanceLabel: routePreview?.distanceLabel,
-                            remainingDurationLabel: routePreview?.durationLabel,
-                            onOpenOfflineInfo: () =>
-                                showOfflineMapSheet(context),
-                          );
-                        },
-                      ),
-                      const SizedBox(width: 10),
-                      if (!hasActiveTrip)
-                        _GlassIconButton(
-                          icon: Icons.local_taxi_rounded,
-                          onTap: () async {
-                            setState(() {
-                              _topActionsExpanded = false;
-                            });
-                            if (_rideMode == RideMode.destino) {
-                              await _requestRide();
-                            } else {
-                              await (_selectedDriverId == null
-                                  ? _selectNearestTaxi()
-                                  : _requestRide());
-                            }
-                          },
-                        ),
-                      if (!hasActiveTrip) const SizedBox(width: 10),
-                      if (!hasActiveTrip)
-                        _GlassIconButton(
-                          icon: Icons.dashboard_customize_rounded,
-                          onTap: () async {
-                            setState(() {
-                              _topActionsExpanded = false;
-                            });
-                            await _reopenServiceLauncher();
-                          },
-                        ),
-                      if (!hasActiveTrip) const SizedBox(width: 10),
-                      if (hasActiveTrip)
-                        _GlassIconButton(
-                          icon: Icons.radar_rounded,
-                          onTap: () {
-                            setState(() {
-                              _topActionsExpanded = false;
-                            });
-                            _showTripRequestSheet(tripState);
-                          },
-                        ),
-                      if (hasActiveTrip) const SizedBox(width: 10),
-                      _GlassIconButton(
-                        icon: Icons.near_me_rounded,
-                        iconWidget: Transform.rotate(
-                          angle: -0.35,
-                          child: Image.asset(
-                            'assets/images/flecha.png',
-                            width: 20,
-                            height: 20,
-                            fit: BoxFit.contain,
-                            filterQuality: FilterQuality.high,
-                          ),
-                        ),
-                        onTap: () async {
-                          setState(() {
-                            _topActionsExpanded = false;
-                          });
-                          await ref
-                              .read(passengerLocationProvider.notifier)
-                              .loadCurrentLocation();
-                          await _syncDashboard();
-                          if (mounted) {
-                            setState(() => _mapFocusSignal++);
-                          }
-                        },
-                      ),
-                    ],
-                    if (_topActionsExpanded) const SizedBox(width: 10),
-                    _MapActionButton(
-                      icon: _topActionsExpanded
-                          ? Icons.close_rounded
-                          : Icons.add_rounded,
-                      onTap: () {
-                        setState(() {
-                          _topActionsExpanded = !_topActionsExpanded;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                _GlassIconButton(
-                  icon: Icons.search_rounded,
-                  onTap: () {
+            child: _PremiumMiniActionRow(
+              onProfile: widget.onMenuTap,
+              onHistory: () {
+                _showFloatingNotification(
+                  'Historial muy pronto disponible.',
+                  tone: NoticeTone.info,
+                );
+              },
+              onWallet: _showUpcomingOptionsSheet,
+              onZoomIn: () {
+                setState(() {
+                  _mapZoomDelta = 0.6;
+                  _mapZoomSignal++;
+                });
+              },
+              onZoomOut: () {
+                setState(() {
+                  _mapZoomDelta = -0.6;
+                  _mapZoomSignal++;
+                });
+              },
+              onRecenter: () async {
+                await ref
+                    .read(passengerLocationProvider.notifier)
+                    .loadCurrentLocation();
+                await _syncDashboard();
+                if (mounted) {
+                  final location =
+                      ref.read(passengerLocationProvider).position ??
+                      _lastKnownLocation;
+                  if (location != null) {
                     setState(() {
-                      _topActionsExpanded = false;
+                      _manualCameraCenterTarget = location;
+                      _mapCenterSignal++;
                     });
-                    _activateDestinationMode();
-                  },
-                ),
-              ],
+                  }
+                }
+              },
             ),
           ),
       ],
@@ -3757,7 +3521,8 @@ class _MapCenterDestinationPin extends StatefulWidget {
   final bool lifted;
 
   @override
-  State<_MapCenterDestinationPin> createState() => _MapCenterDestinationPinState();
+  State<_MapCenterDestinationPin> createState() =>
+      _MapCenterDestinationPinState();
 }
 
 class _MapCenterDestinationPinState extends State<_MapCenterDestinationPin>
@@ -3802,18 +3567,16 @@ class _MapCenterDestinationPinState extends State<_MapCenterDestinationPin>
                     height: 72,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0xFF2F80FF).withValues(
-                        alpha: pulseOpacity,
-                      ),
+                      color: const Color(
+                        0xFF2F80FF,
+                      ).withValues(alpha: pulseOpacity),
                     ),
                   ),
                 ),
               ),
               Positioned(
                 top: 12,
-                child: _ManualDestinationPinVisual(
-                  lifted: lifted,
-                ),
+                child: _ManualDestinationPinVisual(lifted: lifted),
               ),
               Positioned(
                 bottom: 4,
@@ -4144,20 +3907,14 @@ class _MovingDestinationSheet extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 14,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             decoration: BoxDecoration(
               color: AppBrand.surfaceSoft,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
               children: [
-                const Icon(
-                  Icons.place_rounded,
-                  color: AppBrand.primaryBlue,
-                ),
+                const Icon(Icons.place_rounded, color: AppBrand.primaryBlue),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -4336,27 +4093,27 @@ class _RouteConfirmationCard extends StatelessWidget {
               ),
             ),
           ),
-          if (fareLabel != null ||
-              durationLabel != null ||
-              distanceLabel != null) ...[
+          if ((fareLabel?.trim().isNotEmpty ?? false) ||
+              (durationLabel?.trim().isNotEmpty ?? false) ||
+              (distanceLabel?.trim().isNotEmpty ?? false)) ...[
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
-                if (durationLabel != null)
+                if (durationLabel?.trim().isNotEmpty ?? false)
                   _MiniPill(
                     icon: Icons.schedule_rounded,
                     label: durationLabel!,
                     active: true,
                   ),
-                if (distanceLabel != null)
+                if (distanceLabel?.trim().isNotEmpty ?? false)
                   _MiniPill(
                     icon: Icons.route_rounded,
                     label: distanceLabel!,
                     active: false,
                   ),
-                if (fareLabel != null)
+                if (fareLabel?.trim().isNotEmpty ?? false)
                   _MiniPill(
                     icon: Icons.payments_rounded,
                     label: fareLabel!,
@@ -5024,64 +4781,39 @@ class _GlassIconButton extends StatelessWidget {
 class _PremiumRequestTaxiTopBar extends StatelessWidget {
   const _PremiumRequestTaxiTopBar({
     required this.onBack,
-    required this.expanded,
-    required this.hasActiveTrip,
-    required this.onToggleExpanded,
-    required this.onOffline,
-    required this.onDetails,
-    this.onRequest,
-    this.onDashboard,
-    this.onRadar,
+    required this.onProfile,
+    required this.onHistory,
+    required this.onWallet,
+    required this.onZoomIn,
+    required this.onZoomOut,
     required this.onRecenter,
-    required this.onSearch,
   });
 
   final VoidCallback onBack;
-  final bool expanded;
-  final bool hasActiveTrip;
-  final VoidCallback onToggleExpanded;
-  final VoidCallback onOffline;
-  final VoidCallback onDetails;
-  final VoidCallback? onRequest;
-  final VoidCallback? onDashboard;
-  final VoidCallback? onRadar;
+  final VoidCallback onProfile;
+  final VoidCallback onHistory;
+  final VoidCallback onWallet;
+  final VoidCallback onZoomIn;
+  final VoidCallback onZoomOut;
   final VoidCallback onRecenter;
-  final VoidCallback onSearch;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _PremiumBlueSquareButton(
-          icon: Icons.arrow_back_rounded,
-          onTap: onBack,
-        ),
+        _PremiumBlueSquareButton(icon: Icons.arrow_back_rounded, onTap: onBack),
         const Spacer(),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (expanded) ...[
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 108),
-                child: _PremiumMiniActionRow(
-                hasActiveTrip: hasActiveTrip,
-                onOffline: onOffline,
-                onDetails: onDetails,
-                onRequest: onRequest,
-                onDashboard: onDashboard,
-                onRadar: onRadar,
-                onRecenter: onRecenter,
-              ),
-              ),
-              const SizedBox(height: 8),
-            ],
-            _PremiumVerticalActionCard(
-              expanded: expanded,
-              onToggleExpanded: onToggleExpanded,
-              onSearch: onSearch,
-            ),
-          ],
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: _PremiumMiniActionRow(
+            onProfile: onProfile,
+            onHistory: onHistory,
+            onWallet: onWallet,
+            onZoomIn: onZoomIn,
+            onZoomOut: onZoomOut,
+            onRecenter: onRecenter,
+          ),
         ),
       ],
     );
@@ -5089,10 +4821,7 @@ class _PremiumRequestTaxiTopBar extends StatelessWidget {
 }
 
 class _PremiumBlueSquareButton extends StatelessWidget {
-  const _PremiumBlueSquareButton({
-    required this.icon,
-    required this.onTap,
-  });
+  const _PremiumBlueSquareButton({required this.icon, required this.onTap});
 
   final IconData icon;
   final VoidCallback onTap;
@@ -5100,92 +4829,18 @@ class _PremiumBlueSquareButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: const Color(0xFF1D4ED8),
-      borderRadius: BorderRadius.circular(20),
-      elevation: 16,
-      shadowColor: const Color(0x331D4ED8),
+      color: Colors.white.withValues(alpha: 0.98),
+      borderRadius: BorderRadius.circular(24),
+      elevation: 10,
+      shadowColor: const Color(0x180F172A),
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         onTap: onTap,
         child: SizedBox(
-          width: 72,
-          height: 72,
-          child: Icon(
-            icon,
-            color: Colors.white,
-            size: 32,
-          ),
+          width: 66,
+          height: 66,
+          child: Icon(icon, color: const Color(0xFF111827), size: 30),
         ),
-      ),
-    );
-  }
-}
-
-class _PremiumVerticalActionCard extends StatelessWidget {
-  const _PremiumVerticalActionCard({
-    required this.expanded,
-    required this.onToggleExpanded,
-    required this.onSearch,
-  });
-
-  final bool expanded;
-  final VoidCallback onToggleExpanded;
-  final VoidCallback onSearch;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 72,
-      decoration: BoxDecoration(
-        color: const Color(0xFF1D4ED8),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x331D4ED8),
-            blurRadius: 18,
-            offset: Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          InkWell(
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(20),
-            ),
-            onTap: onToggleExpanded,
-            child: SizedBox(
-              width: double.infinity,
-              height: 64,
-              child: Icon(
-                expanded ? Icons.close_rounded : Icons.add_rounded,
-                color: Colors.white,
-                size: 32,
-              ),
-            ),
-          ),
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 12),
-            height: 2,
-            color: Colors.white.withValues(alpha: 0.24),
-          ),
-          InkWell(
-            borderRadius: const BorderRadius.vertical(
-              bottom: Radius.circular(20),
-            ),
-            onTap: onSearch,
-            child: SizedBox(
-              width: double.infinity,
-              height: 64,
-              child: Icon(
-                Icons.search_rounded,
-                color: Colors.white,
-                size: 30,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -5193,69 +4848,50 @@ class _PremiumVerticalActionCard extends StatelessWidget {
 
 class _PremiumMiniActionRow extends StatelessWidget {
   const _PremiumMiniActionRow({
-    required this.hasActiveTrip,
-    required this.onOffline,
-    required this.onDetails,
-    this.onRequest,
-    this.onDashboard,
-    this.onRadar,
+    required this.onProfile,
+    required this.onHistory,
+    required this.onWallet,
+    required this.onZoomIn,
+    required this.onZoomOut,
     required this.onRecenter,
   });
 
-  final bool hasActiveTrip;
-  final VoidCallback onOffline;
-  final VoidCallback onDetails;
-  final VoidCallback? onRequest;
-  final VoidCallback? onDashboard;
-  final VoidCallback? onRadar;
+  final VoidCallback onProfile;
+  final VoidCallback onHistory;
+  final VoidCallback onWallet;
+  final VoidCallback onZoomIn;
+  final VoidCallback onZoomOut;
   final VoidCallback onRecenter;
 
   @override
   Widget build(BuildContext context) {
     final actions = <Widget>[
       _PremiumSmallBlueIconButton(
-        icon: Icons.offline_bolt_rounded,
-        onTap: onOffline,
+        icon: Icons.person_outline_rounded,
+        onTap: onProfile,
+        borderColor: const Color(0xFF2E6CFF),
+        highlighted: true,
       ),
       _PremiumSmallBlueIconButton(
-        icon: Icons.explore_rounded,
-        onTap: onDetails,
+        icon: Icons.history_rounded,
+        onTap: onHistory,
       ),
-      if (!hasActiveTrip && onRequest != null)
-        _PremiumSmallBlueIconButton(
-          icon: Icons.local_taxi_rounded,
-          onTap: onRequest!,
-        ),
-      if (!hasActiveTrip && onDashboard != null)
-        _PremiumSmallBlueIconButton(
-          icon: Icons.dashboard_customize_rounded,
-          onTap: onDashboard!,
-        ),
-      if (hasActiveTrip && onRadar != null)
-        _PremiumSmallBlueIconButton(
-          icon: Icons.radar_rounded,
-          onTap: onRadar!,
-        ),
       _PremiumSmallBlueIconButton(
-        icon: Icons.near_me_rounded,
+        icon: Icons.account_balance_wallet_outlined,
+        onTap: onWallet,
+      ),
+      _PremiumSmallBlueIconButton(icon: Icons.add_rounded, onTap: onZoomIn),
+      _PremiumSmallBlueIconButton(icon: Icons.remove_rounded, onTap: onZoomOut),
+      _PremiumSmallBlueIconButton(
+        icon: Icons.my_location_rounded,
         onTap: onRecenter,
-        iconWidget: Transform.rotate(
-          angle: -0.35,
-          child: Image.asset(
-            'assets/images/flecha.png',
-            width: 16,
-            height: 16,
-            fit: BoxFit.contain,
-            filterQuality: FilterQuality.high,
-          ),
-        ),
       ),
     ];
 
     return Wrap(
       direction: Axis.vertical,
-      spacing: 8,
-      runSpacing: 8,
+      spacing: 12,
+      runSpacing: 12,
       alignment: WrapAlignment.center,
       children: actions,
     );
@@ -5267,32 +4903,39 @@ class _PremiumSmallBlueIconButton extends StatelessWidget {
     required this.icon,
     required this.onTap,
     this.iconWidget,
+    this.borderColor,
+    this.highlighted = false,
   });
 
   final IconData icon;
   final VoidCallback onTap;
   final Widget? iconWidget;
+  final Color? borderColor;
+  final bool highlighted;
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: const Color(0xFF1D4ED8),
-      borderRadius: BorderRadius.circular(16),
+      color: Colors.white.withValues(alpha: 0.98),
       elevation: 10,
-      shadowColor: const Color(0x331D4ED8),
+      shadowColor: const Color(0x180F172A),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(28),
+        side: BorderSide(
+          color: borderColor ?? Colors.transparent,
+          width: highlighted ? 2.8 : 0,
+        ),
+      ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(28),
         onTap: onTap,
         child: SizedBox(
-          width: 40,
-          height: 40,
+          width: 58,
+          height: 58,
           child: Center(
-            child: iconWidget ??
-                Icon(
-                  icon,
-                  color: Colors.white,
-                  size: 18,
-                ),
+            child:
+                iconWidget ??
+                Icon(icon, color: const Color(0xFF111827), size: 28),
           ),
         ),
       ),

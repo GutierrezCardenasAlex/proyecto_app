@@ -1,6 +1,6 @@
 {
   "version": 8,
-  "name": "RAPIGO Pro Navy Blue Navigation",
+  "name": "RAPIGO Light Gray Navigation",
   "sources": {
     "ne2_shaded": {
       "type": "raster",
@@ -22,7 +22,7 @@
       "id": "background",
       "type": "background",
       "paint": {
-        "background-color": "#AFC9E8"
+        "background-color": "#E7E9EC"
       }
     },
     {
@@ -44,7 +44,7 @@
       "source": "openmaptiles",
       "source-layer": "water",
       "paint": {
-        "fill-color": "#82ABD8",
+        "fill-color": "#D3D7DC",
         "fill-opacity": 1
       }
     },
@@ -65,7 +65,7 @@
         ]
       ],
       "paint": {
-        "fill-color": "#A9D19B",
+        "fill-color": "#DADFDC",
         "fill-opacity": 0.88
       }
     },
@@ -86,7 +86,7 @@
         ]
       ],
       "paint": {
-        "fill-color": "#A4C99E",
+        "fill-color": "#CFD6D2",
         "fill-opacity": 0.8
       }
     },
@@ -107,7 +107,7 @@
         ]
       ],
       "paint": {
-        "fill-color": "#D8E6F4",
+        "fill-color": "#ECEEF0",
         "fill-opacity": 0.52
       }
     },
@@ -118,8 +118,8 @@
       "source-layer": "building",
       "minzoom": 13,
       "paint": {
-        "fill-color": "#CCD8E5",
-        "fill-outline-color": "#AFC0D4",
+        "fill-color": "#DDE1E5",
+        "fill-outline-color": "#C4CAD1",
         "fill-opacity": 0.9
       }
     },
@@ -150,7 +150,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "#FCFEFF",
+        "line-color": "#FFFFFF",
         "line-opacity": 0.95,
         "line-width": [
           "interpolate",
@@ -198,7 +198,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "#FFF4D8",
+        "line-color": "#F1F3F5",
         "line-opacity": 1,
         "line-width": [
           "interpolate",
@@ -246,7 +246,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "#6D92BE",
+        "line-color": "#B3BAC3",
         "line-opacity": 0.98,
         "line-width": [
           "interpolate",
@@ -287,7 +287,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "#F4BE49",
+        "line-color": "#E5E7EB",
         "line-opacity": 0.98,
         "line-width": [
           "interpolate",
@@ -328,7 +328,7 @@
         "line-join": "round"
       },
       "paint": {
-        "line-color": "#BF9440",
+        "line-color": "#C9CDD3",
         "line-opacity": 0.98,
         "line-width": [
           "interpolate",
@@ -400,8 +400,8 @@
         ]
       },
       "paint": {
-        "text-color": "#153A64",
-        "text-halo-color": "#F6FAFF",
+        "text-color": "#4B5563",
+        "text-halo-color": "#F8F9FA",
         "text-halo-width": 1.35,
         "text-halo-blur": 0.35,
         "text-opacity": 1
@@ -905,8 +905,8 @@
         "text-transform": "uppercase"
       },
       "paint": {
-        "text-color": "#234A72",
-        "text-halo-color": "#F6FAFF",
+        "text-color": "#4B5563",
+        "text-halo-color": "#F8F9FA",
         "text-halo-width": 1.15,
         "text-opacity": 1
       }
@@ -963,7 +963,7 @@
         ]
       },
       "paint": {
-        "text-color": "#0E3158",
+        "text-color": "#3F4650",
         "text-halo-color": "#FFFFFF",
         "text-halo-width": 1.9,
         "text-halo-blur": 0.35

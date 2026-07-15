@@ -13,11 +13,13 @@ class RideLauncherView extends ConsumerWidget {
     required this.onChooseMode,
     required this.onOpenProfile,
     required this.onOpenDestinationSearch,
+    required this.onOpenTrips,
   });
 
   final ValueChanged<RideMode> onChooseMode;
   final VoidCallback onOpenProfile;
   final VoidCallback onOpenDestinationSearch;
+  final VoidCallback onOpenTrips;
 
   void _openOrders(BuildContext context) {
     Navigator.of(context).push<void>(
@@ -34,80 +36,82 @@ class RideLauncherView extends ConsumerWidget {
               ? session.fullName.trim().split(' ').first
               : 'Pasajero');
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FC),
+      backgroundColor: const Color(0xFFF8FAFF),
       body: SafeArea(
-        bottom: false,
-	        child: LayoutBuilder(
-	          builder: (context, constraints) {
-	            final compact = constraints.maxHeight < 860;
-	            return Center(
-	              child: FittedBox(
-	                fit: BoxFit.contain,
-	                alignment: Alignment.topCenter,
-	                child: SizedBox(
-	                  width: constraints.maxWidth,
-	                  height: compact ? 820 : 870,
-	                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _HomeHeroHeader(
-                        onOpenProfile: onOpenProfile,
-                        displayName: displayName,
-                      ),
-	                      Transform.translate(
-	                        offset: Offset(0, compact ? -16 : -22),
-	                        child: Padding(
-	                          padding: const EdgeInsets.symmetric(horizontal: 18),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _ServiceCard(
-                                      title: 'Pedir Taxi',
-                                      description: 'Viaja rapido y seguro',
-                                      accent: AppBrand.secondaryBlue,
-                                      foreground: Colors.white,
-                                      icon: Icons.local_taxi_rounded,
-                                      ctaLabel: 'Pedir ahora',
-                                      ctaForeground: AppBrand.secondaryBlue,
-                                      ctaBackground: Colors.white,
-                                      onTap: () => onChooseMode(RideMode.destino),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  Expanded(
-                                    child: _ServiceCard(
-                                      title: 'Tomar Taxi',
-                                      description: 'Encuentra taxis cercanos',
-                                      accent: AppBrand.accentYellow,
-                                      foreground: AppBrand.textPrimary,
-                                      icon: Icons.navigation_rounded,
-                                      ctaLabel: 'Conectarme',
-                                      ctaForeground: Colors.white,
-                                      ctaBackground: AppBrand.secondaryBlue,
-                                      onTap: () => onChooseMode(RideMode.cercano),
-                                    ),
-                                  ),
-                                ],
-                              ),
-	                              SizedBox(height: compact ? 10 : 12),
-	                              _OrdersCard(onTap: () => _openOrders(context)),
-	                              SizedBox(height: compact ? 10 : 12),
-	                              const _MiniMapPreviewCard(),
-	                              SizedBox(height: compact ? 10 : 12),
-	                              const _BenefitsRow(),
-	                              SizedBox(height: compact ? 10 : 12),
-	                              _SearchLauncherCard(onTap: onOpenDestinationSearch),
-                            ],
-                          ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxHeight < 820;
+            return Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: EdgeInsets.fromLTRB(
+                      18,
+                      12,
+                      18,
+                      compact ? 16 : 22,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _HomeHeroHeader(
+                          onOpenProfile: onOpenProfile,
+                          displayName: displayName,
                         ),
-                      ),
-                    ],
+                        SizedBox(height: compact ? 14 : 18),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _ServiceCard(
+                                title: 'Pedir Taxi',
+                                description: 'Viaja rapido y seguro',
+                                accent: AppBrand.secondaryBlue,
+                                foreground: Colors.white,
+                                icon: Icons.local_taxi_rounded,
+                                ctaLabel: 'Pedir ahora',
+                                ctaForeground: AppBrand.secondaryBlue,
+                                ctaBackground: Colors.white,
+                                onTap: () => onChooseMode(RideMode.destino),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: _ServiceCard(
+                                title: 'Tomar Taxi',
+                                description: 'Encuentra taxis cercanos',
+                                accent: AppBrand.accentYellow,
+                                foreground: AppBrand.textPrimary,
+                                icon: Icons.navigation_rounded,
+                                ctaLabel: 'Tomar ahora',
+                                ctaForeground: Colors.white,
+                                ctaBackground: AppBrand.secondaryBlue,
+                                onTap: () => onChooseMode(RideMode.cercano),
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: compact ? 12 : 14),
+                        _OrdersCard(onTap: () => _openOrders(context)),
+                        SizedBox(height: compact ? 12 : 14),
+                        const _MiniMapPreviewCard(),
+                        SizedBox(height: compact ? 12 : 14),
+                        _SearchLauncherCard(onTap: onOpenDestinationSearch),
+                        SizedBox(height: compact ? 12 : 14),
+                        const _BenefitsRow(),
+                      ],
+                    ),
                   ),
                 ),
-              ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
+                  child: _LauncherBottomBar(
+                    onOpenOrders: () => _openOrders(context),
+                    onOpenProfile: onOpenProfile,
+                    onOpenTrips: onOpenTrips,
+                  ),
+                ),
+              ],
             );
           },
         ),
@@ -128,200 +132,162 @@ class _HomeHeroHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF0047FF), Color(0xFF0F6CBD)],
-        ),
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(42),
-          bottomRight: Radius.circular(42),
-        ),
-      ),
-      child: Stack(
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Positioned(
-            right: -18,
-            bottom: -12,
-            child: Container(
-              width: 140,
-              height: 140,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.07),
-              ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Hola, $displayName 👋',
+                  style: GoogleFonts.plusJakartaSans(
+                    color: AppBrand.textPrimary,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -1.2,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.location_on_outlined,
+                      size: 20,
+                      color: AppBrand.secondaryBlue,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Potosí, Bolivia',
+                      style: GoogleFonts.plusJakartaSans(
+                        color: AppBrand.textSecondary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: AppBrand.textSecondary,
+                      size: 18,
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-          Positioned(
-            left: 110,
-            top: 28,
-            child: Container(
-              width: 150,
-              height: 90,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(28),
-                color: Colors.white.withValues(alpha: 0.04),
-              ),
-            ),
-          ),
+          const SizedBox(width: 12),
           Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.14),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: const Icon(
-                            Icons.local_taxi_rounded,
-                            color: AppBrand.accentYellow,
-                            size: 24,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          'RapiGo',
-                          style: GoogleFonts.plusJakartaSans(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.w900,
-                            fontStyle: FontStyle.italic,
-                            letterSpacing: -1.2,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                   Material(
                     color: Colors.white,
                     shape: const CircleBorder(),
                     elevation: 8,
-                    shadowColor: const Color(0x330B3CC1),
+                    shadowColor: const Color(0x140F172A),
+                    child: const SizedBox(
+                      width: 50,
+                      height: 50,
+                      child: Icon(
+                        Icons.notifications_none_rounded,
+                        color: AppBrand.textPrimary,
+                        size: 26,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Material(
+                    color: Colors.white,
+                    shape: const CircleBorder(),
+                    elevation: 10,
+                    shadowColor: const Color(0x160F172A),
                     child: InkWell(
                       customBorder: const CircleBorder(),
                       onTap: onOpenProfile,
-                      child: const SizedBox(
-                        width: 48,
-                        height: 48,
-                        child: Icon(
-                          Icons.person_rounded,
-                          color: AppBrand.secondaryBlue,
-                          size: 26,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Text(
-                '¡Buenas noches, $displayName! 👋',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.location_on_outlined,
-                    size: 16,
-                    color: Colors.white70,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Potosí, Bolivia',
-                    style: GoogleFonts.plusJakartaSans(
-                      color: Colors.white.withValues(alpha: 0.88),
-                    fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    color: Colors.white70,
-                    size: 18,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerRight,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF15389F).withValues(alpha: 0.92),
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x220B2C7A),
-                        blurRadius: 18,
-                        offset: Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 28,
-                        height: 28,
-                        decoration: const BoxDecoration(
-                          color: AppBrand.accentYellow,
+                      child: Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
                           shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white,
+                            width: 2,
+                          ),
                         ),
                         child: const Icon(
-                          Icons.star_rounded,
-                          color: AppBrand.textPrimary,
-                          size: 18,
+                          Icons.person_rounded,
+                          color: AppBrand.secondaryBlue,
+                          size: 28,
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '120 pts',
-                            style: GoogleFonts.plusJakartaSans(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 16,
-                            ),
-                          ),
-                          Text(
-                            'Mi saldo',
-                            style: GoogleFonts.plusJakartaSans(
-                              color: Colors.white.withValues(alpha: 0.85),
-                              fontWeight: FontWeight.w700,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(width: 10),
-                      const Icon(
-                        Icons.chevron_right_rounded,
-                        color: Colors.white,
-                      ),
-                    ],
+                    ),
                   ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: AppBrand.secondaryBlue,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x220B2C7A),
+                      blurRadius: 18,
+                      offset: Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: const BoxDecoration(
+                        color: AppBrand.accentYellow,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.star_rounded,
+                        color: AppBrand.textPrimary,
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '120 pts',
+                          style: GoogleFonts.plusJakartaSans(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 16,
+                          ),
+                        ),
+                        Text(
+                          'Mi saldo',
+                          style: GoogleFonts.plusJakartaSans(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 8),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: Colors.white,
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -704,7 +670,7 @@ class _BenefitsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.94),
         borderRadius: BorderRadius.circular(24),
@@ -720,37 +686,174 @@ class _BenefitsRow extends StatelessWidget {
         children: [
           Expanded(
             child: _BenefitItem(
-              icon: Icons.shield_outlined,
+              icon: Icons.home_filled,
               color: AppBrand.secondaryBlue,
-              title: 'Seguro',
-              subtitle: 'Conductores\nverificados',
+              title: 'Casa',
+              subtitle: 'Guardado',
             ),
           ),
           Expanded(
             child: _BenefitItem(
-              icon: Icons.bolt_rounded,
+              icon: Icons.work_rounded,
+              color: AppBrand.textPrimary,
+              title: 'Trabajo',
+              subtitle: 'Guardado',
+            ),
+          ),
+          Expanded(
+            child: _BenefitItem(
+              icon: Icons.star_rounded,
               color: AppBrand.accentYellow,
-              title: 'Rapido',
-              subtitle: 'Llegamos en\nminutos',
+              title: 'Favoritos',
+              subtitle: 'Lugares',
             ),
           ),
           Expanded(
             child: _BenefitItem(
-              icon: Icons.support_agent_rounded,
-              color: AppBrand.secondaryBlue,
-              title: 'Soporte 24/7',
-              subtitle: 'Estamos para\nayudarte',
-            ),
-          ),
-          Expanded(
-            child: _BenefitItem(
-              icon: Icons.verified_user_outlined,
-              color: AppBrand.accentYellow,
-              title: 'Confiable',
-              subtitle: 'Tu seguridad es\nprioridad',
+              icon: Icons.more_horiz_rounded,
+              color: AppBrand.textPrimary,
+              title: 'Más',
+              subtitle: 'Ver todo',
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _LauncherBottomBar extends StatelessWidget {
+  const _LauncherBottomBar({
+    required this.onOpenOrders,
+    required this.onOpenTrips,
+    required this.onOpenProfile,
+  });
+
+  final VoidCallback onOpenOrders;
+  final VoidCallback onOpenTrips;
+  final VoidCallback onOpenProfile;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x120F172A),
+            blurRadius: 24,
+            offset: Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Expanded(
+            child: _BottomItem(
+              icon: Icons.home_filled,
+              label: 'Inicio',
+              active: true,
+            ),
+          ),
+          Expanded(
+            child: _BottomItemButton(
+              icon: Icons.inventory_2_outlined,
+              label: 'Pedidos',
+              onTap: onOpenOrders,
+            ),
+          ),
+          Expanded(
+            child: _BottomItemButton(
+              icon: Icons.receipt_long_outlined,
+              label: 'Viajes',
+              onTap: onOpenTrips,
+            ),
+          ),
+          Expanded(
+            child: _BottomItemButton(
+              icon: Icons.person_outline_rounded,
+              label: 'Perfil',
+              onTap: onOpenProfile,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BottomItem extends StatelessWidget {
+  const _BottomItem({
+    required this.icon,
+    required this.label,
+    this.active = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = active ? AppBrand.secondaryBlue : AppBrand.textSecondary;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: color, size: 28),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: GoogleFonts.plusJakartaSans(
+            color: color,
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 6),
+        AnimatedOpacity(
+          opacity: active ? 1 : 0,
+          duration: const Duration(milliseconds: 220),
+          child: Container(
+            width: 28,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppBrand.secondaryBlue,
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BottomItemButton extends StatelessWidget {
+  const _BottomItemButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: _BottomItem(
+            icon: icon,
+            label: label,
+          ),
+        ),
       ),
     );
   }

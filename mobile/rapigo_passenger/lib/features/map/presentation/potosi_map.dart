@@ -56,6 +56,8 @@ class PotosiMapSurface extends ConsumerStatefulWidget {
     this.onMapCenterChanged,
     this.cameraCenterTarget,
     this.cameraCenterSignal = 0,
+    this.zoomActionSignal = 0,
+    this.zoomActionDelta = 0,
     this.showUtilityControls = true,
     this.showLiveNavigationMode = false,
     this.userMarkerAccentColor = const Color(0xFF0F6CBD),
@@ -83,6 +85,8 @@ class PotosiMapSurface extends ConsumerStatefulWidget {
   final void Function(LatLng center, bool hasGesture)? onMapCenterChanged;
   final LatLng? cameraCenterTarget;
   final int cameraCenterSignal;
+  final int zoomActionSignal;
+  final double zoomActionDelta;
   final bool showUtilityControls;
   final bool showLiveNavigationMode;
   final Color userMarkerAccentColor;
@@ -136,14 +140,16 @@ class _PotosiMapSurfaceState extends ConsumerState<PotosiMapSurface>
     });
   }
 
-  LatLng get _fallbackCenter =>
-      _cachedViewport != null
-          ? LatLng(_cachedViewport!.centerLat, _cachedViewport!.centerLng)
-          : (widget.routeStart ?? widget.userLocation);
+  LatLng get _fallbackCenter => _cachedViewport != null
+      ? LatLng(_cachedViewport!.centerLat, _cachedViewport!.centerLng)
+      : (widget.routeStart ?? widget.userLocation);
 
-  double get _fallbackZoom => _cachedViewport?.zoom ?? AppConfig.mapInitialZoom;
+  double get _fallbackZoom =>
+      (_cachedViewport?.zoom ?? AppConfig.mapInitialZoom)
+          .clamp(AppConfig.mapMinZoom, AppConfig.mapMaxZoom)
+          .toDouble();
 
-  double get _fallbackBearing => _cachedViewport?.bearing ?? 0;
+  double get _fallbackBearing => 0;
 
   @override
   Widget build(BuildContext context) {
@@ -193,6 +199,8 @@ class _PotosiMapSurfaceState extends ConsumerState<PotosiMapSurface>
                     showTargetEditBadge: widget.showTargetEditBadge,
                     cameraCenterTarget: widget.cameraCenterTarget,
                     cameraCenterSignal: widget.cameraCenterSignal,
+                    zoomActionSignal: widget.zoomActionSignal,
+                    zoomActionDelta: widget.zoomActionDelta,
                     showLiveNavigationMode: widget.showLiveNavigationMode,
                     userMarkerAccentColor: widget.userMarkerAccentColor,
                     userMarkerHaloColor: widget.userMarkerHaloColor,
@@ -206,7 +214,7 @@ class _PotosiMapSurfaceState extends ConsumerState<PotosiMapSurface>
                         centerLat: lat,
                         centerLng: lng,
                         zoom: zoom,
-                        bearing: bearing,
+                        bearing: 0,
                       );
                     },
                     onMapReady: () {
@@ -236,9 +244,7 @@ class _PotosiMapSurfaceState extends ConsumerState<PotosiMapSurface>
 }
 
 class _RapigoPassengerMapLoadingSurface extends StatelessWidget {
-  const _RapigoPassengerMapLoadingSurface({
-    required this.offlineReady,
-  });
+  const _RapigoPassengerMapLoadingSurface({required this.offlineReady});
 
   final bool offlineReady;
 
@@ -250,9 +256,9 @@ class _RapigoPassengerMapLoadingSurface extends StatelessWidget {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            const Color(0xFF082150).withValues(alpha: 0.96),
-            const Color(0xFF0C2D66).withValues(alpha: 0.92),
-            const Color(0xFF07111E).withValues(alpha: 0.98),
+            const Color(0xFFF8FBFF),
+            const Color(0xFFF4F8FF),
+            const Color(0xFFEFF5FF),
           ],
         ),
       ),
@@ -266,9 +272,15 @@ class _RapigoPassengerMapLoadingSurface extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: const LinearGradient(
-                  colors: [Color(0x4DFFFFFF), Color(0x14FFFFFF)],
+                  colors: [Color(0xFF4F8CFF), Color(0xFF2563EB)],
                 ),
-                border: Border.all(color: const Color(0x557DB7FF)),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x223B82F6),
+                    blurRadius: 22,
+                    offset: Offset(0, 10),
+                  ),
+                ],
               ),
               child: const Icon(
                 Icons.navigation_rounded,
@@ -278,22 +290,22 @@ class _RapigoPassengerMapLoadingSurface extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             const Text(
-              'Preparando mapa offline',
+              'Preparando mapa',
               style: TextStyle(
-                color: Colors.white,
-                fontSize: 15,
+                color: Color(0xFF0F172A),
+                fontSize: 16,
                 fontWeight: FontWeight.w800,
               ),
             ),
             const SizedBox(height: 6),
             Text(
               offlineReady
-                  ? 'Mapa azul listo en unos instantes'
-                  : 'Sincronizando experiencia RAPIGO',
+                  ? 'Mapa listo en caché'
+                  : 'Cargando experiencia RAPIGO',
               style: const TextStyle(
-                color: Color(0xFFB6CAE6),
+                color: Color(0xFF64748B),
                 fontSize: 12,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ],
@@ -324,6 +336,8 @@ class _PotosiMapLibreView extends ConsumerStatefulWidget {
     required this.showTargetEditBadge,
     this.cameraCenterTarget,
     required this.cameraCenterSignal,
+    required this.zoomActionSignal,
+    required this.zoomActionDelta,
     required this.showLiveNavigationMode,
     required this.userMarkerAccentColor,
     required this.userMarkerHaloColor,
@@ -356,6 +370,8 @@ class _PotosiMapLibreView extends ConsumerStatefulWidget {
   final bool showTargetEditBadge;
   final LatLng? cameraCenterTarget;
   final int cameraCenterSignal;
+  final int zoomActionSignal;
+  final double zoomActionDelta;
   final bool showLiveNavigationMode;
   final Color userMarkerAccentColor;
   final Color userMarkerHaloColor;
@@ -375,7 +391,8 @@ class _PotosiMapLibreView extends ConsumerStatefulWidget {
   final VoidCallback onHardFailure;
 
   @override
-  ConsumerState<_PotosiMapLibreView> createState() => _PotosiMapLibreViewState();
+  ConsumerState<_PotosiMapLibreView> createState() =>
+      _PotosiMapLibreViewState();
 }
 
 class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
@@ -394,13 +411,14 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
   bool _preserveViewportOnResume = false;
   bool _initialViewportLocked = false;
   bool _passengerMarkerImageLoaded = false;
-  double? _lastCameraBearing;
+  bool _driverMarkerImageLoaded = false;
   LatLng? _lastCameraTarget;
   ml.Circle? _passengerHaloCircle;
   ml.Circle? _passengerPulseCircle;
   ml.Circle? _passengerCoreCircle;
   ml.Symbol? _passengerSymbol;
   final List<ml.Circle> _nearbyDriverCircles = <ml.Circle>[];
+  final List<ml.Symbol> _nearbyDriverSymbols = <ml.Symbol>[];
   ml.Circle? _targetHaloCircle;
   ml.Circle? _targetCoreCircle;
   ml.Circle? _secondaryTargetHaloCircle;
@@ -415,7 +433,9 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
   double? _lastPersistedZoom;
   double? _lastPersistedBearing;
 
-  static const String _passengerMarkerImageId = 'rapigo_passenger_navigation_marker';
+  static const String _passengerMarkerImageId =
+      'rapigo_passenger_navigation_marker';
+  static const String _driverMarkerImageId = 'rapigo_nearby_taxi_marker';
   static const String _routeSourceId = 'rapigo_passenger_route_source';
   static const String _routeGlowLayerId = 'rapigo_passenger_route_glow';
   static const String _routeMainLayerId = 'rapigo_passenger_route_main';
@@ -449,25 +469,34 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
         oldWidget.secondaryMarker != widget.secondaryMarker ||
         oldWidget.showRoute != widget.showRoute ||
         oldWidget.showTargetMarker != widget.showTargetMarker ||
-        oldWidget.focusBounds != widget.focusBounds ||
-        oldWidget.cameraCenterTarget != widget.cameraCenterTarget;
-    final driversChanged = !_sameDriverMarkers(oldWidget.drivers, widget.drivers);
+        oldWidget.focusBounds != widget.focusBounds;
+    final driversChanged = !_sameDriverMarkers(
+      oldWidget.drivers,
+      widget.drivers,
+    );
+    final zoomActionChanged =
+        oldWidget.zoomActionSignal != widget.zoomActionSignal &&
+        widget.zoomActionDelta != 0;
+    final focusSignalChanged = oldWidget.focusSignal != widget.focusSignal;
+    final cameraCenterSignalChanged =
+        oldWidget.cameraCenterSignal != widget.cameraCenterSignal;
 
+    if (zoomActionChanged) {
+      _initialViewportLocked = false;
+      unawaited(_applyExternalZoomDelta());
+    }
+    if (focusSignalChanged || cameraCenterSignalChanged) {
+      _initialViewportLocked = false;
+      unawaited(_syncCamera(useCameraCenterTarget: cameraCenterSignalChanged));
+    }
     if (routeStructureChanged || driversChanged) {
       _initialViewportLocked = false;
       _refreshRoute();
       return;
     }
     if (userVisualChanged) {
-      _initialViewportLocked = false;
       unawaited(_updatePassengerVisuals());
-      unawaited(_syncCamera());
       return;
-    }
-    if (oldWidget.focusSignal != widget.focusSignal ||
-        oldWidget.cameraCenterSignal != widget.cameraCenterSignal) {
-      _initialViewportLocked = false;
-      unawaited(_syncCamera());
     }
   }
 
@@ -484,6 +513,41 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
     _resumeSettleTimer?.cancel();
     _followLoopTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _applyExternalZoomDelta() async {
+    final controller = _controller;
+    if (controller == null || !_styleLoaded) {
+      return;
+    }
+    try {
+      final camera = controller.cameraPosition;
+      if (camera == null) {
+        return;
+      }
+      final nextZoom = (camera.zoom + widget.zoomActionDelta)
+          .clamp(AppConfig.mapMinZoom, AppConfig.mapMaxZoom)
+          .toDouble();
+      await controller.animateCamera(
+        ml.CameraUpdate.newCameraPosition(
+          ml.CameraPosition(
+            target: camera.target,
+            zoom: nextZoom,
+            bearing: camera.bearing,
+            tilt: camera.tilt,
+          ),
+        ),
+      );
+      _lastAnimatedCameraTarget = LatLng(
+        camera.target.latitude,
+        camera.target.longitude,
+      );
+      _lastAnimatedCameraZoom = nextZoom;
+      _lastAnimatedCameraBearing = camera.bearing;
+      _lastCameraAnimationAt = DateTime.now();
+    } catch (_) {
+      // Ignore zoom taps while the map is still settling.
+    }
   }
 
   @override
@@ -516,31 +580,6 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
     );
   }
 
-  double _smoothedBearing(double targetBearing) {
-    final normalizedTarget = (targetBearing % 360 + 360) % 360;
-    final previous = _lastCameraBearing;
-    if (previous == null) {
-      _lastCameraBearing = normalizedTarget;
-      return normalizedTarget;
-    }
-
-    var delta = normalizedTarget - previous;
-    if (delta > 180) {
-      delta -= 360;
-    } else if (delta < -180) {
-      delta += 360;
-    }
-
-    if (delta.abs() < 1.8) {
-      return previous;
-    }
-
-    final factor = delta.abs() > 25 ? 0.55 : 0.28;
-    final next = previous + (delta * factor);
-    _lastCameraBearing = (next % 360 + 360) % 360;
-    return _lastCameraBearing!;
-  }
-
   LatLng _smoothedTarget(LatLng target) {
     final previous = _lastCameraTarget;
     if (previous == null) {
@@ -562,12 +601,12 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
   }) {
     final radians = headingDegrees * (math.pi / 180);
     final deltaLat = (metersAhead * math.cos(radians)) / 111320;
-    final cosLat = math.cos(origin.latitude * (math.pi / 180)).abs().clamp(0.2, 1.0);
+    final cosLat = math
+        .cos(origin.latitude * (math.pi / 180))
+        .abs()
+        .clamp(0.2, 1.0);
     final deltaLng = (metersAhead * math.sin(radians)) / (111320 * cosLat);
-    return LatLng(
-      origin.latitude + deltaLat,
-      origin.longitude + deltaLng,
-    );
+    return LatLng(origin.latitude + deltaLat, origin.longitude + deltaLng);
   }
 
   bool _sameDriverMarkers(
@@ -609,7 +648,8 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
     return _snapSoftlyToRoute(widget.userLocation, route);
   }
 
-  double _visualHeading() => _displayHeadingDegrees ?? (widget.userHeadingDegrees ?? 0).toDouble();
+  double _visualHeading() =>
+      _displayHeadingDegrees ?? (widget.userHeadingDegrees ?? 0).toDouble();
 
   void _startFollowLoop() {
     _followLoopTimer?.cancel();
@@ -632,14 +672,16 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
     final pointFactor = distanceMeters > 18
         ? 0.34
         : distanceMeters > 8
-            ? 0.26
-            : 0.18;
+        ? 0.26
+        : 0.18;
     final nextPoint = distanceMeters < 0.45
         ? targetPoint
         : LatLng(
-            currentPoint.latitude + ((targetPoint.latitude - currentPoint.latitude) * pointFactor),
+            currentPoint.latitude +
+                ((targetPoint.latitude - currentPoint.latitude) * pointFactor),
             currentPoint.longitude +
-                ((targetPoint.longitude - currentPoint.longitude) * pointFactor),
+                ((targetPoint.longitude - currentPoint.longitude) *
+                    pointFactor),
           );
 
     final targetHeading = (widget.userHeadingDegrees ?? 0).toDouble();
@@ -659,7 +701,6 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
 
     if (_controller != null && _styleLoaded && !_isSyncingScene) {
       unawaited(_updatePassengerVisuals());
-      unawaited(_syncCamera());
     }
   }
 
@@ -694,8 +735,8 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
     final factor = distanceMeters <= 4
         ? 0.90
         : distanceMeters <= 10
-            ? 0.72
-            : 0.52;
+        ? 0.72
+        : 0.52;
     return LatLng(
       current.latitude + ((snapped.latitude - current.latitude) * factor),
       current.longitude + ((snapped.longitude - current.longitude) * factor),
@@ -707,11 +748,7 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
     var bestDistance = double.infinity;
     for (var i = 0; i < route.length - 1; i++) {
       final candidate = _projectPointToSegment(point, route[i], route[i + 1]);
-      final distance = const Distance().as(
-        LengthUnit.Meter,
-        point,
-        candidate,
-      );
+      final distance = const Distance().as(LengthUnit.Meter, point, candidate);
       if (distance < bestDistance) {
         bestDistance = distance;
         bestPoint = candidate;
@@ -737,10 +774,7 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
     final apy = py - ay;
     final t = ((apx * abx) + (apy * aby)) / ab2;
     final clamped = t.clamp(0.0, 1.0);
-    return LatLng(
-      ay + (aby * clamped),
-      ax + (abx * clamped),
-    );
+    return LatLng(ay + (aby * clamped), ax + (abx * clamped));
   }
 
   void _startFailSafe() {
@@ -756,7 +790,10 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
     if (_routeLayersReady) {
       return;
     }
-    await controller.addGeoJsonSource(_routeSourceId, _routeGeoJson(const <LatLng>[]));
+    await controller.addGeoJsonSource(
+      _routeSourceId,
+      _routeGeoJson(const <LatLng>[]),
+    );
     await controller.addLineLayer(
       _routeSourceId,
       _routeGlowLayerId,
@@ -816,7 +853,8 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
     }
 
     try {
-      final rawStyle = MapStyleCache.get(runtime.style.assetPath) ??
+      final rawStyle =
+          MapStyleCache.get(runtime.style.assetPath) ??
           await MapStyleCache.preload(runtime.style.assetPath);
       if (!mounted) {
         return;
@@ -865,10 +903,9 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
     }
 
     try {
-      final bundle = await ref.read(routeServiceProvider).fetchRouteBundle(
-            start: start,
-            end: target,
-          );
+      final bundle = await ref
+          .read(routeServiceProvider)
+          .fetchRouteBundle(start: start, end: target);
       if (!mounted) {
         return;
       }
@@ -907,7 +944,9 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
       final route = _routeBundle?.primary;
       await controller.setGeoJsonSource(
         _routeSourceId,
-        _routeGeoJson(route != null && route.length >= 2 ? route : const <LatLng>[]),
+        _routeGeoJson(
+          route != null && route.length >= 2 ? route : const <LatLng>[],
+        ),
       );
       await controller.setLayerProperties(
         _routeMainLayerId,
@@ -917,7 +956,6 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
       await _upsertNearbyDrivers(controller);
       await _upsertPassengerMarker(controller);
       await _upsertTargetMarkers(controller);
-      await _syncCamera();
     } catch (_) {
       _triggerFallback();
     } finally {
@@ -926,38 +964,44 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
   }
 
   Future<void> _clearNearbyDrivers(ml.MapLibreMapController controller) async {
-    if (_nearbyDriverCircles.isEmpty) {
+    if (_nearbyDriverCircles.isEmpty && _nearbyDriverSymbols.isEmpty) {
       return;
     }
     for (final circle in _nearbyDriverCircles) {
       await controller.removeCircle(circle);
     }
+    for (final symbol in _nearbyDriverSymbols) {
+      await controller.removeSymbol(symbol);
+    }
     _nearbyDriverCircles.clear();
+    _nearbyDriverSymbols.clear();
   }
 
   Future<void> _upsertNearbyDrivers(ml.MapLibreMapController controller) async {
     await _clearNearbyDrivers(controller);
-    final ordered = [...widget.drivers]..sort((a, b) {
-      if (a.isHighlighted == b.isHighlighted) {
-        return 0;
-      }
-      return a.isHighlighted ? 1 : -1;
-    });
+    await _ensureDriverMarkerImage(controller);
+    final ordered = [...widget.drivers]
+      ..sort((a, b) {
+        if (a.isHighlighted == b.isHighlighted) {
+          return 0;
+        }
+        return a.isHighlighted ? 1 : -1;
+      });
 
     for (final driver in ordered) {
       final point = _toMlLatLng(driver.point);
-      final haloColor = driver.isHighlighted ? '#7DB8FF' : '#6AA3F5';
-      final markerColor = driver.isHighlighted ? '#2F80FF' : '#3E8CFF';
-      final markerRadius = driver.isHighlighted ? 7.6 : 5.9;
-      final haloRadius = driver.isHighlighted ? 15.5 : 11.2;
+      final haloColor = driver.isHighlighted ? '#22C55E' : '#86EFAC';
+      final markerColor = driver.isHighlighted ? '#BBF7D0' : '#DCFCE7';
+      final markerRadius = driver.isHighlighted ? 10.0 : 8.0;
+      final haloRadius = driver.isHighlighted ? 22.0 : 17.0;
 
       final halo = await controller.addCircle(
         ml.CircleOptions(
           geometry: point,
           circleRadius: haloRadius,
           circleColor: haloColor,
-          circleOpacity: driver.isHighlighted ? 0.22 : 0.12,
-          circleBlur: 0.85,
+          circleOpacity: driver.isHighlighted ? 0.26 : 0.18,
+          circleBlur: 0.78,
         ),
       );
       final marker = await controller.addCircle(
@@ -966,40 +1010,48 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
           circleRadius: markerRadius,
           circleColor: markerColor,
           circleStrokeColor: '#FFFFFF',
-          circleStrokeWidth: driver.isHighlighted ? 3.2 : 2.2,
-          circleStrokeOpacity: 0.96,
-          circleOpacity: 0.96,
+          circleStrokeWidth: driver.isHighlighted ? 2.2 : 1.5,
+          circleStrokeOpacity: driver.isHighlighted ? 0.95 : 0.75,
+          circleOpacity: driver.isHighlighted ? 0.82 : 0.48,
+        ),
+      );
+      final symbol = await controller.addSymbol(
+        ml.SymbolOptions(
+          geometry: point,
+          iconImage: _driverMarkerImageId,
+          iconSize: driver.isHighlighted ? 1.02 : 0.86,
+          iconAnchor: 'center',
         ),
       );
       _nearbyDriverCircles
         ..add(halo)
         ..add(marker);
+      _nearbyDriverSymbols.add(symbol);
     }
   }
 
-  Future<void> _upsertPassengerMarker(ml.MapLibreMapController controller) async {
+  Future<void> _upsertPassengerMarker(
+    ml.MapLibreMapController controller,
+  ) async {
     final point = _toMlLatLng(_visualPassengerPoint());
     final accuracyMeters = (widget.userAccuracyMeters ?? 20).clamp(8, 120);
-    final haloRadius = 18 + (accuracyMeters / 18);
-    final pulseRadius = 11 + (accuracyMeters / 28);
+    final haloRadius = 22 + (accuracyMeters / 16);
+    final pulseRadius = 14 + (accuracyMeters / 24);
 
     if (_passengerHaloCircle == null) {
       _passengerHaloCircle = await controller.addCircle(
         ml.CircleOptions(
           geometry: point,
           circleRadius: haloRadius,
-          circleColor: '#4DA3FF',
-          circleOpacity: 0.12,
-          circleBlur: 0.92,
+          circleColor: _hex(widget.userMarkerHaloColor),
+          circleOpacity: 0.14,
+          circleBlur: 0.94,
         ),
       );
     } else {
       await controller.updateCircle(
         _passengerHaloCircle!,
-        ml.CircleOptions(
-          geometry: point,
-          circleRadius: haloRadius,
-        ),
+        ml.CircleOptions(geometry: point, circleRadius: haloRadius),
       );
     }
     if (_passengerPulseCircle == null) {
@@ -1007,28 +1059,25 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
         ml.CircleOptions(
           geometry: point,
           circleRadius: pulseRadius,
-          circleColor: '#2979FF',
-          circleOpacity: 0.18,
-          circleBlur: 0.84,
+          circleColor: _hex(widget.userMarkerAccentColor),
+          circleOpacity: 0.24,
+          circleBlur: 0.88,
         ),
       );
     } else {
       await controller.updateCircle(
         _passengerPulseCircle!,
-        ml.CircleOptions(
-          geometry: point,
-          circleRadius: pulseRadius,
-        ),
+        ml.CircleOptions(geometry: point, circleRadius: pulseRadius),
       );
     }
     if (_passengerCoreCircle == null) {
       _passengerCoreCircle = await controller.addCircle(
         ml.CircleOptions(
           geometry: point,
-          circleRadius: 7.6,
+          circleRadius: 8.6,
           circleColor: '#F8FBFF',
-          circleStrokeColor: '#2979FF',
-          circleStrokeWidth: 3.8,
+          circleStrokeColor: _hex(widget.userMarkerAccentColor),
+          circleStrokeWidth: 4.2,
           circleStrokeOpacity: 0.98,
           circleOpacity: 1,
         ),
@@ -1053,10 +1102,7 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
     } else {
       await controller.updateSymbol(
         _passengerSymbol!,
-        ml.SymbolOptions(
-          geometry: point,
-          iconRotate: _visualHeading(),
-        ),
+        ml.SymbolOptions(geometry: point, iconRotate: _visualHeading()),
       );
     }
   }
@@ -1075,43 +1121,34 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
 
     final point = _toMlLatLng(_visualPassengerPoint());
     final accuracyMeters = (widget.userAccuracyMeters ?? 20).clamp(8, 120);
-    final haloRadius = 18 + (accuracyMeters / 18);
-    final pulseRadius = 11 + (accuracyMeters / 28);
+    final haloRadius = 22 + (accuracyMeters / 16);
+    final pulseRadius = 14 + (accuracyMeters / 24);
 
     try {
       await controller.updateCircle(
         _passengerHaloCircle!,
-        ml.CircleOptions(
-          geometry: point,
-          circleRadius: haloRadius,
-        ),
+        ml.CircleOptions(geometry: point, circleRadius: haloRadius),
       );
       await controller.updateCircle(
         _passengerPulseCircle!,
-        ml.CircleOptions(
-          geometry: point,
-          circleRadius: pulseRadius,
-        ),
+        ml.CircleOptions(geometry: point, circleRadius: pulseRadius),
       );
       await controller.updateCircle(
         _passengerCoreCircle!,
-        ml.CircleOptions(
-          geometry: point,
-        ),
+        ml.CircleOptions(geometry: point),
       );
       await controller.updateSymbol(
         _passengerSymbol!,
-        ml.SymbolOptions(
-          geometry: point,
-          iconRotate: _visualHeading(),
-        ),
+        ml.SymbolOptions(geometry: point, iconRotate: _visualHeading()),
       );
     } catch (_) {
       await _syncScene();
     }
   }
 
-  Future<void> _ensurePassengerMarkerImage(ml.MapLibreMapController controller) async {
+  Future<void> _ensurePassengerMarkerImage(
+    ml.MapLibreMapController controller,
+  ) async {
     if (_passengerMarkerImageLoaded) {
       return;
     }
@@ -1122,45 +1159,174 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
     _passengerMarkerImageLoaded = true;
   }
 
-  Future<Uint8List> _buildPassengerMarkerImageBytes() async {
-    const size = 120.0;
+  Future<void> _ensureDriverMarkerImage(
+    ml.MapLibreMapController controller,
+  ) async {
+    if (_driverMarkerImageLoaded) {
+      return;
+    }
+    await controller.addImage(
+      _driverMarkerImageId,
+      await _buildDriverMarkerImageBytes(),
+    );
+    _driverMarkerImageLoaded = true;
+  }
+
+  Future<Uint8List> _buildDriverMarkerImageBytes() async {
+    const size = 160.0;
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     const center = Offset(size / 2, size / 2);
 
-    final haloPaint =
-        Paint()
-          ..color = const Color(0x55FFFFFF)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18);
-    canvas.drawCircle(center, 27, haloPaint);
+    canvas.drawCircle(
+      center,
+      48,
+      Paint()
+        ..color = const Color(0x6634D399)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 22),
+    );
+    canvas.drawCircle(center, 36, Paint()..color = const Color(0x2234D399));
+    canvas
+      ..save()
+      ..translate(center.dx, center.dy)
+      ..rotate(-0.55);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: const Offset(2, 5), width: 82, height: 52),
+        const Radius.circular(18),
+      ),
+      Paint()
+        ..color = const Color(0x55000000)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10),
+    );
+    final carRect = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: Offset.zero, width: 82, height: 50),
+      const Radius.circular(18),
+    );
+    canvas.drawRRect(carRect, Paint()..color = const Color(0xFFFACC15));
+    canvas.drawRRect(
+      carRect,
+      Paint()
+        ..color = const Color(0xFF111827)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: const Offset(0, -11), width: 44, height: 18),
+        const Radius.circular(8),
+      ),
+      Paint()..color = const Color(0xFF172554),
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: const Offset(-23, -6), width: 18, height: 12),
+        const Radius.circular(5),
+      ),
+      Paint()..color = Colors.white.withValues(alpha: 0.74),
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: const Offset(23, -6), width: 18, height: 12),
+        const Radius.circular(5),
+      ),
+      Paint()..color = Colors.white.withValues(alpha: 0.74),
+    );
+    canvas.drawCircle(
+      const Offset(-30, 18),
+      8,
+      Paint()..color = const Color(0xFF111827),
+    );
+    canvas.drawCircle(
+      const Offset(30, 18),
+      8,
+      Paint()..color = const Color(0xFF111827),
+    );
+    canvas.drawCircle(
+      const Offset(-30, 18),
+      3.2,
+      Paint()..color = const Color(0xFFE5E7EB),
+    );
+    canvas.drawCircle(
+      const Offset(30, 18),
+      3.2,
+      Paint()..color = const Color(0xFFE5E7EB),
+    );
+    canvas.restore();
 
-    final outerRingPaint =
-        Paint()
-          ..color = const Color(0x44FFFFFF)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 8;
-    canvas.drawCircle(center, 27, outerRingPaint);
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(size.toInt(), size.toInt());
+    final data = await image.toByteData(format: ui.ImageByteFormat.png);
+    return data!.buffer.asUint8List();
+  }
+
+  Future<Uint8List> _buildPassengerMarkerImageBytes() async {
+    const size = 144.0;
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    const center = Offset(size / 2, size / 2);
+
+    final haloOuter = Paint()
+      ..color = widget.userMarkerHaloColor.withValues(alpha: 0.16)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 24);
+    final haloInner = Paint()
+      ..color = widget.userMarkerHaloColor.withValues(alpha: 0.28)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
+    canvas.drawCircle(center, 33, haloOuter);
+    canvas.drawCircle(center, 25, haloInner);
+    canvas.drawCircle(
+      center,
+      24,
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.08)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0,
+    );
+
+    final arrowPath = ui.Path()
+      ..moveTo(center.dx, center.dy - 48)
+      ..lineTo(center.dx + 12, center.dy - 22)
+      ..lineTo(center.dx + 3, center.dy - 26)
+      ..lineTo(center.dx, center.dy - 8)
+      ..lineTo(center.dx - 3, center.dy - 26)
+      ..lineTo(center.dx - 12, center.dy - 22)
+      ..close();
+    canvas.drawPath(
+      arrowPath.shift(const Offset(0, 3)),
+      Paint()
+        ..color = const Color(0x44000000)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10),
+    );
+    canvas.drawPath(
+      arrowPath,
+      Paint()
+        ..shader = ui.Gradient.linear(
+          Offset(center.dx, center.dy - 48),
+          Offset(center.dx, center.dy - 8),
+          <Color>[
+            widget.userMarkerBorderColor.withValues(alpha: 0.96),
+            widget.userMarkerAccentColor,
+          ],
+        ),
+    );
+    canvas.drawPath(
+      arrowPath,
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.94)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.2,
+    );
 
     final discPaint = Paint()..color = const Color(0xFF0B0D12);
-    canvas.drawCircle(center, 24, discPaint);
-
-    final borderPaint =
-        Paint()
-          ..color = Colors.white
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 4;
-    canvas.drawCircle(center, 24, borderPaint);
-
-    final arrowPath =
-        ui.Path()
-          ..moveTo(center.dx, center.dy - 14)
-          ..lineTo(center.dx + 12, center.dy + 10)
-          ..lineTo(center.dx + 2.5, center.dy + 6.2)
-          ..lineTo(center.dx, center.dy + 15.2)
-          ..lineTo(center.dx - 2.5, center.dy + 6.2)
-          ..lineTo(center.dx - 12, center.dy + 10)
-          ..close();
-    canvas.drawPath(arrowPath, Paint()..color = Colors.white);
+    canvas.drawCircle(center, 20, discPaint);
+    canvas.drawCircle(
+      center,
+      20,
+      Paint()
+        ..color = widget.userMarkerBorderColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3.4,
+    );
 
     final picture = recorder.endRecording();
     final image = await picture.toImage(size.toInt(), size.toInt());
@@ -1264,7 +1430,7 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
     }
   }
 
-  Future<void> _syncCamera() async {
+  Future<void> _syncCamera({bool useCameraCenterTarget = false}) async {
     final controller = _controller;
     if (controller == null ||
         !_styleLoaded ||
@@ -1276,13 +1442,14 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
     try {
       final now = DateTime.now();
       if (_lastCameraAnimationAt != null &&
-          now.difference(_lastCameraAnimationAt!) < const Duration(milliseconds: 140)) {
+          now.difference(_lastCameraAnimationAt!) <
+              const Duration(milliseconds: 140)) {
         return;
       }
-      if (widget.cameraCenterTarget != null) {
+      if (useCameraCenterTarget && widget.cameraCenterTarget != null) {
         _unlockInitialViewportIfNeeded();
         final target = widget.cameraCenterTarget!;
-        final nextZoom = widget.showLiveNavigationMode ? 17.9 : 16.9;
+        final nextZoom = widget.showLiveNavigationMode ? 16.5 : 15.5;
         final targetDelta = _lastAnimatedCameraTarget == null
             ? double.infinity
             : const Distance().as(
@@ -1296,10 +1463,7 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
           return;
         }
         await controller.animateCamera(
-          ml.CameraUpdate.newLatLngZoom(
-            _toMlLatLng(target),
-            nextZoom,
-          ),
+          ml.CameraUpdate.newLatLngZoom(_toMlLatLng(target), nextZoom),
         );
         _lastAnimatedCameraTarget = target;
         _lastAnimatedCameraZoom = nextZoom;
@@ -1315,11 +1479,10 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
           _forwardLookingTarget(
             _visualPassengerPoint(),
             headingDegrees: heading,
-            metersAhead: 34,
+            metersAhead: 44,
           ),
         );
-        final bearing = _smoothedBearing(heading);
-        const nextZoom = 18.1;
+        const nextZoom = 16.5;
         final targetDelta = _lastAnimatedCameraTarget == null
             ? double.infinity
             : const Distance().as(
@@ -1329,7 +1492,7 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
               );
         final bearingDelta = _lastAnimatedCameraBearing == null
             ? double.infinity
-            : (_lastAnimatedCameraBearing! - bearing).abs();
+            : _lastAnimatedCameraBearing!.abs();
         if (targetDelta < 2.2 &&
             bearingDelta < 2.2 &&
             _lastAnimatedCameraZoom != null &&
@@ -1341,14 +1504,14 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
             ml.CameraPosition(
               target: _toMlLatLng(target),
               zoom: nextZoom,
-              bearing: bearing,
+              bearing: 0,
               tilt: 0,
             ),
           ),
         );
         _lastAnimatedCameraTarget = target;
         _lastAnimatedCameraZoom = nextZoom;
-        _lastAnimatedCameraBearing = bearing;
+        _lastAnimatedCameraBearing = 0;
         _lastCameraAnimationAt = now;
         return;
       }
@@ -1362,11 +1525,10 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
           _forwardLookingTarget(
             _visualPassengerPoint(),
             headingDegrees: heading,
-            metersAhead: 22,
+            metersAhead: 30,
           ),
         );
-        final bearing = _smoothedBearing(heading);
-        const nextZoom = 17.4;
+        const nextZoom = 15.9;
         final targetDelta = _lastAnimatedCameraTarget == null
             ? double.infinity
             : const Distance().as(
@@ -1376,7 +1538,7 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
               );
         final bearingDelta = _lastAnimatedCameraBearing == null
             ? double.infinity
-            : (_lastAnimatedCameraBearing! - bearing).abs();
+            : _lastAnimatedCameraBearing!.abs();
         if (targetDelta < 2.2 &&
             bearingDelta < 2.2 &&
             _lastAnimatedCameraZoom != null &&
@@ -1388,14 +1550,14 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
             ml.CameraPosition(
               target: _toMlLatLng(target),
               zoom: nextZoom,
-              bearing: bearing,
+              bearing: 0,
               tilt: 0,
             ),
           ),
         );
         _lastAnimatedCameraTarget = target;
         _lastAnimatedCameraZoom = nextZoom;
-        _lastAnimatedCameraBearing = bearing;
+        _lastAnimatedCameraBearing = 0;
         _lastCameraAnimationAt = now;
         return;
       }
@@ -1488,16 +1650,16 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
       points.last,
     );
     if (distance <= 180) {
-      return 17.8;
-    }
-    if (distance <= 400) {
-      return 17.1;
-    }
-    if (distance <= 900) {
       return 16.4;
     }
+    if (distance <= 400) {
+      return 16.0;
+    }
+    if (distance <= 900) {
+      return 15.5;
+    }
     if (distance <= 1800) {
-      return 15.7;
+      return 15.0;
     }
     if (distance <= 3500) {
       return 15.0;
@@ -1511,12 +1673,25 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
     return 12.9;
   }
 
-  ml.LatLng _toMlLatLng(LatLng point) => ml.LatLng(point.latitude, point.longitude);
+  ml.LatLng _toMlLatLng(LatLng point) =>
+      ml.LatLng(point.latitude, point.longitude);
 
   String _hex(Color color) {
-    final r = (color.r * 255.0).round().clamp(0, 255).toRadixString(16).padLeft(2, '0');
-    final g = (color.g * 255.0).round().clamp(0, 255).toRadixString(16).padLeft(2, '0');
-    final b = (color.b * 255.0).round().clamp(0, 255).toRadixString(16).padLeft(2, '0');
+    final r = (color.r * 255.0)
+        .round()
+        .clamp(0, 255)
+        .toRadixString(16)
+        .padLeft(2, '0');
+    final g = (color.g * 255.0)
+        .round()
+        .clamp(0, 255)
+        .toRadixString(16)
+        .padLeft(2, '0');
+    final b = (color.b * 255.0)
+        .round()
+        .clamp(0, 255)
+        .toRadixString(16)
+        .padLeft(2, '0');
     return '#$r$g$b';
   }
 
@@ -1526,11 +1701,9 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
     final styleString = _resolvedStyleString;
     if (styleString == null || styleString.isEmpty) {
       return const ColoredBox(
-        color: Color(0xFFD9E8F8),
+        color: Color(0xFFE7E9EC),
         child: Center(
-          child: CircularProgressIndicator(
-            color: Color(0xFF2979FF),
-          ),
+          child: CircularProgressIndicator(color: Color(0xFF2979FF)),
         ),
       );
     }
@@ -1542,7 +1715,11 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
           initialCameraPosition: ml.CameraPosition(
             target: _toMlLatLng(widget.initialCenter),
             zoom: widget.initialZoom,
-            bearing: widget.initialBearing,
+            bearing: 0,
+          ),
+          minMaxZoomPreference: const ml.MinMaxZoomPreference(
+            AppConfig.mapMinZoom,
+            AppConfig.mapMaxZoom,
           ),
           rotateGesturesEnabled: true,
           scrollGesturesEnabled: true,
@@ -1562,19 +1739,22 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
             final lat = position.target.latitude;
             final lng = position.target.longitude;
             final zoom = position.zoom;
-            final bearing = position.bearing;
-            final shouldPersist = _lastPersistedCenterLat == null ||
+            final bearing = 0.0;
+            final shouldPersist =
+                _lastPersistedCenterLat == null ||
                 _lastPersistedCenterLng == null ||
                 const Distance().as(
                       LengthUnit.Meter,
-                      LatLng(_lastPersistedCenterLat!, _lastPersistedCenterLng!),
+                      LatLng(
+                        _lastPersistedCenterLat!,
+                        _lastPersistedCenterLng!,
+                      ),
                       LatLng(lat, lng),
                     ) >
                     3.5 ||
                 _lastPersistedZoom == null ||
                 (_lastPersistedZoom! - zoom).abs() > 0.05 ||
-                _lastPersistedBearing == null ||
-                (_lastPersistedBearing! - bearing).abs() > 1.0;
+                _lastPersistedBearing == null;
             if (shouldPersist) {
               _lastPersistedCenterLat = lat;
               _lastPersistedCenterLng = lng;
@@ -1583,10 +1763,7 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
               widget.onCameraViewportChanged(lat, lng, zoom, bearing);
             }
             _cameraGestureActive = true;
-            widget.onMapCenterChanged?.call(
-              LatLng(lat, lng),
-              true,
-            );
+            widget.onMapCenterChanged?.call(LatLng(lat, lng), true);
           },
           onCameraIdle: () {
             final center = _controller?.cameraPosition?.target;
@@ -1610,6 +1787,8 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
             _passengerCoreCircle = null;
             _passengerSymbol = null;
             _nearbyDriverCircles.clear();
+            _nearbyDriverSymbols.clear();
+            _driverMarkerImageLoaded = false;
             _targetHaloCircle = null;
             _targetCoreCircle = null;
             _secondaryTargetHaloCircle = null;
@@ -1637,11 +1816,7 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
             ),
           ),
         ),
-        const Positioned(
-          left: 16,
-          bottom: 16,
-          child: OfflineMapReadyBadge(),
-        ),
+        const Positioned(left: 16, bottom: 16, child: OfflineMapReadyBadge()),
       ],
     );
   }
@@ -1722,13 +1897,8 @@ class _PotosiMapState extends ConsumerState<PotosiMap>
   LatLng? _lastTargetLookupPoint;
   Timer? _detailsDebounce;
   bool _didApplyInitialFollow = false;
-  bool _isFollowingUser = true;
+  bool _isFollowingUser = false;
   double _mapRotation = 0;
-  late final AnimationController _rotationResetController = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 420),
-  );
-  Animation<double>? _rotationResetAnimation;
   late final AnimationController _cameraFollowController = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 520),
@@ -1761,23 +1931,14 @@ class _PotosiMapState extends ConsumerState<PotosiMap>
         (_) => _centerCameraOn(widget.cameraCenterTarget!),
       );
     }
-    if (widget.showLiveNavigationMode &&
-        (oldWidget.routeStart != widget.routeStart ||
-            oldWidget.routeTarget != widget.routeTarget)) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _applyFocus());
-    }
     if (_shouldRefreshLocationDetails(oldWidget)) {
       _scheduleLocationDetailsRefresh();
-    }
-    if (oldWidget.userLocation != widget.userLocation) {
-      _maybeFollowUser();
     }
   }
 
   @override
   void dispose() {
     _detailsDebounce?.cancel();
-    _rotationResetController.dispose();
     if (_cameraFrameListener != null) {
       _cameraFollowController.removeListener(_cameraFrameListener!);
       _cameraFrameListener = null;
@@ -1816,7 +1977,7 @@ class _PotosiMapState extends ConsumerState<PotosiMap>
     if (widget.showLiveNavigationMode && widget.routeStart != null) {
       _animateCameraTo(
         target: widget.routeStart!,
-        zoom: 17.4,
+        zoom: 16.2,
         duration: const Duration(milliseconds: 620),
       );
       return;
@@ -1831,7 +1992,7 @@ class _PotosiMapState extends ConsumerState<PotosiMap>
         ? (widget.routeStart ?? widget.routeTarget ?? widget.userLocation)
         : (widget.routeTarget ?? widget.userLocation);
     final zoom = widget.showLiveNavigationMode
-        ? 16.8
+        ? 16.0
         : AppConfig.mapInitialZoom;
     _animateCameraTo(target: target, zoom: zoom);
   }
@@ -1856,10 +2017,10 @@ class _PotosiMapState extends ConsumerState<PotosiMap>
       }
       _animateCameraTo(
         target: widget.showLiveNavigationMode
-            ? (widget.routeStart ?? widget.routeTarget ?? widget.userLocation)
-            : (widget.routeTarget ?? widget.userLocation),
+            ? (widget.routeStart ?? widget.userLocation)
+            : widget.userLocation,
         zoom: widget.showLiveNavigationMode
-            ? math.max(_mapController.camera.zoom, 17.4)
+            ? math.max(_mapController.camera.zoom, 16.0)
             : _mapController.camera.zoom,
         duration: widget.showLiveNavigationMode
             ? const Duration(milliseconds: 680)
@@ -1874,9 +2035,14 @@ class _PotosiMapState extends ConsumerState<PotosiMap>
     Duration duration = const Duration(milliseconds: 420),
   }) {
     final currentCenter = _mapController.camera.center;
-    final currentZoom = _mapController.camera.zoom;
+    final currentZoom = _mapController.camera.zoom
+        .clamp(AppConfig.mapMinZoom, AppConfig.mapMaxZoom)
+        .toDouble();
+    final targetZoom = zoom
+        .clamp(AppConfig.mapMinZoom, AppConfig.mapMaxZoom)
+        .toDouble();
     final samePoint = _distance(currentCenter, target) < 2;
-    final sameZoom = (currentZoom - zoom).abs() < 0.02;
+    final sameZoom = (currentZoom - targetZoom).abs() < 0.02;
     if (samePoint && sameZoom) {
       return;
     }
@@ -1910,12 +2076,13 @@ class _PotosiMapState extends ConsumerState<PotosiMap>
             curve: Curves.easeOutCubic,
           ),
         );
-    _cameraZoomAnimation = Tween<double>(begin: currentZoom, end: zoom).animate(
-      CurvedAnimation(
-        parent: _cameraFollowController,
-        curve: Curves.easeOutCubic,
-      ),
-    );
+    _cameraZoomAnimation = Tween<double>(begin: currentZoom, end: targetZoom)
+        .animate(
+          CurvedAnimation(
+            parent: _cameraFollowController,
+            curve: Curves.easeOutCubic,
+          ),
+        );
 
     void handleFrame() {
       final lat = _cameraLatAnimation?.value;
@@ -1937,64 +2104,8 @@ class _PotosiMapState extends ConsumerState<PotosiMap>
       if (!mounted) {
         return;
       }
-      _mapController.move(target, zoom);
+      _mapController.move(target, targetZoom);
     });
-  }
-
-  void _animateRotationToNorth() {
-    final start = _mapController.camera.rotation;
-    if (start.abs() < 0.5) {
-      _mapController.rotate(0);
-      setState(() {
-        _mapRotation = 0;
-      });
-      return;
-    }
-
-    final target = _shortestNorthTarget(start);
-    _rotationResetAnimation?.removeListener(_handleRotationFrame);
-    _rotationResetController.stop();
-    _rotationResetController.reset();
-    _rotationResetAnimation = Tween<double>(begin: start, end: target).animate(
-      CurvedAnimation(
-        parent: _rotationResetController,
-        curve: Curves.easeOutCubic,
-      ),
-    )..addListener(_handleRotationFrame);
-
-    _rotationResetController.forward().whenComplete(() {
-      if (!mounted) {
-        return;
-      }
-      _mapController.rotate(0);
-      setState(() {
-        _mapRotation = 0;
-      });
-    });
-  }
-
-  void _handleRotationFrame() {
-    final value = _rotationResetAnimation?.value;
-    if (value == null) {
-      return;
-    }
-    _mapController.rotate(value);
-    if (mounted) {
-      setState(() {
-        _mapRotation = value;
-      });
-    }
-  }
-
-  double _shortestNorthTarget(double start) {
-    final normalized = start % 360;
-    if (normalized > 180) {
-      return start + (360 - normalized);
-    }
-    if (normalized < -180) {
-      return start - (360 + normalized);
-    }
-    return start - normalized;
   }
 
   bool _shouldRefreshRoute(PotosiMap oldWidget) {
@@ -2219,12 +2330,13 @@ class _PotosiMapState extends ConsumerState<PotosiMap>
               )
               .where((route) => route.length >= 2)
               .toList(growable: false);
-    final orderedDrivers = [...widget.drivers]..sort((a, b) {
-      if (a.isHighlighted == b.isHighlighted) {
-        return 0;
-      }
-      return a.isHighlighted ? 1 : -1;
-    });
+    final orderedDrivers = [...widget.drivers]
+      ..sort((a, b) {
+        if (a.isHighlighted == b.isHighlighted) {
+          return 0;
+        }
+        return a.isHighlighted ? 1 : -1;
+      });
     return Stack(
       children: [
         FlutterMap(
@@ -2242,7 +2354,6 @@ class _PotosiMapState extends ConsumerState<PotosiMap>
                 return;
               }
               _didApplyInitialFollow = true;
-              _maybeFollowUser(force: true);
             },
             onPositionChanged: (_, hasGesture) {
               widget.onMapCenterChanged?.call(
@@ -2309,7 +2420,9 @@ class _PotosiMapState extends ConsumerState<PotosiMap>
                     points: visiblePrimaryRoute!,
                     strokeWidth: 4.6,
                     color: widget.routeColor,
-                    borderColor: const Color(0xFFB9D5FF).withValues(alpha: 0.24),
+                    borderColor: const Color(
+                      0xFFB9D5FF,
+                    ).withValues(alpha: 0.24),
                     borderStrokeWidth: 7.8,
                   ),
                 ],
@@ -2358,8 +2471,8 @@ class _PotosiMapState extends ConsumerState<PotosiMap>
                 ...orderedDrivers.map(
                   (driver) => Marker(
                     point: driver.point,
-                    width: driver.isHighlighted ? 104 : 52,
-                    height: driver.isHighlighted ? 88 : 52,
+                    width: driver.isHighlighted ? 104 : 72,
+                    height: driver.isHighlighted ? 88 : 72,
                     child: _NearbyDriverMapMarker(
                       icon: _vehicleIcon(driver.vehicleType),
                       isHighlighted: driver.isHighlighted,
@@ -2428,24 +2541,9 @@ class _PotosiMapState extends ConsumerState<PotosiMap>
                     backgroundColor: const Color(0xFF0F6CBD),
                     foregroundColor: Colors.white,
                     onPressed: () {
-                      setState(() {
-                        _isFollowingUser = true;
-                      });
                       _maybeFollowUser(force: true);
                     },
                     child: const _NavigationArrowIcon(size: 20),
-                  ),
-                  const SizedBox(height: 10),
-                ],
-                if (_mapRotation.abs() > 3) ...[
-                  FloatingActionButton.small(
-                    heroTag: 'passenger-map-reset-bearing',
-                    backgroundColor: Colors.white,
-                    foregroundColor: const Color(0xFF0F6CBD),
-                    onPressed: () {
-                      _animateRotationToNorth();
-                    },
-                    child: const Icon(Icons.explore_off_rounded),
                   ),
                   const SizedBox(height: 10),
                 ],
@@ -2488,7 +2586,7 @@ class _PotosiMapState extends ConsumerState<PotosiMap>
   IconData _vehicleIcon(String? vehicleType) {
     return switch ((vehicleType ?? '').toLowerCase()) {
       'moto' => Icons.two_wheeler_rounded,
-      _ => Icons.directions_car_filled_rounded,
+      _ => Icons.local_taxi_rounded,
     };
   }
 }
@@ -2575,7 +2673,8 @@ class _PassengerLocationMarkerState extends State<_PassengerLocationMarker>
             final pulseScale =
                 (1 + (_pulseController.value * 0.08)) + (accuracyFactor * 0.18);
             final pulseAlpha =
-                (0.1 + (_pulseController.value * 0.08)) + (accuracyFactor * 0.05);
+                (0.1 + (_pulseController.value * 0.08)) +
+                (accuracyFactor * 0.05);
             final coneScale = 0.88 + ((accuracyMeters - 6) / 54) * 0.38;
             final coneAlpha = 0.11 + ((accuracyMeters - 6) / 54) * 0.12;
             final haloSize = 56 + (accuracyFactor * 18);
@@ -2591,20 +2690,21 @@ class _PassengerLocationMarkerState extends State<_PassengerLocationMarker>
                       height: haloSize,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: widget.haloColor.withValues(
-                          alpha: pulseAlpha,
-                        ),
+                        color: widget.haloColor.withValues(alpha: pulseAlpha),
                       ),
                     ),
                   ),
                   Transform.rotate(
-                    angle: ((animatedHeading) * (math.pi / 180)) - (math.pi / 8),
+                    angle:
+                        ((animatedHeading) * (math.pi / 180)) - (math.pi / 8),
                     child: Transform.scale(
                       scale: coneScale,
                       child: CustomPaint(
                         size: const Size(54, 54),
                         painter: _HeadingConePainter(
-                          color: widget.accentColor.withValues(alpha: coneAlpha),
+                          color: widget.accentColor.withValues(
+                            alpha: coneAlpha,
+                          ),
                         ),
                       ),
                     ),
@@ -2615,10 +2715,7 @@ class _PassengerLocationMarkerState extends State<_PassengerLocationMarker>
                     decoration: BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
-                      border: Border.all(
-                        color: widget.borderColor,
-                        width: 2,
-                      ),
+                      border: Border.all(color: widget.borderColor, width: 2),
                       boxShadow: const [
                         BoxShadow(
                           color: Color(0x220F172A),
@@ -2628,7 +2725,10 @@ class _PassengerLocationMarkerState extends State<_PassengerLocationMarker>
                       ],
                     ),
                   ),
-                  _NavigationArrowIcon(size: 26, headingDegrees: animatedHeading),
+                  _NavigationArrowIcon(
+                    size: 26,
+                    headingDegrees: animatedHeading,
+                  ),
                 ],
               ),
             );
@@ -2711,39 +2811,47 @@ class _NearbyDriverMapMarkerState extends State<_NearbyDriverMapMarker>
   Widget build(BuildContext context) {
     final isHighlighted = widget.isHighlighted;
     final markerCore = Container(
-      width: isHighlighted ? 48 : 34,
-      height: isHighlighted ? 48 : 34,
+      width: isHighlighted ? 52 : 44,
+      height: isHighlighted ? 52 : 44,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: const Color(0xFFFACC15),
         shape: BoxShape.circle,
         border: Border.all(
-          color: isHighlighted
-              ? const Color(0xFFFACC15)
-              : const Color(0xFFD7E6FB),
-          width: isHighlighted ? 3 : 1.6,
+          color: isHighlighted ? Colors.white : const Color(0xFFFFF7CC),
+          width: isHighlighted ? 3 : 2,
         ),
         boxShadow: [
           BoxShadow(
-            color: (isHighlighted
-                    ? const Color(0x33FACC15)
-                    : const Color(0x220F6CBD))
-                .withValues(alpha: isHighlighted ? 0.4 : 0.18),
-            blurRadius: isHighlighted ? 18 : 10,
+            color: const Color(0x55FACC15),
+            blurRadius: isHighlighted ? 18 : 14,
             offset: const Offset(0, 6),
           ),
         ],
       ),
       child: Icon(
         widget.icon,
-        color: isHighlighted
-            ? const Color(0xFF1D4ED8)
-            : const Color(0xFF0F6CBD),
-        size: isHighlighted ? 24 : 18,
+        color: const Color(0xFF111827),
+        size: isHighlighted ? 28 : 24,
       ),
     );
 
     if (!isHighlighted) {
-      return Center(child: markerCore);
+      return Center(
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0x2234D399),
+              ),
+            ),
+            markerCore,
+          ],
+        ),
+      );
     }
 
     return AnimatedBuilder(
@@ -2793,14 +2901,14 @@ class _NearbyDriverMapMarkerState extends State<_NearbyDriverMapMarker>
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: Color.lerp(
-                          const Color(0x18FACC15),
-                          const Color(0x30FACC15),
+                          const Color(0x2234D399),
+                          const Color(0x4034D399),
                           _pulseController.value,
                         ),
                         border: Border.all(
-                          color: const Color(0xFFFACC15).withValues(
-                            alpha: pulseOpacity,
-                          ),
+                          color: const Color(
+                            0xFF22C55E,
+                          ).withValues(alpha: pulseOpacity),
                           width: 1.6,
                         ),
                       ),
@@ -2811,9 +2919,9 @@ class _NearbyDriverMapMarkerState extends State<_NearbyDriverMapMarker>
                     height: 58,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0x22FACC15),
+                      color: const Color(0x3334D399),
                       border: Border.all(
-                        color: const Color(0x55FACC15),
+                        color: const Color(0x6622C55E),
                         width: 1.4,
                       ),
                     ),

@@ -6,17 +6,30 @@ class AppConfig {
     'APP_UPDATES_BASE_URL',
     defaultValue: 'https://rapigo.cybernovatech.space/api',
   );
-  static const serverScheme = String.fromEnvironment('SERVER_SCHEME', defaultValue: 'http');
+  static const serverScheme = String.fromEnvironment(
+    'SERVER_SCHEME',
+    defaultValue: 'http',
+  );
   static const serverHost = String.fromEnvironment(
     'SERVER_HOST',
     defaultValue: '62.171.186.246',
   );
-  static const gatewayPort = String.fromEnvironment('GATEWAY_PORT', defaultValue: '3000');
-  static const websocketPort = String.fromEnvironment('WEBSOCKET_PORT', defaultValue: '3008');
-  static const websocketScheme = String.fromEnvironment('WEBSOCKET_SCHEME', defaultValue: '');
+  static const gatewayPort = String.fromEnvironment(
+    'GATEWAY_PORT',
+    defaultValue: '3000',
+  );
+  static const websocketPort = String.fromEnvironment(
+    'WEBSOCKET_PORT',
+    defaultValue: '3008',
+  );
+  static const websocketScheme = String.fromEnvironment(
+    'WEBSOCKET_SCHEME',
+    defaultValue: '',
+  );
   static const mapTilesUrlTemplate = String.fromEnvironment(
     'MAP_TILES_URL_TEMPLATE',
-    defaultValue: 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
+    defaultValue:
+        'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
   );
   static const mapTilesAttribution = String.fromEnvironment(
     'MAP_TILES_ATTRIBUTION',
@@ -38,9 +51,18 @@ class AppConfig {
     'MAP_GEOCODING_URL_BASE',
     defaultValue: 'https://nominatim.openstreetmap.org/reverse',
   );
-  static const routingScheme = String.fromEnvironment('ROUTING_SCHEME', defaultValue: serverScheme);
-  static const routingHost = String.fromEnvironment('ROUTING_HOST', defaultValue: serverHost);
-  static const routingPort = String.fromEnvironment('ROUTING_PORT', defaultValue: '5005');
+  static const routingScheme = String.fromEnvironment(
+    'ROUTING_SCHEME',
+    defaultValue: serverScheme,
+  );
+  static const routingHost = String.fromEnvironment(
+    'ROUTING_HOST',
+    defaultValue: serverHost,
+  );
+  static const routingPort = String.fromEnvironment(
+    'ROUTING_PORT',
+    defaultValue: '5005',
+  );
   static const routingPath = String.fromEnvironment(
     'ROUTING_PATH',
     defaultValue: '/route/v1/driving',
@@ -106,22 +128,27 @@ class AppConfig {
     return mapTilesAttribution.trim();
   }
 
-  static bool get hasDedicatedOfflineTileSource => effectiveOfflineTilesUrlTemplate.isNotEmpty;
+  static bool get hasDedicatedOfflineTileSource =>
+      effectiveOfflineTilesUrlTemplate.isNotEmpty;
   static bool get shouldUseOpenStreetMapFallbackLayer =>
-      effectiveOfflineTilesUrlTemplate.isNotEmpty && usesDefaultOpenStreetMapTiles;
+      effectiveOfflineTilesUrlTemplate.isNotEmpty &&
+      usesDefaultOpenStreetMapTiles;
   static int get mapTileDimension =>
-      effectiveMapTilesUrlTemplate.contains('/512/') || effectiveMapTilesUrlTemplate.contains('@2x')
-          ? 512
-          : 256;
+      effectiveMapTilesUrlTemplate.contains('/512/') ||
+          effectiveMapTilesUrlTemplate.contains('@2x')
+      ? 512
+      : 256;
   static double get mapTileZoomOffset => mapTileDimension > 256 ? -1.0 : 0.0;
   static String get mapRoutingUrlBase {
     final explicit = _mapRoutingUrlBase.trim();
     if (explicit.isNotEmpty) {
       return explicit;
     }
-    const defaultPublicRouting = 'https://router.project-osrm.org/route/v1/driving';
+    const defaultPublicRouting =
+        'https://router.project-osrm.org/route/v1/driving';
     final usesCustomRoutingHost =
-        routingHost.trim().isNotEmpty && routingHost.trim() != serverHost.trim();
+        routingHost.trim().isNotEmpty &&
+        routingHost.trim() != serverHost.trim();
     if (usesCustomRoutingHost) {
       return '$routingScheme://$routingHost:$routingPort$routingPath';
     }
@@ -133,16 +160,16 @@ class AppConfig {
   static const offlineRegionName = 'Potosi ciudad';
 
   static LatLngBounds get potosiOfflineBounds => LatLngBounds(
-        const LatLng(-19.6350, -65.8050),
-        const LatLng(-19.5450, -65.7050),
-      );
+    const LatLng(-19.6350, -65.8050),
+    const LatLng(-19.5450, -65.7050),
+  );
 
   static LatLngBounds get potosiViewBounds => LatLngBounds(
-        const LatLng(-19.6450, -65.8150),
-        const LatLng(-19.5350, -65.6950),
-      );
+    const LatLng(-19.6450, -65.8150),
+    const LatLng(-19.5350, -65.6950),
+  );
 
   static const mapMinZoom = 13.0;
-  static const mapInitialZoom = 15.1;
-  static const mapMaxZoom = 18.0;
+  static const mapInitialZoom = 14.4;
+  static const mapMaxZoom = 16.6;
 }

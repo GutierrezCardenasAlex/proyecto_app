@@ -261,14 +261,13 @@ class DriverTripRepository {
 
 class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
   bool _isLoadingOffer = false;
-  late final DriverTripStateCache _cache;
+  final DriverTripStateCache _cache = DriverTripStateCache();
   bool _restoredPersistedTrip = false;
 
   DriverTripRepository get _repository => ref.read(tripRepositoryProvider);
 
   @override
   AsyncValue<DriverTrip?> build() {
-    _cache = DriverTripStateCache();
     if (!_restoredPersistedTrip) {
       _restoredPersistedTrip = true;
       Future<void>.microtask(_restorePersistedTrip);
@@ -338,11 +337,15 @@ class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
       );
       state = AsyncData(acceptedTrip);
       await _persistTrip();
-    } catch (error, stackTrace) {
-      state = AsyncError(error, stackTrace);
+    } catch (error) {
+      await clearTrip();
+      await ref.read(driverOffersProvider.notifier).loadOffers();
+      ref.invalidate(driverTripHistoryProvider);
+      throw Exception(_friendlyAcceptError(error));
+    } finally {
+      ref.invalidate(driverTripHistoryProvider);
+      ref.invalidate(driverOffersProvider);
     }
-    ref.invalidate(driverTripHistoryProvider);
-    ref.invalidate(driverOffersProvider);
   }
 
   Future<void> updateTripStatus(String status) async {
@@ -360,8 +363,8 @@ class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
       );
       state = AsyncData(updatedTrip);
       await _persistTrip();
-    } catch (error, stackTrace) {
-      state = AsyncError(error, stackTrace);
+    } catch (_) {
+      state = AsyncData(current);
     }
     ref.invalidate(driverTripHistoryProvider);
   }
@@ -383,14 +386,13 @@ class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
 
 class DriverOffersController extends Notifier<AsyncValue<List<DriverTrip>>> {
   bool _isLoadingOffers = false;
-  late final DriverTripStateCache _cache;
+  final DriverTripStateCache _cache = DriverTripStateCache();
   bool _restoredPersistedOffers = false;
 
   DriverTripRepository get _repository => ref.read(tripRepositoryProvider);
 
   @override
   AsyncValue<List<DriverTrip>> build() {
-    _cache = DriverTripStateCache();
     if (!_restoredPersistedOffers) {
       _restoredPersistedOffers = true;
       Future<void>.microtask(_restorePersistedOffers);
@@ -450,27 +452,6 @@ class DriverOffersController extends Notifier<AsyncValue<List<DriverTrip>>> {
     }
   }
 
-  Future<void> cancelDirectedOffer(DriverTrip trip) async {
-    final session = ref.read(driverSessionProvider);
-    if (!session.loggedIn || session.token.isEmpty) {
-      return;
-    }
-    try {
-      await _repository.updateStatus(
-        token: session.token,
-        trip: trip,
-        status: 'cancelled',
-      );
-      final current = [...(state.value ?? const <DriverTrip>[])];
-      current.removeWhere((item) => item.id == trip.id);
-      state = AsyncData(current);
-      await _persistOffers();
-      ref.invalidate(driverTripHistoryProvider);
-    } catch (error, stackTrace) {
-      state = AsyncError(error, stackTrace);
-    }
-  }
-
   Future<void> rejectOffer(String tripId) async {
     final session = ref.read(driverSessionProvider);
     if (!session.loggedIn || session.driverId.isEmpty || session.token.isEmpty) {
@@ -487,8 +468,8 @@ class DriverOffersController extends Notifier<AsyncValue<List<DriverTrip>>> {
       state = AsyncData(current);
       await _persistOffers();
       ref.invalidate(driverTripHistoryProvider);
-    } catch (error, stackTrace) {
-      state = AsyncError(error, stackTrace);
+    } catch (_) {
+      state = AsyncData(state.value ?? const <DriverTrip>[]);
     }
   }
 
@@ -498,4 +479,20 @@ class DriverOffersController extends Notifier<AsyncValue<List<DriverTrip>>> {
     state = AsyncData(current);
     unawaited(_persistOffers());
   }
+
+  Future<void> clearOffers() async {
+    state = const AsyncData([]);
+    await _persistOffers();
+  }
+}
+
+String _friendlyAcceptError(Object error) {
+  final raw = error.toString();
+  if (raw.contains('409')) {
+    return 'Este viaje ya fue aceptado por otro conductor.';
+  }
+  if (raw.contains('403')) {
+    return 'Esta solicitud ya no esta disponible para tu conductor.';
+  }
+  return 'No se pudo aceptar el viaje. Intenta con otra solicitud.';
 }

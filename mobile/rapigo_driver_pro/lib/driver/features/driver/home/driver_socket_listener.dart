@@ -211,6 +211,29 @@ class _DriverSocketListenerState extends ConsumerState<DriverSocketListener>
       ref.read(offeredTripProvider.notifier).loadOffer();
       ref.invalidate(driverTripHistoryProvider);
     });
+    _socket?.on('driver:trip_unavailable', (data) {
+      final map =
+          data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+      final tripId = map['tripId']?.toString();
+      if (tripId == null || tripId.isEmpty) {
+        ref.read(driverOffersProvider.notifier).loadOffers();
+        return;
+      }
+      final currentTrip = ref.read(offeredTripProvider).value;
+      final isPendingCurrentTrip = currentTrip?.id == tripId &&
+          const {'requested', 'searching'}.contains(currentTrip?.status);
+      ref.read(driverOffersProvider.notifier).removeOfferLocally(tripId);
+      ref.read(driverOfferPreviewTripIdProvider.notifier).setTrip(null);
+      if (isPendingCurrentTrip) {
+        ref.read(offeredTripProvider.notifier).clearTrip();
+      }
+      ref.read(driverOffersProvider.notifier).loadOffers();
+      _showDriverOverlayNotice(
+        'Ese viaje ya fue tomado por otro conductor.',
+        tone: NoticeTone.warning,
+        icon: Icons.info_outline_rounded,
+      );
+    });
     _socket?.connect();
   }
 

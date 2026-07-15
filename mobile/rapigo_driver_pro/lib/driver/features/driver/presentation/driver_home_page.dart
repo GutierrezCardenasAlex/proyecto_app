@@ -320,10 +320,20 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
   static const double _kFixedZoom = 16.91;
   static const double _kFixedMapBearing = -14.6;
   static const double _kFixedTilt = 70.0;
+  static const String _wideMapModeKey = 'driver_dashboard_wide_map_mode';
+  static const String _angledMapModeKey = 'driver_dashboard_angled_map_mode';
+  static const String _homeMapZoomKey = 'driver_dashboard_home_map_zoom';
+  static const String _homeMapTiltKey = 'driver_dashboard_home_map_tilt';
+  static const String _homeMapBearingKey = 'driver_dashboard_home_map_bearing';
 
   int _mapFocusSignal = 0;
   bool _mapReadyLogged = false;
   bool _wideMapMode = false;
+  bool _angledMapMode = true;
+  double? _savedHomeZoom;
+  double? _savedHomeTilt;
+  double? _savedHomeBearing;
+  Timer? _mapViewPersistDebounce;
   final String _debugMarkerStyle = 'rapigo';
   final double _debugMarkerScale = 1.22;
   final double _debugMarkerOffsetX = 0;
@@ -331,10 +341,14 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
   String _streetChipLabel = 'Ubicacion actual';
   LatLng? _lastStreetLookupPoint;
   bool _resolvingStreetChip = false;
+  bool _showResumeOverlay = false;
+  double _resumeOverlayOpacity = 0;
+  bool _resumeOverlayScheduled = false;
 
   @override
   void initState() {
     super.initState();
+    unawaited(_restoreMapViewPreferences());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _mapReadyLogged) {
         return;
@@ -345,6 +359,74 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_refreshStreetChip(force: true));
     });
+  }
+
+  Future<void> _restoreMapViewPreferences() async {
+    final preferences = await SharedPreferences.getInstance();
+    final restoredWide = preferences.getBool(_wideMapModeKey);
+    final restoredAngle = preferences.getBool(_angledMapModeKey);
+    final restoredZoom = preferences.getDouble(_homeMapZoomKey);
+    final restoredTilt = preferences.getDouble(_homeMapTiltKey);
+    final restoredBearing = preferences.getDouble(_homeMapBearingKey);
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      if (restoredWide != null) {
+        _wideMapMode = restoredWide;
+      }
+      if (restoredAngle != null) {
+        _angledMapMode = restoredAngle;
+      }
+      _savedHomeZoom = restoredZoom;
+      _savedHomeTilt = restoredTilt;
+      _savedHomeBearing = restoredBearing;
+    });
+  }
+
+  Future<void> _persistMapViewPreferences() async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool(_wideMapModeKey, _wideMapMode);
+    await preferences.setBool(_angledMapModeKey, _angledMapMode);
+    if (_savedHomeZoom != null) {
+      await preferences.setDouble(_homeMapZoomKey, _savedHomeZoom!);
+    }
+    if (_savedHomeTilt != null) {
+      await preferences.setDouble(_homeMapTiltKey, _savedHomeTilt!);
+    }
+    if (_savedHomeBearing != null) {
+      await preferences.setDouble(_homeMapBearingKey, _savedHomeBearing!);
+    }
+  }
+
+  void _scheduleMapViewPreferencesPersist() {
+    _mapViewPersistDebounce?.cancel();
+    _mapViewPersistDebounce = Timer(const Duration(milliseconds: 420), () {
+      unawaited(_persistMapViewPreferences());
+    });
+  }
+
+  void _onHomeMapTelemetry({
+    required double zoom,
+    required double tilt,
+    required double cameraBearing,
+  }) {
+    final normalizedTilt = _angledMapMode
+        ? (tilt <= 1 ? _kFixedTilt : tilt.clamp(0.0, 85.0))
+        : 0.0;
+    final zoomChanged =
+        _savedHomeZoom == null || (_savedHomeZoom! - zoom).abs() > 0.01;
+    final tiltChanged =
+        _savedHomeTilt == null || (_savedHomeTilt! - normalizedTilt).abs() > 0.01;
+    final bearingChanged = _savedHomeBearing == null ||
+        (_savedHomeBearing! - cameraBearing).abs() > 0.01;
+    if (!zoomChanged && !tiltChanged && !bearingChanged) {
+      return;
+    }
+    _savedHomeZoom = zoom;
+    _savedHomeTilt = normalizedTilt;
+    _savedHomeBearing = cameraBearing;
+    _scheduleMapViewPreferencesPersist();
   }
 
   Future<void> _refreshStreetChip({bool force = false}) async {
@@ -391,11 +473,55 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
   void _toggleAdvancedMapMode() {
     setState(() {
       _wideMapMode = !_wideMapMode;
+      _savedHomeZoom = _wideMapMode ? (_kFixedZoom - 0.33) : _kFixedZoom;
+      _savedHomeBearing ??= _kFixedMapBearing;
       _mapFocusSignal++;
     });
+    unawaited(_persistMapViewPreferences());
     if (_wideMapMode) {
       unawaited(_refreshStreetChip(force: true));
     }
+  }
+
+  void _showHomeResumeOverlay() {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _showResumeOverlay = true;
+      _resumeOverlayOpacity = 1;
+    });
+    Future<void>.delayed(const Duration(milliseconds: 280), () {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _resumeOverlayOpacity = 0);
+      Future<void>.delayed(const Duration(milliseconds: 220), () {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _showResumeOverlay = false;
+          _resumeOverlayScheduled = false;
+        });
+      });
+    });
+  }
+
+  void _toggleMapAngleMode() {
+    setState(() {
+      _angledMapMode = !_angledMapMode;
+      _savedHomeTilt = _angledMapMode ? _kFixedTilt : 0.0;
+      _savedHomeBearing ??= _kFixedMapBearing;
+      _mapFocusSignal++;
+    });
+    unawaited(_persistMapViewPreferences());
+  }
+
+  @override
+  void dispose() {
+    _mapViewPersistDebounce?.cancel();
+    super.dispose();
   }
 
   LatLngBounds? _buildDriverFocusBounds({
@@ -451,16 +577,12 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
           onViewDetails: _showIncomingTripDetail,
           onAccept: _handleDriverPrimaryAction,
           onReject: (offer) async {
-            if (offer.isDirectedRequest) {
-              await ref.read(driverOffersProvider.notifier).cancelDirectedOffer(offer);
-              await ref.read(offeredTripProvider.notifier).loadOffer();
-              await ref.read(driverOffersProvider.notifier).loadOffers();
-              return;
-            }
+            await ref.read(driverOffersProvider.notifier).rejectOffer(offer.id);
             final currentOffer = ref.read(offeredTripProvider).value;
             if (currentOffer?.id == offer.id) {
               await ref.read(offeredTripProvider.notifier).clearTrip();
             }
+            await ref.read(driverOffersProvider.notifier).loadOffers();
           },
         ),
       ),
@@ -658,18 +780,16 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                                   await _handleDriverPrimaryAction(pendingOffer);
                                 },
                                 onReject: () async {
-                                  if (pendingOffer.isDirectedRequest) {
-                                    await ref
-                                        .read(driverOffersProvider.notifier)
-                                        .cancelDirectedOffer(pendingOffer);
-                                  } else {
-                                    if (context.mounted) {
-                                      showTopNotice(
-                                        context,
-                                        'Solicitud ignorada. Sigue disponible para otros conductores.',
-                                        tone: NoticeTone.info,
-                                      );
-                                    }
+                                  await ref
+                                      .read(driverOffersProvider.notifier)
+                                      .rejectOffer(pendingOffer.id);
+                                  await ref.read(offeredTripProvider.notifier).clearTrip();
+                                  if (context.mounted) {
+                                    showTopNotice(
+                                      context,
+                                      'Solicitud ignorada para tu conductor.',
+                                      tone: NoticeTone.info,
+                                    );
                                   }
                                 },
                               );
@@ -692,7 +812,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
     final accent = _driverStatusAccentColor(trip.status);
     final passengerName =
         trip.passengerName?.trim().isNotEmpty == true ? trip.passengerName!.trim() : 'Pasajero';
-    final rejectLabel = trip.isDirectedRequest ? 'Cancelar' : 'Ignorar';
+    const rejectLabel = 'Ignorar';
 
     showModalBottomSheet<void>(
       context: context,
@@ -822,16 +942,14 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                           child: OutlinedButton(
                             onPressed: () async {
                               Navigator.of(context).pop();
-                              if (trip.isDirectedRequest) {
-                                await ref.read(driverOffersProvider.notifier).cancelDirectedOffer(trip);
-                              } else {
-                                if (context.mounted) {
-                                  showTopNotice(
-                                    context,
-                                    'Solicitud ignorada. Sigue visible en viajes disponibles.',
-                                    tone: NoticeTone.info,
-                                  );
-                                }
+                              await ref.read(driverOffersProvider.notifier).rejectOffer(trip.id);
+                              await ref.read(offeredTripProvider.notifier).clearTrip();
+                              if (context.mounted) {
+                                showTopNotice(
+                                  context,
+                                  'Solicitud ignorada para tu conductor.',
+                                  tone: NoticeTone.info,
+                                );
                               }
                             },
                             style: OutlinedButton.styleFrom(
@@ -1312,6 +1430,9 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    final palette = context.rapigoPalette;
+    final metrics = context.rapigoMetrics;
+    final textTheme = Theme.of(context).textTheme;
     final available = ref.watch(driverStateProvider.select((s) => s.available));
     final driverLat = ref.watch(driverStateProvider.select((s) => s.lat));
     final driverLng = ref.watch(driverStateProvider.select((s) => s.lng));
@@ -1322,6 +1443,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
     final trip = tripAsync.value;
     final offers = offersAsync.value ?? const <DriverTrip>[];
     final previewTripId = ref.watch(driverOfferPreviewTripIdProvider);
+    final shouldResumeHome = ref.watch(driverHomeResumeOverlayProvider);
     final isPreviewingRoute =
         previewTripId != null && trip != null && trip.id == previewTripId && trip.status == 'accepted';
     final pendingOffers = <DriverTrip>[
@@ -1333,8 +1455,19 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
       ),
     ];
     final availableOffersCount = pendingOffers.length;
-    final homeIdleZoom = _wideMapMode ? (_kFixedZoom - 0.33) : _kFixedZoom;
-    final homeIdleTilt = _kFixedTilt;
+    final defaultHomeIdleZoom = _wideMapMode ? (_kFixedZoom - 0.33) : _kFixedZoom;
+    final defaultHomeIdleTilt = _angledMapMode ? _kFixedTilt : 0.0;
+    final defaultHomeIdleBearing = _savedHomeBearing ?? _kFixedMapBearing;
+    final homeIdleZoom = _savedHomeZoom ?? defaultHomeIdleZoom;
+    final homeIdleTilt = _angledMapMode
+        ? (((_savedHomeTilt ?? defaultHomeIdleTilt) <= 1)
+            ? defaultHomeIdleTilt
+            : (_savedHomeTilt ?? defaultHomeIdleTilt))
+        : 0.0;
+    final homeNavigationTilt = _angledMapMode
+        ? (((_savedHomeTilt ?? 58.0) <= 1 ? 58.0 : (_savedHomeTilt ?? 58.0))
+            .clamp(0.0, 75.0))
+        : 0.0;
     final routeColor = trip?.status == 'in_progress'
         ? const Color(0xFF0EA5E9)
         : const Color(0xFFF97316);
@@ -1352,6 +1485,16 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
         }
         widget.onOffersDrawerHandled();
         _showAvailableTripsSheet(tripAsync: tripAsync, trip: trip, offersAsync: offersAsync);
+      });
+    }
+    if (shouldResumeHome && !_resumeOverlayScheduled) {
+      _resumeOverlayScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        ref.read(driverHomeResumeOverlayProvider.notifier).clear();
+        _showHomeResumeOverlay();
       });
     }
 
@@ -1385,8 +1528,8 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
               idleZoomLevel: homeIdleZoom,
               maxZoomPreference: 16.55,
               idleTilt: homeIdleTilt,
-              idleBearingOverride: _kFixedMapBearing,
-              navigationTilt: 58,
+              idleBearingOverride: defaultHomeIdleBearing,
+              navigationTilt: homeNavigationTilt,
               driverMarkerScale: _debugMarkerScale,
               driverMarkerOffsetX: _debugMarkerOffsetX,
               driverMarkerOffsetY: _debugMarkerOffsetY,
@@ -1395,6 +1538,22 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
               routeColor: routeColor,
               focusBounds: focusBounds,
               focusSignal: _mapFocusSignal,
+              onDebugTelemetryChanged: ({
+                required double centerLat,
+                required double centerLng,
+                required double zoom,
+                required double tilt,
+                required double cameraBearing,
+                required double iconBearing,
+                required double displayLat,
+                required double displayLng,
+              }) {
+                _onHomeMapTelemetry(
+                  zoom: zoom,
+                  tilt: tilt,
+                  cameraBearing: cameraBearing,
+                );
+              },
               onRouteUpdated: () {
                 if (!mounted) {
                   return;
@@ -1444,7 +1603,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
         ),
         SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 10, 18, 14),
+            padding: EdgeInsets.fromLTRB(metrics.pagePadding, 10, metrics.pagePadding, 14),
             child: Stack(
               children: [
                 Positioned(
@@ -1462,45 +1621,45 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                           offersAsync: offersAsync,
                         ),
                         size: 66,
-                        backgroundColor: const Color(0xF9FFFFFF),
+                        backgroundColor: palette.surfaceInteractive.withValues(alpha: 0.98),
                         iconColor: const Color(0xFF111111),
-                        shadowColor: const Color(0x22000000),
+                        shadowColor: palette.shadowSoft,
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: metrics.itemGap - 2),
                       GestureDetector(
                         onTap: () async {
                           await ref.read(driverStateProvider.notifier).toggleAvailability(!available);
                         },
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 220),
-                          width: 34,
-                          height: 34,
-                        decoration: BoxDecoration(
-                          color: const Color(0xF9FFFFFF),
-                          borderRadius: BorderRadius.circular(999),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x22000000),
-                              blurRadius: 16,
-                              offset: Offset(0, 8),
-                            ),
-                          ],
-                        ),
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: palette.surfaceInteractive.withValues(alpha: 0.96),
+                            borderRadius: BorderRadius.circular(999),
+                            boxShadow: [
+                              BoxShadow(
+                                color: palette.shadowSoft.withValues(alpha: 0.72),
+                                blurRadius: 18,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
                           child: Center(
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 220),
-                              width: 14,
-                              height: 14,
+                              width: 16,
+                              height: 16,
                               decoration: BoxDecoration(
                                 color: available
-                                    ? const Color(0xFF22C55E)
-                                    : const Color(0xFFEF4444),
+                                    ? palette.accentGreen
+                                    : palette.accentDanger,
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
                                     color: (available
-                                            ? const Color(0xFF22C55E)
-                                            : const Color(0xFFEF4444))
+                                            ? palette.accentGreen
+                                            : palette.accentDanger)
                                         .withValues(alpha: 0.45),
                                     blurRadius: 10,
                                     spreadRadius: 1,
@@ -1517,9 +1676,9 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                 Positioned(
                   top: 0,
                   right: 0,
-                  child: GestureDetector(
-                    onTap: () async {
-                      await ref
+                    child: GestureDetector(
+                      onTap: () async {
+                        await ref
                           .read(driverStateProvider.notifier)
                           .toggleAvailability(!available);
                     },
@@ -1530,13 +1689,13 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                         vertical: 14,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xF9FFFFFF),
-                        borderRadius: BorderRadius.circular(22),
-                        boxShadow: const [
+                        color: palette.surfaceInteractive.withValues(alpha: 0.97),
+                        borderRadius: BorderRadius.circular(metrics.radiusMedium),
+                        boxShadow: [
                           BoxShadow(
-                            color: Color(0x22000000),
-                            blurRadius: 16,
-                            offset: Offset(0, 8),
+                            color: palette.shadowSoft.withValues(alpha: 0.72),
+                            blurRadius: 18,
+                            offset: const Offset(0, 8),
                           ),
                         ],
                       ),
@@ -1548,16 +1707,14 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                                 ? Icons.toggle_on_rounded
                                 : Icons.toggle_off_rounded,
                             color: available
-                                ? const Color(0xFF16A34A)
-                                : const Color(0xFFEF4444),
+                                ? palette.accentGreen
+                                : palette.accentDanger,
                             size: 28,
                           ),
                           const SizedBox(width: 10),
                           Text(
                             available ? 'Activo' : 'Inactivo',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
+                            style: textTheme.labelLarge?.copyWith(
                               color: const Color(0xFF111111),
                             ),
                           ),
@@ -1585,7 +1742,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                           offersAsync: offersAsync,
                         ),
                         size: 78,
-                        backgroundColor: const Color(0xFFFFE45C),
+                        backgroundColor: palette.accentYellow,
                         iconColor: const Color(0xFF111111),
                         shadowColor: const Color(0x33B45309),
                       ),
@@ -1597,21 +1754,40 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                             constraints: const BoxConstraints(minWidth: 22),
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF111111),
+                              color: palette.surfacePrimary,
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: Text(
                               '$availableOffersCount',
                               textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
+                              style: textTheme.labelSmall?.copyWith(
+                                color: palette.textPrimary,
+                                fontWeight: FontWeight.w900,
                               ),
                             ),
                           ),
                         ),
                     ],
+                  ),
+                ),
+                Positioned(
+                  right: 10,
+                  bottom: 208,
+                  child: _DriverMapCircleButton(
+                    icon: _angledMapMode
+                        ? Icons.view_in_ar_rounded
+                        : Icons.map_outlined,
+                    onTap: _toggleMapAngleMode,
+                    size: 58,
+                    backgroundColor: _angledMapMode
+                        ? palette.accentBlueSoft
+                        : palette.surfaceInteractive.withValues(alpha: 0.96),
+                    iconColor: _angledMapMode
+                        ? palette.textPrimary
+                        : const Color(0xFF111111),
+                    shadowColor: _angledMapMode
+                        ? palette.accentBlueSoft.withValues(alpha: 0.28)
+                        : palette.shadowSoft,
                   ),
                 ),
                 Positioned(
@@ -1625,15 +1801,15 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                         borderRadius: BorderRadius.circular(22),
                         onTap: _toggleAdvancedMapMode,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF1FA6FF),
-                            borderRadius: BorderRadius.circular(22),
-                            boxShadow: const [
+                            color: palette.accentBlueSoft,
+                            borderRadius: BorderRadius.circular(metrics.radiusMedium),
+                            boxShadow: [
                               BoxShadow(
-                                color: Color(0x331FA6FF),
-                                blurRadius: 14,
-                                offset: Offset(0, 6),
+                                color: palette.accentBlueSoft.withValues(alpha: 0.28),
+                                blurRadius: 16,
+                                offset: const Offset(0, 6),
                               ),
                             ],
                           ),
@@ -1648,14 +1824,18 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                                       RegExp(r'^[a-z]'),
                                       (m) => m.group(0)!.toUpperCase(),
                                     ),
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 24,
+                                style: textTheme.headlineMedium?.copyWith(
+                                  color: palette.textPrimary,
+                                  fontSize: 22,
                                   fontWeight: FontWeight.w800,
-                                  color: Colors.white,
                                 ),
                               ),
                               const SizedBox(width: 10),
-                              const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white, size: 28),
+                              Icon(
+                                Icons.keyboard_arrow_down_rounded,
+                                color: palette.textPrimary,
+                                size: 28,
+                              ),
                             ],
                           ),
                         ),
@@ -1673,13 +1853,13 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                         constraints: const BoxConstraints(maxWidth: 240),
                         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: const [
+                          color: palette.surfaceInteractive,
+                          borderRadius: BorderRadius.circular(metrics.radiusLarge),
+                          boxShadow: [
                             BoxShadow(
-                              color: Color(0x22000000),
+                              color: palette.shadowSoft.withValues(alpha: 0.68),
                               blurRadius: 18,
-                              offset: Offset(0, 8),
+                              offset: const Offset(0, 8),
                             ),
                           ],
                         ),
@@ -1688,10 +1868,9 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           textAlign: TextAlign.center,
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
+                          style: textTheme.titleMedium?.copyWith(
                             color: const Color(0xFF111111),
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
                       ),
@@ -1707,28 +1886,28 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                       borderRadius: BorderRadius.circular(28),
                       onTap: _openDriverCenterSheet,
                       child: Container(
-                        height: 74,
+                        height: 76,
                         padding: const EdgeInsets.symmetric(horizontal: 22),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF4F5FB),
-                          borderRadius: BorderRadius.circular(28),
-                          boxShadow: const [
+                          color: palette.surfaceMuted,
+                          borderRadius: BorderRadius.circular(metrics.radiusLarge),
+                          boxShadow: [
                             BoxShadow(
-                              color: Color(0x1A000000),
-                              blurRadius: 16,
-                              offset: Offset(0, 8),
+                              color: palette.shadowSoft.withValues(alpha: 0.35),
+                              blurRadius: 18,
+                              offset: const Offset(0, 8),
                             ),
                           ],
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.search_rounded, size: 34, color: Color(0xFF6B7280)),
+                            Icon(Icons.search_rounded, size: 34, color: palette.textMuted),
                             const SizedBox(width: 16),
                             Expanded(
                               child: Text(
                                 'Centro del conductor',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 22,
+                                style: textTheme.headlineMedium?.copyWith(
+                                  fontSize: 21,
                                   fontWeight: FontWeight.w700,
                                   color: const Color(0xFF4B5563),
                                 ),
@@ -1745,6 +1924,65 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
             ),
           ),
         ),
+        if (_showResumeOverlay)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 220),
+                opacity: _resumeOverlayOpacity,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        const Color(0xFFFFFFFF).withValues(alpha: 0.08),
+                        const Color(0xFFF8FBFF).withValues(alpha: 0.04),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xF20B1220),
+                        borderRadius: BorderRadius.circular(999),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.18),
+                            blurRadius: 18,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6EA8FF)),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Cargando inicio...',
+                            style: textTheme.titleSmall?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -1923,6 +2161,7 @@ class _DriverTripsTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final palette = context.rapigoPalette;
     final historyAsync = ref.watch(driverTripHistoryProvider);
     return DriverPageShell(
       eyebrow: 'Actividad',
@@ -1931,6 +2170,10 @@ class _DriverTripsTab extends ConsumerWidget {
           ? null
           : IconButton.filledTonal(
               onPressed: onBack,
+              style: IconButton.styleFrom(
+                backgroundColor: palette.surfacePrimary,
+                foregroundColor: palette.textPrimary,
+              ),
               icon: const Icon(Icons.arrow_back_rounded),
             ),
       child: historyAsync.when(
@@ -1993,6 +2236,9 @@ class _DriverAccountTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final palette = context.rapigoPalette;
+    final metrics = context.rapigoMetrics;
+    final textTheme = Theme.of(context).textTheme;
     return DriverPageShell(
       eyebrow: 'Cuenta',
       title: 'Perfil del conductor',
@@ -2000,13 +2246,17 @@ class _DriverAccountTab extends ConsumerWidget {
           ? null
           : IconButton.filledTonal(
               onPressed: onBack,
+              style: IconButton.styleFrom(
+                backgroundColor: palette.surfacePrimary,
+                foregroundColor: palette.textPrimary,
+              ),
               icon: const Icon(Icons.arrow_back_rounded),
             ),
       trailing: IconButton.filledTonal(
         onPressed: onOpenProfile,
         style: IconButton.styleFrom(
-          backgroundColor: const Color(0xFF1B1B1F),
-          foregroundColor: const Color(0xFFF97316),
+          backgroundColor: palette.surfacePrimary,
+          foregroundColor: palette.accentYellow,
         ),
         icon: const Icon(Icons.edit_outlined),
       ),
@@ -2015,9 +2265,9 @@ class _DriverAccountTab extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(22),
             decoration: BoxDecoration(
-              color: const Color(0xFF1B1B1F),
+              color: palette.surfacePrimary,
               borderRadius: BorderRadius.circular(30),
-              border: Border.all(color: const Color(0xFF2E2E34)),
+              border: Border.all(color: palette.outlineStrong),
             ),
             child: Row(
               children: [
@@ -2025,29 +2275,29 @@ class _DriverAccountTab extends ConsumerWidget {
                   width: 78,
                   height: 78,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF25252B),
+                    color: palette.surfaceSecondary,
                     borderRadius: BorderRadius.circular(24),
                   ),
-                  child: const Icon(Icons.person, size: 36, color: Color(0xFFFFF4EC)),
+                  child: Icon(Icons.person, size: 36, color: palette.textPrimary),
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: metrics.itemGap),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         fullName,
-                        style: GoogleFonts.plusJakartaSans(
+                        style: textTheme.headlineSmall?.copyWith(
                           fontSize: 24,
                           fontWeight: FontWeight.w800,
-                          color: const Color(0xFFFFF4EC),
+                          color: palette.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         phone,
-                        style: const TextStyle(
-                          color: Color(0xFFFFC89B),
+                        style: textTheme.bodyLarge?.copyWith(
+                          color: palette.textSecondary,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -2163,11 +2413,12 @@ class _DriverMapCircleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.rapigoPalette;
     return Material(
-      color: backgroundColor ?? const Color(0xFF0B111D).withValues(alpha: 0.94),
+      color: backgroundColor ?? palette.surfacePrimary.withValues(alpha: 0.95),
       shape: const CircleBorder(),
-      shadowColor: shadowColor ?? const Color(0x33000000),
-      elevation: 8,
+      shadowColor: shadowColor ?? palette.shadowSoft,
+      elevation: 7,
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: onTap,
@@ -2207,10 +2458,13 @@ class _DriverHomeOfferCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.rapigoPalette;
+    final metrics = context.rapigoMetrics;
+    final textTheme = Theme.of(context).textTheme;
     final passengerName =
         trip.passengerName?.trim().isNotEmpty == true ? trip.passengerName!.trim() : 'Pasajero';
-    final rejectLabel = trip.isDirectedRequest ? 'Cancelar' : 'Ignorar';
-    final accentColor = isPreviewingRoute ? const Color(0xFF2979FF) : const Color(0xFFFFC400);
+    const rejectLabel = 'Ignorar';
+    final accentColor = isPreviewingRoute ? palette.accentBlue : palette.accentYellow;
     final title = isPreviewingRoute ? 'Recorrido listo para revisar' : 'Nueva solicitud de viaje';
     final primaryLabel = isPreviewingRoute ? 'Aceptar' : 'Recorrido';
     final primaryIcon = isPreviewingRoute ? Icons.check_circle_rounded : Icons.route_rounded;
@@ -2219,14 +2473,14 @@ class _DriverHomeOfferCard extends StatelessWidget {
       constraints: const BoxConstraints(minHeight: 450),
       padding: const EdgeInsets.fromLTRB(22, 18, 22, 18),
       decoration: BoxDecoration(
-        color: const Color(0xFF060D18).withValues(alpha: 0.97),
-        borderRadius: BorderRadius.circular(36),
-        border: Border.all(color: const Color(0x22FFFFFF)),
-        boxShadow: const [
+        color: palette.surfacePrimary.withValues(alpha: 0.97),
+        borderRadius: BorderRadius.circular(metrics.radiusXLarge),
+        border: Border.all(color: palette.outlineSoft),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x33000000),
+            color: palette.shadowSoft.withValues(alpha: 0.9),
             blurRadius: 36,
-            offset: Offset(0, 12),
+            offset: const Offset(0, 12),
           ),
         ],
       ),
@@ -2245,7 +2499,7 @@ class _DriverHomeOfferCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: textTheme.headlineMedium?.copyWith(
                     color: accentColor,
                     fontSize: isPreviewingRoute ? 20 : 22,
                     fontWeight: FontWeight.w900,
@@ -2277,9 +2531,9 @@ class _DriverHomeOfferCard extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFF0D1B32),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0x332979FF)),
+                color: palette.backgroundRaised,
+                borderRadius: BorderRadius.circular(metrics.radiusSmall),
+                border: Border.all(color: palette.accentBlue.withValues(alpha: 0.22)),
               ),
               child: Row(
                 children: [
@@ -2288,10 +2542,9 @@ class _DriverHomeOfferCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       'El mapa ya quedo trazado. Puedes moverlo libremente y revisar tiempo, distancia y destino antes de aceptar.',
-                      style: const TextStyle(
-                        color: Color(0xFFCFE2FF),
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: const Color(0xFFCFE2FF),
+                        fontWeight: FontWeight.w700,
                         height: 1.35,
                       ),
                     ),
@@ -2306,15 +2559,15 @@ class _DriverHomeOfferCard extends StatelessWidget {
               CircleAvatar(
                 radius: 40,
                 backgroundColor: const Color(0xFF1A365D),
-                child: Text(
-                  passengerName.characters.take(1).toString().toUpperCase(),
-                  style: GoogleFonts.plusJakartaSans(
-                    color: Colors.white,
-                    fontSize: 30,
-                    fontWeight: FontWeight.w900,
-                  ),
+              child: Text(
+                passengerName.characters.take(1).toString().toUpperCase(),
+                style: textTheme.displayMedium?.copyWith(
+                  color: palette.textPrimary,
+                  fontSize: 30,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
+            ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -2322,8 +2575,8 @@ class _DriverHomeOfferCard extends StatelessWidget {
                   children: [
                     Text(
                       passengerName,
-                      style: GoogleFonts.plusJakartaSans(
-                        color: Colors.white,
+                      style: textTheme.headlineLarge?.copyWith(
+                        color: palette.textPrimary,
                         fontSize: 24,
                         fontWeight: FontWeight.w900,
                       ),
@@ -2766,37 +3019,27 @@ class _DriverIncomingRequestOverlay extends ConsumerWidget {
                         await launchUrl(telUri);
                       },
                       onReject: () async {
-                        final isDirectedRequest = trip.isDirectedRequest;
                         if (isPreviewingRoute) {
                           ref.read(driverOfferPreviewTripIdProvider.notifier).setTrip(null);
-                          if (isDirectedRequest) {
-                            await ref.read(driverOffersProvider.notifier).cancelDirectedOffer(trip);
-                            await ref.read(offeredTripProvider.notifier).loadOffer();
-                            await ref.read(driverOffersProvider.notifier).loadOffers();
-                          } else {
-                            await ref.read(offeredTripProvider.notifier).clearTrip();
-                          }
+                          await ref.read(driverOffersProvider.notifier).rejectOffer(trip.id);
+                          await ref.read(offeredTripProvider.notifier).clearTrip();
+                          await ref.read(driverOffersProvider.notifier).loadOffers();
                           if (context.mounted) {
                             showTopNotice(
                               context,
-                              isDirectedRequest
-                                  ? 'Solicitud cancelada para este conductor.'
-                                  : 'Solicitud ignorada. Sigue visible en viajes disponibles.',
+                              'Solicitud ignorada para tu conductor.',
                               tone: NoticeTone.info,
                             );
                           }
                           return;
                         }
-                        if (isDirectedRequest) {
-                          await ref.read(driverOffersProvider.notifier).cancelDirectedOffer(trip);
-                          await ref.read(offeredTripProvider.notifier).loadOffer();
-                        } else {
-                          await ref.read(offeredTripProvider.notifier).clearTrip();
-                        }
-                        if (!isDirectedRequest && context.mounted) {
+                        await ref.read(driverOffersProvider.notifier).rejectOffer(trip.id);
+                        await ref.read(offeredTripProvider.notifier).clearTrip();
+                        await ref.read(driverOffersProvider.notifier).loadOffers();
+                        if (context.mounted) {
                           showTopNotice(
                             context,
-                            'Solicitud ignorada. Sigue visible en viajes disponibles.',
+                            'Solicitud ignorada para tu conductor.',
                             tone: NoticeTone.info,
                           );
                         }
@@ -2814,15 +3057,26 @@ class _DriverIncomingRequestOverlay extends ConsumerWidget {
                           }
                           return;
                         }
-                        await ref.read(offeredTripProvider.notifier).acceptTrip(trip);
-                        ref.read(driverOffersProvider.notifier).removeOfferLocally(trip.id);
-                        ref.read(driverOfferPreviewTripIdProvider.notifier).setTrip(trip.id);
-                        if (context.mounted) {
-                          showTopNotice(
-                            context,
-                            'Recorrido bloqueado para ti. Revisa la ruta y luego acepta.',
-                            tone: NoticeTone.info,
-                          );
+                        try {
+                          await ref.read(offeredTripProvider.notifier).acceptTrip(trip);
+                          ref.read(driverOffersProvider.notifier).removeOfferLocally(trip.id);
+                          ref.read(driverOfferPreviewTripIdProvider.notifier).setTrip(trip.id);
+                          if (context.mounted) {
+                            showTopNotice(
+                              context,
+                              'Recorrido bloqueado para ti. Revisa la ruta y luego acepta.',
+                              tone: NoticeTone.info,
+                            );
+                          }
+                        } catch (error) {
+                          ref.read(driverOfferPreviewTripIdProvider.notifier).setTrip(null);
+                          if (context.mounted) {
+                            showTopNotice(
+                              context,
+                              error.toString().replaceFirst('Exception: ', ''),
+                              tone: NoticeTone.warning,
+                            );
+                          }
                         }
                       },
                     ),
@@ -3037,7 +3291,7 @@ class _DriverAvailableTripCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final passengerName =
         trip.passengerName?.trim().isNotEmpty == true ? trip.passengerName!.trim() : 'Pasajero';
-    final rejectLabel = trip.isDirectedRequest ? 'Cancelar' : 'Ignorar';
+    const rejectLabel = 'Ignorar';
     final requestBadgeLabel = trip.isDirectedRequest ? 'Directa' : 'Abierta';
     final requestBadgeColor = trip.isDirectedRequest
         ? const Color(0xFFFF7A59)

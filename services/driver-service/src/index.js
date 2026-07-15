@@ -1,5 +1,6 @@
 const Fastify = require("fastify");
 const cors = require("@fastify/cors");
+const crypto = require("crypto");
 const { Pool } = require("pg");
 const Redis = require("ioredis");
 const amqp = require("amqplib");
@@ -47,6 +48,117 @@ async function publish(routingKey, payload) {
   setTimeout(() => connection.close(), 250);
 }
 
+function base64UrlDecode(value) {
+  return Buffer.from(String(value).replace(/-/g, "+").replace(/_/g, "/"), "base64");
+}
+
+function verifyJwtFromRequest(request, reply) {
+  const authorization = String(request.headers.authorization || "");
+  const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+  if (!token) {
+    reply.code(401).send({ message: "No autorizado" });
+    return null;
+  }
+
+  const [encodedHeader, encodedPayload, signature] = token.split(".");
+  if (!encodedHeader || !encodedPayload || !signature) {
+    reply.code(401).send({ message: "Token invalido" });
+    return null;
+  }
+
+  const expectedSignature = crypto
+    .createHmac("sha256", process.env.JWT_SECRET || "super-secret")
+    .update(`${encodedHeader}.${encodedPayload}`)
+    .digest("base64url");
+
+  const received = Buffer.from(signature);
+  const expected = Buffer.from(expectedSignature);
+  if (received.length !== expected.length || !crypto.timingSafeEqual(received, expected)) {
+    reply.code(401).send({ message: "Token invalido" });
+    return null;
+  }
+
+  try {
+    const payload = JSON.parse(base64UrlDecode(encodedPayload).toString("utf8"));
+    if (payload.exp && Date.now() >= payload.exp * 1000) {
+      reply.code(401).send({ message: "Token vencido" });
+      return null;
+    }
+    return payload;
+  } catch (error) {
+    reply.code(401).send({ message: "Token invalido" });
+    return null;
+  }
+}
+
+async function requireUserToken(request, reply) {
+  const user = verifyJwtFromRequest(request, reply);
+  if (!user) {
+    return null;
+  }
+  if (user.accountType !== "user") {
+    reply.code(403).send({ message: "Acceso solo para usuarios de la app" });
+    return null;
+  }
+  request.user = user;
+  return user;
+}
+
+async function requireAdminToken(request, reply) {
+  const user = verifyJwtFromRequest(request, reply);
+  if (!user) {
+    return null;
+  }
+  if (user.accountType !== "admin" || user.role !== "admin") {
+    reply.code(403).send({ message: "Acceso solo para central" });
+    return null;
+  }
+  request.user = user;
+  return user;
+}
+
+async function requireDriverUser(request, reply) {
+  const user = await requireUserToken(request, reply);
+  if (!user) {
+    return null;
+  }
+  if (user.role !== "driver") {
+    reply.code(403).send({ message: "Acceso solo para conductores" });
+    return null;
+  }
+  return user;
+}
+
+async function requireOwnUserId(request, reply, userId) {
+  const user = await requireDriverUser(request, reply);
+  if (!user) {
+    return null;
+  }
+  if (user.sub !== userId) {
+    reply.code(403).send({ message: "No puedes modificar otro conductor" });
+    return null;
+  }
+  return user;
+}
+
+async function requireOwnDriverId(request, reply, driverId) {
+  const user = await requireDriverUser(request, reply);
+  if (!user) {
+    return null;
+  }
+
+  const result = await pool.query(
+    "SELECT id FROM drivers WHERE id = $1 AND user_id = $2 LIMIT 1",
+    [driverId, user.sub]
+  );
+  if (!result.rows.length) {
+    reply.code(403).send({ message: "No puedes operar con otro conductor" });
+    return null;
+  }
+
+  return user;
+}
+
 async function bootstrap() {
   await app.register(cors, { origin: true, credentials: true });
 
@@ -66,6 +178,9 @@ async function bootstrap() {
 
   app.post("/profile", async (request, reply) => {
     const { userId, licenseNumber, vehicle } = driverProfileSchema.parse(request.body);
+    const user = await requireOwnUserId(request, reply, userId);
+    if (!user) return;
+
     const client = await pool.connect();
 
     try {
@@ -115,6 +230,9 @@ async function bootstrap() {
 
   app.patch("/availability", async (request, reply) => {
     const { driverId, isAvailable } = availabilitySchema.parse(request.body);
+    const user = await requireOwnDriverId(request, reply, driverId);
+    if (!user) return;
+
     const status = isAvailable ? "available" : "offline";
     const result = await pool.query(
       `UPDATE drivers
@@ -148,6 +266,9 @@ async function bootstrap() {
 
   app.post("/ensure-profile", async (request, reply) => {
     const { userId } = ensureProfileSchema.parse(request.body);
+    const user = await requireOwnUserId(request, reply, userId);
+    if (!user) return;
+
     const client = await pool.connect();
 
     try {
@@ -201,6 +322,9 @@ async function bootstrap() {
 
   app.get("/by-user/:userId", async (request, reply) => {
     const { userId } = request.params;
+    const user = await requireOwnUserId(request, reply, userId);
+    if (!user) return;
+
     const result = await pool.query(
       `SELECT d.*, row_to_json(v.*) AS vehicle
        FROM drivers d
@@ -218,6 +342,9 @@ async function bootstrap() {
 
   app.get("/:driverId", async (request, reply) => {
     const { driverId } = request.params;
+    const user = await requireOwnDriverId(request, reply, driverId);
+    if (!user) return;
+
     const result = await pool.query(
       `SELECT d.*, row_to_json(v.*) AS vehicle
        FROM drivers d
@@ -234,6 +361,9 @@ async function bootstrap() {
   });
 
   app.post("/:driverId/access", async (request, reply) => {
+    const admin = await requireAdminToken(request, reply);
+    if (!admin) return;
+
     const { driverId } = request.params;
     const { status, note } = driverAccessSchema.parse(request.body);
     const result = await pool.query(

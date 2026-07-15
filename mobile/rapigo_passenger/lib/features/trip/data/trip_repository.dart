@@ -15,7 +15,9 @@ final tripRepositoryProvider = Provider<TripRepository>((ref) {
   return const TripRepository();
 });
 
-final tripProvider = NotifierProvider<TripController, TripState>(TripController.new);
+final tripProvider = NotifierProvider<TripController, TripState>(
+  TripController.new,
+);
 
 class TripRepository {
   const TripRepository();
@@ -24,8 +26,10 @@ class TripRepository {
 
   TripRequest _mapTripRequest(Map<String, dynamic> payload) {
     return TripRequest(
-      pickupAddress: payload['pickup_address']?.toString() ?? 'Mi ubicacion actual',
-      destinationAddress: payload['destination_address']?.toString() ?? destinationPendingLabel,
+      pickupAddress:
+          payload['pickup_address']?.toString() ?? 'Mi ubicacion actual',
+      destinationAddress:
+          payload['destination_address']?.toString() ?? destinationPendingLabel,
       status: payload['status']?.toString() ?? 'idle',
       activeTripId: payload['id']?.toString(),
       pickupLat: _toNullableDouble(payload['pickup_lat']),
@@ -35,7 +39,10 @@ class TripRepository {
       driverLat: _toNullableDouble(payload['driver_lat']),
       driverLng: _toNullableDouble(payload['driver_lng']),
       vehicleType: payload['vehicle_type']?.toString(),
-      vehicleLabel: _joinVehicleLabel(payload['vehicle_brand'], payload['vehicle_model']),
+      vehicleLabel: _joinVehicleLabel(
+        payload['vehicle_brand'],
+        payload['vehicle_model'],
+      ),
       vehiclePlate: payload['vehicle_plate']?.toString(),
       vehicleColor: payload['vehicle_color']?.toString(),
       driverName: payload['driver_name']?.toString(),
@@ -55,7 +62,9 @@ class TripRepository {
     );
 
     if (response.statusCode >= 400) {
-      throw Exception('No se pudo cargar el historial (${response.statusCode})');
+      throw Exception(
+        'No se pudo cargar el historial (${response.statusCode})',
+      );
     }
 
     final payload = jsonDecode(response.body) as List<dynamic>;
@@ -66,12 +75,17 @@ class TripRepository {
             id: item['id']?.toString() ?? '',
             status: item['status']?.toString() ?? 'unknown',
             pickupAddress: item['pickup_address']?.toString() ?? 'Origen',
-            destinationAddress: item['destination_address']?.toString() ?? destinationPendingLabel,
+            destinationAddress:
+                item['destination_address']?.toString() ??
+                destinationPendingLabel,
             requestedAt: item['requested_at']?.toString() ?? '',
             driverName: item['driver_name']?.toString(),
             driverPhone: item['driver_phone']?.toString(),
             vehicleType: item['vehicle_type']?.toString(),
-            vehicleLabel: _joinVehicleLabel(item['vehicle_brand'], item['vehicle_model']),
+            vehicleLabel: _joinVehicleLabel(
+              item['vehicle_brand'],
+              item['vehicle_model'],
+            ),
             vehiclePlate: item['vehicle_plate']?.toString(),
             vehicleColor: item['vehicle_color']?.toString(),
             isPromotional: item['promotional_trip'] == true,
@@ -90,7 +104,9 @@ class TripRepository {
     );
 
     if (response.statusCode >= 400) {
-      throw Exception('No se pudo cargar el viaje activo (${response.statusCode})');
+      throw Exception(
+        'No se pudo cargar el viaje activo (${response.statusCode})',
+      );
     }
 
     if (response.body.trim() == 'null') {
@@ -111,37 +127,47 @@ class TripRepository {
     }
 
     final dispatchResponse = await http.get(
-      Uri.parse('${AppConfig.apiBaseUrl}/dispatch/nearby?lat=$lat&lng=$lng&radiusMeters=50000&limit=200'),
+      Uri.parse(
+        '${AppConfig.apiBaseUrl}/dispatch/nearby?lat=$lat&lng=$lng&radiusMeters=50000&limit=200',
+      ),
       headers: _headers(token),
     );
 
     final locationResponse = await http.get(
-      Uri.parse('${AppConfig.apiBaseUrl}/locations/nearby?lat=$lat&lng=$lng&radiusMeters=50000&limit=200'),
+      Uri.parse(
+        '${AppConfig.apiBaseUrl}/locations/nearby?lat=$lat&lng=$lng&radiusMeters=50000&limit=200',
+      ),
       headers: _headers(token),
     );
 
     if (dispatchResponse.statusCode >= 500) {
-      throw Exception('No se pudo cargar autos cercanos (${dispatchResponse.statusCode})');
+      throw Exception(
+        'No se pudo cargar autos cercanos (${dispatchResponse.statusCode})',
+      );
     }
 
     final dispatchPayload = dispatchResponse.statusCode < 400
         ? jsonDecode(dispatchResponse.body) as Map<String, dynamic>
         : <String, dynamic>{};
-    final dispatchDrivers = (dispatchPayload['drivers'] as List<dynamic>? ?? const [])
-        .whereType<Map<String, dynamic>>()
-        .toList(growable: false);
+    final dispatchDrivers =
+        (dispatchPayload['drivers'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .toList(growable: false);
     final dispatchById = {
-      for (final driver in dispatchDrivers) driver['driver_id']?.toString() ?? '': driver,
+      for (final driver in dispatchDrivers)
+        driver['driver_id']?.toString() ?? '': driver,
     };
 
     final locationPayload = locationResponse.statusCode < 400
         ? jsonDecode(locationResponse.body) as Map<String, dynamic>
         : <String, dynamic>{};
-    final locationDrivers = (locationPayload['drivers'] as List<dynamic>? ?? const [])
-        .whereType<Map<String, dynamic>>()
-        .toList(growable: false);
+    final locationDrivers =
+        (locationPayload['drivers'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .toList(growable: false);
     final locationById = {
-      for (final driver in locationDrivers) driver['driver_id']?.toString() ?? '': driver,
+      for (final driver in locationDrivers)
+        driver['driver_id']?.toString() ?? '': driver,
     };
 
     final mergedIds = {
@@ -153,9 +179,18 @@ class TripRepository {
       final dispatchDriver = dispatchById[id] ?? const <String, dynamic>{};
       final live = locationById[id] ?? dispatchDriver;
       final brand = _stringValue(dispatchDriver['brand'], fallback: 'Taxi');
-      final model = _stringValue(dispatchDriver['model'], fallback: 'Disponible');
-      final color = _stringValue(dispatchDriver['color'], fallback: 'Color por confirmar');
-      final plate = _stringValue(dispatchDriver['plate'], fallback: 'Sin placa');
+      final model = _stringValue(
+        dispatchDriver['model'],
+        fallback: 'Disponible',
+      );
+      final color = _stringValue(
+        dispatchDriver['color'],
+        fallback: 'Color por confirmar',
+      );
+      final plate = _stringValue(
+        dispatchDriver['plate'],
+        fallback: 'Sin placa',
+      );
       final distanceMeters = _toDouble(
         dispatchDriver['distance_meters'] ?? live['distance_meters'],
       );
@@ -164,8 +199,12 @@ class TripRepository {
         lat: _toDouble(live['lat']),
         lng: _toDouble(live['lng']),
         distanceMeters: distanceMeters,
-        rating: _toDouble(dispatchDriver['rating'] ?? live['rating'], fallback: 5),
-        etaMinutes: (dispatchDriver['eta_minutes'] as num?)?.toInt() ??
+        rating: _toDouble(
+          dispatchDriver['rating'] ?? live['rating'],
+          fallback: 5,
+        ),
+        etaMinutes:
+            (dispatchDriver['eta_minutes'] as num?)?.toInt() ??
             max(2, (distanceMeters / 350).round()),
         vehicleType: _stringValue(
           dispatchDriver['vehicle_type'],
@@ -173,10 +212,9 @@ class TripRepository {
         ),
         vehicleLabel: '$brand $model',
         vehicleDetail: '$color · $plate',
-        priceLabel: 'Bs ${(8 + distanceMeters / 300).toStringAsFixed(0)}',
+        priceLabel: '',
       );
-    }).toList()
-      ..sort((a, b) => a.distanceMeters.compareTo(b.distanceMeters));
+    }).toList()..sort((a, b) => a.distanceMeters.compareTo(b.distanceMeters));
   }
 
   Future<TripRequest> requestTrip({
@@ -190,9 +228,15 @@ class TripRepository {
     String? preferredDriverId,
   }) async {
     final destination = destinationLocation;
-    final distanceMeters = destination == null ? 350 : _estimateDistanceMeters(pickup, destination);
-    final durationSeconds = destination == null ? 300 : max(300, (distanceMeters / 5.5).round());
-    final fareAmount = destination == null ? 10 : max(10, (distanceMeters / 700).ceil() * 3).toDouble();
+    final distanceMeters = destination == null
+        ? 350
+        : _estimateDistanceMeters(pickup, destination);
+    final durationSeconds = destination == null
+        ? 300
+        : max(300, (distanceMeters / 5.5).round());
+    final fareAmount = destination == null
+        ? 10
+        : max(10, (distanceMeters / 700).ceil() * 3).toDouble();
 
     final response = await http.post(
       Uri.parse('${AppConfig.apiBaseUrl}/trips'),
@@ -237,7 +281,9 @@ class TripRepository {
       destinationLat: destination?.latitude,
       destinationLng: destination?.longitude,
       etaMinutes: _toNullableInt(payload['eta_minutes']),
-      isPromotional: payload['reward_applied'] == true || payload['promotional_trip'] == true,
+      isPromotional:
+          payload['reward_applied'] == true ||
+          payload['promotional_trip'] == true,
     );
   }
 
@@ -253,7 +299,9 @@ class TripRepository {
     );
 
     if (response.statusCode >= 400) {
-      throw Exception('No se pudo actualizar el viaje (${response.statusCode})');
+      throw Exception(
+        'No se pudo actualizar el viaje (${response.statusCode})',
+      );
     }
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
@@ -281,14 +329,18 @@ class TripRepository {
 
     if (response.statusCode >= 400) {
       final payload = response.body.isEmpty ? null : jsonDecode(response.body);
-      final message = payload is Map<String, dynamic> ? payload['message']?.toString() : null;
-      throw Exception(message ?? 'No se pudo actualizar el destino (${response.statusCode})');
+      final message = payload is Map<String, dynamic>
+          ? payload['message']?.toString()
+          : null;
+      throw Exception(
+        message ?? 'No se pudo actualizar el destino (${response.statusCode})',
+      );
     }
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
-    return _mapTripRequest(payload).copyWith(
-      activeTripId: payload['id']?.toString() ?? tripId,
-    );
+    return _mapTripRequest(
+      payload,
+    ).copyWith(activeTripId: payload['id']?.toString() ?? tripId);
   }
 
   Future<void> submitRating({
@@ -304,19 +356,22 @@ class TripRepository {
       body: jsonEncode({
         'fromRole': fromRole,
         'score': score,
-        if (comment != null && comment.trim().isNotEmpty) 'comment': comment.trim(),
+        if (comment != null && comment.trim().isNotEmpty)
+          'comment': comment.trim(),
       }),
     );
 
     if (response.statusCode >= 400) {
-      throw Exception('No se pudo enviar la calificacion (${response.statusCode})');
+      throw Exception(
+        'No se pudo enviar la calificacion (${response.statusCode})',
+      );
     }
   }
 
   static Map<String, String> _headers(String token) => {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      };
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer $token',
+  };
   static int _estimateDistanceMeters(LatLng from, LatLng to) {
     const distance = Distance();
     return distance.as(LengthUnit.Meter, from, to).round();
@@ -409,7 +464,8 @@ class TripController extends Notifier<TripState> {
 
   Future<void> _persistRequest() async {
     final request = state.request;
-    if (request.status == 'idle' && (request.activeTripId == null || request.activeTripId!.isEmpty)) {
+    if (request.status == 'idle' &&
+        (request.activeTripId == null || request.activeTripId!.isEmpty)) {
       await _cache.clear();
       return;
     }
@@ -426,10 +482,7 @@ class TripController extends Notifier<TripState> {
     }
 
     _isLoadingDashboard = true;
-    state = state.copyWith(
-      isLoading: true,
-      errorMessage: state.errorMessage,
-    );
+    state = state.copyWith(isLoading: true, errorMessage: state.errorMessage);
     try {
       final results = await Future.wait([
         _repository.fetchHistory(token: token, passengerId: passengerId),
@@ -444,20 +497,15 @@ class TripController extends Notifier<TripState> {
       state = state.copyWith(
         isLoading: false,
         history: results[0] as List<TripHistoryItem>,
-        request: (results[1] as TripRequest?) ??
-            state.request.copyWith(
-              status: 'idle',
-              clearTripId: true,
-            ),
+        request:
+            (results[1] as TripRequest?) ??
+            state.request.copyWith(status: 'idle', clearTripId: true),
         nearbyDrivers: results[2] as List<NearbyDriver>,
         clearError: true,
       );
       await _persistRequest();
     } catch (error) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: error.toString(),
-      );
+      state = state.copyWith(isLoading: false, errorMessage: error.toString());
     } finally {
       _isLoadingDashboard = false;
     }
@@ -525,7 +573,9 @@ class TripController extends Notifier<TripState> {
 
   void upsertLiveDriver(NearbyDriver driver) {
     final updated = [...state.nearbyDrivers];
-    final index = updated.indexWhere((item) => item.driverId == driver.driverId);
+    final index = updated.indexWhere(
+      (item) => item.driverId == driver.driverId,
+    );
     if (index >= 0) {
       updated[index] = driver;
     } else {
@@ -604,10 +654,7 @@ class TripController extends Notifier<TripState> {
     );
 
     state = state.copyWith(
-      request: state.request.copyWith(
-        status: 'idle',
-        clearTripId: true,
-      ),
+      request: state.request.copyWith(status: 'idle', clearTripId: true),
       clearError: true,
     );
     await _persistRequest();

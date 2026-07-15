@@ -1,5 +1,6 @@
 const Fastify = require("fastify");
 const cors = require("@fastify/cors");
+const crypto = require("crypto");
 const { Pool } = require("pg");
 const Redis = require("ioredis");
 const amqp = require("amqplib");
@@ -84,6 +85,128 @@ async function emitRealtime(event, room, data) {
   } catch (error) {
     app.log.warn({ err: error, event, room }, "websocket emit failed");
   }
+}
+
+function base64UrlDecode(value) {
+  return Buffer.from(String(value).replace(/-/g, "+").replace(/_/g, "/"), "base64");
+}
+
+function verifyJwtFromRequest(request, reply) {
+  const authorization = String(request.headers.authorization || "");
+  const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+  if (!token) {
+    reply.code(401).send({ message: "No autorizado" });
+    return null;
+  }
+
+  const [encodedHeader, encodedPayload, signature] = token.split(".");
+  if (!encodedHeader || !encodedPayload || !signature) {
+    reply.code(401).send({ message: "Token invalido" });
+    return null;
+  }
+
+  const expectedSignature = crypto
+    .createHmac("sha256", process.env.JWT_SECRET || "super-secret")
+    .update(`${encodedHeader}.${encodedPayload}`)
+    .digest("base64url");
+
+  const received = Buffer.from(signature);
+  const expected = Buffer.from(expectedSignature);
+  if (received.length !== expected.length || !crypto.timingSafeEqual(received, expected)) {
+    reply.code(401).send({ message: "Token invalido" });
+    return null;
+  }
+
+  try {
+    const payload = JSON.parse(base64UrlDecode(encodedPayload).toString("utf8"));
+    if (payload.exp && Date.now() >= payload.exp * 1000) {
+      reply.code(401).send({ message: "Token vencido" });
+      return null;
+    }
+    return payload;
+  } catch (error) {
+    reply.code(401).send({ message: "Token invalido" });
+    return null;
+  }
+}
+
+async function requireUserToken(request, reply) {
+  const user = verifyJwtFromRequest(request, reply);
+  if (!user) {
+    return null;
+  }
+  if (user.accountType !== "user") {
+    reply.code(403).send({ message: "Acceso solo para usuarios de la app" });
+    return null;
+  }
+  request.user = user;
+  return user;
+}
+
+async function requireOwnDriverId(request, reply, driverId) {
+  const user = await requireUserToken(request, reply);
+  if (!user) {
+    return null;
+  }
+  if (user.role !== "driver") {
+    reply.code(403).send({ message: "Acceso solo para conductores" });
+    return null;
+  }
+
+  const result = await pool.query(
+    "SELECT id FROM drivers WHERE id = $1 AND user_id = $2 LIMIT 1",
+    [driverId, user.sub]
+  );
+  if (!result.rows.length) {
+    reply.code(403).send({ message: "No puedes consultar otro conductor" });
+    return null;
+  }
+
+  return user;
+}
+
+async function requireTripAccess(request, reply, tripId, { forStatus = null } = {}) {
+  const user = await requireUserToken(request, reply);
+  if (!user) {
+    return null;
+  }
+
+  const result = await pool.query(
+    `SELECT t.id, t.passenger_id, t.driver_id, d.user_id AS driver_user_id
+     FROM trips t
+     LEFT JOIN drivers d ON d.id = t.driver_id
+     WHERE t.id = $1
+     LIMIT 1`,
+    [tripId]
+  );
+  const trip = result.rows[0];
+  if (!trip) {
+    reply.code(404).send({ message: "Trip not found" });
+    return null;
+  }
+
+  if (user.role === "driver") {
+    if (!trip.driver_id || trip.driver_user_id !== user.sub) {
+      reply.code(403).send({ message: "No puedes operar un viaje de otro conductor" });
+      return null;
+    }
+    return { user, trip };
+  }
+
+  if (user.role === "passenger") {
+    if (trip.passenger_id !== user.sub) {
+      reply.code(403).send({ message: "No puedes operar un viaje de otro usuario" });
+      return null;
+    }
+    if (forStatus && forStatus !== "cancelled") {
+      reply.code(403).send({ message: "El pasajero solo puede cancelar su viaje desde esta ruta" });
+      return null;
+    }
+    return { user, trip };
+  }
+
+  reply.code(403).send({ message: "Rol no autorizado para este viaje" });
+  return null;
 }
 
 async function ensureSchema() {
@@ -384,8 +507,11 @@ async function bootstrap() {
     return result.rows;
   });
 
-  app.get("/history/driver/:driverId", async (request) => {
+  app.get("/history/driver/:driverId", async (request, reply) => {
     const { driverId } = request.params;
+    const user = await requireOwnDriverId(request, reply, driverId);
+    if (!user) return;
+
     const result = await pool.query(
       `SELECT t.*,
               ST_Y(t.pickup_location::geometry) AS pickup_lat,
@@ -461,8 +587,11 @@ async function bootstrap() {
     return mapTrip(result.rows[0]) ?? null;
   });
 
-  app.get("/active/driver/:driverId", async (request) => {
+  app.get("/active/driver/:driverId", async (request, reply) => {
     const { driverId } = request.params;
+    const user = await requireOwnDriverId(request, reply, driverId);
+    if (!user) return;
+
     const result = await pool.query(
       `SELECT t.*,
               ST_Y(t.pickup_location::geometry) AS pickup_lat,
@@ -492,6 +621,9 @@ async function bootstrap() {
 
   app.get("/:tripId", async (request, reply) => {
     const { tripId } = request.params;
+    const access = await requireTripAccess(request, reply, tripId);
+    if (!access) return;
+
     const result = await pool.query("SELECT * FROM trips WHERE id = $1", [tripId]);
     if (!result.rows.length) {
       return reply.code(404).send({ message: "Trip not found" });
@@ -502,6 +634,9 @@ async function bootstrap() {
   app.patch("/:tripId/status", async (request, reply) => {
     const { tripId } = request.params;
     const { status } = statusSchema.parse(request.body);
+    const access = await requireTripAccess(request, reply, tripId, { forStatus: status });
+    if (!access) return;
+
     if (status === "in_progress") {
       const destinationCheck = await pool.query(
         `SELECT destination_address,
@@ -616,6 +751,12 @@ async function bootstrap() {
   app.patch("/:tripId/destination", async (request, reply) => {
     const { tripId } = request.params;
     const input = destinationUpdateSchema.parse(request.body);
+    const access = await requireTripAccess(request, reply, tripId);
+    if (!access) return;
+
+    if (access.user.role !== "passenger") {
+      return reply.code(403).send({ message: "Solo el pasajero puede cambiar el destino" });
+    }
 
     if (!isInsidePotosi(input.destinationLat, input.destinationLng)) {
       return reply.code(400).send({
@@ -696,6 +837,12 @@ async function bootstrap() {
   app.post("/:tripId/rating", async (request, reply) => {
     const { tripId } = request.params;
     const { fromRole, score, comment } = ratingSchema.parse(request.body);
+    const access = await requireTripAccess(request, reply, tripId);
+    if (!access) return;
+    if (access.user.role !== fromRole) {
+      return reply.code(403).send({ message: "No puedes calificar usando otro rol" });
+    }
+
     const tripResult = await pool.query(
       `SELECT t.id,
               t.passenger_id,

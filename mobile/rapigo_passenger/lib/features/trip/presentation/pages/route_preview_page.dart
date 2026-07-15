@@ -83,14 +83,7 @@ class _RoutePreviewPageState extends ConsumerState<RoutePreviewPage> {
   String get _summaryLabel => '$_durationLabel · $_distanceLabel';
 
   String get _fareLabel {
-    final fareDivisor = _serviceType == 'moto' ? 900 : 700;
-    final fareMultiplier = _serviceType == 'moto' ? 2 : 3;
-    final fareAmount =
-        ((widget.distanceMeters / fareDivisor).ceil() * fareMultiplier).clamp(
-          8,
-          120,
-        );
-    return 'Bs $fareAmount';
+    return '';
   }
 
   String _navigationBadgeCaption(String status) {

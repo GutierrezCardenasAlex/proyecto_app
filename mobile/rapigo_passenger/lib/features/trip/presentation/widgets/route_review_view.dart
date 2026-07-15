@@ -165,7 +165,7 @@ class RouteReviewView extends StatelessWidget {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    '$distanceLabel · $fareLabel',
+                                    distanceLabel,
                                     style: GoogleFonts.plusJakartaSans(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w700,

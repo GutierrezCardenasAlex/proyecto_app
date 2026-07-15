@@ -10,6 +10,7 @@ import '../../../../../core/map/offline_map.dart';
 import '../../../../../core/ui/top_notice.dart';
 import '../../../../../core/update/app_install_info.dart';
 import '../../../../../core/update/app_update_service.dart';
+import '../../../../../shared/theme/rapigo_theme.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../../trip/data/trip_repository.dart';
 import '../../../trip/domain/driver_trip.dart';
@@ -34,6 +35,9 @@ class DriverProfilePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final palette = context.rapigoPalette;
+    final metrics = context.rapigoMetrics;
+    final textTheme = Theme.of(context).textTheme;
     final session = ref.watch(driverSessionProvider);
     final trips = ref.watch(driverTripHistoryProvider).value ?? const <DriverTrip>[];
     final completedTrips = trips.where((trip) => trip.status == 'completed').length;
@@ -46,10 +50,15 @@ class DriverProfilePage extends ConsumerWidget {
     return _DetailScaffold(
       title: 'Perfil',
       child: Scaffold(
-        backgroundColor: const Color(0xFF090D14),
+        backgroundColor: palette.backgroundBase,
         body: SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(22, 18, 22, 26),
+            padding: EdgeInsets.fromLTRB(
+              metrics.pagePadding,
+              metrics.sectionGap,
+              metrics.pagePadding,
+              metrics.pagePadding + 8,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -62,30 +71,30 @@ class DriverProfilePage extends ConsumerWidget {
                         children: [
                           Text(
                             '¡Hola, $displayName!',
-                            style: GoogleFonts.plusJakartaSans(
+                            style: textTheme.headlineMedium?.copyWith(
                               fontSize: 34,
                               fontWeight: FontWeight.w900,
-                              color: Colors.white,
+                              color: palette.textPrimary,
                               height: 1.05,
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          SizedBox(height: metrics.itemGap * 0.55),
                           Row(
                             children: [
-                              const Text(
+                              Text(
                                 'Conductor verificado',
-                                style: TextStyle(
-                                  color: Color(0xFFB8C0CC),
+                                style: textTheme.titleMedium?.copyWith(
+                                  color: palette.textSecondary,
                                   fontSize: 18,
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
-                              const SizedBox(width: 8),
+                              SizedBox(width: metrics.itemGap * 0.5),
                               Container(
                                 width: 26,
                                 height: 26,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFFFACC15),
+                                decoration: BoxDecoration(
+                                  color: palette.accentYellow,
                                   shape: BoxShape.circle,
                                 ),
                                 child: const Icon(
@@ -97,28 +106,28 @@ class DriverProfilePage extends ConsumerWidget {
                             ],
                           ),
                           if (vehicleSummary.isNotEmpty) ...[
-                            const SizedBox(height: 12),
+                            SizedBox(height: metrics.itemGap * 0.8),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF111722),
-                                borderRadius: BorderRadius.circular(18),
-                                border: Border.all(color: const Color(0xFF232C3A)),
+                                color: palette.surfacePrimary,
+                                borderRadius: BorderRadius.circular(metrics.radiusSmall),
+                                border: Border.all(color: palette.outlineStrong),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(
+                                  Icon(
                                     Icons.directions_car_filled_rounded,
                                     size: 18,
-                                    color: Color(0xFFFACC15),
+                                    color: palette.accentYellow,
                                   ),
-                                  const SizedBox(width: 8),
+                                  SizedBox(width: metrics.itemGap * 0.5),
                                   Flexible(
                                     child: Text(
                                       vehicleSummary,
-                                      style: const TextStyle(
-                                        color: Color(0xFFE5E7EB),
+                                      style: textTheme.bodyMedium?.copyWith(
+                                        color: palette.textPrimary,
                                         fontWeight: FontWeight.w700,
                                         fontSize: 13,
                                       ),
@@ -137,26 +146,26 @@ class DriverProfilePage extends ConsumerWidget {
                       width: 82,
                       height: 82,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF111722),
+                        color: palette.surfacePrimary,
                         borderRadius: BorderRadius.circular(28),
-                        border: Border.all(color: const Color(0xFF232C3A)),
+                        border: Border.all(color: palette.outlineStrong),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.person_outline_rounded,
                         size: 40,
-                        color: Colors.white,
+                        color: palette.textPrimary,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: metrics.sectionGap),
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF11151D),
+                    color: palette.surfacePrimary,
                     borderRadius: BorderRadius.circular(28),
-                    border: Border.all(color: const Color(0xFF262D37)),
+                    border: Border.all(color: palette.outlineStrong),
                   ),
                   child: Row(
                     children: [
@@ -599,25 +608,28 @@ class _DriverProfileStatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.rapigoPalette;
+    final metrics = context.rapigoMetrics;
+    final textTheme = Theme.of(context).textTheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6),
       child: Column(
         children: [
-          Icon(icon, color: const Color(0xFFFACC15), size: 40),
-          const SizedBox(height: 18),
+          Icon(icon, color: palette.accentYellow, size: 40),
+          SizedBox(height: metrics.itemGap),
           Text(
             value,
-            style: GoogleFonts.plusJakartaSans(
-              color: Colors.white,
+            style: textTheme.headlineSmall?.copyWith(
+              color: palette.textPrimary,
               fontSize: 24,
               fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: metrics.itemGap * 0.45),
           Text(
             label,
-            style: const TextStyle(
-              color: Color(0xFFB8C0CC),
+            style: textTheme.bodyLarge?.copyWith(
+              color: palette.textSecondary,
               fontSize: 16,
               fontWeight: FontWeight.w600,
             ),
@@ -643,6 +655,9 @@ class _DriverProfileMenuTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.rapigoPalette;
+    final metrics = context.rapigoMetrics;
+    final textTheme = Theme.of(context).textTheme;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(22),
@@ -655,30 +670,30 @@ class _DriverProfileMenuTile extends StatelessWidget {
               width: 68,
               height: 68,
               decoration: BoxDecoration(
-                color: const Color(0xFF121923),
+                color: palette.surfaceSecondary,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFF29313C)),
+                border: Border.all(color: palette.outlineStrong),
               ),
-              child: Icon(icon, color: const Color(0xFFFACC15), size: 32),
+              child: Icon(icon, color: palette.accentYellow, size: 32),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: metrics.itemGap),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     title,
-                    style: GoogleFonts.plusJakartaSans(
-                      color: Colors.white,
+                    style: textTheme.titleLarge?.copyWith(
+                      color: palette.textPrimary,
                       fontSize: 20,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  SizedBox(height: metrics.itemGap * 0.35),
                   Text(
                     subtitle,
-                    style: const TextStyle(
-                      color: Color(0xFFB8C0CC),
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: palette.textSecondary,
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                       height: 1.4,
@@ -688,11 +703,11 @@ class _DriverProfileMenuTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            const Padding(
-              padding: EdgeInsets.only(top: 18),
+            Padding(
+              padding: const EdgeInsets.only(top: 18),
               child: Icon(
                 Icons.chevron_right_rounded,
-                color: Colors.white,
+                color: palette.textPrimary,
                 size: 34,
               ),
             ),
@@ -706,10 +721,10 @@ class _DriverProfileMenuTile extends StatelessWidget {
 class _DriverProfileDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return const Divider(
+    return Divider(
       height: 1,
       thickness: 1,
-      color: Color(0xFF232A34),
+      color: context.rapigoPalette.outlineSoft,
     );
   }
 }
@@ -719,6 +734,7 @@ class DriverSettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.rapigoPalette;
     return _DetailScaffold(
       title: 'Configuraciones',
       child: DriverPageShell(
@@ -729,16 +745,16 @@ class DriverSettingsPage extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
+                gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    Color(0xFF0C1830),
-                    Color(0xFF09111F),
+                    palette.surfacePrimary,
+                    palette.surfaceSecondary,
                   ],
                 ),
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: const Color(0xFF1A3A66)),
+                border: Border.all(color: palette.outlineStrong),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1084,6 +1100,7 @@ class _DriverStatisticsPageState extends ConsumerState<DriverStatisticsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.rapigoPalette;
     final history = ref.watch(driverTripHistoryProvider).value ?? const <DriverTrip>[];
     final now = DateTime.now();
     final filtered = history.where((trip) {
@@ -1119,18 +1136,18 @@ class _DriverStatisticsPageState extends ConsumerState<DriverStatisticsPage> {
               style: ButtonStyle(
                 backgroundColor: WidgetStateProperty.resolveWith((states) {
                   if (states.contains(WidgetState.selected)) {
-                    return const Color(0xFFFACC15);
+                    return palette.accentYellow;
                   }
-                  return const Color(0xFF0C1830);
+                  return palette.surfacePrimary;
                 }),
                 foregroundColor: WidgetStateProperty.resolveWith((states) {
                   if (states.contains(WidgetState.selected)) {
-                    return const Color(0xFF07111F);
+                    return palette.backgroundBase;
                   }
-                  return Colors.white;
+                  return palette.textPrimary;
                 }),
-                side: const WidgetStatePropertyAll(
-                  BorderSide(color: Color(0xFF1A3A66)),
+                side: WidgetStatePropertyAll(
+                  BorderSide(color: palette.outlineStrong),
                 ),
                 shape: WidgetStatePropertyAll(
                   RoundedRectangleBorder(
@@ -1410,6 +1427,8 @@ class DriverTripDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.rapigoPalette;
+    final metrics = context.rapigoMetrics;
     final passengerName = (trip.passengerName ?? '').trim().isEmpty ? 'Pasajero RAPIGO' : trip.passengerName!.trim();
     final distanceKm = driverTripDistanceKm(trip);
     final durationMinutes = driverTripEstimatedMinutes(trip);
@@ -1428,21 +1447,21 @@ class DriverTripDetailPage extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(18, 10, 18, 28),
         children: [
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.all(metrics.pagePadding),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
+              gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Color(0xFF091425),
-                  Color(0xFF08111E),
+                  palette.surfacePrimary,
+                  palette.surfaceSecondary,
                 ],
               ),
               borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: const Color(0xFF15335A)),
-              boxShadow: const [
+              border: Border.all(color: palette.outlineStrong),
+              boxShadow: [
                 BoxShadow(
-                  color: Color(0x24000000),
+                  color: palette.shadowSoft,
                   blurRadius: 24,
                   offset: Offset(0, 14),
                 ),
@@ -2443,16 +2462,17 @@ class _DetailScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.rapigoPalette;
     return Scaffold(
-      backgroundColor: const Color(0xFF111214),
+      backgroundColor: palette.backgroundBase,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF111214),
-        foregroundColor: const Color(0xFFFFF4EC),
+        backgroundColor: palette.backgroundBase,
+        foregroundColor: palette.textPrimary,
         title: Text(
           title,
           style: GoogleFonts.plusJakartaSans(
             fontWeight: FontWeight.w800,
-            color: const Color(0xFFFFF4EC),
+            color: palette.textPrimary,
           ),
         ),
       ),

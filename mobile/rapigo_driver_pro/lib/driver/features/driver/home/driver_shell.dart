@@ -100,6 +100,17 @@ class _DriverShellState extends ConsumerState<DriverShell> {
       _incomingOfferPageTripId = null;
       return;
     }
+    final ignoredTripId = ref.read(driverIgnoredIncomingTripIdProvider);
+    if (ignoredTripId != null) {
+      if (ignoredTripId == pendingOffer.id) {
+        return;
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ref.read(driverIgnoredIncomingTripIdProvider.notifier).clear();
+        }
+      });
+    }
     if (_incomingOfferPageOpen) {
       return;
     }
@@ -140,8 +151,20 @@ class _DriverShellState extends ConsumerState<DriverShell> {
     final activeTrip = ref.watch(offeredTripProvider).value;
     final offers = ref.watch(driverOffersProvider).value ?? const <DriverTrip>[];
     final previewTripId = ref.watch(driverOfferPreviewTripIdProvider);
+    final suppressIncomingOfferOverlay =
+        ref.watch(driverSuppressIncomingOfferOverlayProvider);
     final pendingOffer = _resolvePendingOffer(activeTrip, offers, previewTripId);
-    _maybeOpenIncomingOfferPage(pendingOffer, activeTrip);
+    if (!suppressIncomingOfferOverlay) {
+      _maybeOpenIncomingOfferPage(pendingOffer, activeTrip);
+    } else {
+      Future<void>.delayed(const Duration(milliseconds: 900), () {
+        if (mounted) {
+          ref
+              .read(driverSuppressIncomingOfferOverlayProvider.notifier)
+              .clear();
+        }
+      });
+    }
 
     final pages = <Widget>[
       DriverDashboard(

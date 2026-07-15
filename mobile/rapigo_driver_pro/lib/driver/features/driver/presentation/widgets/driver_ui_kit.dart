@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../../../../core/config/app_brand.dart';
+import '../../../../../shared/theme/rapigo_theme.dart';
 
 class DriverPageShell extends StatelessWidget {
   const DriverPageShell({
@@ -21,16 +21,25 @@ class DriverPageShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.rapigoPalette;
+    final metrics = context.rapigoMetrics;
+    final textTheme = Theme.of(context).textTheme;
+
     return SafeArea(
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
+        padding: EdgeInsets.fromLTRB(
+          metrics.pagePadding,
+          metrics.sectionGap,
+          metrics.pagePadding,
+          metrics.pagePadding + 96,
+        ),
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (leading != null) ...[
                 leading!,
-                const SizedBox(width: 12),
+                SizedBox(width: metrics.itemGap * 0.75),
               ],
               Expanded(
                 child: Column(
@@ -38,32 +47,32 @@ class DriverPageShell extends StatelessWidget {
                   children: [
                     Text(
                       eyebrow.toUpperCase(),
-                      style: const TextStyle(
-                        fontSize: 10,
+                      style: textTheme.labelSmall?.copyWith(
                         fontWeight: FontWeight.w900,
-                        letterSpacing: 1.4,
-                        color: AppBrand.accentYellow,
+                        letterSpacing: 1.5,
+                        color: palette.accentYellow,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: metrics.itemGap * 0.6),
                     Text(
                       title,
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 34,
+                        fontSize: 32,
                         fontWeight: FontWeight.w800,
-                        color: Colors.white,
+                        color: palette.textPrimary,
+                        height: 1.04,
                       ),
                     ),
                   ],
                 ),
               ),
               if (trailing != null) ...[
-                const SizedBox(width: 12),
+                SizedBox(width: metrics.itemGap * 0.75),
                 trailing!,
               ],
             ],
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: metrics.sectionGap),
           child,
         ],
       ),
@@ -83,24 +92,28 @@ class DriverEmptyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.rapigoPalette;
+    final metrics = context.rapigoMetrics;
+    final textTheme = Theme.of(context).textTheme;
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(metrics.pagePadding),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF0C1830),
-            Color(0xFF0A1323),
+            palette.surfacePrimary,
+            palette.surfaceSecondary,
           ],
         ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Color(0xFF1A3A66)),
-        boxShadow: const [
+        borderRadius: BorderRadius.circular(metrics.radiusLarge),
+        border: Border.all(color: palette.outlineStrong),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x22000000),
+            color: palette.shadowSoft,
             blurRadius: 18,
-            offset: Offset(0, 8),
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -109,17 +122,17 @@ class DriverEmptyCard extends StatelessWidget {
         children: [
           Text(
             title,
-            style: GoogleFonts.plusJakartaSans(
+            style: textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.w800,
               fontSize: 18,
-              color: Colors.white,
+              color: palette.textPrimary,
             ),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: metrics.itemGap * 0.45),
           Text(
             subtitle,
-            style: const TextStyle(
-              color: Color(0xFFD9E7FF),
+            style: textTheme.bodyMedium?.copyWith(
+              color: palette.textSecondary,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -145,53 +158,57 @@ class DriverMenuTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.rapigoPalette;
+    final metrics = context.rapigoMetrics;
+    final textTheme = Theme.of(context).textTheme;
+
     return Material(
-      color: const Color(0xFF0C1830),
-      borderRadius: BorderRadius.circular(24),
-      shadowColor: const Color(0x22000000),
+      color: palette.surfacePrimary,
+      borderRadius: BorderRadius.circular(metrics.radiusLarge),
+      shadowColor: palette.shadowSoft,
       elevation: 1,
       child: InkWell(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(metrics.radiusLarge),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(18),
+          padding: EdgeInsets.all(metrics.pagePadding),
           child: Row(
             children: [
               Container(
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: const Color(0x191D4ED8),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0x551D4ED8)),
+                  color: palette.accentBlue.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(metrics.radiusSmall),
+                  border: Border.all(color: palette.accentBlue.withValues(alpha: 0.28)),
                 ),
-                child: Icon(icon, color: AppBrand.accentYellow),
+                child: Icon(icon, color: palette.accentYellow),
               ),
-              const SizedBox(width: 14),
+              SizedBox(width: metrics.itemGap),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w800,
                         fontSize: 16,
-                        color: Colors.white,
+                        color: palette.textPrimary,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: metrics.itemGap * 0.35),
                     Text(
                       subtitle,
-                      style: const TextStyle(
-                        color: Color(0xFFD9E7FF),
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: palette.textSecondary,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: AppBrand.accentYellow),
+              Icon(Icons.chevron_right, color: palette.accentYellow),
             ],
           ),
         ),
