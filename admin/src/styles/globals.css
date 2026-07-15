@@ -1098,6 +1098,15 @@ a {
   border-color: rgba(239, 68, 68, 0.3);
 }
 
+.muted-text {
+  color: #9ca3af;
+}
+
+.success-text {
+  color: #86efac;
+  font-weight: 700;
+}
+
 .status-pill.subtle {
   padding: 4px 8px;
   font-size: 0.7rem;

@@ -34,6 +34,7 @@ class _DriverProfileCompletionPageState
   bool _driverPhotoReady = false;
   bool _licensePhotoReady = false;
   bool _vehiclePhotoReady = false;
+  bool _profileSubmitted = false;
 
   @override
   void initState() {
@@ -63,22 +64,53 @@ class _DriverProfileCompletionPageState
     super.dispose();
   }
 
-  String? _validatePersonalStep() {
-    if (_firstNameController.text.trim().isEmpty) {
-      return 'Ingresa tu nombre.';
-    }
-    if (_lastNameController.text.trim().isEmpty) {
-      return 'Ingresa tu apellido.';
-    }
-    if (_addressController.text.trim().isEmpty) {
-      return 'Ingresa tu direccion.';
+  bool _isGenericName(String value) {
+    return RegExp(
+      r'^(conductor|conductora|driver|chofer|taxista|usuario|user|test|prueba)$',
+      caseSensitive: false,
+    ).hasMatch(value.trim());
+  }
+
+  String? _validateRealName(String value, String label) {
+    final text = value.trim();
+    final hasLetters = RegExp(r'[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]{2,}').hasMatch(text);
+    if (text.length < 2 || !hasLetters || _isGenericName(text)) {
+      return 'Ingresa un $label real.';
     }
     return null;
   }
 
+  bool _isLooseField(String value) {
+    return RegExp(
+      r'^(temp|temporal|pendiente|sin dato|sin datos|n/a|na|test|prueba)$',
+      caseSensitive: false,
+    ).hasMatch(value.trim());
+  }
+
+  String? _validateRequiredField(String value, String label, {int min = 2}) {
+    final text = value.trim();
+    if (text.length < min || _isLooseField(text)) {
+      return '$label es obligatorio.';
+    }
+    return null;
+  }
+
+  String? _validatePersonalStep() {
+    final email = _emailController.text.trim();
+    if (email.isNotEmpty &&
+        !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+      return 'Ingresa un correo valido.';
+    }
+    return _validateRealName(_firstNameController.text, 'nombre') ??
+        _validateRealName(_lastNameController.text, 'apellido') ??
+        _validateRequiredField(_addressController.text, 'La direccion', min: 4);
+  }
+
   String? _validateLicenseStep() {
-    if (_licenseController.text.trim().isEmpty) {
-      return 'Ingresa el numero de licencia.';
+    final license = _licenseController.text.trim();
+    final licenseError = _validateRequiredField(license, 'La licencia', min: 4);
+    if (licenseError != null || license.toUpperCase().startsWith('TEMP-')) {
+      return 'Ingresa un numero de licencia real.';
     }
     if (_licenseCategoryController.text.trim().isEmpty) {
       return 'Selecciona la categoria.';
@@ -93,23 +125,22 @@ class _DriverProfileCompletionPageState
   }
 
   String? _validateVehicleStep() {
-    if (_plateController.text.trim().isEmpty) {
-      return 'Ingresa la placa del vehiculo.';
+    final plate = _plateController.text.trim();
+    if (_validateRequiredField(plate, 'La placa', min: 4) != null ||
+        RegExp(r'^POT-[0-9A-F]{4}$', caseSensitive: false).hasMatch(plate)) {
+      return 'Ingresa una placa real del vehiculo.';
     }
-    if (_brandController.text.trim().isEmpty) {
-      return 'Ingresa la marca.';
-    }
-    if (_modelController.text.trim().isEmpty) {
-      return 'Ingresa el modelo.';
-    }
-    if (_colorController.text.trim().isEmpty) {
-      return 'Ingresa el color.';
-    }
+    final vehicleDataError =
+        _validateRequiredField(_brandController.text, 'La marca') ??
+        _validateRequiredField(_modelController.text, 'El modelo', min: 1) ??
+        _validateRequiredField(_colorController.text, 'El color');
+    if (vehicleDataError != null) return vehicleDataError;
     if (_yearController.text.trim().isEmpty) {
       return 'Ingresa el anio.';
     }
-    if (int.tryParse(_yearController.text.trim()) == null) {
-      return 'El anio debe contener solo numeros.';
+    final year = int.tryParse(_yearController.text.trim());
+    if (year == null || year < 1990 || year > 2100) {
+      return 'Ingresa un anio valido del vehiculo.';
     }
     return null;
   }
@@ -175,9 +206,14 @@ class _DriverProfileCompletionPageState
       return;
     }
     setState(() => _step = 9);
+    await _finishVerification();
   }
 
   Future<void> _finishVerification() async {
+    if (_profileSubmitted) {
+      await ref.read(driverSessionProvider.notifier).refreshSessionStatus();
+      return;
+    }
     await ref
         .read(driverSessionProvider.notifier)
         .completeProfile(
@@ -198,6 +234,7 @@ class _DriverProfileCompletionPageState
     }
     final session = ref.read(driverSessionProvider);
     if (session.errorMessage == null) {
+      setState(() => _profileSubmitted = true);
       showTopNotice(
         context,
         'Registro enviado. Quedara pendiente de autorizacion hasta que la central lo apruebe.',
@@ -789,7 +826,9 @@ class _DriverProfileCompletionPageState
         ),
         const SizedBox(height: 24),
         _WizardButtons(
-          primaryLabel: session.isLoading ? 'ENVIANDO...' : 'ENTENDIDO',
+          primaryLabel: session.isLoading
+              ? 'ENVIANDO...'
+              : (_profileSubmitted ? 'ACTUALIZAR ESTADO' : 'REENVIAR DATOS'),
           onPrimaryPressed: session.isLoading ? null : _finishVerification,
         ),
       ],

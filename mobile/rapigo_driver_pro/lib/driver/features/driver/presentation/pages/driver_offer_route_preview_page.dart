@@ -100,6 +100,14 @@ class _DriverOfferRoutePreviewPageState
         );
         Navigator.of(context).pop();
       }
+    } catch (error) {
+      if (mounted) {
+        showTopNotice(
+          context,
+          error.toString().replaceFirst('Exception: ', ''),
+          tone: NoticeTone.error,
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _busy = false);

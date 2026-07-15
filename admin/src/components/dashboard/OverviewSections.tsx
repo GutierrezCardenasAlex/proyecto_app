@@ -90,12 +90,22 @@ export default function OverviewSections(props: Props) {
                     </span>
                   </div>
                   <p>conductor · {driver.phone}</p>
-                  <p>Licencia: {driver.license_number}</p>
+                  <p>{driver.email || 'Sin email'} · {driver.address || 'Sin direccion'}</p>
+                  <p>Licencia: {driver.license_number || 'pendiente'}</p>
+                  <p>
+                    Vehiculo: {driver.vehicle_type || 'sin tipo'} · {driver.plate || 'sin placa'} ·{' '}
+                    {[driver.brand, driver.model, driver.color, driver.year].filter(Boolean).join(' ') || 'datos incompletos'}
+                  </p>
+                  {driver.missing_fields?.length ? (
+                    <p className="muted-text">Falta verificar: {driver.missing_fields.join(', ')}</p>
+                  ) : (
+                    <p className="success-text">Expediente completo para autorizar.</p>
+                  )}
                 </div>
                 <div className="stack-actions">
                   <textarea value={props.driverAccessNote} onChange={(event) => props.onDriverAccessNoteChange(event.target.value)} placeholder="Nota opcional para central" className="note-input" />
                   <div className="action-row">
-                    <Button variant="success" onClick={() => void props.onUpdateDriverAccess(driver.id, 'AUTORIZADO', props.driverAccessNote)}>
+                    <Button variant="success" disabled={driver.verification_ready === false} onClick={() => void props.onUpdateDriverAccess(driver.id, 'AUTORIZADO', props.driverAccessNote)}>
                       Autorizar conductor
                     </Button>
                     <Button variant="danger" onClick={() => void props.onUpdateDriverAccess(driver.id, 'RECHAZADO', props.driverAccessNote)}>

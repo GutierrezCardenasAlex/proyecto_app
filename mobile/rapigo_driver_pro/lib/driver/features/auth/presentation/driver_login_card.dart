@@ -18,6 +18,7 @@ class DriverLoginCard extends ConsumerStatefulWidget {
 class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _registerFirstNameController = TextEditingController();
   final _registerPasswordController = TextEditingController();
   final List<TextEditingController> _otpControllers =
       List<TextEditingController>.generate(6, (_) => TextEditingController());
@@ -36,6 +37,7 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
   void dispose() {
     _phoneController.dispose();
     _passwordController.dispose();
+    _registerFirstNameController.dispose();
     _registerPasswordController.dispose();
     for (final controller in _otpControllers) {
       controller.dispose();
@@ -65,6 +67,19 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
     ).hasMatch(password.trim());
     if (!valid) {
       return 'La contrasena debe tener al menos 8 caracteres, una letra y un numero.';
+    }
+    return null;
+  }
+
+  String? _validateRealName(String value) {
+    final text = value.trim();
+    final hasLetters = RegExp(r'[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]{2,}').hasMatch(text);
+    final isGeneric = RegExp(
+      r'^(conductor|conductora|driver|chofer|taxista|usuario|user|test|prueba)$',
+      caseSensitive: false,
+    ).hasMatch(text);
+    if (text.length < 2 || !hasLetters || isGeneric) {
+      return 'Ingresa tu nombre real para continuar.';
     }
     return null;
   }
@@ -116,10 +131,18 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
       _showInlineError(phoneError);
       return;
     }
+    final nameError = _validateRealName(_registerFirstNameController.text);
+    if (nameError != null) {
+      _showInlineError(nameError);
+      return;
+    }
 
     final result = await ref
         .read(driverSessionProvider.notifier)
-        .requestRegistrationOtp(_normalizedPhone(), 'Conductor');
+        .requestRegistrationOtp(
+          _normalizedPhone(),
+          _registerFirstNameController.text.trim(),
+        );
     if (!mounted) {
       return;
     }
@@ -691,6 +714,10 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
             ],
           ),
           const SizedBox(height: 16),
+          _SectionLabel('Nombre real'),
+          const SizedBox(height: 10),
+          _NameInputField(controller: _registerFirstNameController),
+          const SizedBox(height: 16),
           _SectionLabel('Numero de celular'),
           const SizedBox(height: 10),
           _PhoneInputField(controller: _phoneController),
@@ -1101,6 +1128,54 @@ class _PhoneInputField extends StatelessWidget {
               size: 24,
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NameInputField extends StatelessWidget {
+  const _NameInputField({required this.controller});
+
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 58,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F9FF),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE1E8F8)),
+      ),
+      child: Row(
+        children: [
+          const SizedBox(width: 16),
+          const Icon(Icons.person_outline_rounded, color: Color(0xFF1746B5)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              textCapitalization: TextCapitalization.words,
+              cursorColor: const Color(0xFF1746B5),
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF1D2D59),
+              ),
+              decoration: InputDecoration(
+                border: InputBorder.none,
+                isCollapsed: true,
+                hintText: 'Ej. Juan',
+                hintStyle: GoogleFonts.plusJakartaSans(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF95A1BD),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
         ],
       ),
     );

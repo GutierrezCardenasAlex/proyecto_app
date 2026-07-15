@@ -379,10 +379,20 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
   }
 
   Future<void> _cancelTrip(DriverTrip trip) async {
-    await ref.read(offeredTripProvider.notifier).updateTripStatus('cancelled');
-    await _clearDetailsExpanded(trip.id);
-    await ref.read(offeredTripProvider.notifier).loadOffer();
-    await _returnToHome();
+    try {
+      await ref.read(offeredTripProvider.notifier).updateTripStatus('cancelled');
+      await _clearDetailsExpanded(trip.id);
+      await ref.read(offeredTripProvider.notifier).loadOffer();
+      await _returnToHome();
+    } catch (error) {
+      if (mounted) {
+        showTopNotice(
+          context,
+          error.toString().replaceFirst('Exception: ', ''),
+          tone: NoticeTone.error,
+        );
+      }
+    }
   }
 
   Future<void> _returnToHome() async {
@@ -426,46 +436,57 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
   }
 
   Future<void> _handlePrimaryAction(DriverTrip trip) async {
-    if (trip.status == 'accepted') {
-      await ref.read(offeredTripProvider.notifier).updateTripStatus('arriving');
-      return;
-    }
-    if (trip.status == 'arriving') {
-      await ref.read(offeredTripProvider.notifier).updateTripStatus('at_pickup');
-      return;
-    }
-    if (trip.status == 'at_pickup') {
-      final destinationLabel = trip.destination.trim().toLowerCase();
-      final destinationMissing =
-          trip.destinationLat == null ||
-          trip.destinationLng == null ||
-          destinationLabel.isEmpty ||
-          destinationLabel == 'destino no esta marcado' ||
-          destinationLabel == 'destino por confirmar' ||
-          destinationLabel == 'abordaje inmediato';
-      if (destinationMissing) {
-        if (mounted) {
-          showTopNotice(
-            context,
-            'El pasajero aun no guardo el destino final. Espera a que lo marque para iniciar el viaje.',
-            tone: NoticeTone.warning,
-          );
-        }
-        return;
-      }
-      await ref.read(offeredTripProvider.notifier).updateTripStatus('in_progress');
-      return;
-    }
-    if (trip.status == 'in_progress') {
-      await ref.read(offeredTripProvider.notifier).updateTripStatus('completed');
-      if (mounted) {
-        setState(() => _detailsExpanded = true);
-      }
-      await _persistDetailsExpanded(trip.id, true);
-      return;
-    }
     if (trip.status == 'completed') {
       await _closeSummaryAndReturnHome();
+      return;
+    }
+
+    try {
+      if (trip.status == 'accepted') {
+        await ref.read(offeredTripProvider.notifier).updateTripStatus('arriving');
+        return;
+      }
+      if (trip.status == 'arriving') {
+        await ref.read(offeredTripProvider.notifier).updateTripStatus('at_pickup');
+        return;
+      }
+      if (trip.status == 'at_pickup') {
+        final destinationLabel = trip.destination.trim().toLowerCase();
+        final destinationMissing =
+            trip.destinationLat == null ||
+            trip.destinationLng == null ||
+            destinationLabel.isEmpty ||
+            destinationLabel == 'destino no esta marcado' ||
+            destinationLabel == 'destino por confirmar' ||
+            destinationLabel == 'abordaje inmediato';
+        if (destinationMissing) {
+          if (mounted) {
+            showTopNotice(
+              context,
+              'El pasajero aun no guardo el destino final. Espera a que lo marque para iniciar el viaje.',
+              tone: NoticeTone.warning,
+            );
+          }
+          return;
+        }
+        await ref.read(offeredTripProvider.notifier).updateTripStatus('in_progress');
+        return;
+      }
+      if (trip.status == 'in_progress') {
+        await ref.read(offeredTripProvider.notifier).updateTripStatus('completed');
+        if (mounted) {
+          setState(() => _detailsExpanded = true);
+        }
+        await _persistDetailsExpanded(trip.id, true);
+      }
+    } catch (error) {
+      if (mounted) {
+        showTopNotice(
+          context,
+          error.toString().replaceFirst('Exception: ', ''),
+          tone: NoticeTone.error,
+        );
+      }
     }
   }
 

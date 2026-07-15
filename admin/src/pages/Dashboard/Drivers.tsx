@@ -56,10 +56,17 @@ export default function DriversPage() {
               <article key={driver.id} className="list-card stack-card">
                 <div>
                   <strong>{driver.full_name || driver.phone}</strong>
-                  <p>{driver.phone} · licencia {driver.license_number}</p>
+                  <p>{driver.phone} · {driver.address || 'sin direccion'}</p>
+                  <p>Licencia {driver.license_number || 'pendiente'} · {driver.plate || 'sin placa'}</p>
+                  <p>{[driver.vehicle_type, driver.brand, driver.model, driver.color, driver.year].filter(Boolean).join(' ') || 'vehiculo incompleto'}</p>
+                  {driver.missing_fields?.length ? (
+                    <p className="muted-text">Falta verificar: {driver.missing_fields.join(', ')}</p>
+                  ) : (
+                    <p className="success-text">Expediente completo.</p>
+                  )}
                 </div>
                 <div className="action-row compact">
-                  <button type="button" className="success-button" onClick={() => void central.updateDriverAccess(driver.id, 'AUTORIZADO')}>
+                  <button type="button" className="success-button" disabled={driver.verification_ready === false} onClick={() => void central.updateDriverAccess(driver.id, 'AUTORIZADO')}>
                     Aprobar
                   </button>
                   <button type="button" className="danger-button" onClick={() => void central.updateDriverAccess(driver.id, 'RECHAZADO')}>

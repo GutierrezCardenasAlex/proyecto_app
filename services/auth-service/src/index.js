@@ -14,6 +14,19 @@ const redis = new Redis(process.env.REDIS_URL);
 
 const phoneRegex = /^\+591\d{8}$/;
 const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
+const genericNamePattern = /^(conductor|conductora|driver|chofer|taxista|usuario|user|test|prueba)$/i;
+
+function isRealPersonName(value) {
+  const text = String(value || "").trim();
+  const letters = text.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/g, "");
+  return letters.length >= 2 && !genericNamePattern.test(text);
+}
+
+const realNameSchema = z
+  .string()
+  .trim()
+  .min(2)
+  .refine(isRealPersonName, "Ingresa un nombre real, no generico.");
 const smsProvider = (process.env.SMS_PROVIDER || "").toLowerCase();
 const exposeOtpInResponse = String(process.env.AUTH_EXPOSE_OTP || "true").toLowerCase() === "true";
 const defaultAdminPhone = process.env.ADMIN_DEFAULT_PHONE || "+59170000001";
@@ -30,7 +43,7 @@ const monitorDisplayName = String(process.env.MONITOR_DISPLAY_NAME || "Monitoreo
 const registerRequestSchema = z.object({
   phone: z.string().min(8),
   role: z.enum(["passenger", "driver"]).default("passenger"),
-  firstName: z.string().min(2)
+  firstName: realNameSchema
 });
 
 const registerVerifySchema = z.object({
@@ -38,7 +51,7 @@ const registerVerifySchema = z.object({
   otp: z.string().length(6),
   password: z.string().min(8),
   role: z.enum(["passenger", "driver"]).default("passenger"),
-  firstName: z.string().min(2),
+  firstName: realNameSchema,
   deviceIdentifier: z.string().min(3),
   deviceName: z.string().min(2).optional(),
   platform: z.string().min(2).optional()
@@ -64,8 +77,8 @@ const resetVerifySchema = z.object({
 });
 
 const completeProfileSchema = z.object({
-  firstName: z.string().min(2),
-  lastName: z.string().min(2),
+  firstName: realNameSchema,
+  lastName: realNameSchema,
   email: z.string().email().optional().or(z.literal("")),
   address: z.string().min(4).optional().or(z.literal("")),
   markCompleted: z.boolean().optional()

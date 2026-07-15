@@ -267,25 +267,6 @@ class DriverAuthRepository {
     required String color,
     required int? year,
   }) async {
-    final authProfileResponse = await _safeRequest(
-      () => http.post(
-        Uri.parse('${AppConfig.apiBaseUrl}/auth/profile'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({
-          'firstName': firstName,
-          'lastName': lastName,
-          'email': email,
-          'address': address,
-          'markCompleted': true,
-        }),
-      ),
-      fallbackMessage: 'No se pudo guardar el perfil',
-    );
-    await _throwIfError(authProfileResponse, fallbackMessage: 'No se pudo guardar el perfil');
-
     final driverProfileResponse = await _safeRequest(
       () => http.post(
         Uri.parse('${AppConfig.apiBaseUrl}/drivers/profile'),
@@ -310,13 +291,32 @@ class DriverAuthRepository {
     );
     await _throwIfError(driverProfileResponse, fallbackMessage: 'No se pudo guardar el vehiculo');
 
+    final authProfileResponse = await _safeRequest(
+      () => http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/auth/profile'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'firstName': firstName,
+          'lastName': lastName,
+          'email': email,
+          'address': address,
+          'markCompleted': true,
+        }),
+      ),
+      fallbackMessage: 'No se pudo guardar el perfil',
+    );
+    await _throwIfError(authProfileResponse, fallbackMessage: 'No se pudo guardar el perfil');
+
     final payload = jsonDecode(authProfileResponse.body) as Map<String, dynamic>;
     final user = payload['user'] as Map<String, dynamic>? ?? const {};
     final driverPayload = jsonDecode(driverProfileResponse.body) as Map<String, dynamic>;
     final driver = driverPayload['driver'] as Map<String, dynamic>? ?? const {};
     return DriverAuthResult(
       userId: user['id']?.toString() ?? userId,
-      driverId: driverId,
+      driverId: driver['id']?.toString() ?? driverId,
       vehicleType: vehicleType,
       accessStatus: driver['access_status']?.toString() ?? 'AUTORIZADO',
       phone: user['phone']?.toString() ?? phone,
@@ -351,7 +351,7 @@ class DriverAuthRepository {
     return DriverSessionStatusResult(
       deviceStatus: payload['deviceStatus']?.toString() ?? 'PENDIENTE',
       profileCompleted: user['profileCompleted'] == true,
-      fullName: user['fullName']?.toString() ?? 'Conductor RAPIGO - PRO',
+      fullName: user['fullName']?.toString() ?? 'Perfil pendiente',
       firstName: user['firstName']?.toString() ?? '',
       lastName: user['lastName']?.toString() ?? '',
       email: user['email']?.toString() ?? '',
@@ -423,7 +423,7 @@ class DriverAuthRepository {
       vehicleType: vehicle['vehicle_type']?.toString() ?? vehicle['type']?.toString() ?? 'taxi',
       accessStatus: driver['access_status']?.toString() ?? 'AUTORIZADO',
       phone: user['phone']?.toString() ?? fallbackPhone,
-      fullName: user['fullName']?.toString() ?? 'Conductor RAPIGO - PRO',
+      fullName: user['fullName']?.toString() ?? 'Perfil pendiente',
       firstName: user['firstName']?.toString() ?? '',
       lastName: user['lastName']?.toString() ?? '',
       email: user['email']?.toString() ?? '',
@@ -447,7 +447,7 @@ class DriverSessionController extends Notifier<DriverSession> {
       vehicleType: 'taxi',
       accessStatus: 'AUTORIZADO',
       phone: '',
-      fullName: 'Conductor RAPIGO - PRO',
+      fullName: 'Perfil pendiente',
       firstName: '',
       lastName: '',
       email: '',
@@ -582,7 +582,7 @@ class DriverSessionController extends Notifier<DriverSession> {
       vehicleType: 'taxi',
       accessStatus: 'AUTORIZADO',
       phone: '',
-      fullName: 'Conductor RAPIGO - PRO',
+      fullName: 'Perfil pendiente',
       firstName: '',
       lastName: '',
       email: '',
@@ -682,7 +682,7 @@ class DriverSessionController extends Notifier<DriverSession> {
       vehicleType: prefs.getString('driver_session_vehicle_type') ?? 'taxi',
       accessStatus: prefs.getString('driver_session_access_status') ?? 'AUTORIZADO',
       phone: prefs.getString('driver_session_phone') ?? '',
-      fullName: prefs.getString('driver_session_full_name') ?? 'Conductor RAPIGO - PRO',
+      fullName: prefs.getString('driver_session_full_name') ?? 'Perfil pendiente',
       firstName: prefs.getString('driver_session_first_name') ?? '',
       lastName: prefs.getString('driver_session_last_name') ?? '',
       email: prefs.getString('driver_session_email') ?? '',

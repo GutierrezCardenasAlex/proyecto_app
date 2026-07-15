@@ -11,15 +11,27 @@ const port = Number(process.env.PORT || 3002);
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const redis = new Redis(process.env.REDIS_URL);
 
+const looseFieldPattern = /^(temp|temporal|pendiente|sin dato|sin datos|n\/a|na|test|prueba)$/i;
+
+function realTextSchema(min, label) {
+  return z
+    .string()
+    .trim()
+    .min(min, `${label} es obligatorio.`)
+    .refine((value) => !looseFieldPattern.test(value), `${label} no puede ser generico.`);
+}
+
 const driverProfileSchema = z.object({
   userId: z.string().uuid(),
-  licenseNumber: z.string().min(4),
+  licenseNumber: realTextSchema(4, "La licencia")
+    .refine((value) => !value.toUpperCase().startsWith("TEMP-"), "Ingresa una licencia real."),
   vehicle: z.object({
     type: z.enum(["taxi", "moto"]).default("taxi"),
-    plate: z.string().min(4),
-    brand: z.string().min(2),
-    model: z.string().min(1),
-    color: z.string().min(2),
+    plate: realTextSchema(4, "La placa")
+      .refine((value) => !/^POT-[0-9A-F]{4}$/i.test(value), "Ingresa una placa real."),
+    brand: realTextSchema(2, "La marca"),
+    model: realTextSchema(1, "El modelo"),
+    color: realTextSchema(2, "El color"),
     year: z.number().int().min(1990).max(2100).optional()
   })
 });

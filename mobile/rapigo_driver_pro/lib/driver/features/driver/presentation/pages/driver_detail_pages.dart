@@ -203,6 +203,13 @@ class DriverProfilePage extends ConsumerWidget {
                   child: Column(
                     children: [
                       _DriverProfileMenuTile(
+                        icon: Icons.edit_outlined,
+                        title: 'Editar perfil',
+                        subtitle: 'Actualiza datos personales, licencia y vehiculo.',
+                        onTap: () => _openPage(context, const DriverEditProfilePage()),
+                      ),
+                      _DriverProfileDivider(),
+                      _DriverProfileMenuTile(
                         icon: Icons.bar_chart_rounded,
                         title: 'Ganancias',
                         subtitle: 'Revisa tu rendimiento, viajes completados y cobro estimado.',
@@ -485,6 +492,440 @@ class _DriverAppInfoPageState extends State<DriverAppInfoPage> {
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+class DriverEditProfilePage extends ConsumerStatefulWidget {
+  const DriverEditProfilePage({super.key});
+
+  @override
+  ConsumerState<DriverEditProfilePage> createState() => _DriverEditProfilePageState();
+}
+
+class _DriverEditProfilePageState extends ConsumerState<DriverEditProfilePage> {
+  final _formKey = GlobalKey<FormState>();
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _licenseController = TextEditingController();
+  final _plateController = TextEditingController();
+  final _brandController = TextEditingController();
+  final _modelController = TextEditingController();
+  final _colorController = TextEditingController();
+  final _yearController = TextEditingController();
+  Future<DriverProfileDetails?>? _profileFuture;
+  String _vehicleType = 'taxi';
+  bool _saving = false;
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final session = ref.read(driverSessionProvider);
+    _firstNameController.text = session.firstName;
+    _lastNameController.text = session.lastName;
+    _emailController.text = session.email;
+    _addressController.text = session.address;
+    _vehicleType = session.vehicleType.trim().isEmpty ? 'taxi' : session.vehicleType;
+    _profileFuture = _loadDriverProfile();
+  }
+
+  @override
+  void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _emailController.dispose();
+    _addressController.dispose();
+    _licenseController.dispose();
+    _plateController.dispose();
+    _brandController.dispose();
+    _modelController.dispose();
+    _colorController.dispose();
+    _yearController.dispose();
+    super.dispose();
+  }
+
+  Future<DriverProfileDetails?> _loadDriverProfile() async {
+    final session = ref.read(driverSessionProvider);
+    if (session.token.isEmpty || session.userId.isEmpty) {
+      return null;
+    }
+    final profile = await ref.read(authRepositoryProvider).fetchDriverProfile(
+      token: session.token,
+      userId: session.userId,
+    );
+    if (!_loaded && mounted) {
+      setState(() {
+        _loaded = true;
+        _licenseController.text = profile.licenseNumber;
+        _vehicleType = profile.vehicleType.trim().isEmpty ? _vehicleType : profile.vehicleType;
+        _plateController.text = profile.plate;
+        _brandController.text = profile.brand;
+        _modelController.text = profile.model;
+        _colorController.text = profile.color;
+        _yearController.text = profile.year?.toString() ?? '';
+      });
+    }
+    return profile;
+  }
+
+  String? _required(String? value, String label, {int min = 2}) {
+    final text = value?.trim() ?? '';
+    if (text.length < min ||
+        RegExp(
+          r'^(temp|temporal|pendiente|sin dato|sin datos|n/a|na|test|prueba)$',
+          caseSensitive: false,
+        ).hasMatch(text)) {
+      return '$label es obligatorio.';
+    }
+    return null;
+  }
+
+  String? _realName(String? value, String label) {
+    final text = value?.trim() ?? '';
+    final hasLetters = RegExp(r'[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]{2,}').hasMatch(text);
+    final isGeneric = RegExp(
+      r'^(conductor|conductora|driver|chofer|taxista|usuario|user|test|prueba)$',
+      caseSensitive: false,
+    ).hasMatch(text);
+    if (text.length < 2 || !hasLetters || isGeneric) {
+      return 'Ingresa un $label real.';
+    }
+    return null;
+  }
+
+  String? _licenseValidator(String? value) {
+    final text = value?.trim() ?? '';
+    final requiredError = _required(text, 'Licencia', min: 4);
+    if (requiredError != null || text.toUpperCase().startsWith('TEMP-')) {
+      return 'Ingresa una licencia real.';
+    }
+    return null;
+  }
+
+  String? _plateValidator(String? value) {
+    final text = value?.trim() ?? '';
+    final requiredError = _required(text, 'Placa', min: 4);
+    if (requiredError != null ||
+        RegExp(r'^POT-[0-9A-F]{4}$', caseSensitive: false).hasMatch(text)) {
+      return 'Ingresa una placa real.';
+    }
+    return null;
+  }
+
+  String? _emailValidator(String? value) {
+    final text = value?.trim() ?? '';
+    if (text.isEmpty) {
+      return null;
+    }
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(text)) {
+      return 'Correo invalido.';
+    }
+    return null;
+  }
+
+  Future<void> _save() async {
+    if (_saving || !_formKey.currentState!.validate()) {
+      return;
+    }
+    setState(() => _saving = true);
+    await ref.read(driverSessionProvider.notifier).completeProfile(
+      firstName: _firstNameController.text.trim(),
+      lastName: _lastNameController.text.trim(),
+      email: _emailController.text.trim(),
+      address: _addressController.text.trim(),
+      licenseNumber: _licenseController.text.trim(),
+      vehicleType: _vehicleType,
+      plate: _plateController.text.trim().toUpperCase(),
+      brand: _brandController.text.trim(),
+      model: _modelController.text.trim(),
+      color: _colorController.text.trim(),
+      year: int.tryParse(_yearController.text.trim()),
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() => _saving = false);
+    final session = ref.read(driverSessionProvider);
+    if (session.errorMessage != null) {
+      showTopNotice(context, session.errorMessage!, tone: NoticeTone.error);
+      return;
+    }
+    await ref.read(driverSessionProvider.notifier).refreshSessionStatus();
+    if (!mounted) {
+      return;
+    }
+    showTopNotice(
+      context,
+      'Perfil actualizado correctamente.',
+      tone: NoticeTone.success,
+    );
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.rapigoPalette;
+    final session = ref.watch(driverSessionProvider);
+    return _DetailScaffold(
+      title: 'Editar perfil',
+      child: Scaffold(
+        backgroundColor: palette.backgroundBase,
+        body: FutureBuilder<DriverProfileDetails?>(
+          future: _profileFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting && !_loaded) {
+              return const Center(
+                child: CircularProgressIndicator(color: Color(0xFFFACC15)),
+              );
+            }
+            return SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _EditSection(
+                      title: 'Datos personales',
+                      children: [
+                        _EditField(
+                          controller: _firstNameController,
+                          label: 'Nombre',
+                          icon: Icons.person_outline_rounded,
+                          validator: (value) => _realName(value, 'nombre'),
+                        ),
+                        _EditField(
+                          controller: _lastNameController,
+                          label: 'Apellido',
+                          icon: Icons.badge_outlined,
+                          validator: (value) => _realName(value, 'apellido'),
+                        ),
+                        _EditField(
+                          controller: _emailController,
+                          label: 'Correo',
+                          icon: Icons.mail_outline_rounded,
+                          keyboardType: TextInputType.emailAddress,
+                          validator: _emailValidator,
+                        ),
+                        _EditField(
+                          controller: _addressController,
+                          label: 'Direccion',
+                          icon: Icons.location_on_outlined,
+                          validator: (value) => _required(value, 'Direccion', min: 4),
+                        ),
+                        _ReadOnlyInfo(label: 'Telefono', value: session.phone),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    _EditSection(
+                      title: 'Licencia',
+                      children: [
+                        _EditField(
+                          controller: _licenseController,
+                          label: 'Numero de licencia',
+                          icon: Icons.credit_card_rounded,
+                          validator: _licenseValidator,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    _EditSection(
+                      title: 'Vehiculo',
+                      children: [
+                        SegmentedButton<String>(
+                          segments: const [
+                            ButtonSegment(
+                              value: 'taxi',
+                              icon: Icon(Icons.local_taxi_rounded),
+                              label: Text('Taxi'),
+                            ),
+                            ButtonSegment(
+                              value: 'moto',
+                              icon: Icon(Icons.two_wheeler_rounded),
+                              label: Text('Moto'),
+                            ),
+                          ],
+                          selected: {_vehicleType == 'moto' ? 'moto' : 'taxi'},
+                          onSelectionChanged: _saving
+                              ? null
+                              : (value) => setState(() => _vehicleType = value.first),
+                        ),
+                        const SizedBox(height: 12),
+                        _EditField(
+                          controller: _plateController,
+                          label: 'Placa',
+                          icon: Icons.pin_rounded,
+                          validator: _plateValidator,
+                        ),
+                        _EditField(
+                          controller: _brandController,
+                          label: 'Marca',
+                          icon: Icons.directions_car_filled_outlined,
+                          validator: (value) => _required(value, 'Marca'),
+                        ),
+                        _EditField(
+                          controller: _modelController,
+                          label: 'Modelo',
+                          icon: Icons.car_repair_outlined,
+                          validator: (value) => _required(value, 'Modelo', min: 1),
+                        ),
+                        _EditField(
+                          controller: _colorController,
+                          label: 'Color',
+                          icon: Icons.palette_outlined,
+                          validator: (value) => _required(value, 'Color'),
+                        ),
+                        _EditField(
+                          controller: _yearController,
+                          label: 'Anio',
+                          icon: Icons.calendar_month_outlined,
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            final text = value?.trim() ?? '';
+                            if (text.isEmpty) {
+                              return null;
+                            }
+                            final year = int.tryParse(text);
+                            if (year == null || year < 1990 || year > 2100) {
+                              return 'Anio invalido.';
+                            }
+                            return null;
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 22),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 58,
+                      child: FilledButton.icon(
+                        onPressed: _saving ? null : _save,
+                        icon: _saving
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.save_outlined),
+                        label: Text(_saving ? 'Guardando...' : 'Guardar cambios'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _EditSection extends StatelessWidget {
+  const _EditSection({required this.title, required this.children});
+
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.rapigoPalette;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: palette.surfacePrimary,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: palette.outlineStrong),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: GoogleFonts.plusJakartaSans(
+              color: palette.textPrimary,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 14),
+          ...children,
+        ],
+      ),
+    );
+  }
+}
+
+class _EditField extends StatelessWidget {
+  const _EditField({
+    required this.controller,
+    required this.label,
+    required this.icon,
+    this.keyboardType,
+    this.validator,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final IconData icon;
+  final TextInputType? keyboardType;
+  final String? Function(String?)? validator;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextFormField(
+        controller: controller,
+        keyboardType: keyboardType,
+        validator: validator,
+        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReadOnlyInfo extends StatelessWidget {
+  const _ReadOnlyInfo({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0B1220),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF263244)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.phone_outlined, color: Color(0xFFFACC15), size: 19),
+          const SizedBox(width: 10),
+          Text(
+            '$label: ',
+            style: const TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.w700),
+          ),
+          Expanded(
+            child: Text(
+              value.trim().isEmpty ? 'Sin dato' : value,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
       ),
     );
   }

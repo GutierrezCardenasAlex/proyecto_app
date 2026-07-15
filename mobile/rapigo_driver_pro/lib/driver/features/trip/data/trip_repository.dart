@@ -363,10 +363,12 @@ class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
       );
       state = AsyncData(updatedTrip);
       await _persistTrip();
-    } catch (_) {
+    } catch (error) {
       state = AsyncData(current);
+      throw Exception(_friendlyTripStatusError(error));
+    } finally {
+      ref.invalidate(driverTripHistoryProvider);
     }
-    ref.invalidate(driverTripHistoryProvider);
   }
 
   void setLocalStatus(String status) {
@@ -468,8 +470,9 @@ class DriverOffersController extends Notifier<AsyncValue<List<DriverTrip>>> {
       state = AsyncData(current);
       await _persistOffers();
       ref.invalidate(driverTripHistoryProvider);
-    } catch (_) {
+    } catch (error) {
       state = AsyncData(state.value ?? const <DriverTrip>[]);
+      throw Exception(_friendlyRejectError(error));
     }
   }
 
@@ -495,4 +498,29 @@ String _friendlyAcceptError(Object error) {
     return 'Esta solicitud ya no esta disponible para tu conductor.';
   }
   return 'No se pudo aceptar el viaje. Intenta con otra solicitud.';
+}
+
+String _friendlyTripStatusError(Object error) {
+  final raw = error.toString();
+  if (raw.contains('403')) {
+    return 'No puedes actualizar este viaje con esta cuenta de conductor.';
+  }
+  if (raw.contains('409')) {
+    return 'El estado del viaje cambio. Actualiza e intenta de nuevo.';
+  }
+  if (raw.contains('404')) {
+    return 'Este viaje ya no esta disponible.';
+  }
+  return 'No se pudo actualizar el viaje. Revisa tu conexion e intenta de nuevo.';
+}
+
+String _friendlyRejectError(Object error) {
+  final raw = error.toString();
+  if (raw.contains('403')) {
+    return 'No puedes rechazar esta solicitud con esta cuenta de conductor.';
+  }
+  if (raw.contains('404')) {
+    return 'Esta solicitud ya no esta disponible.';
+  }
+  return 'No se pudo ignorar la solicitud. Revisa tu conexion e intenta de nuevo.';
 }

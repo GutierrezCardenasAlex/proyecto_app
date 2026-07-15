@@ -83,6 +83,16 @@ export type PendingDriverAccessRow = {
   full_name?: string | null
   first_name?: string | null
   last_name?: string | null
+  email?: string | null
+  address?: string | null
+  vehicle_type?: string | null
+  plate?: string | null
+  brand?: string | null
+  model?: string | null
+  color?: string | null
+  year?: number | null
+  verification_ready?: boolean
+  missing_fields?: string[]
 }
 
 export type DeviceRow = {

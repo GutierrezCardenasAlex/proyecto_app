@@ -121,6 +121,55 @@ function normalizePhone(rawPhone) {
   return String(rawPhone || "").replace(/\s+/g, "");
 }
 
+const genericNamePattern = /^(conductor|conductora|driver|chofer|taxista|usuario|user|test|prueba)$/i;
+const looseFieldPattern = /^(temp|temporal|pendiente|sin dato|sin datos|n\/a|na|test|prueba)$/i;
+
+function hasText(value, min = 1) {
+  return String(value || "").trim().length >= min;
+}
+
+function hasRealPersonName(value) {
+  const text = String(value || "").trim();
+  const letters = text.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/g, "");
+  return letters.length >= 2 && !genericNamePattern.test(text);
+}
+
+function hasVerificationText(value, min = 1) {
+  const text = String(value || "").trim();
+  return text.length >= min && !looseFieldPattern.test(text);
+}
+
+function getDriverVerificationMissingFields(row) {
+  const missing = [];
+  if (!hasRealPersonName(row.first_name)) missing.push("nombre real");
+  if (!hasRealPersonName(row.last_name)) missing.push("apellido real");
+  if (!hasText(row.phone, 8)) missing.push("telefono");
+  if (!hasText(row.address, 4)) missing.push("direccion");
+  if (!hasVerificationText(row.license_number, 4) || String(row.license_number || "").toUpperCase().startsWith("TEMP-")) {
+    missing.push("licencia");
+  }
+  if (!hasVerificationText(row.vehicle_type, 3)) missing.push("tipo de vehiculo");
+  if (!hasVerificationText(row.plate, 4) || /^POT-[0-9A-F]{4}$/i.test(String(row.plate || "").trim())) {
+    missing.push("placa real");
+  }
+  if (!hasVerificationText(row.brand, 2)) missing.push("marca");
+  if (!hasVerificationText(row.model, 1)) missing.push("modelo");
+  if (!hasVerificationText(row.color, 2)) missing.push("color");
+  if (row.year != null && (Number(row.year) < 1990 || Number(row.year) > 2100)) {
+    missing.push("anio del vehiculo");
+  }
+  return missing;
+}
+
+function withDriverVerificationStatus(row) {
+  const missingFields = getDriverVerificationMissingFields(row);
+  return {
+    ...row,
+    verification_ready: missingFields.length === 0,
+    missing_fields: missingFields
+  };
+}
+
 function parseDriverLocationSnapshot(snapshot) {
   if (!snapshot || !snapshot.updatedAt) {
     return { hasSignal: false, isRecent: false, updatedAt: null };
@@ -568,14 +617,23 @@ async function bootstrap() {
               u.phone,
               u.full_name,
               u.first_name,
-              u.last_name
+              u.last_name,
+              u.email,
+              u.address,
+              v.vehicle_type,
+              v.plate,
+              v.brand,
+              v.model,
+              v.color,
+              v.year
        FROM drivers d
        INNER JOIN users u ON u.id = d.user_id
+       LEFT JOIN vehicles v ON v.driver_id = d.id
        WHERE d.access_status = 'PENDIENTE'
        ORDER BY d.created_at ASC`
     );
 
-    return result.rows;
+    return result.rows.map(withDriverVerificationStatus);
   });
 
   app.get("/devices/pending", { preHandler: ensureAdmin }, async () => {
@@ -1153,6 +1211,43 @@ async function bootstrap() {
   app.post("/drivers/:driverId/access", { preHandler: ensureAdmin }, async (request, reply) => {
     const { driverId } = request.params;
     const { status, note } = changeDriverAccessSchema.parse(request.body);
+
+    if (status === "AUTORIZADO") {
+      const verificationResult = await pool.query(
+        `SELECT d.id,
+                d.user_id,
+                d.license_number,
+                u.phone,
+                u.full_name,
+                u.first_name,
+                u.last_name,
+                u.address,
+                v.vehicle_type,
+                v.plate,
+                v.brand,
+                v.model,
+                v.color,
+                v.year
+         FROM drivers d
+         INNER JOIN users u ON u.id = d.user_id
+         LEFT JOIN vehicles v ON v.driver_id = d.id
+         WHERE d.id = $1
+         LIMIT 1`,
+        [driverId]
+      );
+
+      if (!verificationResult.rows.length) {
+        return reply.code(404).send({ message: "Conductor no encontrado" });
+      }
+
+      const missingFields = getDriverVerificationMissingFields(verificationResult.rows[0]);
+      if (missingFields.length) {
+        return reply.code(400).send({
+          message: `No se puede autorizar: faltan ${missingFields.join(", ")}.`,
+          missing_fields: missingFields
+        });
+      }
+    }
 
     const result = await pool.query(
       `UPDATE drivers

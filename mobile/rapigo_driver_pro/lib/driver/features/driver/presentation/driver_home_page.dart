@@ -577,16 +577,37 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
           onViewDetails: _showIncomingTripDetail,
           onAccept: _handleDriverPrimaryAction,
           onReject: (offer) async {
-            await ref.read(driverOffersProvider.notifier).rejectOffer(offer.id);
-            final currentOffer = ref.read(offeredTripProvider).value;
-            if (currentOffer?.id == offer.id) {
-              await ref.read(offeredTripProvider.notifier).clearTrip();
-            }
-            await ref.read(driverOffersProvider.notifier).loadOffers();
+            await _rejectOfferForCurrentDriver(offer);
           },
         ),
       ),
     );
+  }
+
+  Future<void> _rejectOfferForCurrentDriver(DriverTrip offer) async {
+    try {
+      await ref.read(driverOffersProvider.notifier).rejectOffer(offer.id);
+      final currentOffer = ref.read(offeredTripProvider).value;
+      if (currentOffer?.id == offer.id) {
+        await ref.read(offeredTripProvider.notifier).clearTrip();
+      }
+      await ref.read(driverOffersProvider.notifier).loadOffers();
+      if (mounted) {
+        showTopNotice(
+          context,
+          'Solicitud ignorada para tu conductor.',
+          tone: NoticeTone.info,
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        showTopNotice(
+          context,
+          error.toString().replaceFirst('Exception: ', ''),
+          tone: NoticeTone.error,
+        );
+      }
+    }
   }
 
   String _driverStatusShortLabel(String status) {
@@ -780,17 +801,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                                   await _handleDriverPrimaryAction(pendingOffer);
                                 },
                                 onReject: () async {
-                                  await ref
-                                      .read(driverOffersProvider.notifier)
-                                      .rejectOffer(pendingOffer.id);
-                                  await ref.read(offeredTripProvider.notifier).clearTrip();
-                                  if (context.mounted) {
-                                    showTopNotice(
-                                      context,
-                                      'Solicitud ignorada para tu conductor.',
-                                      tone: NoticeTone.info,
-                                    );
-                                  }
+                                  await _rejectOfferForCurrentDriver(pendingOffer);
                                 },
                               );
                             },
@@ -942,15 +953,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                           child: OutlinedButton(
                             onPressed: () async {
                               Navigator.of(context).pop();
-                              await ref.read(driverOffersProvider.notifier).rejectOffer(trip.id);
-                              await ref.read(offeredTripProvider.notifier).clearTrip();
-                              if (context.mounted) {
-                                showTopNotice(
-                                  context,
-                                  'Solicitud ignorada para tu conductor.',
-                                  tone: NoticeTone.info,
-                                );
-                              }
+                              await _rejectOfferForCurrentDriver(trip);
                             },
                             style: OutlinedButton.styleFrom(
                               foregroundColor: const Color(0xFFFFC9C9),
@@ -1005,47 +1008,58 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
       await _openOfferRoutePreview(trip);
       return;
     }
-    if (trip.status == 'accepted') {
-      await ref.read(offeredTripProvider.notifier).updateTripStatus('arriving');
-      return;
-    }
-    if (trip.status == 'arriving') {
-      await ref.read(offeredTripProvider.notifier).updateTripStatus('at_pickup');
-      return;
-    }
-    if (trip.status == 'at_pickup') {
-      final destinationLabel = trip.destination.trim().toLowerCase();
-      final destinationMissing =
-          trip.destinationLat == null ||
-          trip.destinationLng == null ||
-          destinationLabel.isEmpty ||
-          destinationLabel == 'destino no esta marcado' ||
-          destinationLabel == 'destino por confirmar' ||
-          destinationLabel == 'abordaje inmediato';
-      if (destinationMissing) {
-        if (mounted) {
+
+    try {
+      if (trip.status == 'accepted') {
+        await ref.read(offeredTripProvider.notifier).updateTripStatus('arriving');
+        return;
+      }
+      if (trip.status == 'arriving') {
+        await ref.read(offeredTripProvider.notifier).updateTripStatus('at_pickup');
+        return;
+      }
+      if (trip.status == 'at_pickup') {
+        final destinationLabel = trip.destination.trim().toLowerCase();
+        final destinationMissing =
+            trip.destinationLat == null ||
+            trip.destinationLng == null ||
+            destinationLabel.isEmpty ||
+            destinationLabel == 'destino no esta marcado' ||
+            destinationLabel == 'destino por confirmar' ||
+            destinationLabel == 'abordaje inmediato';
+        if (destinationMissing) {
+          if (mounted) {
+            showTopNotice(
+              context,
+              'El pasajero aun no guardo el destino final. Espera a que lo marque para iniciar el viaje.',
+              tone: NoticeTone.warning,
+            );
+          }
+          return;
+        }
+        await ref.read(offeredTripProvider.notifier).updateTripStatus('in_progress');
+        if (trip.isPromotional && mounted) {
           showTopNotice(
             context,
-            'El pasajero aun no guardo el destino final. Espera a que lo marque para iniciar el viaje.',
-            tone: NoticeTone.warning,
+            'Este viaje es gratis. El pasajero se gano la promocion.',
+            tone: NoticeTone.success,
           );
         }
         return;
       }
-      await ref.read(offeredTripProvider.notifier).updateTripStatus('in_progress');
-      if (trip.isPromotional && mounted) {
+      if (trip.status == 'in_progress') {
+        await ref.read(offeredTripProvider.notifier).updateTripStatus('completed');
+        await ref.read(driverOffersProvider.notifier).loadOffers();
+        return;
+      }
+    } catch (error) {
+      if (mounted) {
         showTopNotice(
           context,
-          'Este viaje es gratis. El pasajero se gano la promocion.',
-          tone: NoticeTone.success,
+          error.toString().replaceFirst('Exception: ', ''),
+          tone: NoticeTone.error,
         );
       }
-      return;
-    }
-    if (trip.status == 'in_progress') {
-      await ref.read(offeredTripProvider.notifier).updateTripStatus('completed');
-      await ref.read(driverOffersProvider.notifier).loadOffers();
-      return;
     }
   }
 
@@ -1065,7 +1079,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
   }) async {
     final firstName = fullName.trim().isNotEmpty
         ? fullName.trim().split(' ').first
-        : 'Conductor';
+        : 'Perfil pendiente';
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -1433,6 +1447,21 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
     final palette = context.rapigoPalette;
     final metrics = context.rapigoMetrics;
     final textTheme = Theme.of(context).textTheme;
+    ref.listen<String?>(
+      driverStateProvider.select((s) => s.errorMessage),
+      (previous, next) {
+        if (next == null || next.trim().isEmpty || next == previous) {
+          return;
+        }
+        showTopNotice(
+          context,
+          next,
+          tone: NoticeTone.error,
+          compact: true,
+          centered: true,
+        );
+      },
+    );
     final available = ref.watch(driverStateProvider.select((s) => s.available));
     final driverLat = ref.watch(driverStateProvider.select((s) => s.lat));
     final driverLng = ref.watch(driverStateProvider.select((s) => s.lng));
@@ -3019,10 +3048,15 @@ class _DriverIncomingRequestOverlay extends ConsumerWidget {
                         await launchUrl(telUri);
                       },
                       onReject: () async {
-                        if (isPreviewingRoute) {
-                          ref.read(driverOfferPreviewTripIdProvider.notifier).setTrip(null);
+                        try {
+                          if (isPreviewingRoute) {
+                            ref.read(driverOfferPreviewTripIdProvider.notifier).setTrip(null);
+                          }
                           await ref.read(driverOffersProvider.notifier).rejectOffer(trip.id);
-                          await ref.read(offeredTripProvider.notifier).clearTrip();
+                          final currentOffer = ref.read(offeredTripProvider).value;
+                          if (currentOffer?.id == trip.id) {
+                            await ref.read(offeredTripProvider.notifier).clearTrip();
+                          }
                           await ref.read(driverOffersProvider.notifier).loadOffers();
                           if (context.mounted) {
                             showTopNotice(
@@ -3031,29 +3065,36 @@ class _DriverIncomingRequestOverlay extends ConsumerWidget {
                               tone: NoticeTone.info,
                             );
                           }
-                          return;
-                        }
-                        await ref.read(driverOffersProvider.notifier).rejectOffer(trip.id);
-                        await ref.read(offeredTripProvider.notifier).clearTrip();
-                        await ref.read(driverOffersProvider.notifier).loadOffers();
-                        if (context.mounted) {
-                          showTopNotice(
-                            context,
-                            'Solicitud ignorada para tu conductor.',
-                            tone: NoticeTone.info,
-                          );
+                        } catch (error) {
+                          if (context.mounted) {
+                            showTopNotice(
+                              context,
+                              error.toString().replaceFirst('Exception: ', ''),
+                              tone: NoticeTone.error,
+                            );
+                          }
                         }
                       },
                       onPrimaryAction: () async {
                         if (isPreviewingRoute) {
                           ref.read(driverOfferPreviewTripIdProvider.notifier).setTrip(null);
-                          await ref.read(offeredTripProvider.notifier).updateTripStatus('arriving');
-                          if (context.mounted) {
-                            showTopNotice(
-                              context,
-                              'Viaje aceptado. Dirigete al punto de recogida.',
-                              tone: NoticeTone.success,
-                            );
+                          try {
+                            await ref.read(offeredTripProvider.notifier).updateTripStatus('arriving');
+                            if (context.mounted) {
+                              showTopNotice(
+                                context,
+                                'Viaje aceptado. Dirigete al punto de recogida.',
+                                tone: NoticeTone.success,
+                              );
+                            }
+                          } catch (error) {
+                            if (context.mounted) {
+                              showTopNotice(
+                                context,
+                                error.toString().replaceFirst('Exception: ', ''),
+                                tone: NoticeTone.error,
+                              );
+                            }
                           }
                           return;
                         }
@@ -3652,16 +3693,21 @@ class _DriverHistoryCard extends ConsumerWidget {
   }
 
   Future<void> _cancelTrip(BuildContext context, WidgetRef ref) async {
-    await ref.read(offeredTripProvider.notifier).updateTripStatus('cancelled');
-    if (context.mounted) {
-      final error = ref.read(offeredTripProvider).error;
+    try {
+      await ref.read(offeredTripProvider.notifier).updateTripStatus('cancelled');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Viaje cancelado.')),
+        );
+      }
+    } catch (error) {
+      if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            error == null ? 'Viaje cancelado.' : error.toString().replaceFirst('Exception: ', ''),
-          ),
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
         ),
       );
+      }
     }
   }
 
