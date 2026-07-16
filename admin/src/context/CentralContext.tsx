@@ -653,10 +653,6 @@ export function CentralProvider({ children }: PropsWithChildren) {
 
   const deleteManagedUser = async (user: ManagedUserRow) => {
     if (!token) return
-    if (!window.confirm(`Se eliminara la cuenta ${user.full_name || user.phone}. Deseas continuar?`)) {
-      return
-    }
-
     setLoading(true)
     setError(null)
     try {

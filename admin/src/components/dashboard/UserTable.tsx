@@ -106,9 +106,11 @@ export default function UserTable({ users, onView, onEdit, onDelete, onLoadHisto
               >
                 <ActionIcon type="history" />
               </button>
-              <button type="button" className="admin-icon-action danger" onClick={() => onDelete(user)} aria-label="Eliminar usuario">
-                <ActionIcon type="delete" />
-              </button>
+              <span className="admin-row-actions__danger">
+                <button type="button" className="admin-icon-action danger" onClick={() => onDelete(user)} aria-label={`Eliminar ${user.full_name || user.phone}`}>
+                  <ActionIcon type="delete" />
+                </button>
+              </span>
             </div>
           </article>
         ))}

@@ -2357,6 +2357,13 @@ a {
   flex-wrap: wrap;
 }
 
+.admin-row-actions__danger {
+  display: inline-flex;
+  margin-left: 0.35rem;
+  padding-left: 0.45rem;
+  border-left: 1px solid rgba(239, 68, 68, 0.18);
+}
+
 .admin-icon-action {
   min-width: 2.35rem;
   height: 2.35rem;
@@ -2378,7 +2385,14 @@ a {
 }
 
 .admin-icon-action.danger {
+  border-color: rgba(239, 68, 68, 0.22);
+  background: rgba(254, 242, 242, 0.96);
   color: #b91c1c;
+}
+
+.admin-icon-action.danger:hover {
+  border-color: rgba(239, 68, 68, 0.42);
+  box-shadow: 0 12px 24px rgba(239, 68, 68, 0.14);
 }
 
 .admin-empty-state {
@@ -2504,7 +2518,14 @@ a {
 
 .confirm-dialog {
   display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
   gap: 1rem;
+  border: 1px solid rgba(239, 68, 68, 0.18);
+  border-radius: 1.15rem;
+  background: rgba(254, 242, 242, 0.78);
+  padding: 1rem;
+  color: #0f172a;
 }
 
 .confirm-dialog-icon {
@@ -2517,6 +2538,86 @@ a {
   align-items: center;
   justify-content: center;
   font-size: 1.25rem;
+  font-weight: 900;
+}
+
+.confirm-dialog strong {
+  color: #7f1d1d;
+}
+
+.confirm-dialog p {
+  margin: 0.35rem 0 0;
+  color: rgba(69, 26, 26, 0.82);
+  line-height: 1.5;
+}
+
+.delete-impact-panel {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.delete-risk-badge {
+  justify-self: start;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  padding: 0.45rem 0.72rem;
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(248, 250, 252, 0.96);
+  color: #334155;
+}
+
+.delete-risk-badge.medio {
+  border-color: rgba(245, 158, 11, 0.34);
+  background: rgba(255, 251, 235, 0.98);
+  color: #92400e;
+}
+
+.delete-risk-badge.alto {
+  border-color: rgba(239, 68, 68, 0.34);
+  background: rgba(254, 242, 242, 0.98);
+  color: #991b1b;
+}
+
+.delete-impact-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.delete-impact-card {
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.98);
+  padding: 0.9rem;
+  display: grid;
+  gap: 0.28rem;
+}
+
+.delete-impact-card.identity {
+  grid-column: 1 / -1;
+}
+
+.delete-impact-card span {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(71, 85, 105, 0.78);
+}
+
+.delete-impact-card strong {
+  color: #0f172a;
+  font-size: 1.05rem;
+}
+
+.delete-impact-card p {
+  margin: 0;
+  color: rgba(71, 85, 105, 0.84);
+  font-size: 0.85rem;
 }
 
 .detail-modal-grid {
@@ -4645,6 +4746,29 @@ body.admin-theme-dark .driver-report-trip-row strong {
   .table-wrapper,
   .driver-report-mobile-list {
     min-width: 0;
+  }
+
+  .admin-user-table__head {
+    display: none;
+  }
+
+  .admin-user-row {
+    grid-template-columns: 1fr !important;
+    align-items: stretch;
+    border-top: 1px solid rgba(226, 232, 240, 0.9);
+  }
+
+  .admin-row-actions {
+    justify-content: flex-start;
+  }
+
+  .admin-row-actions__danger {
+    margin-left: 0;
+    padding-left: 0.55rem;
+  }
+
+  .delete-impact-grid {
+    grid-template-columns: 1fr !important;
   }
 }
 

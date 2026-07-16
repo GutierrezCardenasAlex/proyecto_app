@@ -1,10 +1,12 @@
 import Button from '../common/Button'
 import AdminModal from './AdminModal'
+import type { ReactNode } from 'react'
 
 type Props = {
   open: boolean
   title: string
   message: string
+  children?: ReactNode
   confirmLabel?: string
   cancelLabel?: string
   tone?: 'danger' | 'warning'
@@ -17,6 +19,7 @@ export default function ConfirmDialog({
   open,
   title,
   message,
+  children,
   confirmLabel = 'Confirmar',
   cancelLabel = 'Cancelar',
   tone = 'danger',
@@ -49,6 +52,7 @@ export default function ConfirmDialog({
           <p>{message}</p>
         </div>
       </div>
+      {children}
     </AdminModal>
   )
 }

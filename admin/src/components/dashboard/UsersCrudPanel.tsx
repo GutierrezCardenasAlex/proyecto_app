@@ -54,6 +54,10 @@ export default function UsersCrudPanel({
     }),
     [filteredUsers],
   )
+  const deleteImpact = deleteTarget
+    ? (deleteTarget.total_trips || 0) + (deleteTarget.device_count || 0) + (deleteTarget.support_open_count || 0)
+    : 0
+  const deleteRisk = deleteImpact >= 5 ? 'alto' : deleteImpact > 0 ? 'medio' : 'bajo'
 
   function handleCreate() {
     onOpenCreate()
@@ -178,11 +182,37 @@ export default function UsersCrudPanel({
         title={deleteTarget ? `Eliminar usuario · ${deleteTarget.full_name || deleteTarget.phone}` : 'Eliminar usuario'}
         message={
           deleteTarget
-            ? `Se eliminara la cuenta ${deleteTarget.full_name || deleteTarget.phone}. Tiene ${deleteTarget.total_trips} viajes, ${deleteTarget.device_count} equipos y ${deleteTarget.support_open_count} casos de soporte asociados.`
+            ? `Esta accion elimina la cuenta y sus datos administrativos asociados. Revisa el impacto antes de continuar.`
             : 'Se eliminara la cuenta seleccionada.'
         }
         confirmLabel="Eliminar definitivamente"
-      />
+      >
+        {deleteTarget && (
+          <div className="delete-impact-panel">
+            <div className={`delete-risk-badge ${deleteRisk}`}>Riesgo {deleteRisk}</div>
+            <div className="delete-impact-grid">
+              <div className="delete-impact-card identity">
+                <span>Usuario</span>
+                <strong>{deleteTarget.full_name || 'Sin nombre'}</strong>
+                <p>{deleteTarget.phone} · {deleteTarget.role === 'driver' ? 'Conductor' : 'Pasajero'}</p>
+              </div>
+              <div className="delete-impact-card">
+                <span>Viajes</span>
+                <strong>{deleteTarget.total_trips}</strong>
+              </div>
+              <div className="delete-impact-card">
+                <span>Equipos</span>
+                <strong>{deleteTarget.device_count}</strong>
+                <p>{deleteTarget.authorized_devices} autorizados / {deleteTarget.pending_devices} pendientes</p>
+              </div>
+              <div className="delete-impact-card">
+                <span>Soporte abierto</span>
+                <strong>{deleteTarget.support_open_count}</strong>
+              </div>
+            </div>
+          </div>
+        )}
+      </ConfirmDialog>
     </>
   )
 }
