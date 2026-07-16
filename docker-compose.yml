@@ -80,6 +80,7 @@ services:
       MONITOR_USERNAME: ${MONITOR_USERNAME:-monitoreo}
       MONITOR_PASSWORD: ${MONITOR_PASSWORD:-Monitoreo2026}
       MONITOR_DISPLAY_NAME: ${MONITOR_DISPLAY_NAME:-Monitoreo RAPIGO}
+      SUPPORT_PHONE: ${SUPPORT_PHONE:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -190,6 +191,7 @@ services:
       MAP_TILES_URL_TEMPLATE: ${MAP_TILES_URL_TEMPLATE:-https://rapigo.cybernovatech.space/tiles/styles/rapigo-navigation/512/{z}/{x}/{y}.png}
       MAP_OFFLINE_TILES_URL_TEMPLATE: ${MAP_OFFLINE_TILES_URL_TEMPLATE:-https://rapigo.cybernovatech.space/tiles/styles/rapigo-navigation/512/{z}/{x}/{y}.png}
       MAP_OFFLINE_REGION_NAME: ${MAP_OFFLINE_REGION_NAME:-Potosi ciudad}
+      SUPPORT_PHONE: ${SUPPORT_PHONE:-}
     depends_on:
       postgres:
         condition: service_healthy
