@@ -224,6 +224,7 @@ async function readAdminUserById(userId, client = pool) {
             d.is_available AS driver_available,
             d.access_status AS driver_access_status,
             d.license_number,
+            v.vehicle_type,
             COALESCE((SELECT COUNT(*) FROM user_devices ud WHERE ud.user_id = u.id), 0)::int AS device_count,
             COALESCE((SELECT COUNT(*) FROM user_devices ud WHERE ud.user_id = u.id AND ud.status = 'AUTORIZADO'), 0)::int AS authorized_devices,
             COALESCE((SELECT COUNT(*) FROM user_devices ud WHERE ud.user_id = u.id AND ud.status = 'PENDIENTE'), 0)::int AS pending_devices,
@@ -236,6 +237,7 @@ async function readAdminUserById(userId, client = pool) {
             ), 0)::int AS total_trips
      FROM users u
      LEFT JOIN drivers d ON d.user_id = u.id
+     LEFT JOIN vehicles v ON v.driver_id = d.id
      WHERE u.id = $1
      LIMIT 1`,
     [userId]
@@ -724,6 +726,7 @@ async function bootstrap() {
               d.is_available AS driver_available,
               d.access_status AS driver_access_status,
               d.license_number,
+              v.vehicle_type,
               COALESCE((SELECT COUNT(*) FROM user_devices ud WHERE ud.user_id = u.id), 0)::int AS device_count,
               COALESCE((SELECT COUNT(*) FROM user_devices ud WHERE ud.user_id = u.id AND ud.status = 'AUTORIZADO'), 0)::int AS authorized_devices,
               COALESCE((SELECT COUNT(*) FROM user_devices ud WHERE ud.user_id = u.id AND ud.status = 'PENDIENTE'), 0)::int AS pending_devices,
@@ -736,6 +739,7 @@ async function bootstrap() {
               ), 0)::int AS total_trips
        FROM users u
        LEFT JOIN drivers d ON d.user_id = u.id
+       LEFT JOIN vehicles v ON v.driver_id = d.id
        ORDER BY u.updated_at DESC, u.created_at DESC
        LIMIT 500`
     );

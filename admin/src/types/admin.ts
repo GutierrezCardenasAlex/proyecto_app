@@ -233,6 +233,7 @@ export type ManagedUserRow = {
   driver_available?: boolean | null
   driver_access_status?: 'PENDIENTE' | 'AUTORIZADO' | 'RECHAZADO' | null
   license_number?: string | null
+  vehicle_type?: string | null
   device_count: number
   authorized_devices: number
   pending_devices: number

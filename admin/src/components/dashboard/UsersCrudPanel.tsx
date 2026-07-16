@@ -22,6 +22,26 @@ type Props = {
   onLoadHistory: (user: UserSummary) => Promise<void>
 }
 
+function escapeHtml(value: string | number | null | undefined) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;')
+}
+
+function userName(user: ManagedUserRow) {
+  return user.full_name?.trim() || [user.first_name, user.last_name].filter(Boolean).join(' ').trim() || 'Sin nombre'
+}
+
+function vehicleTypeLabel(value?: string | null) {
+  const clean = String(value || '').trim().toLowerCase()
+  if (clean === 'moto') return 'Moto'
+  if (clean === 'taxi') return 'Taxi'
+  return clean ? clean.toUpperCase() : 'Sin tipo'
+}
+
 export default function UsersCrudPanel({
   users,
   form,
@@ -81,6 +101,94 @@ export default function UsersCrudPanel({
     setDeleteTarget(null)
   }
 
+  function exportUsersPdf() {
+    const drivers = filteredUsers.filter((user) => user.role === 'driver')
+    const passengers = filteredUsers.filter((user) => user.role !== 'driver')
+    const generatedAt = new Date().toLocaleString('es-BO')
+    const exportWindow = window.open('', '_blank', 'width=1100,height=850')
+    if (!exportWindow) return
+
+    const driverRows = drivers
+      .map(
+        (user, index) => `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${escapeHtml(userName(user))}</td>
+            <td>${escapeHtml(user.phone)}</td>
+            <td>${escapeHtml(vehicleTypeLabel(user.vehicle_type))}</td>
+          </tr>
+        `,
+      )
+      .join('')
+
+    const passengerRows = passengers
+      .map(
+        (user, index) => `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${escapeHtml(userName(user))}</td>
+            <td>${escapeHtml(user.phone)}</td>
+          </tr>
+        `,
+      )
+      .join('')
+
+    exportWindow.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <title>RAPIGO - Exportacion de usuarios</title>
+          <style>
+            body { font-family: Arial, sans-serif; color: #111827; margin: 28px; }
+            header { border-bottom: 3px solid #f97316; padding-bottom: 14px; margin-bottom: 22px; }
+            h1 { margin: 0; font-size: 24px; }
+            h2 { margin: 26px 0 10px; font-size: 17px; color: #0f172a; }
+            p { margin: 6px 0 0; color: #475569; font-size: 12px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; page-break-inside: avoid; }
+            th, td { border: 1px solid #cbd5e1; padding: 9px 10px; text-align: left; font-size: 12px; }
+            th { background: #f8fafc; color: #334155; text-transform: uppercase; font-size: 11px; }
+            .empty { border: 1px dashed #cbd5e1; padding: 14px; color: #64748b; border-radius: 10px; }
+            .summary { display: flex; gap: 12px; margin-top: 14px; }
+            .summary div { border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; }
+            .summary strong { display: block; font-size: 18px; }
+            @media print { body { margin: 18px; } button { display: none; } }
+          </style>
+        </head>
+        <body>
+          <header>
+            <h1>RAPIGO - Datos de usuarios</h1>
+            <p>Generado: ${escapeHtml(generatedAt)}</p>
+            <div class="summary">
+              <div><strong>${drivers.length}</strong><p>Conductores</p></div>
+              <div><strong>${passengers.length}</strong><p>Pasajeros</p></div>
+            </div>
+          </header>
+
+          <section>
+            <h2>Conductores</h2>
+            ${
+              drivers.length
+                ? `<table><thead><tr><th>#</th><th>Nombre</th><th>Celular</th><th>Tipo de auto</th></tr></thead><tbody>${driverRows}</tbody></table>`
+                : '<div class="empty">No hay conductores para exportar.</div>'
+            }
+          </section>
+
+          <section>
+            <h2>Pasajeros</h2>
+            ${
+              passengers.length
+                ? `<table><thead><tr><th>#</th><th>Nombre</th><th>Celular</th></tr></thead><tbody>${passengerRows}</tbody></table>`
+                : '<div class="empty">No hay pasajeros para exportar.</div>'
+            }
+          </section>
+        </body>
+      </html>
+    `)
+    exportWindow.document.close()
+    exportWindow.focus()
+    setTimeout(() => exportWindow.print(), 250)
+  }
+
   return (
     <>
       <section className="admin-section-shell">
@@ -124,6 +232,9 @@ export default function UsersCrudPanel({
             </div>
             <Button variant="secondary" onClick={handleCreate}>
               Nuevo usuario
+            </Button>
+            <Button variant="secondary" onClick={exportUsersPdf} disabled={!filteredUsers.length}>
+              Exportar PDF
             </Button>
           </div>
         }
