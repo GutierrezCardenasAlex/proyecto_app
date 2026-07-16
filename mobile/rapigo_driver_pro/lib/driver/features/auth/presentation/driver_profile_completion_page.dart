@@ -1106,65 +1106,81 @@ class _DropdownField extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Container(
+          height: 50,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: const Color(0xFFE2E8F8)),
           ),
-          child: DropdownButtonFormField<String>(
-            initialValue: value.isEmpty ? null : value,
-            dropdownColor: Colors.white,
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF1D2D59),
-            ),
-            icon: const Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: Color(0xFF1650D7),
-            ),
-            decoration: const InputDecoration(
-              isCollapsed: true,
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
-              disabledBorder: InputBorder.none,
-            ),
-            hint: Text(
-              hintText,
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: value.isEmpty ? null : value,
+              isExpanded: true,
+              dropdownColor: Colors.white,
+              borderRadius: BorderRadius.circular(14),
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFFA3AEC9),
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF1D2D59),
               ),
-            ),
-            items: items
-                .map(
-                  (item) => DropdownMenuItem<String>(
-                    value: item,
-                    child: Row(
+              icon: const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: Color(0xFF1650D7),
+              ),
+              hint: Text(
+                hintText,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: const Color(0xFFA3AEC9),
+                ),
+              ),
+              selectedItemBuilder: (context) => items
+                  .map(
+                    (item) => Row(
                       children: [
-                        Icon(icon, color: const Color(0xFF1650D7), size: 20),
-                        const SizedBox(width: 10),
+                        Icon(icon, color: const Color(0xFF1650D7), size: 18),
+                        const SizedBox(width: 9),
                         Text(
                           item,
                           style: GoogleFonts.plusJakartaSans(
-                            fontSize: 15,
+                            fontSize: 13,
                             fontWeight: FontWeight.w700,
                             color: const Color(0xFF1D2D59),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                )
-                .toList(),
-            onChanged: (value) {
-              if (value != null) {
-                onChanged(value);
-              }
-            },
+                  )
+                  .toList(),
+              items: items
+                  .map(
+                    (item) => DropdownMenuItem<String>(
+                      value: item,
+                      child: Row(
+                        children: [
+                          Icon(icon, color: const Color(0xFF1650D7), size: 18),
+                          const SizedBox(width: 10),
+                          Text(
+                            item,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF1D2D59),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  onChanged(value);
+                }
+              },
+            ),
           ),
         ),
       ],

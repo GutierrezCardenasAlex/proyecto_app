@@ -1112,7 +1112,13 @@ class _NameInputField extends StatelessWidget {
               ),
               decoration: InputDecoration(
                 border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
                 isCollapsed: true,
+                filled: false,
+                fillColor: Colors.transparent,
+                contentPadding: EdgeInsets.zero,
                 hintText: 'Ej. Juan',
                 hintStyle: GoogleFonts.plusJakartaSans(
                   fontSize: 16,

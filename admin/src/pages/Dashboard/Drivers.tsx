@@ -1,7 +1,7 @@
 import Card from '../../components/cards/Card'
 import StatCard from '../../components/dashboard/StatCard'
 import { useCentral } from '../../hooks/useCentral'
-import { getDriverAvailabilityLabel, getDriverDisplayName, getDriverStatusLabel, getDriverTelemetryDate } from '../../utils/helpers'
+import { formatDateTime, getDriverAvailabilityLabel, getDriverDisplayName, getDriverStatusLabel, getDriverTelemetryDate } from '../../utils/helpers'
 
 export default function DriversPage() {
   const central = useCentral()
@@ -57,6 +57,7 @@ export default function DriversPage() {
                 <div>
                   <strong>{driver.full_name || driver.phone}</strong>
                   <p>{driver.phone} · {driver.address || 'sin direccion'}</p>
+                  <p>Registrado: {formatDateTime(driver.created_at)} · Actualizado: {formatDateTime(driver.updated_at)}</p>
                   <p>
                     Licencia {driver.license_number || 'pendiente'} · Categoria {driver.license_category || 'sin categoria'} · Emision{' '}
                     {driver.license_issue_date || 'pendiente'} · Vence {driver.license_expiry_date || 'pendiente'}

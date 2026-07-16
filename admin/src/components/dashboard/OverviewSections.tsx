@@ -1,6 +1,7 @@
 import Button from '../common/Button'
 import Card from '../cards/Card'
 import type { DeviceRow, PendingDriverAccessRow, PromoSettings, SupportReport, Trip } from '../../types/admin'
+import { formatDateTime } from '../../utils/helpers'
 
 type Props = {
   promoSettings: PromoSettings
@@ -90,6 +91,7 @@ export default function OverviewSections(props: Props) {
                     </span>
                   </div>
                   <p>conductor · {driver.phone}</p>
+                  <p>Registrado: {formatDateTime(driver.created_at)} · Actualizado: {formatDateTime(driver.updated_at)}</p>
                   <p>{driver.email || 'Sin email'} · {driver.address || 'Sin direccion'}</p>
                   <p>
                     Licencia: {driver.license_number || 'pendiente'} · Categoria {driver.license_category || 'sin categoria'} · Emision{' '}
