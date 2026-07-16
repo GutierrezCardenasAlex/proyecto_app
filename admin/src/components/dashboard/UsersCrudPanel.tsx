@@ -42,6 +42,13 @@ function vehicleTypeLabel(value?: string | null) {
   return clean ? clean.toUpperCase() : 'Sin tipo'
 }
 
+function registeredAtLabel(value?: string | null) {
+  if (!value) return 'Sin fecha'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Sin fecha'
+  return date.toLocaleString('es-BO')
+}
+
 export default function UsersCrudPanel({
   users,
   form,
@@ -116,6 +123,7 @@ export default function UsersCrudPanel({
             <td>${escapeHtml(userName(user))}</td>
             <td>${escapeHtml(user.phone)}</td>
             <td>${escapeHtml(vehicleTypeLabel(user.vehicle_type))}</td>
+            <td>${escapeHtml(registeredAtLabel(user.created_at))}</td>
           </tr>
         `,
       )
@@ -128,6 +136,7 @@ export default function UsersCrudPanel({
             <td>${index + 1}</td>
             <td>${escapeHtml(userName(user))}</td>
             <td>${escapeHtml(user.phone)}</td>
+            <td>${escapeHtml(registeredAtLabel(user.created_at))}</td>
           </tr>
         `,
       )
@@ -168,7 +177,7 @@ export default function UsersCrudPanel({
             <h2>Conductores</h2>
             ${
               drivers.length
-                ? `<table><thead><tr><th>#</th><th>Nombre</th><th>Celular</th><th>Tipo de auto</th></tr></thead><tbody>${driverRows}</tbody></table>`
+                ? `<table><thead><tr><th>#</th><th>Nombre</th><th>Celular</th><th>Tipo de auto</th><th>Registro</th></tr></thead><tbody>${driverRows}</tbody></table>`
                 : '<div class="empty">No hay conductores para exportar.</div>'
             }
           </section>
@@ -177,7 +186,7 @@ export default function UsersCrudPanel({
             <h2>Pasajeros</h2>
             ${
               passengers.length
-                ? `<table><thead><tr><th>#</th><th>Nombre</th><th>Celular</th></tr></thead><tbody>${passengerRows}</tbody></table>`
+                ? `<table><thead><tr><th>#</th><th>Nombre</th><th>Celular</th><th>Registro</th></tr></thead><tbody>${passengerRows}</tbody></table>`
                 : '<div class="empty">No hay pasajeros para exportar.</div>'
             }
           </section>
