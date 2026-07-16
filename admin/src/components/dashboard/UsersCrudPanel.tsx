@@ -57,6 +57,7 @@ export default function UsersCrudPanel({
   const deleteImpact = deleteTarget
     ? (deleteTarget.total_trips || 0) + (deleteTarget.device_count || 0) + (deleteTarget.support_open_count || 0)
     : 0
+  const deleteBlocked = Boolean(deleteTarget && deleteTarget.total_trips > 0)
   const deleteRisk = deleteImpact >= 5 ? 'alto' : deleteImpact > 0 ? 'medio' : 'bajo'
 
   function handleCreate() {
@@ -181,11 +182,14 @@ export default function UsersCrudPanel({
         loading={loading}
         title={deleteTarget ? `Eliminar usuario · ${deleteTarget.full_name || deleteTarget.phone}` : 'Eliminar usuario'}
         message={
-          deleteTarget
+          deleteBlocked
+            ? 'Esta cuenta tiene viajes registrados. No se puede eliminar porque forma parte del historial operativo; puedes editarla o bloquear su acceso.'
+            : deleteTarget
             ? `Esta accion elimina la cuenta y sus datos administrativos asociados. Revisa el impacto antes de continuar.`
             : 'Se eliminara la cuenta seleccionada.'
         }
-        confirmLabel="Eliminar definitivamente"
+        confirmLabel={deleteBlocked ? 'Eliminacion bloqueada' : 'Eliminar definitivamente'}
+        confirmDisabled={deleteBlocked}
       >
         {deleteTarget && (
           <div className="delete-impact-panel">

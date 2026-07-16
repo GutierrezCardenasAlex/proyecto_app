@@ -928,8 +928,13 @@ async function bootstrap() {
       [userId, currentUser.driver_id || null]
     );
 
-    if (Number(tripConflict.rows[0]?.count || 0) > 0) {
-      return reply.code(409).send({ message: "No se puede eliminar un usuario con viajes registrados." });
+    const tripCount = Number(tripConflict.rows[0]?.count || 0);
+    if (tripCount > 0) {
+      return reply.code(409).send({
+        message: `No se puede eliminar este usuario porque tiene ${tripCount} viaje(s) registrados. Edita la cuenta o bloquea su acceso para conservar el historial operativo.`,
+        reason: "USER_HAS_TRIPS",
+        trip_count: tripCount
+      });
     }
 
     await pool.query(`DELETE FROM users WHERE id = $1`, [userId]);

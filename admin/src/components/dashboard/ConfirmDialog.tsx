@@ -11,6 +11,7 @@ type Props = {
   cancelLabel?: string
   tone?: 'danger' | 'warning'
   loading?: boolean
+  confirmDisabled?: boolean
   onCancel: () => void
   onConfirm: () => void
 }
@@ -24,6 +25,7 @@ export default function ConfirmDialog({
   cancelLabel = 'Cancelar',
   tone = 'danger',
   loading = false,
+  confirmDisabled = false,
   onCancel,
   onConfirm,
 }: Props) {
@@ -39,7 +41,7 @@ export default function ConfirmDialog({
           <Button variant="secondary" onClick={onCancel} disabled={loading}>
             {cancelLabel}
           </Button>
-          <Button variant={tone === 'warning' ? 'secondary' : 'danger'} onClick={onConfirm} disabled={loading}>
+          <Button variant={tone === 'warning' ? 'secondary' : 'danger'} onClick={onConfirm} disabled={loading || confirmDisabled}>
             {loading ? 'Procesando...' : confirmLabel}
           </Button>
         </>

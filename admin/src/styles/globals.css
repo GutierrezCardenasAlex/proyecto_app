@@ -2620,6 +2620,10 @@ a {
   font-size: 0.85rem;
 }
 
+.delete-risk-badge.alto + .delete-impact-grid .delete-impact-card.identity {
+  border-color: rgba(239, 68, 68, 0.24);
+}
+
 .detail-modal-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
