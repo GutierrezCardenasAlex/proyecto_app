@@ -102,8 +102,14 @@ class DriverMapLibreView extends ConsumerStatefulWidget {
     required double iconBearing,
     required double displayLat,
     required double displayLng,
-  })? onDebugTelemetryChanged;
-  final void Function(double centerLat, double centerLng, double zoom, double bearing)?
+  })?
+  onDebugTelemetryChanged;
+  final void Function(
+    double centerLat,
+    double centerLng,
+    double zoom,
+    double bearing,
+  )?
   onCameraViewportChanged;
   final VoidCallback onHardFailure;
 
@@ -157,6 +163,8 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
   ll.LatLng? _idleRoadSnapPoint;
   ll.LatLng? _lastRoadSnapSourcePoint;
   ll.LatLng? _lastRawDriverPoint;
+  ll.LatLng? _lastRouteSourceVisualPoint;
+  DateTime? _lastRouteSourceUpdatedAt;
   DateTime? _lastRawDriverAt;
   double _estimatedSpeedMps = 0;
   double? _idleMarkerBearing;
@@ -164,7 +172,8 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
 
   static const String _driverMarkerImageId = 'rapigo_driver_navigation_marker';
   static const String _pickupMarkerImageId = 'rapigo_trip_pickup_marker_a';
-  static const String _destinationMarkerImageId = 'rapigo_trip_destination_marker_b';
+  static const String _destinationMarkerImageId =
+      'rapigo_trip_destination_marker_b';
   static const String _routeSourceId = 'rapigo_driver_route_source';
   static const String _routeCasingLayerId = 'rapigo_driver_route_casing';
   static const String _routeGlowLayerId = 'rapigo_driver_route_glow';
@@ -190,21 +199,6 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
     return 'desconectado';
   }
 
-  Color _driverMarkerHaloColor() {
-    switch (_driverMarkerVisualStateKey()) {
-      case 'en_camino':
-        return const Color(0xFFFACC15);
-      case 'con_pasajero':
-        return const Color(0xFF22C55E);
-      case 'finalizando':
-        return const Color(0xFFEF4444);
-      case 'desconectado':
-        return const Color(0xFF94A3B8);
-      case 'libre':
-      default:
-        return const Color(0xFF12A8FF);
-    }
-  }
   static const double _defaultMaxZoom = 16.35;
 
   @override
@@ -213,8 +207,10 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
     _initialViewportLocked = widget.preserveInitialViewport;
     _lastRawDriverPoint = _driverPoint;
     _lastRawDriverAt = DateTime.now();
-    _currentCameraCenterLat = widget.initialCenter?.latitude ?? widget.driverLat;
-    _currentCameraCenterLng = widget.initialCenter?.longitude ?? widget.driverLng;
+    _currentCameraCenterLat =
+        widget.initialCenter?.latitude ?? widget.driverLat;
+    _currentCameraCenterLng =
+        widget.initialCenter?.longitude ?? widget.driverLng;
     _currentCameraZoom = widget.initialZoom ?? AppConfig.mapInitialZoom;
     _currentCameraTilt = widget.tripAccepted
         ? (widget.navigationTilt ?? 56)
@@ -272,7 +268,8 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
             _driverPoint,
           );
           final instantSpeed = distance / (elapsedMs / 1000);
-          _estimatedSpeedMps = (_estimatedSpeedMps * 0.58) + (instantSpeed * 0.42);
+          _estimatedSpeedMps =
+              (_estimatedSpeedMps * 0.58) + (instantSpeed * 0.42);
         }
       }
       _lastRawDriverPoint = _driverPoint;
@@ -361,19 +358,19 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
     );
     final factor = widget.tripAccepted
         ? distanceMeters > 30
-            ? 0.58
-            : distanceMeters > 14
-                ? 0.46
-                : distanceMeters > 6
-                    ? 0.34
-                    : 0.24
+              ? 0.58
+              : distanceMeters > 14
+              ? 0.46
+              : distanceMeters > 6
+              ? 0.34
+              : 0.24
         : distanceMeters > 26
-            ? 0.54
-            : distanceMeters > 12
-                ? 0.40
-                : distanceMeters > 5
-                    ? 0.28
-                    : 0.18;
+        ? 0.54
+        : distanceMeters > 12
+        ? 0.40
+        : distanceMeters > 5
+        ? 0.28
+        : 0.18;
     final next = ll.LatLng(
       previous.latitude + ((target.latitude - previous.latitude) * factor),
       previous.longitude + ((target.longitude - previous.longitude) * factor),
@@ -394,14 +391,17 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
     if (_routeLayersReady) {
       return;
     }
-    await controller.addGeoJsonSource(_routeSourceId, _routeGeoJson(const <ll.LatLng>[]));
+    await controller.addGeoJsonSource(
+      _routeSourceId,
+      _routeGeoJson(const <ll.LatLng>[]),
+    );
     await controller.addLineLayer(
       _routeSourceId,
       _routeCasingLayerId,
       const ml.LineLayerProperties(
-        lineColor: '#0B3A72',
-        lineOpacity: 0.96,
-        lineWidth: 12.8,
+        lineColor: '#082D57',
+        lineOpacity: 0.88,
+        lineWidth: 10.6,
         lineBlur: 0.12,
         lineJoin: 'round',
         lineCap: 'round',
@@ -411,9 +411,9 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
       _routeSourceId,
       _routeGlowLayerId,
       const ml.LineLayerProperties(
-        lineColor: '#5FE8FF',
-        lineOpacity: 0.26,
-        lineWidth: 16.4,
+        lineColor: '#6EE7FF',
+        lineOpacity: 0.18,
+        lineWidth: 15.2,
         lineBlur: 1.02,
         lineJoin: 'round',
         lineCap: 'round',
@@ -423,9 +423,9 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
       _routeSourceId,
       _routeMainLayerId,
       const ml.LineLayerProperties(
-        lineColor: '#35D7FF',
-        lineOpacity: 0.98,
-        lineWidth: 7.9,
+        lineColor: '#3EDBFF',
+        lineOpacity: 0.96,
+        lineWidth: 6.6,
         lineBlur: 0.08,
         lineJoin: 'round',
         lineCap: 'round',
@@ -435,6 +435,7 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
   }
 
   Map<String, dynamic> _routeGeoJson(List<ll.LatLng> route) {
+    final visibleRoute = _visibleRoute(route);
     return <String, dynamic>{
       'type': 'FeatureCollection',
       'features': <Map<String, dynamic>>[
@@ -443,13 +444,35 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
           'properties': const <String, dynamic>{},
           'geometry': <String, dynamic>{
             'type': 'LineString',
-            'coordinates': route
+            'coordinates': visibleRoute
                 .map((point) => <double>[point.longitude, point.latitude])
                 .toList(growable: false),
           },
         },
       ],
     };
+  }
+
+  List<ll.LatLng> _visibleRoute(List<ll.LatLng> route) {
+    if (!widget.tripAccepted || widget.lockToFocusBounds || route.length < 2) {
+      return route;
+    }
+    final visualPoint = _visualDriverPoint();
+    final snapped = _nearestPointOnPolyline(visualPoint, route);
+    final distanceMeters = const ll.Distance().as(
+      ll.LengthUnit.Meter,
+      visualPoint,
+      snapped.point,
+    );
+    if (distanceMeters > 52) {
+      return route;
+    }
+    final remaining = <ll.LatLng>[snapped.point];
+    remaining.addAll(route.skip(snapped.segmentIndex + 1));
+    if (remaining.length < 2) {
+      remaining.add(route.last);
+    }
+    return remaining;
   }
 
   Future<void> _loadStyleString() async {
@@ -466,7 +489,8 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
     }
 
     try {
-      final rawStyle = MapStyleCache.get(runtime.style.assetPath) ??
+      final rawStyle =
+          MapStyleCache.get(runtime.style.assetPath) ??
           await MapStyleCache.preload(runtime.style.assetPath);
       if (!mounted) {
         return;
@@ -494,17 +518,20 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
 
   ll.LatLng get _driverPoint => ll.LatLng(widget.driverLat, widget.driverLng);
 
-  ll.LatLng? get _pickupPoint => widget.pickupLat != null && widget.pickupLng != null
+  ll.LatLng? get _pickupPoint =>
+      widget.pickupLat != null && widget.pickupLng != null
       ? ll.LatLng(widget.pickupLat!, widget.pickupLng!)
       : null;
 
   ll.LatLng? get _destinationPoint =>
       widget.destinationLat != null && widget.destinationLng != null
-          ? ll.LatLng(widget.destinationLat!, widget.destinationLng!)
-          : null;
+      ? ll.LatLng(widget.destinationLat!, widget.destinationLng!)
+      : null;
 
   bool get _showsPreviewTripRoute =>
-      widget.lockToFocusBounds && _pickupPoint != null && _destinationPoint != null;
+      widget.lockToFocusBounds &&
+      _pickupPoint != null &&
+      _destinationPoint != null;
 
   ll.LatLng get _routeStartPoint =>
       _showsPreviewTripRoute ? _pickupPoint! : _driverPoint;
@@ -515,7 +542,8 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
   bool get _isOnDestinationStage =>
       widget.tripStatus == 'in_progress' || widget.tripStatus == 'completed';
 
-  ll.LatLng? get _routePoint => _isOnDestinationStage ? _destinationPoint : _pickupPoint;
+  ll.LatLng? get _routePoint =>
+      _isOnDestinationStage ? _destinationPoint : _pickupPoint;
 
   List<String> _normalizedRouteReadKeys() {
     final keys = <String>[];
@@ -643,10 +671,7 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
           math.sin(bearing) * sinAd * cosLat1,
           cosAd - (sinLat1 * math.sin(lat2)),
         );
-    return ll.LatLng(
-      lat2 * 57.29577951308232,
-      lon2 * 57.29577951308232,
-    );
+    return ll.LatLng(lat2 * 57.29577951308232, lon2 * 57.29577951308232);
   }
 
   ll.LatLng _idleCameraTarget() {
@@ -658,8 +683,8 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
     final metersAhead = _estimatedSpeedMps > 10
         ? 68.0
         : _estimatedSpeedMps > 5
-            ? 52.0
-            : 38.0;
+        ? 52.0
+        : 38.0;
     return _projectPointMeters(point, bearing, metersAhead);
   }
 
@@ -713,30 +738,30 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
     );
     var pointFactor = widget.tripAccepted
         ? distanceMeters > 18
-            ? 0.36
-            : distanceMeters > 8
-                ? 0.29
-                : 0.22
+              ? 0.36
+              : distanceMeters > 8
+              ? 0.29
+              : 0.22
         : distanceMeters > 18
-            ? 0.62
-            : distanceMeters > 8
-                ? 0.50
-                : 0.36;
+        ? 0.62
+        : distanceMeters > 8
+        ? 0.50
+        : 0.36;
     if (!widget.tripAccepted && _idleRoadSnapPoint != null) {
       pointFactor = distanceMeters > 12
           ? 0.82
           : distanceMeters > 4
-              ? 0.68
-              : 0.54;
+          ? 0.68
+          : 0.54;
     }
     if (widget.tripAccepted) {
       final speedBoost = _estimatedSpeedMps > 16
           ? 0.22
           : _estimatedSpeedMps > 10
-              ? 0.16
-              : _estimatedSpeedMps > 5
-                  ? 0.10
-                  : 0.04;
+          ? 0.16
+          : _estimatedSpeedMps > 5
+          ? 0.10
+          : 0.04;
       pointFactor += speedBoost;
       final route = _routeBundle?.primary;
       if (route != null && route.length >= 2) {
@@ -756,15 +781,20 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
       }
       pointFactor = pointFactor.clamp(0.24, 0.72);
     }
-    final nextPoint = distanceMeters < (_idleRoadSnapPoint != null && !widget.tripAccepted ? 1.15 : 0.32)
+    final snapThresholdMeters = widget.tripAccepted
+        ? 0.18
+        : (_idleRoadSnapPoint != null ? 1.15 : 0.32);
+    final nextPoint = distanceMeters < snapThresholdMeters
         ? targetPoint
         : ll.LatLng(
-            currentPoint.latitude + ((targetPoint.latitude - currentPoint.latitude) * pointFactor),
+            currentPoint.latitude +
+                ((targetPoint.latitude - currentPoint.latitude) * pointFactor),
             currentPoint.longitude +
-                ((targetPoint.longitude - currentPoint.longitude) * pointFactor),
+                ((targetPoint.longitude - currentPoint.longitude) *
+                    pointFactor),
           );
 
-    final movedEnough = distanceMeters > 0.08;
+    final movedEnough = distanceMeters > (widget.tripAccepted ? 0.16 : 0.08);
 
     if (!widget.tripAccepted) {
       final headingDistance = const ll.Distance().as(
@@ -781,10 +811,7 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
               ) >
               0.45) {
         _idleMarkerBearing = _smoothIdleBearing(
-          _bearingBetween(
-            _lastRoadSnapSourcePoint!,
-            _idleRoadSnapPoint!,
-          ),
+          _bearingBetween(_lastRoadSnapSourcePoint!, _idleRoadSnapPoint!),
         );
       } else if (headingDistance > 0.45) {
         _idleMarkerBearing = _smoothIdleBearing(
@@ -801,7 +828,8 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
 
     if (_controller != null && _styleLoaded && !_isSyncingScene) {
       unawaited(_updateDriverVisuals());
-      if (!widget.lockToFocusBounds && (widget.tripAccepted || widget.available)) {
+      if (!widget.lockToFocusBounds &&
+          (widget.tripAccepted || widget.available)) {
         unawaited(_syncCamera());
       }
     }
@@ -834,8 +862,8 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
     final factor = delta.abs() > 35
         ? 0.34
         : delta.abs() > 16
-            ? 0.22
-            : 0.12;
+        ? 0.22
+        : 0.12;
     final next = previous + (delta * factor);
     final normalized = next % 360;
     return normalized < 0 ? normalized + 360 : normalized;
@@ -857,11 +885,15 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
     final factor = distanceMeters <= 16 ? 0.94 : 0.82;
     return ll.LatLng(
       current.latitude + ((snapped.point.latitude - current.latitude) * factor),
-      current.longitude + ((snapped.point.longitude - current.longitude) * factor),
+      current.longitude +
+          ((snapped.point.longitude - current.longitude) * factor),
     );
   }
 
-  _SnappedRoutePoint _nearestPointOnPolyline(ll.LatLng point, List<ll.LatLng> route) {
+  _SnappedRoutePoint _nearestPointOnPolyline(
+    ll.LatLng point,
+    List<ll.LatLng> route,
+  ) {
     var bestPoint = route.first;
     var bestDistance = double.infinity;
     var bestIndex = 0;
@@ -954,8 +986,8 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
     final factor = delta.abs() > 45
         ? 0.28
         : delta.abs() > 18
-            ? 0.22
-            : 0.16;
+        ? 0.22
+        : 0.16;
     final next = previous + (delta * factor);
     final normalized = next % 360;
     return normalized < 0 ? normalized + 360 : normalized;
@@ -978,10 +1010,7 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
     final apy = py - ay;
     final t = ((apx * abx) + (apy * aby)) / ab2;
     final clamped = t.clamp(0.0, 1.0);
-    return ll.LatLng(
-      ay + (aby * clamped),
-      ax + (abx * clamped),
-    );
+    return ll.LatLng(ay + (aby * clamped), ax + (abx * clamped));
   }
 
   Future<void> _refreshRoute() async {
@@ -992,6 +1021,8 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
         setState(() {
           _routeBundle = null;
           _routeKey = null;
+          _lastRouteSourceVisualPoint = null;
+          _lastRouteSourceUpdatedAt = null;
           _lastRouteRefreshDriverPoint = _driverPoint;
         });
       }
@@ -1012,10 +1043,15 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
     final readKeys = _normalizedRouteReadKeys();
     final writeKeys = _normalizedRouteWriteKeys();
     if (readKeys.isNotEmpty) {
-      final cachedBundle = await _readFirstPersistedBundle(routeService, readKeys);
+      final cachedBundle = await _readFirstPersistedBundle(
+        routeService,
+        readKeys,
+      );
       if (cachedBundle != null && mounted) {
         setState(() {
           _routeBundle = cachedBundle;
+          _lastRouteSourceVisualPoint = null;
+          _lastRouteSourceUpdatedAt = null;
           _lastRouteRefreshDriverPoint = _driverPoint;
         });
         await _syncScene();
@@ -1037,6 +1073,8 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
       setState(() {
         _routeKey = nextKey;
         _routeBundle = bundle;
+        _lastRouteSourceVisualPoint = null;
+        _lastRouteSourceUpdatedAt = null;
         _lastRouteRefreshDriverPoint = _driverPoint;
       });
       if (writeKeys.isNotEmpty) {
@@ -1049,16 +1087,20 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
       if (!mounted) {
         return;
       }
-      final cachedBundle =
-          readKeys.isEmpty ? null : await _readFirstPersistedBundle(routeService, readKeys);
+      final cachedBundle = readKeys.isEmpty
+          ? null
+          : await _readFirstPersistedBundle(routeService, readKeys);
       setState(() {
         _routeKey = nextKey;
-        _routeBundle = cachedBundle ??
+        _routeBundle =
+            cachedBundle ??
             RoutePathBundle(
               primary: [routeStart, routeEnd],
               start: routeStart,
               end: routeEnd,
             );
+        _lastRouteSourceVisualPoint = null;
+        _lastRouteSourceUpdatedAt = null;
         _lastRouteRefreshDriverPoint = _driverPoint;
       });
       if (cachedBundle != null && cachedBundle.primary.length >= 2) {
@@ -1083,7 +1125,9 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
       final route = _routeBundle?.primary;
       await controller.setGeoJsonSource(
         _routeSourceId,
-        _routeGeoJson(route != null && route.length >= 2 ? route : const <ll.LatLng>[]),
+        _routeGeoJson(
+          route != null && route.length >= 2 ? route : const <ll.LatLng>[],
+        ),
       );
 
       await _upsertDriverMarker(controller);
@@ -1127,14 +1171,20 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
     _lastIdleRoadSnapAt = now;
     _lastRoadSnapSourcePoint = sourcePoint;
     try {
-      final snapped = await ref.read(routeServiceProvider).snapToRoadIfPossible(sourcePoint);
+      final snapped = await ref
+          .read(routeServiceProvider)
+          .snapToRoadIfPossible(sourcePoint);
       if (!mounted || widget.tripAccepted || widget.lockToFocusBounds) {
         return;
       }
       _idleRoadSnapPoint = snapped;
       final snappedDelta = previousSnapped == null
           ? const ll.Distance().as(ll.LengthUnit.Meter, sourcePoint, snapped)
-          : const ll.Distance().as(ll.LengthUnit.Meter, previousSnapped, snapped);
+          : const ll.Distance().as(
+              ll.LengthUnit.Meter,
+              previousSnapped,
+              snapped,
+            );
       if (snappedDelta > 0.55) {
         final bearingAnchor = previousSnapped ?? sourcePoint;
         _idleMarkerBearing = _smoothIdleBearing(
@@ -1196,7 +1246,9 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
   }
 
   bool _shouldRefreshRouteForDriverMovement() {
-    if (!widget.tripAccepted || _routeEndPoint == null || widget.lockToFocusBounds) {
+    if (!widget.tripAccepted ||
+        _routeEndPoint == null ||
+        widget.lockToFocusBounds) {
       return false;
     }
     final previous = _lastRouteRefreshDriverPoint;
@@ -1213,20 +1265,100 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
 
   Future<void> _updateDriverVisuals() async {
     final controller = _controller;
-    if (controller == null ||
-        !_styleLoaded ||
-        _isSyncingScene) {
+    if (controller == null || !_styleLoaded || _isSyncingScene) {
       return;
     }
 
     try {
+      final route = _routeBundle?.primary;
+      if (widget.tripAccepted &&
+          route != null &&
+          route.length >= 2 &&
+          _shouldUpdateRouteSource()) {
+        await controller.setGeoJsonSource(_routeSourceId, _routeGeoJson(route));
+      }
       await _upsertDriverMarker(controller);
     } catch (_) {
       await _syncScene();
     }
   }
 
-  Future<void> _ensureDriverMarkerImage(ml.MapLibreMapController controller) async {
+  bool _shouldUpdateRouteSource() {
+    final visualPoint = _visualDriverPoint();
+    final previousPoint = _lastRouteSourceVisualPoint;
+    final previousAt = _lastRouteSourceUpdatedAt;
+    final now = DateTime.now();
+    final movedMeters = previousPoint == null
+        ? double.infinity
+        : const ll.Distance().as(
+            ll.LengthUnit.Meter,
+            previousPoint,
+            visualPoint,
+          );
+    final elapsed = previousAt == null ? null : now.difference(previousAt);
+    if (movedMeters < 1.2 &&
+        elapsed != null &&
+        elapsed < const Duration(milliseconds: 700)) {
+      return false;
+    }
+    _lastRouteSourceVisualPoint = visualPoint;
+    _lastRouteSourceUpdatedAt = now;
+    return true;
+  }
+
+  double _routeDistanceMeters(List<ll.LatLng> route) {
+    if (route.length < 2) {
+      return 0;
+    }
+    var total = 0.0;
+    for (var index = 0; index < route.length - 1; index++) {
+      total += const ll.Distance().as(
+        ll.LengthUnit.Meter,
+        route[index],
+        route[index + 1],
+      );
+    }
+    return total;
+  }
+
+  double? _remainingNavigationDistanceMeters() {
+    final target = _routePoint;
+    if (!widget.tripAccepted || target == null) {
+      return null;
+    }
+    final route = _routeBundle?.primary;
+    if (route != null && route.length >= 2) {
+      return _routeDistanceMeters(_visibleRoute(route));
+    }
+    return const ll.Distance().as(
+      ll.LengthUnit.Meter,
+      _visualDriverPoint(),
+      target,
+    );
+  }
+
+  String _formatNavigationDistance(double meters) {
+    if (meters >= 1000) {
+      return '${(meters / 1000).toStringAsFixed(meters >= 9500 ? 0 : 1)} km';
+    }
+    return '${meters.clamp(0, double.infinity).round()} m';
+  }
+
+  String get _navigationBannerTitle =>
+      _isOnDestinationStage ? 'Sigue hacia destino' : 'Sigue hacia recojo';
+
+  String get _navigationBannerSubtitle {
+    final distance = _remainingNavigationDistanceMeters();
+    final stage = _isOnDestinationStage ? 'Destino' : 'Recojo';
+    if (distance == null) {
+      return '$stage activo en el mapa';
+    }
+    return '${_formatNavigationDistance(distance)} restantes';
+  }
+
+  Future<void> _ensureDriverMarkerImage(
+    ml.MapLibreMapController controller,
+  ) async {
     final imageId = _activeDriverMarkerImageId;
     if (_loadedDriverMarkerImageIds.contains(imageId)) {
       return;
@@ -1234,6 +1366,76 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
     final bytes = await _buildDriverMarkerImageBytes();
     await controller.addImage(imageId, bytes);
     _loadedDriverMarkerImageIds.add(imageId);
+  }
+
+  Path _navigationSvgRepoMarkerPath() {
+    return Path()
+      ..fillType = PathFillType.evenOdd
+      ..moveTo(21.81, 34.75)
+      ..lineTo(21.5, 34.75)
+      ..arcToPoint(const Offset(18, 31.58), radius: const Radius.circular(3.8))
+      ..lineTo(16, 20.12)
+      ..arcToPoint(
+        const Offset(14.88, 19),
+        radius: const Radius.circular(1.36),
+        clockwise: false,
+      )
+      ..lineTo(3.42, 17)
+      ..arcToPoint(
+        const Offset(2.86, 9.58),
+        radius: const Radius.circular(3.84),
+      )
+      ..lineTo(29.66, 0.46)
+      ..arcToPoint(
+        const Offset(34.54, 5.34),
+        radius: const Radius.circular(3.84),
+      )
+      ..lineTo(25.43, 32.14)
+      ..arcToPoint(
+        const Offset(21.81, 34.75),
+        radius: const Radius.circular(3.79),
+      )
+      ..close()
+      ..moveTo(30.47, 2.83)
+      ..lineTo(3.66, 11.94)
+      ..arcToPoint(
+        const Offset(3.86, 14.53),
+        radius: const Radius.circular(1.34),
+        clockwise: false,
+      )
+      ..lineTo(15.32, 16.53)
+      ..arcToPoint(
+        const Offset(18.43, 19.64),
+        radius: const Radius.circular(3.85),
+      )
+      ..lineTo(20.43, 31.1)
+      ..arcToPoint(
+        const Offset(23.02, 31.3),
+        radius: const Radius.circular(1.34),
+        clockwise: false,
+      )
+      ..lineTo(32.17, 4.53)
+      ..arcToPoint(
+        const Offset(30.47, 2.83),
+        radius: const Radius.circular(1.34),
+        clockwise: false,
+      )
+      ..close();
+  }
+
+  void _drawNavigationSvgRepoMarker(
+    Canvas canvas,
+    Offset center,
+    Paint paint, {
+    Offset offset = Offset.zero,
+  }) {
+    canvas.save();
+    canvas.translate(center.dx + offset.dx, center.dy + offset.dy);
+    canvas.rotate(-math.pi / 3.08);
+    canvas.scale(2.55);
+    canvas.translate(-17.5, -17.5);
+    canvas.drawPath(_navigationSvgRepoMarkerPath(), paint);
+    canvas.restore();
   }
 
   Future<Uint8List> _buildDriverMarkerImageBytes() async {
@@ -1244,205 +1446,104 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
     final style = widget.driverMarkerStyle ?? 'rapigo';
 
     if (style == 'rapigo') {
-      final haloColor = _driverMarkerHaloColor();
-      final haloOuter =
-          Paint()
-            ..color = haloColor.withValues(alpha: 0.16)
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 24);
-      final haloInner =
-          Paint()
-            ..color = haloColor.withValues(alpha: 0.28)
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
-      canvas.drawCircle(center, 38, haloOuter);
-      canvas.drawCircle(center, 30, haloInner);
-      canvas.drawCircle(
+      const haloColor = Color(0xFF1976FF);
+      final haloOuter = Paint()
+        ..color = haloColor.withValues(alpha: 0.16)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 22);
+      final haloInner = Paint()
+        ..color = haloColor.withValues(alpha: 0.28)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 9);
+      canvas.drawCircle(center, 36, haloOuter);
+      canvas.drawCircle(center, 25, haloInner);
+
+      final groundShadow = Paint()
+        ..color = const Color(0x421976FF)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
+      canvas.drawOval(
+        Rect.fromCenter(center: center.translate(0, 35), width: 34, height: 11),
+        groundShadow,
+      );
+
+      _drawNavigationSvgRepoMarker(
+        canvas,
         center,
-        28,
         Paint()
-          ..color = Colors.white.withValues(alpha: 0.08)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.2,
-      );
-
-      final arrowPath =
-          Path()
-            ..moveTo(center.dx, center.dy - 53)
-            ..lineTo(center.dx + 13, center.dy - 25)
-            ..lineTo(center.dx + 3, center.dy - 29)
-            ..lineTo(center.dx, center.dy - 11)
-            ..lineTo(center.dx - 3, center.dy - 29)
-            ..lineTo(center.dx - 13, center.dy - 25)
-            ..close();
-      canvas.drawPath(
-        arrowPath.shift(const Offset(0, 3)),
-        Paint()
-          ..color = const Color(0x44000000)
+          ..color = const Color(0x3A000000)
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10),
+        offset: const Offset(0, 5),
       );
-      canvas.drawPath(
-        arrowPath,
+      _drawNavigationSvgRepoMarker(
+        canvas,
+        center,
+        Paint()
+          ..color = Colors.white.withValues(alpha: 0.94)
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round
+          ..strokeWidth = 1.55,
+      );
+      _drawNavigationSvgRepoMarker(
+        canvas,
+        center,
         Paint()
           ..shader = ui.Gradient.linear(
-            Offset(center.dx, center.dy - 53),
-            Offset(center.dx, center.dy - 11),
-            const [Color(0xFF6FE8FF), Color(0xFF1A7BFF)],
+            Offset(center.dx - 28, center.dy - 36),
+            Offset(center.dx + 30, center.dy + 36),
+            const [Color(0xFF60A5FA), Color(0xFF1976FF), Color(0xFF0B5DE2)],
+            const [0, 0.58, 1],
           ),
       );
-      canvas.drawPath(
-        arrowPath,
+      canvas.drawCircle(
+        center.translate(0, 4),
+        4.4,
+        Paint()..color = const Color(0xFF0F172A).withValues(alpha: 0.82),
+      );
+      canvas.drawCircle(
+        center.translate(0, 4),
+        7.4,
         Paint()
-          ..color = Colors.white.withValues(alpha: 0.92)
+          ..color = Colors.white.withValues(alpha: 0.40)
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.4,
-      );
-
-      final bodyRect = RRect.fromRectAndRadius(
-        Rect.fromCenter(center: center.translate(0, 6), width: 44, height: 78),
-        const Radius.circular(18),
-      );
-      canvas.drawRRect(
-        bodyRect.shift(const Offset(0, 4)),
-        Paint()
-          ..color = const Color(0x33000000)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
-      );
-      canvas.drawRRect(
-        bodyRect,
-        Paint()
-          ..shader = ui.Gradient.linear(
-            bodyRect.outerRect.topCenter,
-            bodyRect.outerRect.bottomCenter,
-            const [Color(0xFF2DA7FF), Color(0xFF0D64F2)],
-          ),
-      );
-      canvas.drawRRect(
-        bodyRect,
-        Paint()
-          ..color = const Color(0xFF0B5DE2)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.0,
-      );
-
-      final cabinRect = RRect.fromRectAndRadius(
-        Rect.fromCenter(center: center.translate(0, 6), width: 29, height: 50),
-        const Radius.circular(12),
-      );
-      canvas.drawRRect(cabinRect, Paint()..color = Colors.white);
-
-      final windshieldRect = RRect.fromRectAndRadius(
-        Rect.fromCenter(center: center.translate(0, -4), width: 22, height: 16),
-        const Radius.circular(8),
-      );
-      final rearGlassRect = RRect.fromRectAndRadius(
-        Rect.fromCenter(center: center.translate(0, 18), width: 22, height: 16),
-        const Radius.circular(8),
-      );
-      final glassPaint =
-          Paint()
-            ..shader = ui.Gradient.linear(
-              windshieldRect.outerRect.topCenter,
-              windshieldRect.outerRect.bottomCenter,
-              const [Color(0xFF14263D), Color(0xFF0A1220)],
-            );
-      canvas.drawRRect(windshieldRect, glassPaint);
-      canvas.drawRRect(rearGlassRect, glassPaint);
-
-      final sideShadow =
-          Paint()
-            ..color = const Color(0x14000000)
-            ..style = PaintingStyle.fill;
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(bodyRect.left + 3, bodyRect.top + 8, 5, 48),
-          const Radius.circular(4),
-        ),
-        sideShadow,
-      );
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(bodyRect.right - 8, bodyRect.top + 8, 5, 48),
-          const Radius.circular(4),
-        ),
-        sideShadow,
-      );
-
-      final lightPaintFront = Paint()..color = const Color(0xFF8CEBFF);
-      final lightPaintRear = Paint()..color = const Color(0xFFFF7043);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromCenter(center: center.translate(-11, -24), width: 8, height: 6),
-          const Radius.circular(3),
-        ),
-        lightPaintFront,
-      );
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromCenter(center: center.translate(11, -24), width: 8, height: 6),
-          const Radius.circular(3),
-        ),
-        lightPaintFront,
-      );
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromCenter(center: center.translate(-11, 36), width: 8, height: 6),
-          const Radius.circular(3),
-        ),
-        lightPaintRear,
-      );
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromCenter(center: center.translate(11, 36), width: 8, height: 6),
-          const Radius.circular(3),
-        ),
-        lightPaintRear,
+          ..strokeWidth = 1.4,
       );
     } else {
-      final softShadow =
-          Paint()
-            ..color = const Color(0x4064748B)
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 22);
+      final softShadow = Paint()
+        ..color = const Color(0x4064748B)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 22);
       canvas.drawCircle(center, 38, softShadow);
 
-      canvas.drawCircle(
-        center,
-        34,
-        Paint()..color = const Color(0x3F94A3B8),
-      );
+      canvas.drawCircle(center, 34, Paint()..color = const Color(0x3F94A3B8));
 
       canvas.drawCircle(center, 29, Paint()..color = const Color(0x19FFFFFF));
 
-      final triangleShadow =
-          Paint()
-            ..color = const Color(0x33000000)
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 11);
+      final triangleShadow = Paint()
+        ..color = const Color(0x33000000)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 11);
       Path markerPath;
       if (style == 'triangle') {
-        markerPath =
-            Path()
-              ..moveTo(center.dx, center.dy - 28)
-              ..lineTo(center.dx + 23, center.dy + 18)
-              ..lineTo(center.dx - 23, center.dy + 18)
-              ..close();
+        markerPath = Path()
+          ..moveTo(center.dx, center.dy - 28)
+          ..lineTo(center.dx + 23, center.dy + 18)
+          ..lineTo(center.dx - 23, center.dy + 18)
+          ..close();
       } else if (style == 'dart') {
-        markerPath =
-            Path()
-              ..moveTo(center.dx, center.dy - 30)
-              ..lineTo(center.dx + 16, center.dy + 10)
-              ..lineTo(center.dx + 2, center.dy + 6)
-              ..lineTo(center.dx, center.dy + 26)
-              ..lineTo(center.dx - 2, center.dy + 6)
-              ..lineTo(center.dx - 16, center.dy + 10)
-              ..close();
+        markerPath = Path()
+          ..moveTo(center.dx, center.dy - 30)
+          ..lineTo(center.dx + 16, center.dy + 10)
+          ..lineTo(center.dx + 2, center.dy + 6)
+          ..lineTo(center.dx, center.dy + 26)
+          ..lineTo(center.dx - 2, center.dy + 6)
+          ..lineTo(center.dx - 16, center.dy + 10)
+          ..close();
       } else {
-        markerPath =
-            Path()
-              ..moveTo(center.dx, center.dy - 34)
-              ..lineTo(center.dx + 21, center.dy + 14)
-              ..lineTo(center.dx + 6, center.dy + 10)
-              ..lineTo(center.dx, center.dy + 28)
-              ..lineTo(center.dx - 6, center.dy + 10)
-              ..lineTo(center.dx - 21, center.dy + 14)
-              ..close();
+        markerPath = Path()
+          ..moveTo(center.dx, center.dy - 34)
+          ..lineTo(center.dx + 21, center.dy + 14)
+          ..lineTo(center.dx + 6, center.dy + 10)
+          ..lineTo(center.dx, center.dy + 28)
+          ..lineTo(center.dx - 6, center.dy + 10)
+          ..lineTo(center.dx - 21, center.dy + 14)
+          ..close();
       }
       canvas.drawPath(markerPath.shift(const Offset(0, 3)), triangleShadow);
       canvas.drawPath(markerPath, Paint()..color = const Color(0xFF14C6E8));
@@ -1491,7 +1592,9 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
     await _ensureDestinationMarkerImage(controller);
 
     final targetPoint = _toMlLatLng(target);
-    final targetImageId = _isOnDestinationStage ? _destinationMarkerImageId : _pickupMarkerImageId;
+    final targetImageId = _isOnDestinationStage
+        ? _destinationMarkerImageId
+        : _pickupMarkerImageId;
 
     if (_targetHaloCircle == null) {
       _targetHaloCircle = await controller.addCircle(
@@ -1548,10 +1651,7 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
       } else {
         await controller.updateCircle(
           _secondaryTargetHaloCircle!,
-          ml.CircleOptions(
-            geometry: destinationPoint,
-            circleRadius: 24,
-          ),
+          ml.CircleOptions(geometry: destinationPoint, circleRadius: 24),
         );
       }
       if (_secondaryTargetSymbol == null) {
@@ -1566,10 +1666,7 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
       } else {
         await controller.updateSymbol(
           _secondaryTargetSymbol!,
-          ml.SymbolOptions(
-            geometry: destinationPoint,
-            iconSize: 1.22,
-          ),
+          ml.SymbolOptions(geometry: destinationPoint, iconSize: 1.22),
         );
       }
     } else {
@@ -1584,7 +1681,9 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
     }
   }
 
-  Future<void> _ensurePickupMarkerImage(ml.MapLibreMapController controller) async {
+  Future<void> _ensurePickupMarkerImage(
+    ml.MapLibreMapController controller,
+  ) async {
     if (_pickupMarkerImageLoaded) {
       return;
     }
@@ -1599,7 +1698,9 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
     _pickupMarkerImageLoaded = true;
   }
 
-  Future<void> _ensureDestinationMarkerImage(ml.MapLibreMapController controller) async {
+  Future<void> _ensureDestinationMarkerImage(
+    ml.MapLibreMapController controller,
+  ) async {
     if (_destinationMarkerImageLoaded) {
       return;
     }
@@ -1624,26 +1725,28 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
 
-    final glowPaint =
-        Paint()
-          ..color = glowColor
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18);
+    final glowPaint = Paint()
+      ..color = glowColor
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18);
     canvas.drawCircle(const Offset(width / 2, 42), 26, glowPaint);
 
-    final pinPath =
-        Path()
-          ..moveTo(width / 2, height - 10)
-          ..quadraticBezierTo(width / 2 - 10, height - 26, width / 2 - 22, 84)
-          ..arcToPoint(
-            const Offset(width / 2 + 22, 84),
-            radius: const Radius.circular(30),
-            clockwise: false,
-          )
-          ..quadraticBezierTo(width / 2 + 10, height - 26, width / 2, height - 10)
-          ..close();
+    final pinPath = Path()
+      ..moveTo(width / 2, height - 10)
+      ..quadraticBezierTo(width / 2 - 10, height - 26, width / 2 - 22, 84)
+      ..arcToPoint(
+        const Offset(width / 2 + 22, 84),
+        radius: const Radius.circular(30),
+        clockwise: false,
+      )
+      ..quadraticBezierTo(width / 2 + 10, height - 26, width / 2, height - 10)
+      ..close();
 
     canvas.drawPath(pinPath, Paint()..color = fillColor);
-    canvas.drawCircle(const Offset(width / 2, 42), 26, Paint()..color = fillColor);
+    canvas.drawCircle(
+      const Offset(width / 2, 42),
+      26,
+      Paint()..color = fillColor,
+    );
     canvas.drawCircle(
       const Offset(width / 2, 42),
       26,
@@ -1659,9 +1762,11 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
       fontWeight: FontWeight.w900,
     );
     final textStyle = ui.TextStyle(color: Colors.white);
-    final builder =
-        ui.ParagraphBuilder(paragraphStyle)..pushStyle(textStyle)..addText(label);
-    final paragraph = builder.build()..layout(const ui.ParagraphConstraints(width: width));
+    final builder = ui.ParagraphBuilder(paragraphStyle)
+      ..pushStyle(textStyle)
+      ..addText(label);
+    final paragraph = builder.build()
+      ..layout(const ui.ParagraphConstraints(width: width));
     canvas.drawParagraph(paragraph, const Offset(0, 24));
 
     final picture = recorder.endRecording();
@@ -1683,7 +1788,8 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
       final now = DateTime.now();
       if (!force &&
           _lastCameraAnimationAt != null &&
-          now.difference(_lastCameraAnimationAt!) < const Duration(milliseconds: 140)) {
+          now.difference(_lastCameraAnimationAt!) <
+              const Duration(milliseconds: 140)) {
         return;
       }
       if (widget.lockToFocusBounds && widget.focusBounds != null) {
@@ -1826,7 +1932,8 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
     }
   }
 
-  ml.LatLng _toMlLatLng(ll.LatLng point) => ml.LatLng(point.latitude, point.longitude);
+  ml.LatLng _toMlLatLng(ll.LatLng point) =>
+      ml.LatLng(point.latitude, point.longitude);
 
   @override
   Widget build(BuildContext context) {
@@ -1837,9 +1944,7 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
       return const ColoredBox(
         color: Color(0xFFC8DCF2),
         child: Center(
-          child: CircularProgressIndicator(
-            color: Color(0xFF2979FF),
-          ),
+          child: CircularProgressIndicator(color: Color(0xFF2979FF)),
         ),
       );
     }
@@ -1898,13 +2003,17 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
             _currentCameraTilt = tilt;
             _currentCameraBearing = bearing;
             _emitDebugTelemetry();
-            final shouldPersist = _lastPersistedCenterLat == null ||
+            final shouldPersist =
+                _lastPersistedCenterLat == null ||
                 _lastPersistedCenterLng == null ||
                 _lastPersistedZoom == null ||
                 _lastPersistedBearing == null ||
                 const ll.Distance().as(
                       ll.LengthUnit.Meter,
-                      ll.LatLng(_lastPersistedCenterLat!, _lastPersistedCenterLng!),
+                      ll.LatLng(
+                        _lastPersistedCenterLat!,
+                        _lastPersistedCenterLng!,
+                      ),
                       ll.LatLng(lat, lng),
                     ) >
                     8.0 ||
@@ -1938,21 +2047,113 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
             ),
           ),
         ),
-        const Positioned(
-          left: 16,
-          bottom: 16,
-          child: OfflineMapReadyBadge(),
-        ),
+        if (widget.tripAccepted && _routePoint != null)
+          Positioned(
+            top: 12,
+            left: 16,
+            right: 16,
+            child: SafeArea(
+              bottom: false,
+              child: Center(
+                child: _DriverMiniNavigationBanner(
+                  title: _navigationBannerTitle,
+                  subtitle: _navigationBannerSubtitle,
+                  accentColor: _isOnDestinationStage
+                      ? const Color(0xFF22C55E)
+                      : const Color(0xFFFACC15),
+                ),
+              ),
+            ),
+          ),
+        const Positioned(left: 16, bottom: 16, child: OfflineMapReadyBadge()),
       ],
     );
   }
 }
 
-class _SnappedRoutePoint {
-  const _SnappedRoutePoint({
-    required this.point,
-    required this.segmentIndex,
+class _DriverMiniNavigationBanner extends StatelessWidget {
+  const _DriverMiniNavigationBanner({
+    required this.title,
+    required this.subtitle,
+    required this.accentColor,
   });
+
+  final String title;
+  final String subtitle;
+  final Color accentColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xE8101829),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: accentColor.withValues(alpha: 0.34)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x33000000),
+            blurRadius: 18,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 14, 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: accentColor.withValues(alpha: 0.16),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.navigation_rounded,
+                color: accentColor,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    height: 1.05,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFFC7D2FE),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    height: 1.05,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SnappedRoutePoint {
+  const _SnappedRoutePoint({required this.point, required this.segmentIndex});
 
   final ll.LatLng point;
   final int segmentIndex;

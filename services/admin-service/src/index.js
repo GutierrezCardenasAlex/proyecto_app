@@ -56,6 +56,10 @@ const promoSettingsSchema = z.object({
   rewardCredits: z.number().int().min(1).max(10).optional()
 });
 
+const supportPhoneSettingsSchema = z.object({
+  supportPhone: z.string().max(32).optional().or(z.literal(""))
+});
+
 const supportReportSchema = z.object({
   category: z.string().min(2).max(60),
   message: z.string().min(8).max(1000)
@@ -148,6 +152,9 @@ function getDriverVerificationMissingFields(row) {
   if (!hasVerificationText(row.license_number, 4) || String(row.license_number || "").toUpperCase().startsWith("TEMP-")) {
     missing.push("licencia");
   }
+  if (!hasVerificationText(row.license_category, 1)) missing.push("categoria de licencia");
+  if (!hasVerificationText(row.license_issue_date, 4)) missing.push("fecha de emision de licencia");
+  if (!hasVerificationText(row.license_expiry_date, 4)) missing.push("fecha de vencimiento de licencia");
   if (!hasVerificationText(row.vehicle_type, 3)) missing.push("tipo de vehiculo");
   if (!hasVerificationText(row.plate, 4) || /^POT-[0-9A-F]{4}$/i.test(String(row.plate || "").trim())) {
     missing.push("placa real");
@@ -272,6 +279,21 @@ async function ensureAdminSchema() {
     VALUES (1, TRUE, 5, 1)
     ON CONFLICT (id) DO NOTHING
   `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key VARCHAR(80) PRIMARY KEY,
+      value TEXT NOT NULL DEFAULT '',
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(
+    `INSERT INTO app_settings (key, value)
+     VALUES ('support_phone', $1)
+     ON CONFLICT (key) DO NOTHING`,
+    [String(process.env.SUPPORT_PHONE || "")]
+  );
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS support_reports (
@@ -610,6 +632,9 @@ async function bootstrap() {
       `SELECT d.id,
               d.user_id,
               d.license_number,
+              d.license_category,
+              d.license_issue_date,
+              d.license_expiry_date,
               d.access_status,
               d.access_note,
               d.created_at,
@@ -1065,6 +1090,46 @@ async function bootstrap() {
         rewardCredits: Number(result.rows[0]?.reward_credits || 1),
         updatedAt: result.rows[0]?.updated_at ?? null
       }
+    };
+  });
+
+  app.get("/settings/support-phone", { preHandler: ensureAdmin }, async () => {
+    const result = await pool.query(
+      `SELECT value, updated_at
+       FROM app_settings
+       WHERE key = 'support_phone'
+       LIMIT 1`
+    );
+
+    return {
+      supportPhone: result.rows[0]?.value || "",
+      updatedAt: result.rows[0]?.updated_at ?? null
+    };
+  });
+
+  app.post("/settings/support-phone", { preHandler: ensureAdmin }, async (request, reply) => {
+    const payload = supportPhoneSettingsSchema.parse(request.body);
+    const supportPhone = String(payload.supportPhone || "").trim();
+    const digits = supportPhone.replace(/\D/g, "");
+
+    if (supportPhone && digits.length !== 8 && !(digits.length === 11 && digits.startsWith("591"))) {
+      return reply.code(400).send({ message: "Usa un numero de Bolivia de 8 digitos o con codigo 591." });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO app_settings (key, value, updated_at)
+       VALUES ('support_phone', $1, NOW())
+       ON CONFLICT (key)
+       DO UPDATE SET value = EXCLUDED.value,
+                     updated_at = NOW()
+       RETURNING value, updated_at`,
+      [supportPhone]
+    );
+
+    return {
+      message: "Telefono de soporte actualizado",
+      supportPhone: result.rows[0]?.value || "",
+      updatedAt: result.rows[0]?.updated_at ?? null
     };
   });
 

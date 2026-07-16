@@ -14,7 +14,7 @@ class DriverBottomNav extends StatelessWidget {
   Widget build(BuildContext context) {
     const items = [
       (Icons.home_rounded, 'Inicio'),
-      (Icons.bar_chart_rounded, 'Ganancias'),
+      (Icons.bar_chart_rounded, 'Estad.'),
       (Icons.local_taxi_rounded, 'Viajes'),
       (Icons.inventory_2_rounded, 'Pedidos'),
       (Icons.person_rounded, 'Perfil'),
@@ -24,7 +24,7 @@ class DriverBottomNav extends StatelessWidget {
       top: false,
       child: Container(
         margin: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 8),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             begin: Alignment.topCenter,
@@ -50,14 +50,14 @@ class DriverBottomNav extends StatelessWidget {
                 borderRadius: BorderRadius.circular(22),
                 onTap: () => onTap(index),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  padding: const EdgeInsets.symmetric(vertical: 6),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       AnimatedContainer(
                         duration: const Duration(milliseconds: 180),
                         curve: Curves.easeOut,
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(7),
                         decoration: BoxDecoration(
                           color: selected
                               ? const Color(0x22FACC15)
@@ -74,19 +74,20 @@ class DriverBottomNav extends StatelessWidget {
                           color: selected
                               ? const Color(0xFFFACC15)
                               : const Color(0xFFE2E8F0),
-                          size: 24,
+                          size: 21,
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 4),
                       Text(
                         item.$2,
                         style: GoogleFonts.plusJakartaSans(
                           color: selected
                               ? const Color(0xFFFACC15)
                               : const Color(0xFFDCE6F2),
-                          fontSize: 12,
-                          fontWeight:
-                              selected ? FontWeight.w800 : FontWeight.w600,
+                          fontSize: 10.5,
+                          fontWeight: selected
+                              ? FontWeight.w800
+                              : FontWeight.w600,
                         ),
                       ),
                     ],

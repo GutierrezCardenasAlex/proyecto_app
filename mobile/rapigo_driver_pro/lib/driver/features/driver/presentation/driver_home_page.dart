@@ -1,6 +1,6 @@
 part of '../home/driver_home_page.dart';
 
-class _DriverAuthorizationPendingShell extends StatelessWidget {
+class _DriverAuthorizationPendingShell extends ConsumerWidget {
   const _DriverAuthorizationPendingShell({
     required this.accessStatus,
     required this.onRefresh,
@@ -11,9 +11,56 @@ class _DriverAuthorizationPendingShell extends StatelessWidget {
   final Future<void> Function() onRefresh;
   final bool isRefreshing;
 
+  String? _normalizeWhatsAppPhone(String? rawPhone) {
+    final digits = (rawPhone ?? '').replaceAll(RegExp(r'\D'), '');
+    if (digits.length == 8) return '591$digits';
+    if (digits.length == 11 && digits.startsWith('591')) return digits;
+    return null;
+  }
+
+  Future<void> _requestAuthorization(
+    BuildContext context,
+    DriverSession session,
+    String supportPhone,
+  ) async {
+    final centralPhone = _normalizeWhatsAppPhone(supportPhone);
+    if (centralPhone == null) {
+      showTopNotice(
+        context,
+        'No hay numero de central configurado para WhatsApp.',
+      );
+      return;
+    }
+    final message = Uri.encodeComponent(
+      'Hola central RAPIGO, solicito autorizacion para usar la aplicacion de conductor.\n'
+      'Nombre: ${session.fullName}\n'
+      'Telefono: ${session.phone}\n'
+      'ID conductor: ${session.driverId}\n'
+      'Estado: ${session.accessStatus}\n'
+      'Por favor revisen y autoricen mi registro.',
+    );
+    final uri = Uri.parse('https://wa.me/$centralPhone?text=$message');
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!context.mounted) {
+      return;
+    }
+    if (!opened) {
+      showTopNotice(context, 'No se pudo abrir WhatsApp en este momento.');
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final rejected = accessStatus == 'RECHAZADO';
+    final session = ref.watch(driverSessionProvider);
+    final offlineState = ref.watch(offlineMapProvider);
+    final publicSettings = ref.watch(driverPublicSettingsProvider);
+    final loadedSupportPhone = publicSettings.asData?.value.supportPhone ?? '';
+    final supportPhone =
+        loadedSupportPhone.trim().isNotEmpty
+        ? loadedSupportPhone
+        : shared_config.AppConfig.supportPhone;
+    final mapPercent = (offlineState.progress * 100).clamp(0, 100).round();
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8FE),
       body: SafeArea(
@@ -49,7 +96,9 @@ class _DriverAuthorizationPendingShell extends StatelessWidget {
                         borderRadius: BorderRadius.circular(22),
                       ),
                       child: Icon(
-                        rejected ? Icons.block_rounded : Icons.verified_user_outlined,
+                        rejected
+                            ? Icons.block_rounded
+                            : Icons.verified_user_outlined,
                         color: rejected
                             ? const Color(0xFFE04F4F)
                             : const Color(0xFF1746B5),
@@ -58,7 +107,9 @@ class _DriverAuthorizationPendingShell extends StatelessWidget {
                     ),
                     const SizedBox(height: 18),
                     Text(
-                      rejected ? 'Permisos insuficientes' : 'Falta autorizacion',
+                      rejected
+                          ? 'Permisos insuficientes'
+                          : 'Falta autorizacion',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 28,
                         fontWeight: FontWeight.w900,
@@ -76,7 +127,7 @@ class _DriverAuthorizationPendingShell extends StatelessWidget {
                         fontSize: 15,
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 14),
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
@@ -105,7 +156,71 @@ class _DriverAuthorizationPendingShell extends StatelessWidget {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFF),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFE2E8F8)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.map_outlined,
+                            color: Color(0xFF1746B5),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              offlineState.isReady
+                                  ? 'Mapa offline listo'
+                                  : 'Descarga de mapa',
+                              style: const TextStyle(
+                                color: Color(0xFF1746B5),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            offlineState.isReady ? '100%' : '$mapPercent%',
+                            style: const TextStyle(
+                              color: Color(0xFF101722),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                     const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () =>
+                            _requestAuthorization(context, session, supportPhone),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF1746B5),
+                          side: const BorderSide(color: Color(0xFFBFD3FF)),
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        icon: const Icon(Icons.chat_rounded, size: 18),
+                        label: const Text(
+                          'Solicitar autorización por WhatsApp',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton(
@@ -178,8 +293,12 @@ class _DriverDeviceAccessPendingShell extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(
-                      rejected ? Icons.block_rounded : Icons.phone_android_rounded,
-                      color: rejected ? const Color(0xFFE04F4F) : const Color(0xFF1746B5),
+                      rejected
+                          ? Icons.block_rounded
+                          : Icons.phone_android_rounded,
+                      color: rejected
+                          ? const Color(0xFFE04F4F)
+                          : const Color(0xFF1746B5),
                       size: 40,
                     ),
                     const SizedBox(height: 16),
@@ -244,11 +363,7 @@ class _DriverLoginShell extends StatelessWidget {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Color(0xFFF8FBFF),
-              Color(0xFFF2F6FF),
-              Color(0xFFEAF1FF),
-            ],
+            colors: [Color(0xFFF8FBFF), Color(0xFFF2F6FF), Color(0xFFEAF1FF)],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -417,8 +532,10 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
     final zoomChanged =
         _savedHomeZoom == null || (_savedHomeZoom! - zoom).abs() > 0.01;
     final tiltChanged =
-        _savedHomeTilt == null || (_savedHomeTilt! - normalizedTilt).abs() > 0.01;
-    final bearingChanged = _savedHomeBearing == null ||
+        _savedHomeTilt == null ||
+        (_savedHomeTilt! - normalizedTilt).abs() > 0.01;
+    final bearingChanged =
+        _savedHomeBearing == null ||
         (_savedHomeBearing! - cameraBearing).abs() > 0.01;
     if (!zoomChanged && !tiltChanged && !bearingChanged) {
       return;
@@ -450,11 +567,15 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
     _resolvingStreetChip = true;
     _lastStreetLookupPoint = point;
     try {
-      final details = await ref.read(geocodingServiceProvider).reverseLookup(point);
+      final details = await ref
+          .read(geocodingServiceProvider)
+          .reverseLookup(point);
       if (!mounted) {
         return;
       }
-      final label = details.primary.trim().isNotEmpty ? details.primary.trim() : 'Ubicacion actual';
+      final label = details.primary.trim().isNotEmpty
+          ? details.primary.trim()
+          : 'Ubicacion actual';
       setState(() {
         _streetChipLabel = label;
       });
@@ -546,7 +667,10 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
     }
     if (trip.status == 'in_progress') {
       if (trip.destinationLat == null || trip.destinationLng == null) {
-        return LatLngBounds.fromPoints([driverPoint, LatLng(trip.pickupLat, trip.pickupLng)]);
+        return LatLngBounds.fromPoints([
+          driverPoint,
+          LatLng(trip.pickupLat, trip.pickupLng),
+        ]);
       }
       return LatLngBounds.fromPoints([
         driverPoint,
@@ -567,7 +691,9 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
     required AsyncValue<List<DriverTrip>> offersAsync,
   }) async {
     final offers = offersAsync.value ?? const <DriverTrip>[];
-    final pendingOffers = offers.where((item) => _hasPendingOffer(item)).toList(growable: false);
+    final pendingOffers = offers
+        .where((item) => _hasPendingOffer(item))
+        .toList(growable: false);
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => _DriverAvailableTripsPage(
@@ -624,16 +750,26 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
   }
 
   bool _hasPendingOffer(DriverTrip? trip) {
-    return trip != null && const {'requested', 'searching'}.contains(trip.status);
+    return trip != null &&
+        const {'requested', 'searching'}.contains(trip.status);
   }
 
   bool _hasLiveTripStatus(DriverTrip? trip) {
-    return trip != null && const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(trip.status);
+    return trip != null &&
+        const {
+          'accepted',
+          'arriving',
+          'at_pickup',
+          'in_progress',
+        }.contains(trip.status);
   }
 
   Color _driverStatusAccentColor(String status) {
     return switch (status) {
-      'requested' || 'searching' || 'accepted' || 'arriving' => const Color(0xFFF97316),
+      'requested' ||
+      'searching' ||
+      'accepted' ||
+      'arriving' => const Color(0xFFF97316),
       'at_pickup' => const Color(0xFF22C55E),
       'in_progress' => const Color(0xFF0EA5E9),
       'completed' => const Color(0xFF9CA3AF),
@@ -654,7 +790,9 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
     required AsyncValue<List<DriverTrip>> offersAsync,
   }) {
     final offers = offersAsync.value ?? const <DriverTrip>[];
-    final pendingOffers = offers.where((item) => _hasPendingOffer(item)).toList(growable: false);
+    final pendingOffers = offers
+        .where((item) => _hasPendingOffer(item))
+        .toList(growable: false);
     final accent = pendingOffers.isEmpty
         ? const Color(0xFFF97316)
         : _driverStatusAccentColor(pendingOffers.first.status);
@@ -702,7 +840,9 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                           end: Alignment.bottomRight,
                         ),
                         borderRadius: BorderRadius.circular(26),
-                        border: Border.all(color: accent.withValues(alpha: 0.32)),
+                        border: Border.all(
+                          color: accent.withValues(alpha: 0.32),
+                        ),
                       ),
                       child: Row(
                         children: [
@@ -745,11 +885,16 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                             ),
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFF111214),
                               borderRadius: BorderRadius.circular(999),
-                              border: Border.all(color: accent.withValues(alpha: 0.35)),
+                              border: Border.all(
+                                color: accent.withValues(alpha: 0.35),
+                              ),
                             ),
                             child: Text(
                               '${pendingOffers.length}',
@@ -765,43 +910,56 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                     const SizedBox(height: 18),
                     Expanded(
                       child: offersAsync.when(
-                        loading: () => const Center(child: CircularProgressIndicator()),
+                        loading: () =>
+                            const Center(child: CircularProgressIndicator()),
                         error: (error, stackTrace) => DriverEmptyCard(
                           title: 'No pudimos cargar ofertas',
-                          subtitle: error.toString().replaceFirst('Exception: ', ''),
+                          subtitle: error.toString().replaceFirst(
+                            'Exception: ',
+                            '',
+                          ),
                         ),
                         data: (_) {
                           if (pendingOffers.isEmpty) {
                             if (_hasLiveTripStatus(trip)) {
                               return const DriverEmptyCard(
                                 title: 'Ya tienes un viaje en curso',
-                                subtitle: 'Termina o actualiza ese viaje para recibir una nueva solicitud.',
+                                subtitle:
+                                    'Termina o actualiza ese viaje para recibir una nueva solicitud.',
                               );
                             }
                             return const DriverEmptyCard(
                               title: 'No hay viajes disponibles',
-                              subtitle: 'En cuanto entre una nueva solicitud, la veras aqui.',
+                              subtitle:
+                                  'En cuanto entre una nueva solicitud, la veras aqui.',
                             );
                           }
 
                           return ListView.separated(
                             itemCount: pendingOffers.length,
-                            separatorBuilder: (_, _) => const SizedBox(height: 14),
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: 14),
                             itemBuilder: (context, index) {
                               final pendingOffer = pendingOffers[index];
                               return _DriverAvailableTripCard(
                                 trip: pendingOffer,
-                                accentColor: _driverStatusAccentColor(pendingOffer.status),
+                                accentColor: _driverStatusAccentColor(
+                                  pendingOffer.status,
+                                ),
                                 onViewDetails: () {
                                   Navigator.of(context).pop();
                                   _showIncomingTripDetail(pendingOffer);
                                 },
                                 onAccept: () async {
                                   Navigator.of(context).pop();
-                                  await _handleDriverPrimaryAction(pendingOffer);
+                                  await _handleDriverPrimaryAction(
+                                    pendingOffer,
+                                  );
                                 },
                                 onReject: () async {
-                                  await _rejectOfferForCurrentDriver(pendingOffer);
+                                  await _rejectOfferForCurrentDriver(
+                                    pendingOffer,
+                                  );
                                 },
                               );
                             },
@@ -821,8 +979,9 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
 
   void _showIncomingTripDetail(DriverTrip trip) {
     final accent = _driverStatusAccentColor(trip.status);
-    final passengerName =
-        trip.passengerName?.trim().isNotEmpty == true ? trip.passengerName!.trim() : 'Pasajero';
+    final passengerName = trip.passengerName?.trim().isNotEmpty == true
+        ? trip.passengerName!.trim()
+        : 'Pasajero';
     const rejectLabel = 'Ignorar';
 
     showModalBottomSheet<void>(
@@ -868,7 +1027,9 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                           end: Alignment.bottomRight,
                         ),
                         borderRadius: BorderRadius.circular(28),
-                        border: Border.all(color: accent.withValues(alpha: 0.36)),
+                        border: Border.all(
+                          color: accent.withValues(alpha: 0.36),
+                        ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -882,7 +1043,10 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                                   color: const Color(0xFF111214),
                                   borderRadius: BorderRadius.circular(18),
                                 ),
-                                child: Icon(_tripVehicleIcon(trip), color: accent),
+                                child: Icon(
+                                  _tripVehicleIcon(trip),
+                                  color: accent,
+                                ),
                               ),
                               const SizedBox(width: 14),
                               Expanded(
@@ -915,8 +1079,14 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                             spacing: 10,
                             runSpacing: 10,
                             children: [
-                              _DriverMiniBadge(icon: Icons.flag_rounded, label: _driverStatusShortLabel(trip.status)),
-                              _DriverMiniBadge(icon: Icons.tag_rounded, label: trip.id),
+                              _DriverMiniBadge(
+                                icon: Icons.flag_rounded,
+                                label: _driverStatusShortLabel(trip.status),
+                              ),
+                              _DriverMiniBadge(
+                                icon: Icons.tag_rounded,
+                                label: trip.id,
+                              ),
                             ],
                           ),
                         ],
@@ -936,8 +1106,14 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                         children: [
                           _InfoTile(label: 'Pasajero', value: passengerName),
                           if (trip.passengerPhone?.trim().isNotEmpty ?? false)
-                            _InfoTile(label: 'Telefono', value: trip.passengerPhone!.trim()),
-                          _InfoTile(label: 'Recojo', value: trip.passengerPickup),
+                            _InfoTile(
+                              label: 'Telefono',
+                              value: trip.passengerPhone!.trim(),
+                            ),
+                          _InfoTile(
+                            label: 'Recojo',
+                            value: trip.passengerPickup,
+                          ),
                           _InfoTile(label: 'Destino', value: trip.destination),
                           _InfoTile(
                             label: 'Vehiculo pedido',
@@ -1011,11 +1187,15 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
 
     try {
       if (trip.status == 'accepted') {
-        await ref.read(offeredTripProvider.notifier).updateTripStatus('arriving');
+        await ref
+            .read(offeredTripProvider.notifier)
+            .updateTripStatus('arriving');
         return;
       }
       if (trip.status == 'arriving') {
-        await ref.read(offeredTripProvider.notifier).updateTripStatus('at_pickup');
+        await ref
+            .read(offeredTripProvider.notifier)
+            .updateTripStatus('at_pickup');
         return;
       }
       if (trip.status == 'at_pickup') {
@@ -1037,7 +1217,9 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
           }
           return;
         }
-        await ref.read(offeredTripProvider.notifier).updateTripStatus('in_progress');
+        await ref
+            .read(offeredTripProvider.notifier)
+            .updateTripStatus('in_progress');
         if (trip.isPromotional && mounted) {
           showTopNotice(
             context,
@@ -1048,7 +1230,9 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
         return;
       }
       if (trip.status == 'in_progress') {
-        await ref.read(offeredTripProvider.notifier).updateTripStatus('completed');
+        await ref
+            .read(offeredTripProvider.notifier)
+            .updateTripStatus('completed');
         await ref.read(driverOffersProvider.notifier).loadOffers();
         return;
       }
@@ -1111,7 +1295,9 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                             borderRadius: BorderRadius.circular(24),
                           ),
                           padding: const EdgeInsets.all(10),
-                          child: Image.asset('assets/icons/rapigo_driver_icon.png'),
+                          child: Image.asset(
+                            'assets/icons/rapigo_driver_icon.png',
+                          ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
@@ -1137,7 +1323,10 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                                   style: FilledButton.styleFrom(
                                     backgroundColor: const Color(0xFFEAF2FF),
                                     foregroundColor: const Color(0xFF1D4ED8),
-                                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 18,
+                                      vertical: 12,
+                                    ),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(18),
                                     ),
@@ -1178,7 +1367,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                               children: [
                                 _HomeNavigatorCard(
                                   icon: Icons.bar_chart_rounded,
-                                  label: 'Ganancias',
+                                  label: 'Estadistica',
                                   accent: const Color(0xFF1D4ED8),
                                   onTap: () {
                                     Navigator.of(context).pop();
@@ -1220,7 +1409,10 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                               label: 'Viajes disponibles',
                               onTap: () {
                                 Navigator.of(context).pop();
-                                _openAvailableTripsPage(trip: trip, offersAsync: offersAsync);
+                                _openAvailableTripsPage(
+                                  trip: trip,
+                                  offersAsync: offersAsync,
+                                );
                               },
                             ),
                             _HomeQuickActionTile(
@@ -1229,7 +1421,10 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                               onTap: () {
                                 Navigator.of(context).pop();
                                 Navigator.of(this.context).push(
-                                  MaterialPageRoute(builder: (_) => const DriverNotificationsPage()),
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const DriverNotificationsPage(),
+                                  ),
                                 );
                               },
                             ),
@@ -1239,7 +1434,9 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                               onTap: () {
                                 Navigator.of(context).pop();
                                 Navigator.of(this.context).push(
-                                  MaterialPageRoute(builder: (_) => const DriverSettingsPage()),
+                                  MaterialPageRoute(
+                                    builder: (_) => const DriverSettingsPage(),
+                                  ),
                                 );
                               },
                             ),
@@ -1249,7 +1446,9 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                               onTap: () {
                                 Navigator.of(context).pop();
                                 Navigator.of(this.context).push(
-                                  MaterialPageRoute(builder: (_) => const DriverSupportPage()),
+                                  MaterialPageRoute(
+                                    builder: (_) => const DriverSupportPage(),
+                                  ),
                                 );
                               },
                             ),
@@ -1327,7 +1526,9 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                             decoration: BoxDecoration(
                               color: const Color(0xFFF6F8FE),
                               borderRadius: BorderRadius.circular(22),
-                              border: Border.all(color: const Color(0xFFE3EAF9)),
+                              border: Border.all(
+                                color: const Color(0xFFE3EAF9),
+                              ),
                             ),
                             child: Row(
                               children: [
@@ -1346,7 +1547,8 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         offlineState.isDownloading
@@ -1363,8 +1565,8 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                                         offlineState.isDownloading
                                             ? '${(offlineState.progress * 100).toStringAsFixed(0)}% completado'
                                             : (offlineState.isReady
-                                                ? 'Potosi guardado para usar sin conexion'
-                                                : 'Cache inteligente activo'),
+                                                  ? 'Potosi guardado para usar sin conexion'
+                                                  : 'Cache inteligente activo'),
                                         style: GoogleFonts.plusJakartaSans(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w600,
@@ -1378,51 +1580,71 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                             ),
                           ),
                           _HomeQuickActionTile(
-                            icon: Icons.history_rounded,
-                            label: 'Recientes',
-                            onTap: () {
+                            icon: Icons.my_location_rounded,
+                            label: 'Actualizar GPS',
+                            onTap: () async {
                               Navigator.of(context).pop();
+                              await ref
+                                  .read(driverStateProvider.notifier)
+                                  .refreshLocation();
+                              if (!mounted) return;
+                              setState(() => _mapFocusSignal++);
+                              final gpsError = ref
+                                  .read(driverStateProvider)
+                                  .errorMessage;
+                              if (gpsError != null &&
+                                  gpsError.trim().isNotEmpty) {
+                                showTopNotice(
+                                  this.context,
+                                  gpsError,
+                                  tone: NoticeTone.error,
+                                );
+                                return;
+                              }
                               showTopNotice(
                                 this.context,
-                                'Recientes en desarrollo.',
-                                tone: NoticeTone.info,
+                                'Ubicacion actualizada en el mapa.',
+                                tone: NoticeTone.success,
                               );
                             },
                           ),
                           _HomeQuickActionTile(
-                            icon: Icons.location_on_outlined,
-                            label: 'Direcciones guardadas',
-                            onTap: () {
+                            icon: Icons.sync_rounded,
+                            label: 'Sincronizar solicitudes',
+                            onTap: () async {
                               Navigator.of(context).pop();
+                              await ref
+                                  .read(offeredTripProvider.notifier)
+                                  .loadOffer();
+                              await ref
+                                  .read(driverOffersProvider.notifier)
+                                  .loadOffers();
+                              if (!mounted) return;
                               showTopNotice(
                                 this.context,
-                                'Direcciones guardadas en desarrollo.',
-                                tone: NoticeTone.info,
+                                'Solicitudes sincronizadas.',
+                                tone: NoticeTone.success,
                               );
                             },
                           ),
                           _HomeQuickActionTile(
-                            icon: Icons.route_outlined,
-                            label: 'Rutas frecuentes',
+                            icon: Icons.download_for_offline_rounded,
+                            label: 'Mapa offline',
                             onTap: () {
                               Navigator.of(context).pop();
-                              showTopNotice(
-                                this.context,
-                                'Rutas frecuentes en desarrollo.',
-                                tone: NoticeTone.info,
-                              );
+                              showOfflineMapSheet(this.context);
                             },
                           ),
                           _HomeQuickActionTile(
-                            icon: Icons.tune_rounded,
-                            label: 'Preferencias del mapa',
+                            icon: _wideMapMode
+                                ? Icons.splitscreen_rounded
+                                : Icons.fullscreen_rounded,
+                            label: _wideMapMode
+                                ? 'Vista compacta'
+                                : 'Vista amplia',
                             onTap: () {
                               Navigator.of(context).pop();
-                              showTopNotice(
-                                this.context,
-                                'Preferencias del mapa en desarrollo.',
-                                tone: NoticeTone.info,
-                              );
+                              _toggleAdvancedMapMode();
                             },
                           ),
                         ],
@@ -1447,26 +1669,28 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
     final palette = context.rapigoPalette;
     final metrics = context.rapigoMetrics;
     final textTheme = Theme.of(context).textTheme;
-    ref.listen<String?>(
-      driverStateProvider.select((s) => s.errorMessage),
-      (previous, next) {
-        if (next == null || next.trim().isEmpty || next == previous) {
-          return;
-        }
-        showTopNotice(
-          context,
-          next,
-          tone: NoticeTone.error,
-          compact: true,
-          centered: true,
-        );
-      },
-    );
+    ref.listen<String?>(driverStateProvider.select((s) => s.errorMessage), (
+      previous,
+      next,
+    ) {
+      if (next == null || next.trim().isEmpty || next == previous) {
+        return;
+      }
+      showTopNotice(
+        context,
+        next,
+        tone: NoticeTone.error,
+        compact: true,
+        centered: true,
+      );
+    });
     final available = ref.watch(driverStateProvider.select((s) => s.available));
     final driverLat = ref.watch(driverStateProvider.select((s) => s.lat));
     final driverLng = ref.watch(driverStateProvider.select((s) => s.lng));
     final driverHeading = _kFixedHeading;
-    final speedKph = ref.watch(driverStateProvider.select((s) => s.speedKph ?? 0));
+    final speedKph = ref.watch(
+      driverStateProvider.select((s) => s.speedKph ?? 0),
+    );
     final tripAsync = ref.watch(offeredTripProvider);
     final offersAsync = ref.watch(driverOffersProvider);
     final trip = tripAsync.value;
@@ -1474,7 +1698,10 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
     final previewTripId = ref.watch(driverOfferPreviewTripIdProvider);
     final shouldResumeHome = ref.watch(driverHomeResumeOverlayProvider);
     final isPreviewingRoute =
-        previewTripId != null && trip != null && trip.id == previewTripId && trip.status == 'accepted';
+        previewTripId != null &&
+        trip != null &&
+        trip.id == previewTripId &&
+        trip.status == 'accepted';
     final pendingOffers = <DriverTrip>[
       if (_hasPendingOffer(trip)) trip!,
       ...offers.where(
@@ -1484,18 +1711,20 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
       ),
     ];
     final availableOffersCount = pendingOffers.length;
-    final defaultHomeIdleZoom = _wideMapMode ? (_kFixedZoom - 0.33) : _kFixedZoom;
+    final defaultHomeIdleZoom = _wideMapMode
+        ? (_kFixedZoom - 0.33)
+        : _kFixedZoom;
     final defaultHomeIdleTilt = _angledMapMode ? _kFixedTilt : 0.0;
     final defaultHomeIdleBearing = _savedHomeBearing ?? _kFixedMapBearing;
     final homeIdleZoom = _savedHomeZoom ?? defaultHomeIdleZoom;
     final homeIdleTilt = _angledMapMode
         ? (((_savedHomeTilt ?? defaultHomeIdleTilt) <= 1)
-            ? defaultHomeIdleTilt
-            : (_savedHomeTilt ?? defaultHomeIdleTilt))
+              ? defaultHomeIdleTilt
+              : (_savedHomeTilt ?? defaultHomeIdleTilt))
         : 0.0;
     final homeNavigationTilt = _angledMapMode
         ? (((_savedHomeTilt ?? 58.0) <= 1 ? 58.0 : (_savedHomeTilt ?? 58.0))
-            .clamp(0.0, 75.0))
+              .clamp(0.0, 75.0))
         : 0.0;
     final routeColor = trip?.status == 'in_progress'
         ? const Color(0xFF0EA5E9)
@@ -1513,7 +1742,11 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
           return;
         }
         widget.onOffersDrawerHandled();
-        _showAvailableTripsSheet(tripAsync: tripAsync, trip: trip, offersAsync: offersAsync);
+        _showAvailableTripsSheet(
+          tripAsync: tripAsync,
+          trip: trip,
+          offersAsync: offersAsync,
+        );
       });
     }
     if (shouldResumeHome && !_resumeOverlayScheduled) {
@@ -1533,16 +1766,25 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
           child: RepaintBoundary(
             child: DriverMapSurface(
               viewportCacheKey: 'driver_shared_premium_map',
-              routePersistenceKey:
-                  trip == null ? null : 'driver_trip_route_${trip.id}',
-              routePersistenceReadKeys:
-                  trip == null ? null : driverTripRouteReadKeys(trip.id, trip.status),
-              routePersistenceWriteKeys:
-                  trip == null ? null : driverTripRouteWriteKeys(trip.id, trip.status),
-              prefetchRoutePersistenceKey:
-                  trip == null ? null : driverTripRoutePrefetchKey(trip.id, trip.status),
+              routePersistenceKey: trip == null
+                  ? null
+                  : 'driver_trip_route_${trip.id}',
+              routePersistenceReadKeys: trip == null
+                  ? null
+                  : driverTripRouteReadKeys(trip.id, trip.status),
+              routePersistenceWriteKeys: trip == null
+                  ? null
+                  : driverTripRouteWriteKeys(trip.id, trip.status),
+              prefetchRoutePersistenceKey: trip == null
+                  ? null
+                  : driverTripRoutePrefetchKey(trip.id, trip.status),
               available: available,
-              tripAccepted: const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(trip?.status),
+              tripAccepted: const {
+                'accepted',
+                'arriving',
+                'at_pickup',
+                'in_progress',
+              }.contains(trip?.status),
               driverLat: driverLat,
               driverLng: driverLng,
               headingDegrees: driverHeading,
@@ -1567,22 +1809,23 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
               routeColor: routeColor,
               focusBounds: focusBounds,
               focusSignal: _mapFocusSignal,
-              onDebugTelemetryChanged: ({
-                required double centerLat,
-                required double centerLng,
-                required double zoom,
-                required double tilt,
-                required double cameraBearing,
-                required double iconBearing,
-                required double displayLat,
-                required double displayLng,
-              }) {
-                _onHomeMapTelemetry(
-                  zoom: zoom,
-                  tilt: tilt,
-                  cameraBearing: cameraBearing,
-                );
-              },
+              onDebugTelemetryChanged:
+                  ({
+                    required double centerLat,
+                    required double centerLng,
+                    required double zoom,
+                    required double tilt,
+                    required double cameraBearing,
+                    required double iconBearing,
+                    required double displayLat,
+                    required double displayLng,
+                  }) {
+                    _onHomeMapTelemetry(
+                      zoom: zoom,
+                      tilt: tilt,
+                      cameraBearing: cameraBearing,
+                    );
+                  },
               onRouteUpdated: () {
                 if (!mounted) {
                   return;
@@ -1632,7 +1875,12 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
         ),
         SafeArea(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(metrics.pagePadding, 10, metrics.pagePadding, 14),
+            padding: EdgeInsets.fromLTRB(
+              metrics.pagePadding,
+              10,
+              metrics.pagePadding,
+              14,
+            ),
             child: Stack(
               children: [
                 Positioned(
@@ -1650,25 +1898,33 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                           offersAsync: offersAsync,
                         ),
                         size: 66,
-                        backgroundColor: palette.surfaceInteractive.withValues(alpha: 0.98),
+                        backgroundColor: palette.surfaceInteractive.withValues(
+                          alpha: 0.98,
+                        ),
                         iconColor: const Color(0xFF111111),
                         shadowColor: palette.shadowSoft,
                       ),
                       SizedBox(height: metrics.itemGap - 2),
                       GestureDetector(
                         onTap: () async {
-                          await ref.read(driverStateProvider.notifier).toggleAvailability(!available);
+                          await ref
+                              .read(driverStateProvider.notifier)
+                              .toggleAvailability(!available);
                         },
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 220),
                           width: 38,
                           height: 38,
                           decoration: BoxDecoration(
-                            color: palette.surfaceInteractive.withValues(alpha: 0.96),
+                            color: palette.surfaceInteractive.withValues(
+                              alpha: 0.96,
+                            ),
                             borderRadius: BorderRadius.circular(999),
                             boxShadow: [
                               BoxShadow(
-                                color: palette.shadowSoft.withValues(alpha: 0.72),
+                                color: palette.shadowSoft.withValues(
+                                  alpha: 0.72,
+                                ),
                                 blurRadius: 18,
                                 offset: const Offset(0, 8),
                               ),
@@ -1686,10 +1942,11 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: (available
-                                            ? palette.accentGreen
-                                            : palette.accentDanger)
-                                        .withValues(alpha: 0.45),
+                                    color:
+                                        (available
+                                                ? palette.accentGreen
+                                                : palette.accentDanger)
+                                            .withValues(alpha: 0.45),
                                     blurRadius: 10,
                                     spreadRadius: 1,
                                   ),
@@ -1705,9 +1962,9 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                 Positioned(
                   top: 0,
                   right: 0,
-                    child: GestureDetector(
-                      onTap: () async {
-                        await ref
+                  child: GestureDetector(
+                    onTap: () async {
+                      await ref
                           .read(driverStateProvider.notifier)
                           .toggleAvailability(!available);
                     },
@@ -1718,8 +1975,12 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                         vertical: 14,
                       ),
                       decoration: BoxDecoration(
-                        color: palette.surfaceInteractive.withValues(alpha: 0.97),
-                        borderRadius: BorderRadius.circular(metrics.radiusMedium),
+                        color: palette.surfaceInteractive.withValues(
+                          alpha: 0.97,
+                        ),
+                        borderRadius: BorderRadius.circular(
+                          metrics.radiusMedium,
+                        ),
                         boxShadow: [
                           BoxShadow(
                             color: palette.shadowSoft.withValues(alpha: 0.72),
@@ -1781,7 +2042,10 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                           top: 8,
                           child: Container(
                             constraints: const BoxConstraints(minWidth: 22),
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: palette.surfacePrimary,
                               borderRadius: BorderRadius.circular(999),
@@ -1830,13 +2094,20 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                         borderRadius: BorderRadius.circular(22),
                         onTap: _toggleAdvancedMapMode,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 13,
+                          ),
                           decoration: BoxDecoration(
                             color: palette.accentBlueSoft,
-                            borderRadius: BorderRadius.circular(metrics.radiusMedium),
+                            borderRadius: BorderRadius.circular(
+                              metrics.radiusMedium,
+                            ),
                             boxShadow: [
                               BoxShadow(
-                                color: palette.accentBlueSoft.withValues(alpha: 0.28),
+                                color: palette.accentBlueSoft.withValues(
+                                  alpha: 0.28,
+                                ),
                                 blurRadius: 16,
                                 offset: const Offset(0, 6),
                               ),
@@ -1880,10 +2151,15 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                     child: Center(
                       child: Container(
                         constraints: const BoxConstraints(maxWidth: 240),
-                        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 22,
+                          vertical: 16,
+                        ),
                         decoration: BoxDecoration(
                           color: palette.surfaceInteractive,
-                          borderRadius: BorderRadius.circular(metrics.radiusLarge),
+                          borderRadius: BorderRadius.circular(
+                            metrics.radiusLarge,
+                          ),
                           boxShadow: [
                             BoxShadow(
                               color: palette.shadowSoft.withValues(alpha: 0.68),
@@ -1919,7 +2195,9 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                         padding: const EdgeInsets.symmetric(horizontal: 22),
                         decoration: BoxDecoration(
                           color: palette.surfaceMuted,
-                          borderRadius: BorderRadius.circular(metrics.radiusLarge),
+                          borderRadius: BorderRadius.circular(
+                            metrics.radiusLarge,
+                          ),
                           boxShadow: [
                             BoxShadow(
                               color: palette.shadowSoft.withValues(alpha: 0.35),
@@ -1930,7 +2208,11 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.search_rounded, size: 34, color: palette.textMuted),
+                            Icon(
+                              Icons.search_rounded,
+                              size: 34,
+                              color: palette.textMuted,
+                            ),
                             const SizedBox(width: 16),
                             Expanded(
                               child: Text(
@@ -1942,7 +2224,11 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                                 ),
                               ),
                             ),
-                            const Icon(Icons.mic_none_rounded, size: 34, color: Color(0xFF111111)),
+                            const Icon(
+                              Icons.mic_none_rounded,
+                              size: 34,
+                              color: Color(0xFF111111),
+                            ),
                           ],
                         ),
                       ),
@@ -1973,7 +2259,10 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                   ),
                   child: Center(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xF20B1220),
                         borderRadius: BorderRadius.circular(999),
@@ -1993,7 +2282,9 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                             height: 18,
                             child: CircularProgressIndicator(
                               strokeWidth: 2.2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6EA8FF)),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Color(0xFF6EA8FF),
+                              ),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -2131,9 +2422,7 @@ class _HomeNavigatorCard extends StatelessWidget {
 }
 
 class _DriverSpeedBubble extends StatelessWidget {
-  const _DriverSpeedBubble({
-    required this.speedKph,
-  });
+  const _DriverSpeedBubble({required this.speedKph});
 
   final double speedKph;
 
@@ -2182,9 +2471,7 @@ class _DriverSpeedBubble extends StatelessWidget {
 }
 
 class _DriverTripsTab extends ConsumerWidget {
-  const _DriverTripsTab({
-    this.onBack,
-  });
+  const _DriverTripsTab({this.onBack});
 
   final VoidCallback? onBack;
 
@@ -2220,7 +2507,8 @@ class _DriverTripsTab extends ConsumerWidget {
           if (history.isEmpty) {
             return const DriverEmptyCard(
               title: 'Todavia no hay viajes',
-              subtitle: 'Activa disponibilidad para empezar a recibir solicitudes reales.',
+              subtitle:
+                  'Activa disponibilidad para empezar a recibir solicitudes reales.',
             );
           }
 
@@ -2229,10 +2517,21 @@ class _DriverTripsTab extends ConsumerWidget {
               for (final item in history) ...[
                 _DriverHistoryCard(
                   trip: item,
-                  title: const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(item.status)
+                  title:
+                      const {
+                        'accepted',
+                        'arriving',
+                        'at_pickup',
+                        'in_progress',
+                      }.contains(item.status)
                       ? 'Viaje actual'
                       : 'Viaje realizado',
-                  isCurrentTrip: const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(item.status),
+                  isCurrentTrip: const {
+                    'accepted',
+                    'arriving',
+                    'at_pickup',
+                    'in_progress',
+                  }.contains(item.status),
                 ),
                 const SizedBox(height: 14),
               ],
@@ -2307,7 +2606,11 @@ class _DriverAccountTab extends ConsumerWidget {
                     color: palette.surfaceSecondary,
                     borderRadius: BorderRadius.circular(24),
                   ),
-                  child: Icon(Icons.person, size: 36, color: palette.textPrimary),
+                  child: Icon(
+                    Icons.person,
+                    size: 36,
+                    color: palette.textPrimary,
+                  ),
                 ),
                 SizedBox(width: metrics.itemGap),
                 Expanded(
@@ -2340,21 +2643,24 @@ class _DriverAccountTab extends ConsumerWidget {
           DriverMenuTile(
             icon: Icons.notifications_active_outlined,
             title: 'Notificaciones',
-            subtitle: 'Avisos de central, autorizaciones y mensajes operativos.',
+            subtitle:
+                'Avisos de central, autorizaciones y mensajes operativos.',
             onTap: onOpenNotifications,
           ),
           const SizedBox(height: 14),
           DriverMenuTile(
             icon: Icons.settings_outlined,
             title: 'Descarga de mapa',
-            subtitle: 'Guarda Potosi ciudad para usar el mapa aun con señal baja.',
+            subtitle:
+                'Guarda Potosi ciudad para usar el mapa aun con señal baja.',
             onTap: onOpenSettings,
           ),
           const SizedBox(height: 14),
           DriverMenuTile(
             icon: Icons.support_agent,
             title: 'Soporte',
-            subtitle: 'Reporta fallas de la app o incidencias del servicio a central.',
+            subtitle:
+                'Reporta fallas de la app o incidencias del servicio a central.',
             onTap: onOpenHelp,
           ),
         ],
@@ -2490,13 +2796,20 @@ class _DriverHomeOfferCard extends StatelessWidget {
     final palette = context.rapigoPalette;
     final metrics = context.rapigoMetrics;
     final textTheme = Theme.of(context).textTheme;
-    final passengerName =
-        trip.passengerName?.trim().isNotEmpty == true ? trip.passengerName!.trim() : 'Pasajero';
+    final passengerName = trip.passengerName?.trim().isNotEmpty == true
+        ? trip.passengerName!.trim()
+        : 'Pasajero';
     const rejectLabel = 'Ignorar';
-    final accentColor = isPreviewingRoute ? palette.accentBlue : palette.accentYellow;
-    final title = isPreviewingRoute ? 'Recorrido listo para revisar' : 'Nueva solicitud de viaje';
+    final accentColor = isPreviewingRoute
+        ? palette.accentBlue
+        : palette.accentYellow;
+    final title = isPreviewingRoute
+        ? 'Recorrido listo para revisar'
+        : 'Nueva solicitud de viaje';
     final primaryLabel = isPreviewingRoute ? 'Aceptar' : 'Recorrido';
-    final primaryIcon = isPreviewingRoute ? Icons.check_circle_rounded : Icons.route_rounded;
+    final primaryIcon = isPreviewingRoute
+        ? Icons.check_circle_rounded
+        : Icons.route_rounded;
     return Container(
       width: double.infinity,
       constraints: const BoxConstraints(minHeight: 450),
@@ -2520,7 +2833,9 @@ class _DriverHomeOfferCard extends StatelessWidget {
           Row(
             children: [
               Icon(
-                isPreviewingRoute ? Icons.alt_route_rounded : Icons.access_time_rounded,
+                isPreviewingRoute
+                    ? Icons.alt_route_rounded
+                    : Icons.access_time_rounded,
                 color: accentColor,
                 size: 24,
               ),
@@ -2562,11 +2877,17 @@ class _DriverHomeOfferCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: palette.backgroundRaised,
                 borderRadius: BorderRadius.circular(metrics.radiusSmall),
-                border: Border.all(color: palette.accentBlue.withValues(alpha: 0.22)),
+                border: Border.all(
+                  color: palette.accentBlue.withValues(alpha: 0.22),
+                ),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.map_rounded, color: Color(0xFF7DB7FF), size: 20),
+                  const Icon(
+                    Icons.map_rounded,
+                    color: Color(0xFF7DB7FF),
+                    size: 20,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -2588,15 +2909,15 @@ class _DriverHomeOfferCard extends StatelessWidget {
               CircleAvatar(
                 radius: 40,
                 backgroundColor: const Color(0xFF1A365D),
-              child: Text(
-                passengerName.characters.take(1).toString().toUpperCase(),
-                style: textTheme.displayMedium?.copyWith(
-                  color: palette.textPrimary,
-                  fontSize: 30,
-                  fontWeight: FontWeight.w900,
+                child: Text(
+                  passengerName.characters.take(1).toString().toUpperCase(),
+                  style: textTheme.displayMedium?.copyWith(
+                    color: palette.textPrimary,
+                    fontSize: 30,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
-            ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -2613,7 +2934,11 @@ class _DriverHomeOfferCard extends StatelessWidget {
                     const SizedBox(height: 6),
                     const Row(
                       children: [
-                        Icon(Icons.star_rounded, color: Color(0xFFFFC400), size: 22),
+                        Icon(
+                          Icons.star_rounded,
+                          color: Color(0xFFFFC400),
+                          size: 22,
+                        ),
                         SizedBox(width: 8),
                         Text(
                           '4.9',
@@ -2629,10 +2954,7 @@ class _DriverHomeOfferCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 14),
-              _DriverMapCircleButton(
-                icon: Icons.call_rounded,
-                onTap: onCall,
-              ),
+              _DriverMapCircleButton(icon: Icons.call_rounded, onTap: onCall),
             ],
           ),
           const SizedBox(height: 18),
@@ -2668,10 +2990,10 @@ class _DriverHomeOfferCard extends StatelessWidget {
               ),
               Expanded(
                 child: _DriverOfferMetric(
-                  icon: Icons.payments_outlined,
-                  iconColor: const Color(0xFFD946EF),
-                  label: 'Pago',
-                  value: 'Efectivo',
+                  icon: Icons.verified_outlined,
+                  iconColor: const Color(0xFF22C55E),
+                  label: 'Estado',
+                  value: 'Disponible',
                 ),
               ),
             ],
@@ -2683,19 +3005,25 @@ class _DriverHomeOfferCard extends StatelessWidget {
                 child: FilledButton(
                   onPressed: onReject,
                   style: ButtonStyle(
-                    minimumSize: const WidgetStatePropertyAll(Size.fromHeight(64)),
+                    minimumSize: const WidgetStatePropertyAll(
+                      Size.fromHeight(64),
+                    ),
                     backgroundColor: WidgetStateProperty.resolveWith((states) {
                       return states.contains(WidgetState.pressed)
                           ? const Color(0xFF334155)
                           : const Color(0xFF1F2937);
                     }),
                     foregroundColor: const WidgetStatePropertyAll(Colors.white),
-                    overlayColor: const WidgetStatePropertyAll(Color(0x22FFFFFF)),
+                    overlayColor: const WidgetStatePropertyAll(
+                      Color(0x22FFFFFF),
+                    ),
                     elevation: WidgetStateProperty.resolveWith(
                       (states) => states.contains(WidgetState.pressed) ? 1 : 0,
                     ),
                     shape: WidgetStatePropertyAll(
-                      RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                      RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(22),
+                      ),
                     ),
                   ),
                   child: Row(
@@ -2705,7 +3033,10 @@ class _DriverHomeOfferCard extends StatelessWidget {
                       SizedBox(width: 10),
                       Text(
                         rejectLabel,
-                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 20,
+                        ),
                       ),
                     ],
                   ),
@@ -2716,21 +3047,36 @@ class _DriverHomeOfferCard extends StatelessWidget {
                 child: FilledButton(
                   onPressed: onPrimaryAction,
                   style: ButtonStyle(
-                    minimumSize: const WidgetStatePropertyAll(Size.fromHeight(64)),
+                    minimumSize: const WidgetStatePropertyAll(
+                      Size.fromHeight(64),
+                    ),
                     backgroundColor: WidgetStateProperty.resolveWith((states) {
-                      final base = isPreviewingRoute ? const Color(0xFF2979FF) : const Color(0xFFFFC400);
-                      final pressed =
-                          isPreviewingRoute ? const Color(0xFF2265E5) : const Color(0xFFEAB308);
-                      return states.contains(WidgetState.pressed) ? pressed : base;
+                      final base = isPreviewingRoute
+                          ? const Color(0xFF2979FF)
+                          : const Color(0xFFFFC400);
+                      final pressed = isPreviewingRoute
+                          ? const Color(0xFF2265E5)
+                          : const Color(0xFFEAB308);
+                      return states.contains(WidgetState.pressed)
+                          ? pressed
+                          : base;
                     }),
-                    foregroundColor: const WidgetStatePropertyAll(Color(0xFF091223)),
-                    overlayColor: const WidgetStatePropertyAll(Color(0x22000000)),
+                    foregroundColor: const WidgetStatePropertyAll(
+                      Color(0xFF091223),
+                    ),
+                    overlayColor: const WidgetStatePropertyAll(
+                      Color(0x22000000),
+                    ),
                     elevation: WidgetStateProperty.resolveWith(
                       (states) => states.contains(WidgetState.pressed) ? 2 : 0,
                     ),
-                    shadowColor: WidgetStatePropertyAll(accentColor.withValues(alpha: 0.35)),
+                    shadowColor: WidgetStatePropertyAll(
+                      accentColor.withValues(alpha: 0.35),
+                    ),
                     shape: WidgetStatePropertyAll(
-                      RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                      RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(22),
+                      ),
                     ),
                   ),
                   child: Row(
@@ -2740,7 +3086,10 @@ class _DriverHomeOfferCard extends StatelessWidget {
                       const SizedBox(width: 10),
                       Text(
                         primaryLabel,
-                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 19),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 19,
+                        ),
                       ),
                     ],
                   ),
@@ -2897,7 +3246,8 @@ class _DriverIncomingRequestOverlay extends ConsumerWidget {
     const earthRadius = 6371000.0;
     final dLat = (endLat - startLat) * math.pi / 180;
     final dLng = (endLng - startLng) * math.pi / 180;
-    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+    final a =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
         math.cos(startLat * math.pi / 180) *
             math.cos(endLat * math.pi / 180) *
             math.sin(dLng / 2) *
@@ -2929,19 +3279,21 @@ class _DriverIncomingRequestOverlay extends ConsumerWidget {
     );
     final double destinationDistance =
         trip.destinationLat != null && trip.destinationLng != null
-            ? _distanceMeters(
-                startLat: trip.pickupLat,
-                startLng: trip.pickupLng,
-                endLat: trip.destinationLat!,
-                endLng: trip.destinationLng!,
-              )
-            : 0.0;
+        ? _distanceMeters(
+            startLat: trip.pickupLat,
+            startLng: trip.pickupLng,
+            endLat: trip.destinationLat!,
+            endLng: trip.destinationLng!,
+          )
+        : 0.0;
     final pickupDistanceLabel = _formatDistance(pickupDistance);
     final pickupEtaLabel = _formatEta(pickupDistance);
-    final destinationDistanceLabel = trip.destinationLat != null && trip.destinationLng != null
+    final destinationDistanceLabel =
+        trip.destinationLat != null && trip.destinationLng != null
         ? _formatDistance(destinationDistance)
         : '--';
-    final destinationEtaLabel = trip.destinationLat != null && trip.destinationLng != null
+    final destinationEtaLabel =
+        trip.destinationLat != null && trip.destinationLng != null
         ? _formatEta(destinationDistance)
         : '--';
 
@@ -2973,7 +3325,10 @@ class _DriverIncomingRequestOverlay extends ConsumerWidget {
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xE90A162A),
                         borderRadius: BorderRadius.circular(18),
@@ -2989,7 +3344,11 @@ class _DriverIncomingRequestOverlay extends ConsumerWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: const [
-                          Icon(Icons.notifications_active_rounded, color: Color(0xFFFFC400), size: 18),
+                          Icon(
+                            Icons.notifications_active_rounded,
+                            color: Color(0xFFFFC400),
+                            size: 18,
+                          ),
                           SizedBox(width: 8),
                           Text(
                             'Solicitud entrante',
@@ -3044,20 +3403,32 @@ class _DriverIncomingRequestOverlay extends ConsumerWidget {
                           );
                           return;
                         }
-                        final telUri = Uri.parse('tel:${phone.replaceAll(RegExp(r"[^0-9+]"), "")}');
+                        final telUri = Uri.parse(
+                          'tel:${phone.replaceAll(RegExp(r"[^0-9+]"), "")}',
+                        );
                         await launchUrl(telUri);
                       },
                       onReject: () async {
                         try {
                           if (isPreviewingRoute) {
-                            ref.read(driverOfferPreviewTripIdProvider.notifier).setTrip(null);
+                            ref
+                                .read(driverOfferPreviewTripIdProvider.notifier)
+                                .setTrip(null);
                           }
-                          await ref.read(driverOffersProvider.notifier).rejectOffer(trip.id);
-                          final currentOffer = ref.read(offeredTripProvider).value;
+                          await ref
+                              .read(driverOffersProvider.notifier)
+                              .rejectOffer(trip.id);
+                          final currentOffer = ref
+                              .read(offeredTripProvider)
+                              .value;
                           if (currentOffer?.id == trip.id) {
-                            await ref.read(offeredTripProvider.notifier).clearTrip();
+                            await ref
+                                .read(offeredTripProvider.notifier)
+                                .clearTrip();
                           }
-                          await ref.read(driverOffersProvider.notifier).loadOffers();
+                          await ref
+                              .read(driverOffersProvider.notifier)
+                              .loadOffers();
                           if (context.mounted) {
                             showTopNotice(
                               context,
@@ -3077,9 +3448,13 @@ class _DriverIncomingRequestOverlay extends ConsumerWidget {
                       },
                       onPrimaryAction: () async {
                         if (isPreviewingRoute) {
-                          ref.read(driverOfferPreviewTripIdProvider.notifier).setTrip(null);
+                          ref
+                              .read(driverOfferPreviewTripIdProvider.notifier)
+                              .setTrip(null);
                           try {
-                            await ref.read(offeredTripProvider.notifier).updateTripStatus('arriving');
+                            await ref
+                                .read(offeredTripProvider.notifier)
+                                .updateTripStatus('arriving');
                             if (context.mounted) {
                               showTopNotice(
                                 context,
@@ -3091,7 +3466,10 @@ class _DriverIncomingRequestOverlay extends ConsumerWidget {
                             if (context.mounted) {
                               showTopNotice(
                                 context,
-                                error.toString().replaceFirst('Exception: ', ''),
+                                error.toString().replaceFirst(
+                                  'Exception: ',
+                                  '',
+                                ),
                                 tone: NoticeTone.error,
                               );
                             }
@@ -3099,9 +3477,15 @@ class _DriverIncomingRequestOverlay extends ConsumerWidget {
                           return;
                         }
                         try {
-                          await ref.read(offeredTripProvider.notifier).acceptTrip(trip);
-                          ref.read(driverOffersProvider.notifier).removeOfferLocally(trip.id);
-                          ref.read(driverOfferPreviewTripIdProvider.notifier).setTrip(trip.id);
+                          await ref
+                              .read(offeredTripProvider.notifier)
+                              .acceptTrip(trip);
+                          ref
+                              .read(driverOffersProvider.notifier)
+                              .removeOfferLocally(trip.id);
+                          ref
+                              .read(driverOfferPreviewTripIdProvider.notifier)
+                              .setTrip(trip.id);
                           if (context.mounted) {
                             showTopNotice(
                               context,
@@ -3110,7 +3494,9 @@ class _DriverIncomingRequestOverlay extends ConsumerWidget {
                             );
                           }
                         } catch (error) {
-                          ref.read(driverOfferPreviewTripIdProvider.notifier).setTrip(null);
+                          ref
+                              .read(driverOfferPreviewTripIdProvider.notifier)
+                              .setTrip(null);
                           if (context.mounted) {
                             showTopNotice(
                               context,
@@ -3182,7 +3568,11 @@ class _DriverPreviewRouteBadge extends StatelessWidget {
                 ),
               ],
             ),
-            child: const Icon(Icons.route_rounded, color: Colors.white, size: 24),
+            child: const Icon(
+              Icons.route_rounded,
+              color: Colors.white,
+              size: 24,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -3210,7 +3600,11 @@ class _DriverPreviewRouteBadge extends StatelessWidget {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    const Icon(Icons.flag_rounded, color: Color(0xFF7DB7FF), size: 14),
+                    const Icon(
+                      Icons.flag_rounded,
+                      color: Color(0xFF7DB7FF),
+                      size: 14,
+                    ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
@@ -3282,12 +3676,14 @@ class _DriverAvailableTripsPage extends StatelessWidget {
                 if (hasLiveTrip) {
                   return const DriverEmptyCard(
                     title: 'Ya tienes un viaje en curso',
-                    subtitle: 'Termina o actualiza ese viaje para recibir una nueva solicitud.',
+                    subtitle:
+                        'Termina o actualiza ese viaje para recibir una nueva solicitud.',
                   );
                 }
                 return const DriverEmptyCard(
                   title: 'No hay viajes disponibles',
-                  subtitle: 'En cuanto entre una nueva solicitud, la veras aqui.',
+                  subtitle:
+                      'En cuanto entre una nueva solicitud, la veras aqui.',
                 );
               }
 
@@ -3330,8 +3726,9 @@ class _DriverAvailableTripCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final passengerName =
-        trip.passengerName?.trim().isNotEmpty == true ? trip.passengerName!.trim() : 'Pasajero';
+    final passengerName = trip.passengerName?.trim().isNotEmpty == true
+        ? trip.passengerName!.trim()
+        : 'Pasajero';
     const rejectLabel = 'Ignorar';
     final requestBadgeLabel = trip.isDirectedRequest ? 'Directa' : 'Abierta';
     final requestBadgeColor = trip.isDirectedRequest
@@ -3362,13 +3759,10 @@ class _DriverAvailableTripCard extends StatelessWidget {
                   color: accentColor.withValues(alpha: 0.16),
                   borderRadius: BorderRadius.circular(18),
                 ),
-                child: Icon(
-                  switch ((trip.vehicleType ?? '').toLowerCase()) {
-                    'moto' => Icons.two_wheeler_rounded,
-                    _ => Icons.local_taxi_rounded,
-                  },
-                  color: accentColor,
-                ),
+                child: Icon(switch ((trip.vehicleType ?? '').toLowerCase()) {
+                  'moto' => Icons.two_wheeler_rounded,
+                  _ => Icons.local_taxi_rounded,
+                }, color: accentColor),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -3398,7 +3792,10 @@ class _DriverAvailableTripCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: requestBadgeColor.withValues(alpha: 0.18),
                       borderRadius: BorderRadius.circular(999),
@@ -3414,7 +3811,10 @@ class _DriverAvailableTripCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: freshnessBadgeColor.withValues(alpha: 0.16),
                       borderRadius: BorderRadius.circular(999),
@@ -3496,10 +3896,7 @@ class _DriverAvailableTripCard extends StatelessWidget {
 }
 
 class _InfoTile extends StatelessWidget {
-  const _InfoTile({
-    required this.label,
-    required this.value,
-  });
+  const _InfoTile({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -3537,9 +3934,7 @@ class _InfoTile extends StatelessWidget {
 }
 
 class _DriverTripProgressBar extends StatelessWidget {
-  const _DriverTripProgressBar({
-    required this.status,
-  });
+  const _DriverTripProgressBar({required this.status});
 
   final String status;
 
@@ -3586,7 +3981,9 @@ class _DriverTripProgressBar extends StatelessWidget {
                   height: 3,
                   margin: const EdgeInsets.symmetric(horizontal: 6),
                   decoration: BoxDecoration(
-                    color: isActive ? const Color(0xFFF97316) : const Color(0x55F97316),
+                    color: isActive
+                        ? const Color(0xFFF97316)
+                        : const Color(0x55F97316),
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
@@ -3599,16 +3996,22 @@ class _DriverTripProgressBar extends StatelessWidget {
               width: 24,
               height: 24,
               decoration: BoxDecoration(
-                color: isReached ? const Color(0xFFF97316) : const Color(0xFF25252B),
+                color: isReached
+                    ? const Color(0xFFF97316)
+                    : const Color(0xFF25252B),
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isReached ? const Color(0xFFF97316) : const Color(0x55F97316),
+                  color: isReached
+                      ? const Color(0xFFF97316)
+                      : const Color(0x55F97316),
                 ),
               ),
               child: Icon(
                 isReached ? Icons.check : Icons.circle,
                 size: isReached ? 14 : 8,
-                color: isReached ? const Color(0xFF0F0F10) : const Color(0xFFFFC89B),
+                color: isReached
+                    ? const Color(0xFF0F0F10)
+                    : const Color(0xFFFFC89B),
               ),
             );
           }),
@@ -3625,7 +4028,9 @@ class _DriverTripProgressBar extends StatelessWidget {
                 label,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: highlighted ? const Color(0xFFFFF4EC) : const Color(0xFFFFC89B),
+                  color: highlighted
+                      ? const Color(0xFFFFF4EC)
+                      : const Color(0xFFFFC89B),
                   fontSize: 10,
                   fontWeight: highlighted ? FontWeight.w800 : FontWeight.w700,
                 ),
@@ -3652,7 +4057,12 @@ class _DriverHistoryCard extends ConsumerWidget {
   bool get _canChat {
     final phone = (trip.passengerPhone ?? '').trim();
     return phone.isNotEmpty &&
-        const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(trip.status);
+        const {
+          'accepted',
+          'arriving',
+          'at_pickup',
+          'in_progress',
+        }.contains(trip.status);
   }
 
   bool get _canCancel {
@@ -3674,46 +4084,56 @@ class _DriverHistoryCard extends ConsumerWidget {
     final normalizedPhone = _normalizeWhatsAppPhone(trip.passengerPhone);
     if (normalizedPhone == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No hay numero valido del pasajero para WhatsApp.')),
+        const SnackBar(
+          content: Text('No hay numero valido del pasajero para WhatsApp.'),
+        ),
       );
       return;
     }
-    final passengerName = (trip.passengerName ?? '').trim().isEmpty ? 'pasajero' : trip.passengerName!.trim();
+    final passengerName = (trip.passengerName ?? '').trim().isEmpty
+        ? 'pasajero'
+        : trip.passengerName!.trim();
     final message = trip.status == 'at_pickup'
         ? 'Hola $passengerName, ya llegue al punto de recojo en RAPIGO PRO.'
         : 'Hola $passengerName, te escribo por tu viaje de RAPIGO PRO.';
     final uri = Uri.parse(
       'https://wa.me/$normalizedPhone?text=${Uri.encodeComponent(message)}',
     );
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && context.mounted) {
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) &&
+        context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se pudo abrir WhatsApp en este momento.')),
+        const SnackBar(
+          content: Text('No se pudo abrir WhatsApp en este momento.'),
+        ),
       );
     }
   }
 
   Future<void> _cancelTrip(BuildContext context, WidgetRef ref) async {
     try {
-      await ref.read(offeredTripProvider.notifier).updateTripStatus('cancelled');
+      await ref
+          .read(offeredTripProvider.notifier)
+          .updateTripStatus('cancelled');
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Viaje cancelado.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Viaje cancelado.')));
       }
     } catch (error) {
       if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error.toString().replaceFirst('Exception: ', '')),
-        ),
-      );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error.toString().replaceFirst('Exception: ', '')),
+          ),
+        );
       }
     }
   }
 
   void _showDetails(BuildContext context) {
-    final passengerName =
-        trip.passengerName?.trim().isNotEmpty == true ? trip.passengerName!.trim() : 'Pasajero';
+    final passengerName = trip.passengerName?.trim().isNotEmpty == true
+        ? trip.passengerName!.trim()
+        : 'Pasajero';
 
     showModalBottomSheet<void>(
       context: context,
@@ -3768,7 +4188,10 @@ class _DriverHistoryCard extends ConsumerWidget {
                           children: [
                             Row(
                               children: [
-                                Icon(Icons.card_giftcard_rounded, color: Color(0xFF86EFAC)),
+                                Icon(
+                                  Icons.card_giftcard_rounded,
+                                  color: Color(0xFF86EFAC),
+                                ),
                                 SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
@@ -3795,13 +4218,19 @@ class _DriverHistoryCard extends ConsumerWidget {
                       const SizedBox(height: 14),
                     ],
                     _InfoTile(label: 'Pasajero', value: passengerName),
-                    _InfoTile(label: 'Estado', value: _historyStatusLabel(trip.status)),
+                    _InfoTile(
+                      label: 'Estado',
+                      value: _historyStatusLabel(trip.status),
+                    ),
                     _InfoTile(label: 'Recojo', value: trip.passengerPickup),
                     _InfoTile(label: 'Destino', value: trip.destination),
                     if (trip.passengerPhone?.isNotEmpty ?? false)
                       _InfoTile(label: 'Telefono', value: trip.passengerPhone!),
                     if (trip.vehicleType?.isNotEmpty ?? false)
-                      _InfoTile(label: 'Tipo de vehiculo', value: trip.vehicleType!.toUpperCase()),
+                      _InfoTile(
+                        label: 'Tipo de vehiculo',
+                        value: trip.vehicleType!.toUpperCase(),
+                      ),
                     if (trip.vehicleLabel?.isNotEmpty ?? false)
                       _InfoTile(label: 'Vehiculo', value: trip.vehicleLabel!),
                     if (trip.vehicleColor?.isNotEmpty ?? false)
@@ -3809,7 +4238,10 @@ class _DriverHistoryCard extends ConsumerWidget {
                     if (trip.vehiclePlate?.isNotEmpty ?? false)
                       _InfoTile(label: 'Placa', value: trip.vehiclePlate!),
                     if (trip.requestedAt?.isNotEmpty ?? false)
-                      _InfoTile(label: 'Fecha del pedido', value: trip.requestedAt!),
+                      _InfoTile(
+                        label: 'Fecha del pedido',
+                        value: trip.requestedAt!,
+                      ),
                   ],
                 ),
               ),
@@ -3823,8 +4255,9 @@ class _DriverHistoryCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final accent = _historyAccentColor(trip.status);
-    final passengerName =
-        trip.passengerName?.trim().isNotEmpty == true ? trip.passengerName!.trim() : 'Pasajero';
+    final passengerName = trip.passengerName?.trim().isNotEmpty == true
+        ? trip.passengerName!.trim()
+        : 'Pasajero';
     final vehicleSummary = (trip.vehicleLabel ?? trip.vehicleType ?? '').trim();
     return Container(
       decoration: BoxDecoration(
@@ -3852,7 +4285,10 @@ class _DriverHistoryCard extends ConsumerWidget {
                 if (trip.isPromotional) ...[
                   Container(
                     margin: const EdgeInsets.only(right: 10),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0x1F22C55E),
                       borderRadius: BorderRadius.circular(999),
@@ -3861,7 +4297,11 @@ class _DriverHistoryCard extends ConsumerWidget {
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.card_giftcard_rounded, size: 14, color: Color(0xFF86EFAC)),
+                        Icon(
+                          Icons.card_giftcard_rounded,
+                          size: 14,
+                          color: Color(0xFF86EFAC),
+                        ),
                         SizedBox(width: 6),
                         Text(
                           'Promo',
@@ -3876,7 +4316,10 @@ class _DriverHistoryCard extends ConsumerWidget {
                   ),
                 ],
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: accent.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(999),
@@ -3899,7 +4342,10 @@ class _DriverHistoryCard extends ConsumerWidget {
               children: [
                 _DriverMiniBadge(icon: Icons.badge_outlined, label: title),
                 if (trip.requestedAt?.isNotEmpty ?? false)
-                  _DriverMiniBadge(icon: Icons.schedule_rounded, label: trip.requestedAt!),
+                  _DriverMiniBadge(
+                    icon: Icons.schedule_rounded,
+                    label: trip.requestedAt!,
+                  ),
                 if (vehicleSummary.isNotEmpty)
                   _DriverMiniBadge(
                     icon: (trip.vehicleType ?? '').toLowerCase() == 'moto'
@@ -4015,10 +4461,7 @@ class _DriverHistoryCard extends ConsumerWidget {
 }
 
 class _DriverMiniBadge extends StatelessWidget {
-  const _DriverMiniBadge({
-    required this.icon,
-    required this.label,
-  });
+  const _DriverMiniBadge({required this.icon, required this.label});
 
   final IconData icon;
   final String label;

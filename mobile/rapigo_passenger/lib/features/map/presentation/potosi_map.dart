@@ -237,8 +237,37 @@ class _PotosiMapSurfaceState extends ConsumerState<PotosiMapSurface>
       );
     }
 
-    return _RapigoPassengerMapLoadingSurface(
-      offlineReady: offlineState.isReady,
+    if (!canBuildMap) {
+      return _RapigoPassengerMapLoadingSurface(
+        offlineReady: offlineState.isReady,
+      );
+    }
+
+    return PotosiMap(
+      drivers: widget.drivers,
+      userLocation: widget.userLocation,
+      userAccuracyMeters: widget.userAccuracyMeters,
+      userHeadingDegrees: widget.userHeadingDegrees,
+      routeStart: widget.routeStart,
+      routeTarget: widget.routeTarget,
+      secondaryMarker: widget.secondaryMarker,
+      showRoute: widget.showRoute,
+      showTargetMarker: widget.showTargetMarker,
+      routeColor: widget.routeColor,
+      focusBounds: widget.focusBounds,
+      focusPadding: widget.focusPadding,
+      focusSignal: widget.focusSignal,
+      onRouteUpdated: widget.onRouteUpdated,
+      onMapTap: widget.onMapTap,
+      showTargetEditBadge: widget.showTargetEditBadge,
+      onMapCenterChanged: widget.onMapCenterChanged,
+      cameraCenterTarget: widget.cameraCenterTarget,
+      cameraCenterSignal: widget.cameraCenterSignal,
+      showUtilityControls: widget.showUtilityControls,
+      showLiveNavigationMode: widget.showLiveNavigationMode,
+      userMarkerAccentColor: widget.userMarkerAccentColor,
+      userMarkerHaloColor: widget.userMarkerHaloColor,
+      userMarkerBorderColor: widget.userMarkerBorderColor,
     );
   }
 }

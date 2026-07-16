@@ -1,4 +1,5 @@
 import type {
+  AppSettings,
   Dashboard,
   DeviceRow,
   Driver,
@@ -36,6 +37,7 @@ export const adminService = {
   getDevices: (token: string) => apiRequest<DeviceRow[]>(`${API_BASE}/admin/devices`, { headers: authHeaders(token) }),
   getUsers: (token: string) => apiRequest<ManagedUserRow[]>(`${API_BASE}/admin/users`, { headers: authHeaders(token) }),
   getPromoSettings: (token: string) => apiRequest<PromoSettings>(`${API_BASE}/admin/promotions/settings`, { headers: authHeaders(token) }),
+  getAppSettings: (token: string) => apiRequest<AppSettings>(`${API_BASE}/admin/settings/support-phone`, { headers: authHeaders(token) }),
   getSupportReports: (token: string) =>
     apiRequest<SupportReport[]>(`${API_BASE}/admin/support/reports/all`, { headers: authHeaders(token) }),
   getDriverPerformance: (token: string, range: PerformanceRange) =>
@@ -67,6 +69,12 @@ export const adminService = {
       method: 'POST',
       headers: authJsonHeaders(token),
       body: JSON.stringify(payload),
+    }),
+  updateSupportPhone: (token: string, supportPhone: string) =>
+    apiRequest<AppSettings>(`${API_BASE}/admin/settings/support-phone`, {
+      method: 'POST',
+      headers: authJsonHeaders(token),
+      body: JSON.stringify({ supportPhone }),
     }),
   sendNotification: (
     token: string,

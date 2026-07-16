@@ -28,9 +28,9 @@ class DriverProfilePage extends ConsumerWidget {
   }
 
   Future<void> _openPage(BuildContext context, Widget page) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => page),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => page));
   }
 
   @override
@@ -39,13 +39,14 @@ class DriverProfilePage extends ConsumerWidget {
     final metrics = context.rapigoMetrics;
     final textTheme = Theme.of(context).textTheme;
     final session = ref.watch(driverSessionProvider);
-    final trips = ref.watch(driverTripHistoryProvider).value ?? const <DriverTrip>[];
-    final completedTrips = trips.where((trip) => trip.status == 'completed').length;
     final displayName = session.firstName.trim().isNotEmpty
         ? session.firstName.trim()
-        : (session.fullName.trim().isNotEmpty ? session.fullName.trim().split(' ').first : 'alex');
-    final vehicleSummary =
-        session.vehicleType.trim().isNotEmpty ? session.vehicleType.trim() : '';
+        : (session.fullName.trim().isNotEmpty
+              ? session.fullName.trim().split(' ').first
+              : 'alex');
+    final vehicleSummary = session.vehicleType.trim().isNotEmpty
+        ? session.vehicleType.trim()
+        : '';
 
     return _DetailScaffold(
       title: 'Perfil',
@@ -108,11 +109,18 @@ class DriverProfilePage extends ConsumerWidget {
                           if (vehicleSummary.isNotEmpty) ...[
                             SizedBox(height: metrics.itemGap * 0.8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 10,
+                              ),
                               decoration: BoxDecoration(
                                 color: palette.surfacePrimary,
-                                borderRadius: BorderRadius.circular(metrics.radiusSmall),
-                                border: Border.all(color: palette.outlineStrong),
+                                borderRadius: BorderRadius.circular(
+                                  metrics.radiusSmall,
+                                ),
+                                border: Border.all(
+                                  color: palette.outlineStrong,
+                                ),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -161,40 +169,10 @@ class DriverProfilePage extends ConsumerWidget {
                 SizedBox(height: metrics.sectionGap),
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
-                  decoration: BoxDecoration(
-                    color: palette.surfacePrimary,
-                    borderRadius: BorderRadius.circular(28),
-                    border: Border.all(color: palette.outlineStrong),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 8,
                   ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _DriverProfileStatTile(
-                          icon: Icons.workspace_premium_outlined,
-                          value: '+${completedTrips < 120 ? 120 : completedTrips}',
-                          label: 'Prioridad',
-                        ),
-                      ),
-                      Container(
-                        width: 1,
-                        height: 112,
-                        color: const Color(0xFF242B35),
-                      ),
-                      const Expanded(
-                        child: _DriverProfileStatTile(
-                          icon: Icons.star_border_rounded,
-                          value: '5.0',
-                          label: 'Calificación',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
                   decoration: BoxDecoration(
                     color: const Color(0xFF11151D),
                     borderRadius: BorderRadius.circular(28),
@@ -205,163 +183,58 @@ class DriverProfilePage extends ConsumerWidget {
                       _DriverProfileMenuTile(
                         icon: Icons.edit_outlined,
                         title: 'Editar perfil',
-                        subtitle: 'Actualiza datos personales, licencia y vehiculo.',
-                        onTap: () => _openPage(context, const DriverEditProfilePage()),
+                        onTap: () =>
+                            _openPage(context, const DriverEditProfilePage()),
                       ),
                       _DriverProfileDivider(),
                       _DriverProfileMenuTile(
                         icon: Icons.bar_chart_rounded,
-                        title: 'Ganancias',
-                        subtitle: 'Revisa tu rendimiento, viajes completados y cobro estimado.',
-                        onTap: () => _openPage(context, const DriverStatisticsPage()),
-                      ),
-                      _DriverProfileDivider(),
-                      _DriverProfileMenuTile(
-                        icon: Icons.local_taxi_outlined,
-                        title: 'Historial',
-                        subtitle: 'Consulta el historial y el estado de tus recorridos.',
-                        onTap: () {
-                          showTopNotice(
-                            context,
-                            'Revisa el historial completo desde la pestaña Viajes.',
-                            tone: NoticeTone.info,
-                          );
-                        },
+                        title: 'Estadistica',
+                        onTap: () =>
+                            _openPage(context, const DriverStatisticsPage()),
                       ),
                       _DriverProfileDivider(),
                       _DriverProfileMenuTile(
                         icon: Icons.notifications_none_rounded,
                         title: 'Notificaciones',
-                        subtitle: 'Avisos de central, autorizaciones y mensajes operativos.',
-                        onTap: () => _openPage(context, const DriverNotificationsPage()),
+                        onTap: () =>
+                            _openPage(context, const DriverNotificationsPage()),
                       ),
                       _DriverProfileDivider(),
                       _DriverProfileMenuTile(
                         icon: Icons.settings_outlined,
                         title: 'Configuraciones',
-                        subtitle: 'Mapa offline, preferencias y herramientas del conductor.',
-                        onTap: () => _openPage(context, const DriverSettingsPage()),
+                        onTap: () =>
+                            _openPage(context, const DriverSettingsPage()),
                       ),
                       _DriverProfileDivider(),
                       _DriverProfileMenuTile(
                         icon: Icons.support_agent_rounded,
                         title: 'Soporte',
-                        subtitle: 'Reporta fallas de la app o incidentes del servicio a central.',
-                        onTap: () => _openPage(context, const DriverSupportPage()),
+                        onTap: () =>
+                            _openPage(context, const DriverSupportPage()),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
-                  height: 64,
-                  child: OutlinedButton.icon(
-                    onPressed: () => _openPage(context, const DriverAppInfoPage()),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: Color(0xFF2A3340)),
-                      backgroundColor: const Color(0xFF11151D),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(22),
-                      ),
-                    ),
-                    icon: const Icon(Icons.info_outline_rounded, color: Color(0xFFFACC15)),
-                    label: const Text(
-                      'Abrir información',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF11151D),
-                    borderRadius: BorderRadius.circular(26),
-                    border: Border.all(color: const Color(0xFF262D37)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 54,
-                        height: 54,
-                        decoration: BoxDecoration(
-                          color: const Color(0x19FACC15),
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: const Color(0x33FACC15)),
-                        ),
-                        child: const Icon(
-                          Icons.shield_outlined,
-                          color: Color(0xFFFACC15),
-                          size: 28,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Sesión protegida activa',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 17,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Tu cuenta está segura y monitoreada.',
-                              style: TextStyle(
-                                color: Color(0xFFB8C0CC),
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        width: 18,
-                        height: 18,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF32D74B),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF32D74B).withValues(alpha: 0.35),
-                              blurRadius: 12,
-                              spreadRadius: 1,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  height: 72,
+                  height: 52,
                   child: FilledButton.icon(
                     onPressed: () => _handleLogout(context, ref),
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFFFACC15),
                       foregroundColor: const Color(0xFF111827),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24),
+                        borderRadius: BorderRadius.circular(18),
                       ),
                     ),
-                    icon: const Icon(Icons.logout_rounded, size: 30),
+                    icon: const Icon(Icons.logout_rounded, size: 20),
                     label: const Text(
                       'Cerrar sesión',
                       style: TextStyle(
-                        fontSize: 20,
+                        fontSize: 14,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
@@ -389,7 +262,9 @@ class _DriverAppInfoPageState extends State<DriverAppInfoPage> {
   Future<_DriverAppInfoData> _load() async {
     final packageInfo = await PackageInfo.fromPlatform();
     final installInfo = await AndroidAppInstallInfo.read();
-    final updateManifest = await AppUpdateService(appId: 'rapigo_driver_pro').fetchLatestManifest();
+    final updateManifest = await AppUpdateService(
+      appId: 'rapigo_driver_pro',
+    ).fetchLatestManifest();
     return _DriverAppInfoData(
       packageInfo: packageInfo,
       installInfo: installInfo,
@@ -442,10 +317,10 @@ class _DriverAppInfoPageState extends State<DriverAppInfoPage> {
                           child: const Icon(
                             Icons.info_outline_rounded,
                             color: Color(0xFFFACC15),
-                            size: 34,
+                            size: 26,
                           ),
                         ),
-                        const SizedBox(width: 16),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -454,16 +329,16 @@ class _DriverAppInfoPageState extends State<DriverAppInfoPage> {
                                 'RAPIGO PRO',
                                 style: GoogleFonts.plusJakartaSans(
                                   color: Colors.white,
-                                  fontSize: 24,
+                                  fontSize: 20,
                                   fontWeight: FontWeight.w900,
                                 ),
                               ),
-                              const SizedBox(height: 6),
-                              Text(
+                              const SizedBox(height: 4),
+                              const Text(
                                 'Información técnica y datos de la versión instalada.',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: Color(0xFFB8C0CC),
-                                  fontSize: 14,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w600,
                                   height: 1.4,
                                 ),
@@ -478,13 +353,49 @@ class _DriverAppInfoPageState extends State<DriverAppInfoPage> {
                   _DriverInfoSection(
                     title: 'Acerca de',
                     children: [
-                      _DriverInfoRow(label: 'Versión instalada', value: '${data.packageInfo.version}+${data.packageInfo.buildNumber}'),
-                      _DriverInfoRow(label: 'Paquete', value: data.packageInfo.packageName),
-                      _DriverInfoRow(label: 'Fecha de lanzamiento', value: _formatInfoDate(data.installInfo?.firstInstallDate) ?? 'No disponible'),
-                      _DriverInfoRow(label: 'Fecha de actualización', value: _formatInfoDate(data.installInfo?.lastUpdateDate) ?? 'No disponible'),
-                      _DriverInfoRow(label: 'Última versión publicada', value: data.latestVersion ?? 'No disponible'),
-                      _DriverInfoRow(label: 'Lanzamiento publicado', value: _formatInfoDate(_tryParseDate(data.manifestReleasedAt)) ?? 'No disponible'),
-                      _DriverInfoRow(label: 'Actualización publicada', value: _formatInfoDate(_tryParseDate(data.manifestUpdatedAt)) ?? 'No disponible'),
+                      _DriverInfoRow(
+                        label: 'Versión instalada',
+                        value:
+                            '${data.packageInfo.version}+${data.packageInfo.buildNumber}',
+                      ),
+                      _DriverInfoRow(
+                        label: 'Paquete',
+                        value: data.packageInfo.packageName,
+                      ),
+                      _DriverInfoRow(
+                        label: 'Fecha de lanzamiento',
+                        value:
+                            _formatInfoDate(
+                              data.installInfo?.firstInstallDate,
+                            ) ??
+                            'No disponible',
+                      ),
+                      _DriverInfoRow(
+                        label: 'Fecha de actualización',
+                        value:
+                            _formatInfoDate(data.installInfo?.lastUpdateDate) ??
+                            'No disponible',
+                      ),
+                      _DriverInfoRow(
+                        label: 'Última versión publicada',
+                        value: data.latestVersion ?? 'No disponible',
+                      ),
+                      _DriverInfoRow(
+                        label: 'Lanzamiento publicado',
+                        value:
+                            _formatInfoDate(
+                              _tryParseDate(data.manifestReleasedAt),
+                            ) ??
+                            'No disponible',
+                      ),
+                      _DriverInfoRow(
+                        label: 'Actualización publicada',
+                        value:
+                            _formatInfoDate(
+                              _tryParseDate(data.manifestUpdatedAt),
+                            ) ??
+                            'No disponible',
+                      ),
                     ],
                   ),
                 ],
@@ -501,7 +412,8 @@ class DriverEditProfilePage extends ConsumerStatefulWidget {
   const DriverEditProfilePage({super.key});
 
   @override
-  ConsumerState<DriverEditProfilePage> createState() => _DriverEditProfilePageState();
+  ConsumerState<DriverEditProfilePage> createState() =>
+      _DriverEditProfilePageState();
 }
 
 class _DriverEditProfilePageState extends ConsumerState<DriverEditProfilePage> {
@@ -529,7 +441,9 @@ class _DriverEditProfilePageState extends ConsumerState<DriverEditProfilePage> {
     _lastNameController.text = session.lastName;
     _emailController.text = session.email;
     _addressController.text = session.address;
-    _vehicleType = session.vehicleType.trim().isEmpty ? 'taxi' : session.vehicleType;
+    _vehicleType = session.vehicleType.trim().isEmpty
+        ? 'taxi'
+        : session.vehicleType;
     _profileFuture = _loadDriverProfile();
   }
 
@@ -553,15 +467,16 @@ class _DriverEditProfilePageState extends ConsumerState<DriverEditProfilePage> {
     if (session.token.isEmpty || session.userId.isEmpty) {
       return null;
     }
-    final profile = await ref.read(authRepositoryProvider).fetchDriverProfile(
-      token: session.token,
-      userId: session.userId,
-    );
+    final profile = await ref
+        .read(authRepositoryProvider)
+        .fetchDriverProfile(token: session.token, userId: session.userId);
     if (!_loaded && mounted) {
       setState(() {
         _loaded = true;
         _licenseController.text = profile.licenseNumber;
-        _vehicleType = profile.vehicleType.trim().isEmpty ? _vehicleType : profile.vehicleType;
+        _vehicleType = profile.vehicleType.trim().isEmpty
+            ? _vehicleType
+            : profile.vehicleType;
         _plateController.text = profile.plate;
         _brandController.text = profile.brand;
         _modelController.text = profile.model;
@@ -632,19 +547,24 @@ class _DriverEditProfilePageState extends ConsumerState<DriverEditProfilePage> {
       return;
     }
     setState(() => _saving = true);
-    await ref.read(driverSessionProvider.notifier).completeProfile(
-      firstName: _firstNameController.text.trim(),
-      lastName: _lastNameController.text.trim(),
-      email: _emailController.text.trim(),
-      address: _addressController.text.trim(),
-      licenseNumber: _licenseController.text.trim(),
-      vehicleType: _vehicleType,
-      plate: _plateController.text.trim().toUpperCase(),
-      brand: _brandController.text.trim(),
-      model: _modelController.text.trim(),
-      color: _colorController.text.trim(),
-      year: int.tryParse(_yearController.text.trim()),
-    );
+    await ref
+        .read(driverSessionProvider.notifier)
+        .completeProfile(
+          firstName: _firstNameController.text.trim(),
+          lastName: _lastNameController.text.trim(),
+          email: _emailController.text.trim(),
+          address: _addressController.text.trim(),
+          licenseNumber: _licenseController.text.trim(),
+          licenseCategory: '',
+          licenseIssueDate: '',
+          licenseExpiryDate: '',
+          vehicleType: _vehicleType,
+          plate: _plateController.text.trim().toUpperCase(),
+          brand: _brandController.text.trim(),
+          model: _modelController.text.trim(),
+          color: _colorController.text.trim(),
+          year: int.tryParse(_yearController.text.trim()),
+        );
     if (!mounted) {
       return;
     }
@@ -677,7 +597,8 @@ class _DriverEditProfilePageState extends ConsumerState<DriverEditProfilePage> {
         body: FutureBuilder<DriverProfileDetails?>(
           future: _profileFuture,
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting && !_loaded) {
+            if (snapshot.connectionState == ConnectionState.waiting &&
+                !_loaded) {
               return const Center(
                 child: CircularProgressIndicator(color: Color(0xFFFACC15)),
               );
@@ -715,7 +636,8 @@ class _DriverEditProfilePageState extends ConsumerState<DriverEditProfilePage> {
                           controller: _addressController,
                           label: 'Direccion',
                           icon: Icons.location_on_outlined,
-                          validator: (value) => _required(value, 'Direccion', min: 4),
+                          validator: (value) =>
+                              _required(value, 'Direccion', min: 4),
                         ),
                         _ReadOnlyInfo(label: 'Telefono', value: session.phone),
                       ],
@@ -752,7 +674,8 @@ class _DriverEditProfilePageState extends ConsumerState<DriverEditProfilePage> {
                           selected: {_vehicleType == 'moto' ? 'moto' : 'taxi'},
                           onSelectionChanged: _saving
                               ? null
-                              : (value) => setState(() => _vehicleType = value.first),
+                              : (value) =>
+                                    setState(() => _vehicleType = value.first),
                         ),
                         const SizedBox(height: 12),
                         _EditField(
@@ -771,7 +694,8 @@ class _DriverEditProfilePageState extends ConsumerState<DriverEditProfilePage> {
                           controller: _modelController,
                           label: 'Modelo',
                           icon: Icons.car_repair_outlined,
-                          validator: (value) => _required(value, 'Modelo', min: 1),
+                          validator: (value) =>
+                              _required(value, 'Modelo', min: 1),
                         ),
                         _EditField(
                           controller: _colorController,
@@ -808,10 +732,14 @@ class _DriverEditProfilePageState extends ConsumerState<DriverEditProfilePage> {
                             ? const SizedBox(
                                 width: 18,
                                 height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Icon(Icons.save_outlined),
-                        label: Text(_saving ? 'Guardando...' : 'Guardar cambios'),
+                        label: Text(
+                          _saving ? 'Guardando...' : 'Guardar cambios',
+                        ),
                       ),
                     ),
                   ],
@@ -884,11 +812,11 @@ class _EditField extends StatelessWidget {
         controller: controller,
         keyboardType: keyboardType,
         validator: validator,
-        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
-        decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: Icon(icon),
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w700,
         ),
+        decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon)),
       ),
     );
   }
@@ -916,12 +844,18 @@ class _ReadOnlyInfo extends StatelessWidget {
           const SizedBox(width: 10),
           Text(
             '$label: ',
-            style: const TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.w700),
+            style: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontWeight: FontWeight.w700,
+            ),
           ),
           Expanded(
             child: Text(
               value.trim().isEmpty ? 'Sin dato' : value,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+              ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -948,10 +882,7 @@ class _DriverAppInfoData {
 }
 
 class _DriverInfoSection extends StatelessWidget {
-  const _DriverInfoSection({
-    required this.title,
-    required this.children,
-  });
+  const _DriverInfoSection({required this.title, required this.children});
 
   final String title;
   final List<Widget> children;
@@ -960,10 +891,10 @@ class _DriverInfoSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 6),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 4),
       decoration: BoxDecoration(
         color: const Color(0xFF11151D),
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFF262D37)),
       ),
       child: Column(
@@ -973,11 +904,11 @@ class _DriverInfoSection extends StatelessWidget {
             title,
             style: GoogleFonts.plusJakartaSans(
               color: Colors.white,
-              fontSize: 22,
+              fontSize: 17,
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           ...children,
         ],
       ),
@@ -986,10 +917,7 @@ class _DriverInfoSection extends StatelessWidget {
 }
 
 class _DriverInfoRow extends StatelessWidget {
-  const _DriverInfoRow({
-    required this.label,
-    required this.value,
-  });
+  const _DriverInfoRow({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -997,12 +925,12 @@ class _DriverInfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 9),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
         decoration: BoxDecoration(
           color: const Color(0xFF0C121B),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(15),
           border: Border.all(color: const Color(0xFF232D3A)),
         ),
         child: Row(
@@ -1012,19 +940,19 @@ class _DriverInfoRow extends StatelessWidget {
                 label,
                 style: const TextStyle(
                   color: Color(0xFFB8C0CC),
-                  fontSize: 14,
+                  fontSize: 11,
                   fontWeight: FontWeight.w700,
                 ),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             Flexible(
               child: Text(
                 value,
                 textAlign: TextAlign.right,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 15,
+                  fontSize: 12,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -1036,8 +964,8 @@ class _DriverInfoRow extends StatelessWidget {
   }
 }
 
-class _DriverProfileStatTile extends StatelessWidget {
-  const _DriverProfileStatTile({
+class _DriverStatisticsMetricButton extends StatelessWidget {
+  const _DriverStatisticsMetricButton({
     required this.icon,
     required this.value,
     required this.label,
@@ -1050,29 +978,52 @@ class _DriverProfileStatTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.rapigoPalette;
-    final metrics = context.rapigoMetrics;
     final textTheme = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      child: Column(
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: palette.surfacePrimary,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: palette.outlineStrong),
+      ),
+      child: Row(
         children: [
-          Icon(icon, color: palette.accentYellow, size: 40),
-          SizedBox(height: metrics.itemGap),
-          Text(
-            value,
-            style: textTheme.headlineSmall?.copyWith(
-              color: palette.textPrimary,
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: const Color(0x19FACC15),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0x44FACC15)),
             ),
+            child: Icon(icon, color: palette.accentYellow, size: 18),
           ),
-          SizedBox(height: metrics.itemGap * 0.45),
-          Text(
-            label,
-            style: textTheme.bodyLarge?.copyWith(
-              color: palette.textSecondary,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  value,
+                  style: textTheme.titleMedium?.copyWith(
+                    color: palette.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: palette.textSecondary,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -1085,13 +1036,11 @@ class _DriverProfileMenuTile extends StatelessWidget {
   const _DriverProfileMenuTile({
     required this.icon,
     required this.title,
-    required this.subtitle,
     required this.onTap,
   });
 
   final IconData icon;
   final String title;
-  final String subtitle;
   final VoidCallback onTap;
 
   @override
@@ -1103,21 +1052,21 @@ class _DriverProfileMenuTile extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(22),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 18),
+        padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
-              width: 68,
-              height: 68,
+              width: 46,
+              height: 46,
               decoration: BoxDecoration(
                 color: palette.surfaceSecondary,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(15),
                 border: Border.all(color: palette.outlineStrong),
               ),
-              child: Icon(icon, color: palette.accentYellow, size: 32),
+              child: Icon(icon, color: palette.accentYellow, size: 22),
             ),
-            SizedBox(width: metrics.itemGap),
+            SizedBox(width: metrics.itemGap * 0.75),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1126,30 +1075,20 @@ class _DriverProfileMenuTile extends StatelessWidget {
                     title,
                     style: textTheme.titleLarge?.copyWith(
                       color: palette.textPrimary,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  SizedBox(height: metrics.itemGap * 0.35),
-                  Text(
-                    subtitle,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: palette.textSecondary,
                       fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      height: 1.4,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 6),
             Padding(
-              padding: const EdgeInsets.only(top: 18),
+              padding: EdgeInsets.zero,
               child: Icon(
                 Icons.chevron_right_rounded,
                 color: palette.textPrimary,
-                size: 34,
+                size: 24,
               ),
             ),
           ],
@@ -1184,17 +1123,14 @@ class DriverSettingsPage extends StatelessWidget {
         child: Column(
           children: [
             Container(
-              padding: const EdgeInsets.all(18),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [
-                    palette.surfacePrimary,
-                    palette.surfaceSecondary,
-                  ],
+                  colors: [palette.surfacePrimary, palette.surfaceSecondary],
                 ),
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: palette.outlineStrong),
               ),
               child: Column(
@@ -1203,32 +1139,325 @@ class DriverSettingsPage extends StatelessWidget {
                   Text(
                     'Mapa offline',
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: 20,
+                      fontSize: 16,
                       fontWeight: FontWeight.w800,
                       color: Colors.white,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   const Text(
                     'Descarga o actualiza Potosi ciudad para mantener el mapa listo aun con señal baja.',
                     style: TextStyle(
                       color: Color(0xFFDCE6F2),
+                      fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 10),
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
                       onPressed: () => showOfflineMapSheet(context),
-                      icon: const Icon(Icons.download_for_offline_rounded),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(42),
+                        textStyle: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      icon: const Icon(
+                        Icons.download_for_offline_rounded,
+                        size: 18,
+                      ),
                       label: const Text('Abrir mapa offline'),
                     ),
                   ),
                 ],
               ),
             ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [palette.surfacePrimary, palette.surfaceSecondary],
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: palette.outlineStrong),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Servicios',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: _DriverServiceOptionButton(
+                          icon: Icons.local_taxi_rounded,
+                          title: 'Taxi o moto',
+                          subtitle: 'Activo',
+                          active: true,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _DriverServiceOptionButton(
+                          icon: Icons.delivery_dining_rounded,
+                          title: 'Delivery',
+                          subtitle: 'En desarrollo',
+                          active: false,
+                          onTap: () => showTopNotice(
+                            context,
+                            'Delivery en desarrollo proximamente.',
+                            tone: NoticeTone.info,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            const _DriverProtectedSessionCard(),
+            const SizedBox(height: 14),
+            _DriverAboutSettingsCard(
+              onOpenInfo: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const DriverAppInfoPage(),
+                ),
+              ),
+            ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DriverProtectedSessionCard extends StatelessWidget {
+  const _DriverProtectedSessionCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: const Color(0xFF11151D),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFF262D37)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: const Color(0x19FACC15),
+              borderRadius: BorderRadius.circular(13),
+              border: Border.all(color: const Color(0x33FACC15)),
+            ),
+            child: const Icon(
+              Icons.shield_outlined,
+              color: Color(0xFFFACC15),
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Sesión protegida activa',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Cuenta segura y monitoreada.',
+                  style: TextStyle(
+                    color: Color(0xFFB8C0CC),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(
+              color: const Color(0xFF32D74B),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF32D74B).withValues(alpha: 0.30),
+                  blurRadius: 9,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DriverAboutSettingsCard extends StatelessWidget {
+  const _DriverAboutSettingsCard({required this.onOpenInfo});
+
+  final VoidCallback onOpenInfo;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF11151D),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFF262D37)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Acerca de',
+            style: GoogleFonts.plusJakartaSans(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 9),
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: OutlinedButton.icon(
+              onPressed: onOpenInfo,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white,
+                side: const BorderSide(color: Color(0xFF2A3340)),
+                backgroundColor: const Color(0xFF0B1220),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                textStyle: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              icon: const Icon(
+                Icons.info_outline_rounded,
+                color: Color(0xFFFACC15),
+                size: 18,
+              ),
+              label: const Text('Versión y datos'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DriverServiceOptionButton extends StatelessWidget {
+  const _DriverServiceOptionButton({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.active,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool active;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final borderColor = active
+        ? const Color(0x661D4ED8)
+        : const Color(0x33475569);
+    final iconColor = active
+        ? const Color(0xFF60A5FA)
+        : const Color(0xFF94A3B8);
+    return Material(
+      color: active ? const Color(0x191D4ED8) : const Color(0xFF0B1220),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 82),
+          padding: const EdgeInsets.all(11),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: borderColor),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Row(
+                children: [
+                  Icon(icon, color: iconColor, size: 22),
+                  const Spacer(),
+                  Icon(
+                    active
+                        ? Icons.check_circle_rounded
+                        : Icons.schedule_rounded,
+                    color: active
+                        ? const Color(0xFF22C55E)
+                        : const Color(0xFFFACC15),
+                    size: 17,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 9),
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.plusJakartaSans(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFFDCE6F2),
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1246,14 +1475,18 @@ class DriverNotificationsPage extends ConsumerWidget {
     return _DetailScaffold(
       title: 'Notificaciones',
       child: FutureBuilder<List<AdminNotificationItem>>(
-        future: session.token.isEmpty ? Future.value(const <AdminNotificationItem>[]) : repository.fetchNotifications(session.token),
+        future: session.token.isEmpty
+            ? Future.value(const <AdminNotificationItem>[])
+            : repository.fetchNotifications(session.token),
         builder: (context, snapshot) {
           final items = snapshot.data ?? const <AdminNotificationItem>[];
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: Padding(
-              padding: EdgeInsets.only(top: 80),
-              child: CircularProgressIndicator(color: Color(0xFFFACC15)),
-            ));
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.only(top: 80),
+                child: CircularProgressIndicator(color: Color(0xFFFACC15)),
+              ),
+            );
           }
 
           return DriverPageShell(
@@ -1263,17 +1496,14 @@ class DriverNotificationsPage extends ConsumerWidget {
               children: [
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xFF123E8A),
-                        Color(0xFF0C1830),
-                      ],
+                      colors: [Color(0xFF123E8A), Color(0xFF0C1830)],
                     ),
-                    borderRadius: BorderRadius.circular(28),
+                    borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: const Color(0x551D4ED8)),
                     boxShadow: [
                       BoxShadow(
@@ -1286,39 +1516,42 @@ class DriverNotificationsPage extends ConsumerWidget {
                   child: Row(
                     children: [
                       Container(
-                        width: 58,
-                        height: 58,
+                        width: 42,
+                        height: 42,
                         decoration: BoxDecoration(
                           color: const Color(0x19FACC15),
-                          borderRadius: BorderRadius.circular(18),
+                          borderRadius: BorderRadius.circular(14),
                           border: Border.all(color: const Color(0x55FACC15)),
                         ),
                         child: const Icon(
                           Icons.notifications_active_rounded,
                           color: Color(0xFFFACC15),
-                          size: 30,
+                          size: 22,
                         ),
                       ),
-                      const SizedBox(width: 14),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              items.isEmpty ? 'Bandeja limpia' : '${items.length} aviso(s) disponible(s)',
+                              items.isEmpty
+                                  ? 'Bandeja limpia'
+                                  : '${items.length} aviso(s) disponible(s)',
                               style: GoogleFonts.plusJakartaSans(
                                 color: Colors.white,
-                                fontSize: 18,
+                                fontSize: 14,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 2),
                             Text(
                               items.isEmpty
                                   ? 'Solicitudes de pasajeros y promociones prioritarias pueden llegar al telefono. El resto aparecera aqui.'
                                   : 'Las solicitudes prioritarias y promociones pueden sonar en el telefono. Cambios operativos y avisos internos se consultan aqui.',
                               style: const TextStyle(
                                 color: Color(0xFFDCE6F2),
+                                fontSize: 11,
                                 fontWeight: FontWeight.w600,
                                 height: 1.35,
                               ),
@@ -1329,15 +1562,16 @@ class DriverNotificationsPage extends ConsumerWidget {
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 if (items.isEmpty)
                   const _DriverSettingsInfoCard(
                     title: 'Sin avisos nuevos',
-                    subtitle: 'Aqui veras cambios de estado, avisos operativos, autorizaciones y mensajes internos de RAPIGO - PRO.',
+                    subtitle:
+                        'Aqui veras cambios de estado, avisos operativos, autorizaciones y mensajes internos de RAPIGO - PRO.',
                   ),
                 ...items.map(
                   (item) => Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
+                    padding: const EdgeInsets.only(bottom: 10),
                     child: _DriverNotificationCard(
                       kind: item.kind,
                       title: item.title,
@@ -1381,7 +1615,9 @@ class _DriverSupportPageState extends ConsumerState<DriverSupportPage> {
     return _DetailScaffold(
       title: 'Soporte',
       child: FutureBuilder<List<SupportReportItem>>(
-        future: session.token.isEmpty ? Future.value(const <SupportReportItem>[]) : repository.fetchSupportReports(session.token),
+        future: session.token.isEmpty
+            ? Future.value(const <SupportReportItem>[])
+            : repository.fetchSupportReports(session.token),
         builder: (context, snapshot) {
           final reports = snapshot.data ?? const <SupportReportItem>[];
           return DriverPageShell(
@@ -1390,10 +1626,10 @@ class _DriverSupportPageState extends ConsumerState<DriverSupportPage> {
             child: Column(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(18),
+                  padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: const Color(0xFF1B1B1F),
-                    borderRadius: BorderRadius.circular(24),
+                    borderRadius: BorderRadius.circular(18),
                     border: Border.all(color: const Color(0xFF2C2C31)),
                   ),
                   child: Column(
@@ -1401,67 +1637,134 @@ class _DriverSupportPageState extends ConsumerState<DriverSupportPage> {
                       DropdownButtonFormField<String>(
                         initialValue: _category,
                         dropdownColor: const Color(0xFF0C1830),
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
                         decoration: InputDecoration(
+                          isDense: true,
                           labelText: 'Tipo de reporte',
-                          labelStyle: const TextStyle(color: Color(0xFFFACC15)),
+                          labelStyle: const TextStyle(
+                            color: Color(0xFFFACC15),
+                            fontSize: 12,
+                          ),
                           filled: true,
                           fillColor: const Color(0xFF0A1323),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(18),
+                            borderRadius: BorderRadius.circular(14),
                             borderSide: BorderSide.none,
                           ),
                           enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(18),
-                            borderSide: const BorderSide(color: Color(0xFF1A3A66)),
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF1A3A66),
+                            ),
                           ),
                           focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(18),
-                            borderSide: const BorderSide(color: Color(0xFFFACC15), width: 1.4),
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFFACC15),
+                              width: 1.4,
+                            ),
                           ),
                         ),
                         items: const [
-                          DropdownMenuItem(value: 'Falla de app', child: Text('Falla de app', style: TextStyle(color: Colors.white))),
-                          DropdownMenuItem(value: 'Problema con viaje', child: Text('Problema con viaje', style: TextStyle(color: Colors.white))),
-                          DropdownMenuItem(value: 'Cuenta o acceso', child: Text('Cuenta o acceso', style: TextStyle(color: Colors.white))),
-                          DropdownMenuItem(value: 'Mapa o GPS', child: Text('Mapa o GPS', style: TextStyle(color: Colors.white))),
+                          DropdownMenuItem(
+                            value: 'Falla de app',
+                            child: Text(
+                              'Falla de app',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Problema con viaje',
+                            child: Text(
+                              'Problema con viaje',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Cuenta o acceso',
+                            child: Text(
+                              'Cuenta o acceso',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Mapa o GPS',
+                            child: Text(
+                              'Mapa o GPS',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
                         ],
-                        onChanged: (value) => setState(() => _category = value ?? 'Falla de app'),
+                        onChanged: (value) =>
+                            setState(() => _category = value ?? 'Falla de app'),
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 10),
                       TextField(
                         controller: _messageController,
-                        maxLines: 5,
-                        style: const TextStyle(color: Colors.white),
+                        maxLines: 4,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                        ),
                         decoration: InputDecoration(
+                          isDense: true,
                           labelText: 'Detalle del problema',
-                          hintText: 'Describe lo que pasó para que central pueda ayudarte mejor.',
-                          hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                          labelStyle: const TextStyle(color: Color(0xFFFACC15)),
+                          hintText:
+                              'Describe lo que pasó para que central pueda ayudarte mejor.',
+                          hintStyle: const TextStyle(
+                            color: Color(0xFF94A3B8),
+                            fontSize: 12,
+                          ),
+                          labelStyle: const TextStyle(
+                            color: Color(0xFFFACC15),
+                            fontSize: 12,
+                          ),
                           filled: true,
                           fillColor: const Color(0xFF0A1323),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(18),
+                            borderRadius: BorderRadius.circular(14),
                             borderSide: BorderSide.none,
                           ),
                           enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(18),
-                            borderSide: const BorderSide(color: Color(0xFF1A3A66)),
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF1A3A66),
+                            ),
                           ),
                           focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(18),
-                            borderSide: const BorderSide(color: Color(0xFFFACC15), width: 1.4),
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFFACC15),
+                              width: 1.4,
+                            ),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 10),
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton.icon(
                           onPressed: _sending
                               ? null
                               : () async {
-                                  if (_messageController.text.trim().length < 8) {
+                                  if (_messageController.text.trim().length <
+                                      8) {
                                     showTopNotice(
                                       context,
                                       'Describe mejor el problema para enviarlo a central.',
@@ -1488,7 +1791,10 @@ class _DriverSupportPageState extends ConsumerState<DriverSupportPage> {
                                     if (!context.mounted) return;
                                     showTopNotice(
                                       context,
-                                      error.toString().replaceFirst('Exception: ', ''),
+                                      error.toString().replaceFirst(
+                                        'Exception: ',
+                                        '',
+                                      ),
                                       tone: NoticeTone.error,
                                     );
                                   } finally {
@@ -1497,26 +1803,37 @@ class _DriverSupportPageState extends ConsumerState<DriverSupportPage> {
                                     }
                                   }
                                 },
-                          icon: const Icon(Icons.send_rounded),
-                          label: Text(_sending ? 'Enviando...' : 'Enviar reporte'),
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size.fromHeight(42),
+                            textStyle: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          icon: const Icon(Icons.send_rounded, size: 18),
+                          label: Text(
+                            _sending ? 'Enviando...' : 'Enviar reporte',
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 12),
                 if (reports.isEmpty)
                   const _DriverSettingsInfoCard(
                     title: 'Sin reportes todavía',
-                    subtitle: 'Cuando envíes un reporte desde aquí, central podrá verlo con tus datos del conductor.',
+                    subtitle:
+                        'Cuando envíes un reporte desde aquí, central podrá verlo con tus datos del conductor.',
                   ),
                 ...reports.map(
                   (report) => Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
+                    padding: const EdgeInsets.only(bottom: 10),
                     child: DriverMenuTile(
                       icon: Icons.support_agent,
                       title: '${report.category} · ${report.status}',
-                      subtitle: '${report.message}\n${_formatShortDate(report.createdAt)}',
+                      subtitle:
+                          '${report.message}\n${_formatShortDate(report.createdAt)}',
                     ),
                   ),
                 ),
@@ -1533,7 +1850,8 @@ class DriverStatisticsPage extends ConsumerStatefulWidget {
   const DriverStatisticsPage({super.key});
 
   @override
-  ConsumerState<DriverStatisticsPage> createState() => _DriverStatisticsPageState();
+  ConsumerState<DriverStatisticsPage> createState() =>
+      _DriverStatisticsPageState();
 }
 
 class _DriverStatisticsPageState extends ConsumerState<DriverStatisticsPage> {
@@ -1542,28 +1860,35 @@ class _DriverStatisticsPageState extends ConsumerState<DriverStatisticsPage> {
   @override
   Widget build(BuildContext context) {
     final palette = context.rapigoPalette;
-    final history = ref.watch(driverTripHistoryProvider).value ?? const <DriverTrip>[];
+    final history =
+        ref.watch(driverTripHistoryProvider).value ?? const <DriverTrip>[];
     final now = DateTime.now();
-    final filtered = history.where((trip) {
-      final date = DateTime.tryParse(trip.requestedAt ?? '');
-      if (date == null) {
-        return false;
-      }
-      final local = date.toLocal();
-      if (_range == 'Dia') {
-        return local.year == now.year && local.month == now.month && local.day == now.day;
-      }
-      if (_range == 'Semana') {
-        return now.difference(local).inDays < 7;
-      }
-      return local.year == now.year && local.month == now.month;
-    }).toList(growable: false);
+    final filtered = history
+        .where((trip) {
+          final date = DateTime.tryParse(trip.requestedAt ?? '');
+          if (date == null) {
+            return false;
+          }
+          final local = date.toLocal();
+          if (_range == 'Dia') {
+            return local.year == now.year &&
+                local.month == now.month &&
+                local.day == now.day;
+          }
+          if (_range == 'Semana') {
+            return now.difference(local).inDays < 7;
+          }
+          return local.year == now.year && local.month == now.month;
+        })
+        .toList(growable: false);
 
-    final completed = filtered.where((trip) => trip.status == 'completed').length;
+    final completed = filtered
+        .where((trip) => trip.status == 'completed')
+        .length;
+    final totalCompleted = history
+        .where((trip) => trip.status == 'completed')
+        .length;
     final promoTrips = filtered.where((trip) => trip.isPromotional).length;
-    final estimatedRevenue = filtered
-        .where((trip) => trip.status == 'completed' && !trip.isPromotional)
-        .fold<double>(0, (sum, trip) => sum + trip.fareAmount);
 
     return _DetailScaffold(
       title: 'Estadistica',
@@ -1573,8 +1898,34 @@ class _DriverStatisticsPageState extends ConsumerState<DriverStatisticsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Row(
+              children: [
+                Expanded(
+                  child: _DriverStatisticsMetricButton(
+                    icon: Icons.workspace_premium_outlined,
+                    label: 'Prioridad',
+                    value: '+${totalCompleted < 120 ? 120 : totalCompleted}',
+                  ),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: _DriverStatisticsMetricButton(
+                    icon: Icons.star_border_rounded,
+                    label: 'Calificación',
+                    value: '5.0',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
             SegmentedButton<String>(
               style: ButtonStyle(
+                textStyle: const WidgetStatePropertyAll(
+                  TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                ),
+                padding: const WidgetStatePropertyAll(
+                  EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                ),
                 backgroundColor: WidgetStateProperty.resolveWith((states) {
                   if (states.contains(WidgetState.selected)) {
                     return palette.accentYellow;
@@ -1602,7 +1953,8 @@ class _DriverStatisticsPageState extends ConsumerState<DriverStatisticsPage> {
                 ButtonSegment(value: 'Mes', label: Text('Mes')),
               ],
               selected: {_range},
-              onSelectionChanged: (selection) => setState(() => _range = selection.first),
+              onSelectionChanged: (selection) =>
+                  setState(() => _range = selection.first),
             ),
             const SizedBox(height: 18),
             _DriverSettingsInfoCard(
@@ -1612,10 +1964,6 @@ class _DriverStatisticsPageState extends ConsumerState<DriverStatisticsPage> {
             _DriverSettingsInfoCard(
               title: 'Viajes promocionales',
               subtitle: '$promoTrips viaje(s) promo en este periodo.',
-            ),
-            _DriverSettingsInfoCard(
-              title: 'Cobro estimado',
-              subtitle: 'Bs ${estimatedRevenue.toStringAsFixed(2)} en viajes no promocionales.',
             ),
           ],
         ),
@@ -1650,17 +1998,14 @@ class _DriverNotificationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final visual = _driverNotificationVisual(kind);
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF0C1830),
-            Color(0xFF09111F),
-          ],
+          colors: [Color(0xFF0C1830), Color(0xFF09111F)],
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: visual.borderColor),
         boxShadow: const [
           BoxShadow(
@@ -1674,16 +2019,16 @@ class _DriverNotificationCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 54,
-            height: 54,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               color: visual.backgroundColor,
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(13),
               border: Border.all(color: visual.borderColor),
             ),
-            child: Icon(visual.icon, color: visual.accentColor, size: 26),
+            child: Icon(visual.icon, color: visual.accentColor, size: 20),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1691,16 +2036,19 @@ class _DriverNotificationCard extends StatelessWidget {
                 Text(
                   title,
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 17,
+                    fontSize: 14,
                     fontWeight: FontWeight.w800,
                     color: Colors.white,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 5),
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: visual.backgroundColor,
                         borderRadius: BorderRadius.circular(999),
@@ -1711,13 +2059,16 @@ class _DriverNotificationCard extends StatelessWidget {
                         style: TextStyle(
                           color: visual.accentColor,
                           fontWeight: FontWeight.w800,
-                          fontSize: 11,
+                          fontSize: 9.5,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFF0A1323),
                         borderRadius: BorderRadius.circular(999),
@@ -1728,19 +2079,20 @@ class _DriverNotificationCard extends StatelessWidget {
                         style: const TextStyle(
                           color: Color(0xFFDCE6F2),
                           fontWeight: FontWeight.w700,
-                          fontSize: 11,
+                          fontSize: 9.5,
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Text(
                   message,
                   style: const TextStyle(
                     color: Color(0xFFDCE6F2),
+                    fontSize: 11.5,
                     fontWeight: FontWeight.w600,
-                    height: 1.4,
+                    height: 1.35,
                   ),
                 ),
               ],
@@ -1752,7 +2104,14 @@ class _DriverNotificationCard extends StatelessWidget {
   }
 }
 
-({Color accentColor, Color backgroundColor, Color borderColor, IconData icon, String label}) _driverNotificationVisual(String kind) {
+({
+  Color accentColor,
+  Color backgroundColor,
+  Color borderColor,
+  IconData icon,
+  String label,
+})
+_driverNotificationVisual(String kind) {
   switch (kind.toLowerCase()) {
     case 'importante':
       return (
@@ -1782,10 +2141,7 @@ class _DriverNotificationCard extends StatelessWidget {
 }
 
 class _DriverSettingsInfoCard extends StatelessWidget {
-  const _DriverSettingsInfoCard({
-    required this.title,
-    required this.subtitle,
-  });
+  const _DriverSettingsInfoCard({required this.title, required this.subtitle});
 
   final String title;
   final String subtitle;
@@ -1793,19 +2149,16 @@ class _DriverSettingsInfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.only(bottom: 10),
       child: Container(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(13),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF0C1830),
-              Color(0xFF09111F),
-            ],
+            colors: [Color(0xFF0C1830), Color(0xFF09111F)],
           ),
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(color: const Color(0xFF1A3A66)),
           boxShadow: const [
             BoxShadow(
@@ -1818,16 +2171,20 @@ class _DriverSettingsInfoCard extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 52,
-              height: 52,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
                 color: const Color(0x191D4ED8),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(13),
                 border: Border.all(color: const Color(0x551D4ED8)),
               ),
-              child: const Icon(Icons.check_circle_outline, color: Color(0xFFFACC15)),
+              child: const Icon(
+                Icons.check_circle_outline,
+                color: Color(0xFFFACC15),
+                size: 20,
+              ),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1835,17 +2192,18 @@ class _DriverSettingsInfoCard extends StatelessWidget {
                   Text(
                     title,
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: 18,
+                      fontSize: 14,
                       fontWeight: FontWeight.w800,
                       color: Colors.white,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
                     subtitle,
                     style: const TextStyle(
                       color: Color(0xFFDCE6F2),
                       fontWeight: FontWeight.w600,
+                      fontSize: 12,
                     ),
                   ),
                 ],
@@ -1859,10 +2217,7 @@ class _DriverSettingsInfoCard extends StatelessWidget {
 }
 
 class DriverTripDetailPage extends StatelessWidget {
-  const DriverTripDetailPage({
-    super.key,
-    required this.trip,
-  });
+  const DriverTripDetailPage({super.key, required this.trip});
 
   final DriverTrip trip;
 
@@ -1870,15 +2225,18 @@ class DriverTripDetailPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.rapigoPalette;
     final metrics = context.rapigoMetrics;
-    final passengerName = (trip.passengerName ?? '').trim().isEmpty ? 'Pasajero RAPIGO' : trip.passengerName!.trim();
+    final passengerName = (trip.passengerName ?? '').trim().isEmpty
+        ? 'Pasajero RAPIGO'
+        : trip.passengerName!.trim();
     final distanceKm = driverTripDistanceKm(trip);
     final durationMinutes = driverTripEstimatedMinutes(trip);
-    final fareText = 'Bs ${trip.fareAmount.toStringAsFixed(2)}';
     final requestedAt = trip.requestedAt ?? '';
     final routeDate = _formatTripDate(requestedAt);
     final routeTime = _formatTripTime(requestedAt);
     final vehicleLabel = _tripVehicleLabel(trip);
-    final vehicleChip = trip.vehicleLabel?.trim().isNotEmpty == true ? trip.vehicleLabel!.trim() : vehicleLabel;
+    final vehicleChip = trip.vehicleLabel?.trim().isNotEmpty == true
+        ? trip.vehicleLabel!.trim()
+        : vehicleLabel;
     final statusLabel = driverTripStatusLabel(trip.status);
     final statusColor = driverTripStatusColor(trip.status);
 
@@ -1893,10 +2251,7 @@ class DriverTripDetailPage extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  palette.surfacePrimary,
-                  palette.surfaceSecondary,
-                ],
+                colors: [palette.surfacePrimary, palette.surfaceSecondary],
               ),
               borderRadius: BorderRadius.circular(28),
               border: Border.all(color: palette.outlineStrong),
@@ -1963,16 +2318,25 @@ class DriverTripDetailPage extends StatelessWidget {
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
                       decoration: BoxDecoration(
                         color: statusColor.withValues(alpha: 0.14),
                         borderRadius: BorderRadius.circular(999),
-                        border: Border.all(color: statusColor.withValues(alpha: 0.24)),
+                        border: Border.all(
+                          color: statusColor.withValues(alpha: 0.24),
+                        ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.check_circle_rounded, color: statusColor, size: 18),
+                          Icon(
+                            Icons.check_circle_rounded,
+                            color: statusColor,
+                            size: 18,
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             statusLabel,
@@ -2020,7 +2384,10 @@ class DriverTripDetailPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 14),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 16,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF08111E),
                     borderRadius: BorderRadius.circular(22),
@@ -2045,24 +2412,6 @@ class DriverTripDetailPage extends StatelessWidget {
                           color: const Color(0xFF2979FF),
                         ),
                       ),
-                      const _TripMetricDivider(),
-                      Expanded(
-                        child: _TripMetricItem(
-                          icon: Icons.account_balance_wallet_rounded,
-                          value: fareText,
-                          label: 'Ganancia',
-                          color: const Color(0xFFFACC15),
-                        ),
-                      ),
-                      const _TripMetricDivider(),
-                      Expanded(
-                        child: _TripMetricItem(
-                          icon: Icons.payments_rounded,
-                          value: 'Efectivo',
-                          label: 'Metodo de pago',
-                          color: const Color(0xFF22C55E),
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -2070,10 +2419,7 @@ class DriverTripDetailPage extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          _TripTimelineCard(
-            requestedAt: requestedAt,
-            trip: trip,
-          ),
+          _TripTimelineCard(requestedAt: requestedAt, trip: trip),
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(18),
@@ -2081,10 +2427,7 @@ class DriverTripDetailPage extends StatelessWidget {
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF091425),
-                  Color(0xFF08111E),
-                ],
+                colors: [Color(0xFF091425), Color(0xFF08111E)],
               ),
               borderRadius: BorderRadius.circular(26),
               border: Border.all(color: const Color(0xFF15335A)),
@@ -2162,7 +2505,10 @@ class DriverTripDetailPage extends StatelessWidget {
               Expanded(
                 child: FilledButton.icon(
                   onPressed: () {
-                    showTopNotice(context, 'Muy pronto podras descargar el recibo del viaje.');
+                    showTopNotice(
+                      context,
+                      'Muy pronto podras descargar el recibo del viaje.',
+                    );
                   },
                   icon: const Icon(Icons.download_rounded),
                   label: const Text('Descargar recibo'),
@@ -2206,24 +2552,13 @@ class DriverTripRoutePreview extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF09111E),
-              Color(0xFF0A1425),
-            ],
+            colors: [Color(0xFF09111E), Color(0xFF0A1425)],
           ),
         ),
         child: Stack(
           children: [
-            Positioned.fill(
-              child: CustomPaint(
-                painter: _TripMapGridPainter(),
-              ),
-            ),
-            Positioned.fill(
-              child: CustomPaint(
-                painter: _TripRoutePainter(),
-              ),
-            ),
+            Positioned.fill(child: CustomPaint(painter: _TripMapGridPainter())),
+            Positioned.fill(child: CustomPaint(painter: _TripRoutePainter())),
             Positioned(
               left: 26,
               bottom: 28,
@@ -2279,10 +2614,7 @@ class DriverTripRoutePreview extends StatelessWidget {
 }
 
 class _TripCapsule extends StatelessWidget {
-  const _TripCapsule({
-    required this.icon,
-    required this.label,
-  });
+  const _TripCapsule({required this.icon, required this.label});
 
   final IconData icon;
   final String label;
@@ -2331,7 +2663,9 @@ class _TripMetaLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisAlignment: alignEnd ? MainAxisAlignment.end : MainAxisAlignment.start,
+      mainAxisAlignment: alignEnd
+          ? MainAxisAlignment.end
+          : MainAxisAlignment.start,
       children: [
         Icon(icon, size: 18, color: color),
         const SizedBox(width: 8),
@@ -2415,10 +2749,7 @@ class _TripMetricDivider extends StatelessWidget {
 }
 
 class _TripTimelineCard extends StatelessWidget {
-  const _TripTimelineCard({
-    required this.requestedAt,
-    required this.trip,
-  });
+  const _TripTimelineCard({required this.requestedAt, required this.trip});
 
   final String requestedAt;
   final DriverTrip trip;
@@ -2431,10 +2762,7 @@ class _TripTimelineCard extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF091425),
-            Color(0xFF08111E),
-          ],
+          colors: [Color(0xFF091425), Color(0xFF08111E)],
         ),
         borderRadius: BorderRadius.circular(26),
         border: Border.all(color: const Color(0xFF15335A)),
@@ -2528,10 +2856,7 @@ class _TripTimelineCard extends StatelessWidget {
 }
 
 class _TripWaypoint extends StatelessWidget {
-  const _TripWaypoint({
-    required this.color,
-    this.outlined = false,
-  });
+  const _TripWaypoint({required this.color, this.outlined = false});
 
   final Color color;
   final bool outlined;
@@ -2551,10 +2876,7 @@ class _TripWaypoint extends StatelessWidget {
               child: Container(
                 width: 8,
                 height: 8,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: color,
-                ),
+                decoration: BoxDecoration(shape: BoxShape.circle, color: color),
               ),
             )
           : null,
@@ -2637,19 +2959,12 @@ class _TripInfoDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Divider(
-      height: 1,
-      color: Color(0xFF143050),
-    );
+    return const Divider(height: 1, color: Color(0xFF143050));
   }
 }
 
 class _TripMapPin extends StatelessWidget {
-  const _TripMapPin({
-    required this.color,
-    required this.innerColor,
-    this.glow,
-  });
+  const _TripMapPin({required this.color, required this.innerColor, this.glow});
 
   final Color color;
   final Color innerColor;
@@ -2675,10 +2990,7 @@ class _TripMapPin extends StatelessWidget {
         child: Container(
           width: 12,
           height: 12,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: innerColor,
-          ),
+          decoration: BoxDecoration(shape: BoxShape.circle, color: innerColor),
         ),
       ),
     );
@@ -2803,12 +3115,18 @@ String driverTripStatusLabel(String status) {
 }
 
 String _driverInitials(String name) {
-  final parts = name.trim().split(RegExp(r'\s+')).where((part) => part.isNotEmpty).toList();
+  final parts = name
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((part) => part.isNotEmpty)
+      .toList();
   if (parts.isEmpty) {
     return 'RP';
   }
   if (parts.length == 1) {
-    return parts.first.substring(0, parts.first.length >= 2 ? 2 : 1).toUpperCase();
+    return parts.first
+        .substring(0, parts.first.length >= 2 ? 2 : 1)
+        .toUpperCase();
   }
   return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
 }
@@ -2835,7 +3153,20 @@ String _formatTripDate(String raw) {
   if (date == null) {
     return '17 jun 2026';
   }
-  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const months = [
+    'ene',
+    'feb',
+    'mar',
+    'abr',
+    'may',
+    'jun',
+    'jul',
+    'ago',
+    'sep',
+    'oct',
+    'nov',
+    'dic',
+  ];
   return '${date.day} ${months[date.month - 1]} ${date.year}';
 }
 
@@ -2844,7 +3175,9 @@ String _formatTripTime(String raw) {
   if (date == null) {
     return '03:08 p. m.';
   }
-  final hour = date.hour > 12 ? date.hour - 12 : (date.hour == 0 ? 12 : date.hour);
+  final hour = date.hour > 12
+      ? date.hour - 12
+      : (date.hour == 0 ? 12 : date.hour);
   final minutes = date.minute.toString().padLeft(2, '0');
   final suffix = date.hour >= 12 ? 'p. m.' : 'a. m.';
   return '$hour:$minutes $suffix';
@@ -2893,10 +3226,7 @@ String? _formatInfoDate(DateTime? date) {
 }
 
 class _DetailScaffold extends StatelessWidget {
-  const _DetailScaffold({
-    required this.title,
-    required this.child,
-  });
+  const _DetailScaffold({required this.title, required this.child});
 
   final String title;
   final Widget child;

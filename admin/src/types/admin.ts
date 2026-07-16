@@ -250,6 +250,11 @@ export type ManagedUserForm = {
   accessStatus: 'PENDIENTE' | 'AUTORIZADO' | 'RECHAZADO'
 }
 
+export type AppSettings = {
+  supportPhone: string
+  updatedAt?: string | null
+}
+
 export type ActivityEvent = {
   id: string
   title: string

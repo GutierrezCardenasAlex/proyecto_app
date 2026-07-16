@@ -18,6 +18,34 @@ export default function LiveMapSection({ drivers, trips, offlineStatus, mapFulls
   const mapCardRef = useRef<HTMLDivElement | null>(null)
   const mapInstanceRef = useRef<ReturnType<typeof L.map> | null>(null)
   const markersLayerRef = useRef<ReturnType<typeof L.layerGroup> | null>(null)
+  const didFitInitialDriversRef = useRef(false)
+
+  function escapeHtml(value: string) {
+    return value
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;')
+  }
+
+  function visibleDriverPoints() {
+    return drivers
+      .filter((driver) => driver.location?.lat && driver.location?.lng)
+      .map((driver) => [Number(driver.location!.lat), Number(driver.location!.lng)] as [number, number])
+      .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng))
+  }
+
+  function fitVisibleDrivers() {
+    const map = mapInstanceRef.current
+    const points = visibleDriverPoints()
+    if (!map || points.length === 0) return
+    if (points.length === 1) {
+      map.setView(points[0], 15)
+      return
+    }
+    map.fitBounds(L.latLngBounds(points), { padding: [42, 42], maxZoom: 15 })
+  }
 
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return
@@ -53,23 +81,31 @@ export default function LiveMapSection({ drivers, trips, offlineStatus, mapFulls
         const operationalStatus = getDriverStatusLabel(driver)
         const markerTone = operationalStatus === 'En viaje' ? '#ef4444' : operationalStatus === 'Disponible' ? '#22c55e' : '#f97316'
         const displayName = getDriverDisplayName(driver)
+        const lat = Number(driver.location?.lat)
+        const lng = Number(driver.location?.lng)
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return
         const driverIcon = new L.DivIcon({
           className: 'driver-pin',
-          html: `<span>${getInitials(displayName)}</span>`,
+          html: `<span>${escapeHtml(getInitials(displayName))}</span>`,
           iconSize: [34, 34],
         })
-        L.marker([Number(driver.location?.lat), Number(driver.location?.lng)], { icon: driverIcon })
+        L.marker([lat, lng], { icon: driverIcon })
           .bindPopup(
             `<div style="min-width:180px">
-              <strong>${displayName}</strong><br/>
-              <span>${driver.phone || driver.id}</span><br/>
+              <strong>${escapeHtml(displayName)}</strong><br/>
+              <span>${escapeHtml(driver.phone || driver.id)}</span><br/>
               <span style="color:${markerTone};font-weight:700">${operationalStatus}</span><br/>
-              <span>${getDriverAvailabilityLabel(driver)}</span><br/>
-              <span>${driver.current_trip_id ? 'En viaje activo' : getDriverTelemetryLabel(driver, 'Ultimo GPS')}</span>
+              <span>${escapeHtml(getDriverAvailabilityLabel(driver))}</span><br/>
+              <span>${escapeHtml(driver.current_trip_id ? 'En viaje activo' : getDriverTelemetryLabel(driver, 'Ultimo GPS'))}</span>
             </div>`,
           )
           .addTo(markersLayerRef.current!)
       })
+
+    if (!didFitInitialDriversRef.current && visibleDriverPoints().length > 0) {
+      didFitInitialDriversRef.current = true
+      window.setTimeout(fitVisibleDrivers, 120)
+    }
   }, [drivers])
 
   async function toggleMapFullscreen() {
@@ -108,6 +144,9 @@ export default function LiveMapSection({ drivers, trips, offlineStatus, mapFulls
             </div>
             <Button variant="secondary" onClick={toggleMapFullscreen}>
               {mapFullscreen ? 'Salir de pantalla completa' : 'Expandir mapa'}
+            </Button>
+            <Button variant="secondary" onClick={fitVisibleDrivers} disabled={visibleDriverPoints().length === 0}>
+              Ajustar flota
             </Button>
           </div>
         </div>

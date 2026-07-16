@@ -126,16 +126,17 @@ class TripRepository {
       return const [];
     }
 
+    final nearbyRadiusMeters = (PotosiGeo.maxRadiusKm * 1000).round();
     final dispatchResponse = await http.get(
       Uri.parse(
-        '${AppConfig.apiBaseUrl}/dispatch/nearby?lat=$lat&lng=$lng&radiusMeters=50000&limit=200',
+        '${AppConfig.apiBaseUrl}/dispatch/nearby?lat=$lat&lng=$lng&radiusMeters=$nearbyRadiusMeters&limit=200',
       ),
       headers: _headers(token),
     );
 
     final locationResponse = await http.get(
       Uri.parse(
-        '${AppConfig.apiBaseUrl}/locations/nearby?lat=$lat&lng=$lng&radiusMeters=50000&limit=200',
+        '${AppConfig.apiBaseUrl}/locations/nearby?lat=$lat&lng=$lng&radiusMeters=$nearbyRadiusMeters&limit=200',
       ),
       headers: _headers(token),
     );

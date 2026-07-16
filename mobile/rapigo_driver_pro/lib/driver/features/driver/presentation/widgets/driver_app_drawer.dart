@@ -28,7 +28,6 @@ class DriverAppDrawer extends StatelessWidget {
     final items = const [
       ('Panel de viaje', Icons.local_taxi),
       ('Viajes disponibles', Icons.assignment_rounded),
-      ('Historial', Icons.history),
       ('Estadistica', Icons.insights_rounded),
       ('Cuenta', Icons.person_outline_rounded),
       ('Notificaciones', Icons.notifications_active_outlined),
@@ -37,7 +36,7 @@ class DriverAppDrawer extends StatelessWidget {
     ];
 
     return Drawer(
-      width: 320,
+      width: 292,
       child: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -48,46 +47,54 @@ class DriverAppDrawer extends StatelessWidget {
         ),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
+            padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Material(
                   color: const Color(0xFF1F1F24),
-                  borderRadius: BorderRadius.circular(28),
+                  borderRadius: BorderRadius.circular(20),
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(28),
+                    borderRadius: BorderRadius.circular(20),
                     onTap: onOpenProfile,
                     child: Padding(
-                      padding: const EdgeInsets.all(14),
+                      padding: const EdgeInsets.all(10),
                       child: Row(
                         children: [
                           Stack(
                             children: [
                               Container(
-                                width: 78,
-                                height: 78,
+                                width: 58,
+                                height: 58,
                                 decoration: BoxDecoration(
                                   color: const Color(0xFF2A2A31),
-                                  borderRadius: BorderRadius.circular(22),
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
-                                child: const Icon(Icons.person, size: 36, color: Color(0xFFFFF4EC)),
+                                child: const Icon(
+                                  Icons.person,
+                                  size: 28,
+                                  color: Color(0xFFFFF4EC),
+                                ),
                               ),
                               Positioned(
                                 right: 0,
                                 bottom: 0,
                                 child: Container(
-                                  padding: const EdgeInsets.all(5),
+                                  padding: const EdgeInsets.all(4),
                                   decoration: BoxDecoration(
                                     color: const Color(0xFFF97316),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
-                                  child: const Icon(Icons.verified, size: 16, color: Color(0xFF0F0F10)),
+                                  child: const Icon(
+                                    Icons.verified,
+                                    size: 13,
+                                    color: Color(0xFF0F0F10),
+                                  ),
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(width: 14),
+                          const SizedBox(width: 10),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -95,22 +102,26 @@ class DriverAppDrawer extends StatelessWidget {
                                 Text(
                                   fullName,
                                   style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 22,
+                                    fontSize: 16,
                                     fontWeight: FontWeight.w800,
                                     color: const Color(0xFFFFF4EC),
                                   ),
                                 ),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 3),
                                 const Text(
                                   'Calificacion 4.97',
                                   style: TextStyle(
                                     color: Color(0xFFFDBA74),
                                     fontWeight: FontWeight.w800,
+                                    fontSize: 11,
                                   ),
                                 ),
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 5),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: const Color(0x33F97316),
                                     borderRadius: BorderRadius.circular(999),
@@ -118,17 +129,20 @@ class DriverAppDrawer extends StatelessWidget {
                                   child: const Text(
                                     'ACTIVO EN POTOSI',
                                     style: TextStyle(
-                                      fontSize: 10,
+                                      fontSize: 8.5,
                                       fontWeight: FontWeight.w900,
                                       letterSpacing: 1.2,
                                       color: Color(0xFFFFC89B),
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 5),
                                 Text(
                                   phone,
-                                  style: const TextStyle(color: Color(0xFFFFDCC1)),
+                                  style: const TextStyle(
+                                    color: Color(0xFFFFDCC1),
+                                    fontSize: 11,
+                                  ),
                                 ),
                               ],
                             ),
@@ -138,11 +152,12 @@ class DriverAppDrawer extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 12),
                 Expanded(
                   child: ListView.separated(
                     itemCount: items.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 8),
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 5),
                     itemBuilder: (context, index) {
                       final item = items[index];
                       final active = item.$1 == activeItem;
@@ -150,38 +165,64 @@ class DriverAppDrawer extends StatelessWidget {
                       final isSupport = item.$1 == 'Soporte';
                       return Container(
                         decoration: BoxDecoration(
-                          color: active ? const Color(0xFFF97316) : Colors.transparent,
-                          borderRadius: BorderRadius.circular(18),
+                          color: active
+                              ? const Color(0xFFF97316)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                            color: active ? const Color(0xFFF97316) : const Color(0xFF2D2D32),
+                            color: active
+                                ? const Color(0xFFF97316)
+                                : const Color(0xFF2D2D32),
                           ),
                         ),
                         child: ListTile(
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                          dense: true,
+                          visualDensity: const VisualDensity(
+                            horizontal: -2,
+                            vertical: -3,
+                          ),
+                          minLeadingWidth: 34,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 9,
+                            vertical: 0,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                           leading: Container(
-                            width: 40,
-                            height: 40,
+                            width: 32,
+                            height: 32,
                             decoration: BoxDecoration(
-                              color: active ? const Color(0xFF0F0F10) : const Color(0xFF25252B),
-                              borderRadius: BorderRadius.circular(12),
+                              color: active
+                                  ? const Color(0xFF0F0F10)
+                                  : const Color(0xFF25252B),
+                              borderRadius: BorderRadius.circular(10),
                             ),
                             child: Icon(
                               item.$2,
-                              color: active ? const Color(0xFFF97316) : const Color(0xFFFFC89B),
+                              size: 18,
+                              color: active
+                                  ? const Color(0xFFF97316)
+                                  : const Color(0xFFFFC89B),
                             ),
                           ),
                           title: Text(
                             item.$1,
                             style: TextStyle(
-                              fontWeight: active ? FontWeight.w800 : FontWeight.w600,
-                              color: active ? const Color(0xFF0F0F10) : const Color(0xFFFFF4EC),
+                              fontWeight: active
+                                  ? FontWeight.w800
+                                  : FontWeight.w600,
+                              fontSize: 13,
+                              color: active
+                                  ? const Color(0xFF0F0F10)
+                                  : const Color(0xFFFFF4EC),
                             ),
                           ),
                           trailing: isNotifications
                               ? _DriverInboxBadge(token: token)
                               : isSupport
-                                  ? _DriverSupportBadge(token: token)
-                                  : null,
+                              ? _DriverSupportBadge(token: token)
+                              : null,
                           onTap: () {
                             Navigator.pop(context);
                             onSelect(item.$1);
@@ -192,7 +233,7 @@ class DriverAppDrawer extends StatelessWidget {
                   ),
                 ),
                 const Divider(color: Color(0x33F97316)),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
@@ -203,8 +244,13 @@ class DriverAppDrawer extends StatelessWidget {
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFFF97316),
                       foregroundColor: const Color(0xFF0F0F10),
+                      minimumSize: const Size.fromHeight(38),
+                      textStyle: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                    icon: const Icon(Icons.logout),
+                    icon: const Icon(Icons.logout, size: 16),
                     label: const Text('Cerrar sesion'),
                   ),
                 ),
@@ -226,7 +272,9 @@ class _DriverInboxBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final repository = const AdminCenterRepository();
     return FutureBuilder<List<AdminNotificationItem>>(
-      future: token.isEmpty ? Future.value(const <AdminNotificationItem>[]) : repository.fetchNotifications(token),
+      future: token.isEmpty
+          ? Future.value(const <AdminNotificationItem>[])
+          : repository.fetchNotifications(token),
       builder: (context, snapshot) {
         final count = snapshot.data?.length ?? 0;
         return _DriverDrawerBadge(
@@ -248,7 +296,9 @@ class _DriverSupportBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final repository = const AdminCenterRepository();
     return FutureBuilder<List<SupportReportItem>>(
-      future: token.isEmpty ? Future.value(const <SupportReportItem>[]) : repository.fetchSupportReports(token),
+      future: token.isEmpty
+          ? Future.value(const <SupportReportItem>[])
+          : repository.fetchSupportReports(token),
       builder: (context, snapshot) {
         final openCount = (snapshot.data ?? const <SupportReportItem>[])
             .where((item) => item.status.toUpperCase() == 'ABIERTO')
@@ -280,7 +330,9 @@ class _DriverDrawerBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: hasCount ? color.withValues(alpha: 0.14) : const Color(0xFF25252B),
+        color: hasCount
+            ? color.withValues(alpha: 0.14)
+            : const Color(0xFF25252B),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(

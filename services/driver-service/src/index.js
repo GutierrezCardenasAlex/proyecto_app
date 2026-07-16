@@ -25,6 +25,9 @@ const driverProfileSchema = z.object({
   userId: z.string().uuid(),
   licenseNumber: realTextSchema(4, "La licencia")
     .refine((value) => !value.toUpperCase().startsWith("TEMP-"), "Ingresa una licencia real."),
+  licenseCategory: z.string().trim().min(1).max(8).optional().or(z.literal("")),
+  licenseIssueDate: z.string().trim().min(4).max(32).optional().or(z.literal("")),
+  licenseExpiryDate: z.string().trim().min(4).max(32).optional().or(z.literal("")),
   vehicle: z.object({
     type: z.enum(["taxi", "moto"]).default("taxi"),
     plate: realTextSchema(4, "La placa")
@@ -183,13 +186,16 @@ async function bootstrap() {
     ALTER TABLE drivers
       ADD COLUMN IF NOT EXISTS access_status VARCHAR(20) NOT NULL DEFAULT 'AUTORIZADO',
       ADD COLUMN IF NOT EXISTS access_note TEXT,
-      ADD COLUMN IF NOT EXISTS access_granted_at TIMESTAMPTZ
+      ADD COLUMN IF NOT EXISTS access_granted_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS license_category VARCHAR(16),
+      ADD COLUMN IF NOT EXISTS license_issue_date VARCHAR(32),
+      ADD COLUMN IF NOT EXISTS license_expiry_date VARCHAR(32)
   `);
 
   app.get("/health", async () => ({ status: "ok", service: "driver-service" }));
 
   app.post("/profile", async (request, reply) => {
-    const { userId, licenseNumber, vehicle } = driverProfileSchema.parse(request.body);
+    const { userId, licenseNumber, licenseCategory, licenseIssueDate, licenseExpiryDate, vehicle } = driverProfileSchema.parse(request.body);
     const user = await requireOwnUserId(request, reply, userId);
     if (!user) return;
 
@@ -198,12 +204,16 @@ async function bootstrap() {
     try {
       await client.query("BEGIN");
       const driverResult = await client.query(
-        `INSERT INTO drivers (user_id, license_number, status, is_available)
-         VALUES ($1, $2, 'offline', FALSE)
+        `INSERT INTO drivers (user_id, license_number, license_category, license_issue_date, license_expiry_date, status, is_available)
+         VALUES ($1, $2, $3, $4, $5, 'offline', FALSE)
          ON CONFLICT (user_id)
-         DO UPDATE SET license_number = EXCLUDED.license_number, updated_at = NOW()
+         DO UPDATE SET license_number = EXCLUDED.license_number,
+                       license_category = COALESCE(EXCLUDED.license_category, drivers.license_category),
+                       license_issue_date = COALESCE(EXCLUDED.license_issue_date, drivers.license_issue_date),
+                       license_expiry_date = COALESCE(EXCLUDED.license_expiry_date, drivers.license_expiry_date),
+                       updated_at = NOW()
          RETURNING *`,
-        [userId, licenseNumber]
+        [userId, licenseNumber, licenseCategory || null, licenseIssueDate || null, licenseExpiryDate || null]
       );
 
       const driver = driverResult.rows[0];

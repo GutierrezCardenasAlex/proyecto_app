@@ -76,6 +76,28 @@ export default function SettingsPage() {
           </div>
         </Card>
 
+        <Card title="Soporte conductor" subtitle="Numero usado por el boton de WhatsApp cuando un conductor solicita autorizacion." className="saas-panel-dark">
+          <div className="settings-stack">
+            <label className="admin-field">
+              <span>WhatsApp de central</span>
+              <input
+                value={central.supportPhoneDraft}
+                onChange={(event) => central.setSupportPhoneDraft(event.target.value)}
+                placeholder="+59170000000"
+              />
+            </label>
+            <div className="admin-detail-card">
+              <span>Numero activo</span>
+              <strong>{central.appSettings.supportPhone || 'Sin configurar'}</strong>
+            </div>
+            <div className="admin-form-actions">
+              <Button variant="success" onClick={() => void central.updateSupportPhone()} disabled={central.loading}>
+                Guardar soporte
+              </Button>
+            </div>
+          </div>
+        </Card>
+
         <Card title="Promociones y reglas" subtitle="Control comercial y estado actual del ciclo de beneficios." className="saas-panel-dark">
           <div className="settings-toggle-panel">
             <div className="settings-toggle-panel__copy">

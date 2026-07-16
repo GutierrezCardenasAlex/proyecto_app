@@ -2,6 +2,7 @@ import { createContext, useEffect, useMemo, useRef, useState, type PropsWithChil
 import { io } from 'socket.io-client'
 import type {
   ActivityEvent,
+  AppSettings,
   Dashboard,
   DeviceRow,
   Driver,
@@ -33,6 +34,8 @@ type CentralContextValue = {
   allDevices: DeviceRow[]
   managedUsers: ManagedUserRow[]
   promoSettings: PromoSettings
+  appSettings: AppSettings
+  supportPhoneDraft: string
   offlineMapStatus: OfflineMapStatus
   supportReports: SupportReport[]
   performanceRange: PerformanceRange
@@ -81,6 +84,7 @@ type CentralContextValue = {
   setNotificationKind: (value: NotificationKind) => void
   setNotificationTitle: (value: string) => void
   setNotificationMessage: (value: string) => void
+  setSupportPhoneDraft: (value: string) => void
   openCreateUserForm: () => void
   openEditUserForm: (user: ManagedUserRow) => void
   updateManagedUserForm: <K extends keyof ManagedUserForm>(field: K, value: ManagedUserForm[K]) => void
@@ -92,6 +96,7 @@ type CentralContextValue = {
   updateDeviceStatus: (deviceId: number, status: 'AUTORIZADO' | 'RECHAZADO') => Promise<void>
   updateDriverAccess: (driverId: string, status: 'AUTORIZADO' | 'RECHAZADO', note?: string) => Promise<void>
   updatePromoStatus: (enabled: boolean) => Promise<void>
+  updateSupportPhone: () => Promise<void>
   sendAdminNotification: () => Promise<void>
   loadDriverPerformance: (range: PerformanceRange) => Promise<void>
   loadDriverTrips: (driverId: string) => Promise<void>
@@ -101,6 +106,7 @@ type CentralContextValue = {
 
 const emptyDashboard: Dashboard = { drivers: 0, trips: 0, activeTrips: 0, revenue: '0.00', pendingDevices: 0 }
 const emptyPromo: PromoSettings = { enabled: true, cycleLength: 5, rewardCredits: 1, updatedAt: null }
+const emptyAppSettings: AppSettings = { supportPhone: '', updatedAt: null }
 const emptyOffline: OfflineMapStatus = {
   enabled: false,
   status: 'PENDIENTE',
@@ -131,6 +137,8 @@ export function CentralProvider({ children }: PropsWithChildren) {
   const [allDevices, setAllDevices] = useState<DeviceRow[]>([])
   const [managedUsers, setManagedUsers] = useState<ManagedUserRow[]>([])
   const [promoSettings, setPromoSettings] = useState<PromoSettings>(emptyPromo)
+  const [appSettings, setAppSettings] = useState<AppSettings>(emptyAppSettings)
+  const [supportPhoneDraft, setSupportPhoneDraft] = useState('')
   const [offlineMapStatus, setOfflineMapStatus] = useState<OfflineMapStatus>(emptyOffline)
   const [supportReports, setSupportReports] = useState<SupportReport[]>([])
   const [performanceRange, setPerformanceRange] = useState<PerformanceRange>('day')
@@ -295,6 +303,8 @@ export function CentralProvider({ children }: PropsWithChildren) {
           setUserHistory([])
           setDriverPerformance(emptyPerformance)
           setPromoSettings(emptyPromo)
+          setAppSettings(emptyAppSettings)
+          setSupportPhoneDraft('')
         }
 
         failures = results.filter((entry) => entry.status === 'rejected') as PromiseRejectedResult[]
@@ -308,6 +318,7 @@ export function CentralProvider({ children }: PropsWithChildren) {
           adminService.getDevices(token),
           adminService.getUsers(token),
           adminService.getPromoSettings(token),
+          adminService.getAppSettings(token),
           adminService.getSupportReports(token),
           adminService.getDriverPerformance(token, performanceRange),
           adminService.getOfflineStatus(token),
@@ -321,6 +332,7 @@ export function CentralProvider({ children }: PropsWithChildren) {
           devicesResult,
           usersResult,
           promoResult,
+          appSettingsResult,
           supportResult,
           performanceResult,
           offlineResult,
@@ -334,6 +346,10 @@ export function CentralProvider({ children }: PropsWithChildren) {
         if (devicesResult.status === 'fulfilled') setAllDevices(devicesResult.value)
         if (usersResult.status === 'fulfilled') setManagedUsers(usersResult.value)
         if (promoResult.status === 'fulfilled') setPromoSettings(promoResult.value)
+        if (appSettingsResult.status === 'fulfilled') {
+          setAppSettings(appSettingsResult.value)
+          setSupportPhoneDraft(appSettingsResult.value.supportPhone || '')
+        }
         if (supportResult.status === 'fulfilled') setSupportReports(supportResult.value)
         if (performanceResult.status === 'fulfilled') setDriverPerformance(performanceResult.value)
         if (offlineResult.status === 'fulfilled') setOfflineMapStatus(offlineResult.value)
@@ -527,6 +543,22 @@ export function CentralProvider({ children }: PropsWithChildren) {
     }
   }
 
+  const updateSupportPhone = async () => {
+    if (!token) return
+    setLoading(true)
+    setError(null)
+    try {
+      const settings = await adminService.updateSupportPhone(token, supportPhoneDraft.trim())
+      setAppSettings(settings)
+      setSupportPhoneDraft(settings.supportPhone || '')
+    } catch (settingsError) {
+      handleAuthError(settingsError)
+      ensureMountedSetError(settingsError instanceof Error ? settingsError.message : 'No se pudo actualizar el telefono de soporte.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const sendAdminNotification = async () => {
     if (!token) return
     if (notificationTitle.trim().length < 3 || notificationMessage.trim().length < 6) {
@@ -651,6 +683,8 @@ export function CentralProvider({ children }: PropsWithChildren) {
       allDevices,
       managedUsers,
       promoSettings,
+      appSettings,
+      supportPhoneDraft,
       offlineMapStatus,
       supportReports,
       performanceRange,
@@ -694,6 +728,7 @@ export function CentralProvider({ children }: PropsWithChildren) {
       setNotificationKind,
       setNotificationTitle,
       setNotificationMessage,
+      setSupportPhoneDraft,
       openCreateUserForm,
       openEditUserForm,
       updateManagedUserForm,
@@ -705,6 +740,7 @@ export function CentralProvider({ children }: PropsWithChildren) {
       updateDeviceStatus,
       updateDriverAccess,
       updatePromoStatus,
+      updateSupportPhone,
       sendAdminNotification,
       loadDriverPerformance,
       loadDriverTrips,
@@ -714,6 +750,7 @@ export function CentralProvider({ children }: PropsWithChildren) {
     [
       adminSearch,
       allDevices,
+      appSettings,
       dashboard,
       driverAccessNote,
       driverPerformance,
@@ -743,6 +780,7 @@ export function CentralProvider({ children }: PropsWithChildren) {
       selectedHistoryUser,
       selectedManagedUser,
       supportReports,
+      supportPhoneDraft,
       supportRoleFilter,
       supportSearch,
       supportStatusFilter,

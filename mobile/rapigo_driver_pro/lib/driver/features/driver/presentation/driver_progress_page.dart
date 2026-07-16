@@ -19,10 +19,7 @@ import '../../trip/data/trip_repository.dart';
 import '../../trip/domain/driver_trip.dart';
 
 class DriverProgressPage extends ConsumerStatefulWidget {
-  const DriverProgressPage({
-    super.key,
-    required this.onClosed,
-  });
+  const DriverProgressPage({super.key, required this.onClosed});
 
   final VoidCallback onClosed;
 
@@ -114,7 +111,10 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
     final driverPoint = LatLng(driverLat, driverLng);
     if (trip.status == 'in_progress' || trip.status == 'completed') {
       if (trip.destinationLat == null || trip.destinationLng == null) {
-        return LatLngBounds.fromPoints([driverPoint, LatLng(trip.pickupLat, trip.pickupLng)]);
+        return LatLngBounds.fromPoints([
+          driverPoint,
+          LatLng(trip.pickupLat, trip.pickupLng),
+        ]);
       }
       return LatLngBounds.fromPoints([
         driverPoint,
@@ -154,7 +154,9 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
     if (value == null) {
       return '--:--';
     }
-    final hour = value.hour == 0 ? 12 : (value.hour > 12 ? value.hour - 12 : value.hour);
+    final hour = value.hour == 0
+        ? 12
+        : (value.hour > 12 ? value.hour - 12 : value.hour);
     final minute = value.minute.toString().padLeft(2, '0');
     final suffix = value.hour >= 12 ? 'PM' : 'AM';
     return '$hour:$minute $suffix';
@@ -165,7 +167,10 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
     if (startedAt == null) {
       return '18 min';
     }
-    final minutes = DateTime.now().difference(startedAt).inMinutes.clamp(1, 180);
+    final minutes = DateTime.now()
+        .difference(startedAt)
+        .inMinutes
+        .clamp(1, 180);
     return '$minutes min';
   }
 
@@ -197,7 +202,10 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
     final normalizedPhone = _normalizeWhatsAppPhone(trip.passengerPhone);
     if (normalizedPhone == null) {
       if (mounted) {
-        showTopNotice(context, 'Todavia no hay numero del pasajero para WhatsApp.');
+        showTopNotice(
+          context,
+          'Todavia no hay numero del pasajero para WhatsApp.',
+        );
       }
       return;
     }
@@ -210,7 +218,8 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
     final uri = Uri.parse(
       'https://wa.me/$normalizedPhone?text=${Uri.encodeComponent(message)}',
     );
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && mounted) {
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) &&
+        mounted) {
       showTopNotice(context, 'No se pudo abrir WhatsApp en este momento.');
     }
   }
@@ -219,12 +228,16 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
     final phone = trip.passengerPhone?.trim() ?? '';
     if (phone.isEmpty) {
       if (mounted) {
-        showTopNotice(context, 'Todavia no hay numero del pasajero para llamar.');
+        showTopNotice(
+          context,
+          'Todavia no hay numero del pasajero para llamar.',
+        );
       }
       return;
     }
     final uri = Uri(scheme: 'tel', path: phone);
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && mounted) {
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) &&
+        mounted) {
       showTopNotice(context, 'No se pudo iniciar la llamada en este momento.');
     }
   }
@@ -282,9 +295,16 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xFF1D4ED8), width: 2),
+                          border: Border.all(
+                            color: const Color(0xFF1D4ED8),
+                            width: 2,
+                          ),
                         ),
-                        child: const Icon(Icons.person, color: Color(0xFF111827), size: 32),
+                        child: const Icon(
+                          Icons.person,
+                          color: Color(0xFF111827),
+                          size: 32,
+                        ),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -345,7 +365,10 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
                     const SizedBox(height: 12),
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFF0B1627),
                         borderRadius: BorderRadius.circular(18),
@@ -353,7 +376,11 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.verified_rounded, color: Color(0xFF22C55E), size: 20),
+                          const Icon(
+                            Icons.verified_rounded,
+                            color: Color(0xFF22C55E),
+                            size: 20,
+                          ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
@@ -380,7 +407,9 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
 
   Future<void> _cancelTrip(DriverTrip trip) async {
     try {
-      await ref.read(offeredTripProvider.notifier).updateTripStatus('cancelled');
+      await ref
+          .read(offeredTripProvider.notifier)
+          .updateTripStatus('cancelled');
       await _clearDetailsExpanded(trip.id);
       await ref.read(offeredTripProvider.notifier).loadOffer();
       await _returnToHome();
@@ -415,7 +444,9 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
       setState(() => _showHomeReturnButton = false);
     }
     ref.read(driverHomeResumeOverlayProvider.notifier).showOnce();
-    ref.read(driverSuppressIncomingOfferOverlayProvider.notifier).suppressOnce();
+    ref
+        .read(driverSuppressIncomingOfferOverlayProvider.notifier)
+        .suppressOnce();
     await Future<void>.delayed(const Duration(milliseconds: 90));
     if (!mounted) {
       return;
@@ -443,11 +474,15 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
 
     try {
       if (trip.status == 'accepted') {
-        await ref.read(offeredTripProvider.notifier).updateTripStatus('arriving');
+        await ref
+            .read(offeredTripProvider.notifier)
+            .updateTripStatus('arriving');
         return;
       }
       if (trip.status == 'arriving') {
-        await ref.read(offeredTripProvider.notifier).updateTripStatus('at_pickup');
+        await ref
+            .read(offeredTripProvider.notifier)
+            .updateTripStatus('at_pickup');
         return;
       }
       if (trip.status == 'at_pickup') {
@@ -469,11 +504,15 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
           }
           return;
         }
-        await ref.read(offeredTripProvider.notifier).updateTripStatus('in_progress');
+        await ref
+            .read(offeredTripProvider.notifier)
+            .updateTripStatus('in_progress');
         return;
       }
       if (trip.status == 'in_progress') {
-        await ref.read(offeredTripProvider.notifier).updateTripStatus('completed');
+        await ref
+            .read(offeredTripProvider.notifier)
+            .updateTripStatus('completed');
         if (mounted) {
           setState(() => _detailsExpanded = true);
         }
@@ -513,7 +552,9 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
       await _clearDetailsExpanded(tripId);
     }
     ref.read(driverOfferPreviewTripIdProvider.notifier).setTrip(null);
-    ref.read(driverSuppressIncomingOfferOverlayProvider.notifier).suppressOnce();
+    ref
+        .read(driverSuppressIncomingOfferOverlayProvider.notifier)
+        .suppressOnce();
     ref.read(driverIgnoredIncomingTripIdProvider.notifier).ignore(tripId);
     ref.read(driverHomeResumeOverlayProvider.notifier).showOnce();
     if (tripId != null && tripId.isNotEmpty) {
@@ -534,9 +575,15 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
 
   @override
   Widget build(BuildContext context) {
-    final available = ref.watch(driverStateProvider.select((state) => state.available));
-    final driverLat = ref.watch(driverStateProvider.select((state) => state.lat));
-    final driverLng = ref.watch(driverStateProvider.select((state) => state.lng));
+    final available = ref.watch(
+      driverStateProvider.select((state) => state.available),
+    );
+    final driverLat = ref.watch(
+      driverStateProvider.select((state) => state.lat),
+    );
+    final driverLng = ref.watch(
+      driverStateProvider.select((state) => state.lng),
+    );
     final driverHeading = ref.watch(
       driverStateProvider.select((state) => state.headingDegrees),
     );
@@ -637,7 +684,8 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
       );
     }
 
-    final routeColor = trip.status == 'in_progress' || trip.status == 'completed'
+    final routeColor =
+        trip.status == 'in_progress' || trip.status == 'completed'
         ? const Color(0xFF0EA5E9)
         : const Color(0xFF2563EB);
     final focusBounds = _buildDriverFocusBounds(
@@ -649,26 +697,40 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
       LatLng(driverLat, driverLng),
       LatLng(trip.pickupLat, trip.pickupLng),
     );
-    final destinationDistance = trip.destinationLat != null && trip.destinationLng != null
+    final destinationDistance =
+        trip.destinationLat != null && trip.destinationLng != null
         ? _distanceMeters(
             LatLng(trip.pickupLat, trip.pickupLng),
             LatLng(trip.destinationLat!, trip.destinationLng!),
           )
         : 0.0;
-    final destinationDistanceLabel = trip.destinationLat != null && trip.destinationLng != null
+    final destinationDistanceLabel =
+        trip.destinationLat != null && trip.destinationLng != null
         ? _formatDistance(destinationDistance)
         : '--';
-    final destinationEtaLabel = trip.destinationLat != null && trip.destinationLng != null
+    final destinationEtaLabel =
+        trip.destinationLat != null && trip.destinationLng != null
         ? _formatEtaFromMeters(destinationDistance)
         : '--';
     final showSummaryOnly = trip.status == 'completed';
     final showDetailsModal = _detailsExpanded || showSummaryOnly;
     final showCompactPanel = !showSummaryOnly;
-    final isPickupStage = trip.status == 'accepted' || trip.status == 'arriving' || trip.status == 'at_pickup';
-    final navigationDistanceLabel = isPickupStage ? _formatDistance(pickupDistance) : destinationDistanceLabel;
-    final navigationEtaLabel = isPickupStage ? _formatEtaFromMeters(pickupDistance) : destinationEtaLabel;
-    final navigationTitle = isPickupStage ? _primaryAddress(trip.passengerPickup) : _primaryAddress(trip.destination);
-    final navigationSubtitle = isPickupStage ? _secondaryAddress(trip.passengerPickup) : _secondaryAddress(trip.destination);
+    final isPickupStage =
+        trip.status == 'accepted' ||
+        trip.status == 'arriving' ||
+        trip.status == 'at_pickup';
+    final navigationDistanceLabel = isPickupStage
+        ? _formatDistance(pickupDistance)
+        : destinationDistanceLabel;
+    final navigationEtaLabel = isPickupStage
+        ? _formatEtaFromMeters(pickupDistance)
+        : destinationEtaLabel;
+    final navigationTitle = isPickupStage
+        ? _primaryAddress(trip.passengerPickup)
+        : _primaryAddress(trip.destination);
+    final navigationSubtitle = isPickupStage
+        ? _secondaryAddress(trip.passengerPickup)
+        : _secondaryAddress(trip.destination);
 
     return PopScope(
       canPop: false,
@@ -698,9 +760,18 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
               child: DriverMapSurface(
                 viewportCacheKey: 'driver_shared_premium_map',
                 routePersistenceKey: 'driver_trip_route_${trip.id}',
-                routePersistenceReadKeys: driverTripRouteReadKeys(trip.id, trip.status),
-                routePersistenceWriteKeys: driverTripRouteWriteKeys(trip.id, trip.status),
-                prefetchRoutePersistenceKey: driverTripRoutePrefetchKey(trip.id, trip.status),
+                routePersistenceReadKeys: driverTripRouteReadKeys(
+                  trip.id,
+                  trip.status,
+                ),
+                routePersistenceWriteKeys: driverTripRouteWriteKeys(
+                  trip.id,
+                  trip.status,
+                ),
+                prefetchRoutePersistenceKey: driverTripRoutePrefetchKey(
+                  trip.id,
+                  trip.status,
+                ),
                 available: available,
                 tripAccepted: true,
                 driverLat: driverLat,
@@ -765,14 +836,19 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
                     child: Center(
                       child: Container(
                         margin: const EdgeInsets.symmetric(horizontal: 28),
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 22),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 22,
+                        ),
                         decoration: BoxDecoration(
                           color: const Color(0xFF08111E),
                           borderRadius: BorderRadius.circular(24),
                           border: Border.all(color: const Color(0xFF1E293B)),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF020617).withValues(alpha: 0.45),
+                              color: const Color(
+                                0xFF020617,
+                              ).withValues(alpha: 0.45),
                               blurRadius: 24,
                               offset: const Offset(0, 14),
                             ),
@@ -868,25 +944,37 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
                       child: _DriverTripFlowPanel(
                         trip: trip,
                         driverPoint: LatLng(driverLat, driverLng),
-                        onPrimary: tripAsync.isLoading ? null : () => _handlePrimaryAction(trip),
-                        onSecondary: _canCancelTrip(trip) ? () => _cancelTrip(trip) : null,
+                        onPrimary: tripAsync.isLoading
+                            ? null
+                            : () => _handlePrimaryAction(trip),
+                        onSecondary: _canCancelTrip(trip)
+                            ? () => _cancelTrip(trip)
+                            : null,
                         onCall: () => _callPassenger(trip),
                         onChat: () => _openPassengerWhatsApp(trip),
                         onMore: () => _openPassengerActions(trip),
                         pickupDistanceLabel: _formatDistance(pickupDistance),
                         pickupEtaLabel: _formatEtaFromMeters(pickupDistance),
-                        destinationDistanceLabel: trip.destinationLat != null && trip.destinationLng != null
+                        destinationDistanceLabel:
+                            trip.destinationLat != null &&
+                                trip.destinationLng != null
                             ? _formatDistance(destinationDistance)
                             : '--',
-                        destinationEtaLabel: trip.destinationLat != null && trip.destinationLng != null
+                        destinationEtaLabel:
+                            trip.destinationLat != null &&
+                                trip.destinationLng != null
                             ? _formatEtaFromMeters(destinationDistance)
                             : '--',
-                        paymentLabel: 'Efectivo',
-                        totalDistanceLabel: trip.destinationLat != null && trip.destinationLng != null
+                        totalDistanceLabel:
+                            trip.destinationLat != null &&
+                                trip.destinationLng != null
                             ? _formatDistance(
                                 _distanceMeters(
                                   LatLng(trip.pickupLat, trip.pickupLng),
-                                  LatLng(trip.destinationLat!, trip.destinationLng!),
+                                  LatLng(
+                                    trip.destinationLat!,
+                                    trip.destinationLng!,
+                                  ),
                                 ),
                               )
                             : '--',
@@ -894,14 +982,22 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
                         pickupTitle: _primaryAddress(trip.passengerPickup),
                         pickupSubtitle: _secondaryAddress(trip.passengerPickup),
                         destinationTitle: _primaryAddress(trip.destination),
-                        destinationSubtitle: _secondaryAddress(trip.destination),
-                        pickupClockLabel: _formatClock(_parseTripDate(trip.requestedAt)),
-                        onCloseSummary: trip.status == 'completed' ? _closeSummaryAndReturnHome : null,
+                        destinationSubtitle: _secondaryAddress(
+                          trip.destination,
+                        ),
+                        pickupClockLabel: _formatClock(
+                          _parseTripDate(trip.requestedAt),
+                        ),
+                        onCloseSummary: trip.status == 'completed'
+                            ? _closeSummaryAndReturnHome
+                            : null,
                         onCollapse: trip.status == 'completed'
                             ? null
                             : () {
                                 setState(() => _detailsExpanded = false);
-                                unawaited(_persistDetailsExpanded(trip.id, false));
+                                unawaited(
+                                  _persistDetailsExpanded(trip.id, false),
+                                );
                               },
                       ),
                     ),
@@ -1081,7 +1177,9 @@ class _DriverNavigationCompactDrawer extends StatelessWidget {
             Row(
               children: [
                 _CompactRoundButton(
-                  icon: detailsExpanded ? Icons.close_rounded : Icons.menu_rounded,
+                  icon: detailsExpanded
+                      ? Icons.close_rounded
+                      : Icons.menu_rounded,
                   onTap: onExpand,
                 ),
                 Expanded(
@@ -1108,9 +1206,7 @@ class _DriverNavigationCompactDrawer extends StatelessWidget {
                     ],
                   ),
                 ),
-                const _CompactRoundButton(
-                  icon: Icons.alt_route_rounded,
-                ),
+                const _CompactRoundButton(icon: Icons.alt_route_rounded),
               ],
             ),
             const SizedBox(height: 16),
@@ -1146,10 +1242,7 @@ class _DriverNavigationCompactDrawer extends StatelessWidget {
 }
 
 class _CompactRoundButton extends StatelessWidget {
-  const _CompactRoundButton({
-    required this.icon,
-    this.onTap,
-  });
+  const _CompactRoundButton({required this.icon, this.onTap});
 
   final IconData icon;
   final VoidCallback? onTap;
@@ -1186,7 +1279,6 @@ class _DriverTripFlowPanel extends StatelessWidget {
     required this.pickupEtaLabel,
     required this.destinationDistanceLabel,
     required this.destinationEtaLabel,
-    required this.paymentLabel,
     required this.totalDistanceLabel,
     required this.totalDurationLabel,
     required this.pickupTitle,
@@ -1209,7 +1301,6 @@ class _DriverTripFlowPanel extends StatelessWidget {
   final String pickupEtaLabel;
   final String destinationDistanceLabel;
   final String destinationEtaLabel;
-  final String paymentLabel;
   final String totalDistanceLabel;
   final String totalDurationLabel;
   final String pickupTitle;
@@ -1248,7 +1339,9 @@ class _DriverTripFlowPanel extends StatelessWidget {
     if (_isArriving) return Icons.directions_car_filled_rounded;
     if (_isAtPickup) return Icons.verified_rounded;
     if (_isCompleted) return Icons.receipt_long_rounded;
-    return _isNearDestination ? Icons.task_alt_rounded : Icons.play_circle_outline_rounded;
+    return _isNearDestination
+        ? Icons.task_alt_rounded
+        : Icons.play_circle_outline_rounded;
   }
 
   Color get _headlineColor {
@@ -1270,10 +1363,35 @@ class _DriverTripFlowPanel extends StatelessWidget {
   String get _headlineSubtitle {
     if (_isRequest) return 'Tienes una nueva solicitud disponible';
     if (_isAccepted) return 'Dirigete al punto de recogida';
-    if (_isArriving) return 'Llegada estimada en $pickupEtaLabel ($pickupDistanceLabel)';
+    if (_isArriving) {
+      return 'Llegada estimada en $pickupEtaLabel ($pickupDistanceLabel)';
+    }
     if (_isAtPickup) return 'Espera a que el pasajero suba al vehiculo';
     if (_isCompleted) return 'Gracias por elegir nuestro servicio';
-    return _isNearDestination ? 'Estas llegando al destino' : 'El viaje ha comenzado';
+    return _isNearDestination
+        ? 'Estas llegando al destino'
+        : 'El viaje ha comenzado';
+  }
+
+  String get _statusLabel {
+    switch (trip.status) {
+      case 'requested':
+        return 'Solicitud';
+      case 'accepted':
+        return 'Aceptado';
+      case 'arriving':
+        return 'En camino';
+      case 'at_pickup':
+        return 'En recojo';
+      case 'in_progress':
+        return 'En viaje';
+      case 'completed':
+        return 'Finalizado';
+      case 'cancelled':
+        return 'Cancelado';
+      default:
+        return 'Activo';
+    }
   }
 
   String get _primaryLabel {
@@ -1347,17 +1465,10 @@ class _DriverTripFlowPanel extends StatelessWidget {
             Container(
               width: 16,
               height: 16,
-              decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
             if (label != 'Destino')
-              Container(
-                width: 2,
-                height: 54,
-                color: const Color(0xFF374151),
-              ),
+              Container(width: 2, height: 54, color: const Color(0xFF374151)),
           ],
         ),
         const SizedBox(width: 14),
@@ -1428,7 +1539,9 @@ class _DriverTripFlowPanel extends StatelessWidget {
     final palette = context.rapigoPalette;
     final metrics = context.rapigoMetrics;
     final textTheme = Theme.of(context).textTheme;
-    final passengerName = trip.passengerName?.trim().isNotEmpty == true ? trip.passengerName!.trim() : 'Pasajero';
+    final passengerName = trip.passengerName?.trim().isNotEmpty == true
+        ? trip.passengerName!.trim()
+        : 'Pasajero';
     final vehicleLabel = (trip.vehicleType ?? 'taxi').toUpperCase();
 
     return Material(
@@ -1518,7 +1631,11 @@ class _DriverTripFlowPanel extends StatelessWidget {
                       child: const SizedBox(
                         width: 54,
                         height: 54,
-                        child: Icon(Icons.close_rounded, color: Colors.white, size: 26),
+                        child: Icon(
+                          Icons.close_rounded,
+                          color: Colors.white,
+                          size: 26,
+                        ),
                       ),
                     ),
                   ),
@@ -1548,7 +1665,11 @@ class _DriverTripFlowPanel extends StatelessWidget {
                       shape: BoxShape.circle,
                       border: Border.all(color: palette.accentBlue, width: 2),
                     ),
-                    child: const Icon(Icons.person, color: Color(0xFF111827), size: 34),
+                    child: const Icon(
+                      Icons.person,
+                      color: Color(0xFF111827),
+                      size: 34,
+                    ),
                   ),
                   if (!_isCompleted) ...[
                     const SizedBox(width: 12),
@@ -1604,7 +1725,11 @@ class _DriverTripFlowPanel extends StatelessWidget {
                     ],
                   ),
                 ),
-                _MiniAction(icon: Icons.more_horiz_rounded, label: 'Mas', onTap: onMore),
+                _MiniAction(
+                  icon: Icons.more_horiz_rounded,
+                  label: 'Mas',
+                  onTap: onMore,
+                ),
               ],
             ),
             const SizedBox(height: 14),
@@ -1615,7 +1740,9 @@ class _DriverTripFlowPanel extends StatelessWidget {
               label: 'Punto de recogida',
               title: pickupTitle,
               subtitle: pickupSubtitle,
-              trailingTop: _isCompleted ? (pickupClockLabel ?? '--:--') : pickupDistanceLabel,
+              trailingTop: _isCompleted
+                  ? (pickupClockLabel ?? '--:--')
+                  : pickupDistanceLabel,
               trailingBottom: _isCompleted ? null : pickupEtaLabel,
             ),
             const SizedBox(height: 12),
@@ -1643,7 +1770,9 @@ class _DriverTripFlowPanel extends StatelessWidget {
               label: 'Destino',
               title: destinationTitle,
               subtitle: destinationSubtitle,
-              trailingTop: _isCompleted ? 'Finalizado' : destinationDistanceLabel,
+              trailingTop: _isCompleted
+                  ? 'Finalizado'
+                  : destinationDistanceLabel,
               trailingBottom: _isCompleted ? null : destinationEtaLabel,
             ),
             const SizedBox(height: 14),
@@ -1658,10 +1787,10 @@ class _DriverTripFlowPanel extends StatelessWidget {
                   value: vehicleLabel,
                 ),
                 _buildMetric(
-                  icon: Icons.payments_rounded,
-                  color: const Color(0xFFD946EF),
-                  label: 'Pago',
-                  value: paymentLabel,
+                  icon: Icons.verified_outlined,
+                  color: const Color(0xFF22C55E),
+                  label: 'Estado',
+                  value: _statusLabel,
                 ),
               ],
             ),
@@ -1690,7 +1819,10 @@ class _DriverTripFlowPanel extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 13,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFF09111F),
                         borderRadius: BorderRadius.circular(18),
@@ -1698,7 +1830,11 @@ class _DriverTripFlowPanel extends StatelessWidget {
                       ),
                       child: const Row(
                         children: [
-                          Icon(Icons.verified_rounded, color: Color(0xFF22C55E), size: 18),
+                          Icon(
+                            Icons.verified_rounded,
+                            color: Color(0xFF22C55E),
+                            size: 18,
+                          ),
                           SizedBox(width: 10),
                           Expanded(
                             child: Text(
@@ -1734,8 +1870,13 @@ class _DriverTripFlowPanel extends StatelessWidget {
                           ),
                         ),
                         child: Text(
-                          _isRequest ? _secondaryRequestLabel : 'CANCELAR VIAJE',
-                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                          _isRequest
+                              ? _secondaryRequestLabel
+                              : 'CANCELAR VIAJE',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                          ),
                         ),
                       ),
                     ),
@@ -1746,7 +1887,9 @@ class _DriverTripFlowPanel extends StatelessWidget {
                       onPressed: onPrimary,
                       style: FilledButton.styleFrom(
                         backgroundColor: _primaryColor,
-                        foregroundColor: _isRequest ? const Color(0xFF111827) : Colors.white,
+                        foregroundColor: _isRequest
+                            ? const Color(0xFF111827)
+                            : Colors.white,
                         minimumSize: const Size.fromHeight(60),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(20),
@@ -1755,7 +1898,10 @@ class _DriverTripFlowPanel extends StatelessWidget {
                       child: Text(
                         _primaryLabel,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
                   ),
@@ -1777,10 +1923,7 @@ class _DriverTripFlowPanel extends StatelessWidget {
                   ),
                   label: const Text(
                     'COMPLETAR',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 16,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
                   ),
                 ),
               ),
@@ -1850,11 +1993,16 @@ class _DriverSlideActionState extends State<_DriverSlideAction> {
               ? null
               : (details) {
                   setState(() {
-                    _dragRatio = (_dragRatio + (details.delta.dx / maxTravel)).clamp(0.0, 1.0);
+                    _dragRatio = (_dragRatio + (details.delta.dx / maxTravel))
+                        .clamp(0.0, 1.0);
                   });
                 },
-          onHorizontalDragEnd: widget.onCompleted == null ? null : (_) => _handleEnd(),
-          onHorizontalDragCancel: widget.onCompleted == null ? null : _handleEnd,
+          onHorizontalDragEnd: widget.onCompleted == null
+              ? null
+              : (_) => _handleEnd(),
+          onHorizontalDragCancel: widget.onCompleted == null
+              ? null
+              : _handleEnd,
           child: Container(
             height: 92,
             decoration: BoxDecoration(

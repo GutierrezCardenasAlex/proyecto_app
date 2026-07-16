@@ -14,6 +14,7 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../auth/data/auth_repository.dart';
+import '../../auth/domain/driver_session.dart';
 import '../../auth/presentation/driver_login_card.dart';
 import '../../auth/presentation/driver_profile_completion_page.dart';
 import '../../trip/data/trip_repository.dart';

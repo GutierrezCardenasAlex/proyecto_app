@@ -57,6 +57,11 @@ const registerVerifySchema = z.object({
   platform: z.string().min(2).optional()
 });
 
+const cancelRegistrationSchema = z.object({
+  phone: z.string().min(8),
+  role: z.enum(["passenger", "driver"]).optional()
+});
+
 const loginSchema = z.object({
   phone: z.string().min(8),
   password: z.string().min(8),
@@ -301,6 +306,21 @@ async function ensureSchema() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key VARCHAR(80) PRIMARY KEY,
+      value TEXT NOT NULL DEFAULT '',
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(
+    `INSERT INTO app_settings (key, value)
+     VALUES ('support_phone', $1)
+     ON CONFLICT (key) DO NOTHING`,
+    [String(process.env.SUPPORT_PHONE || "")]
+  );
+
+  await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS uq_user_devices_user_identifier
       ON user_devices (user_id, device_identifier)
   `);
@@ -471,6 +491,20 @@ async function bootstrap() {
 
   app.get("/health", async () => ({ status: "ok", service: "auth-service" }));
 
+  app.get("/public-settings", async () => {
+    const result = await pool.query(
+      `SELECT value, updated_at
+       FROM app_settings
+       WHERE key = 'support_phone'
+       LIMIT 1`
+    );
+
+    return {
+      supportPhone: result.rows[0]?.value || String(process.env.SUPPORT_PHONE || ""),
+      updatedAt: result.rows[0]?.updated_at ?? null
+    };
+  });
+
   app.post("/register/request-otp", async (request, reply) => {
     const { role, firstName } = registerRequestSchema.parse(request.body);
     const phone = normalizePhone(request.body.phone);
@@ -612,6 +646,35 @@ async function bootstrap() {
       user: mapUser({ ...updatedUser, role: parsed.role }),
       promo
     });
+  });
+
+  app.post("/register/cancel", async (request, reply) => {
+    const parsed = cancelRegistrationSchema.parse(request.body);
+    const phone = normalizePhone(parsed.phone);
+    assertValidPhone(phone);
+
+    const existing = await pool.query(
+      `SELECT id, role, password_hash, profile_completed
+       FROM users
+       WHERE phone = $1`,
+      [phone]
+    );
+    if (!existing.rows.length) {
+      await redis.del(`otp:${phone}`);
+      return reply.send({ cancelled: true });
+    }
+
+    const user = existing.rows[0];
+    if (user.password_hash || user.profile_completed) {
+      return reply.code(409).send({ message: "Este numero ya tiene una cuenta creada. Inicia sesion o solicita ayuda a central." });
+    }
+    if (parsed.role && user.role && user.role !== parsed.role) {
+      return reply.code(409).send({ message: `Este numero pertenece a un registro de ${roleLabel(user.role)}.` });
+    }
+
+    await pool.query(`DELETE FROM users WHERE id = $1`, [user.id]);
+    await redis.del(`otp:${phone}`);
+    reply.send({ cancelled: true });
   });
 
   app.post("/login", async (request, reply) => {

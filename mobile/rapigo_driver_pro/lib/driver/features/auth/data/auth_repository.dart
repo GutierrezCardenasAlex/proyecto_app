@@ -15,7 +15,21 @@ final authRepositoryProvider = Provider<DriverAuthRepository>((ref) {
 });
 
 final driverSessionProvider =
-    NotifierProvider<DriverSessionController, DriverSession>(DriverSessionController.new);
+    NotifierProvider<DriverSessionController, DriverSession>(
+      DriverSessionController.new,
+    );
+
+final driverPublicSettingsProvider = FutureProvider<DriverPublicSettings>((
+  ref,
+) async {
+  return ref.watch(authRepositoryProvider).fetchPublicSettings();
+});
+
+class DriverPublicSettings {
+  const DriverPublicSettings({required this.supportPhone});
+
+  final String supportPhone;
+}
 
 class DriverAuthResult {
   const DriverAuthResult({
@@ -64,6 +78,9 @@ class DriverOtpRequestResult {
 class DriverProfileDetails {
   const DriverProfileDetails({
     required this.licenseNumber,
+    required this.licenseCategory,
+    required this.licenseIssueDate,
+    required this.licenseExpiryDate,
     required this.vehicleType,
     required this.driverId,
     required this.accessStatus,
@@ -75,6 +92,9 @@ class DriverProfileDetails {
   });
 
   final String licenseNumber;
+  final String licenseCategory;
+  final String licenseIssueDate;
+  final String licenseExpiryDate;
   final String vehicleType;
   final String driverId;
   final String accessStatus;
@@ -108,6 +128,24 @@ class DriverSessionStatusResult {
 class DriverAuthRepository {
   const DriverAuthRepository();
 
+  Future<DriverPublicSettings> fetchPublicSettings() async {
+    final response = await _safeRequest(
+      () => http.get(
+        Uri.parse('${AppConfig.apiBaseUrl}/auth/public-settings'),
+        headers: {'Content-Type': 'application/json'},
+      ),
+      fallbackMessage: 'No se pudo cargar la configuracion publica',
+    );
+    await _throwIfError(
+      response,
+      fallbackMessage: 'No se pudo cargar la configuracion publica',
+    );
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    return DriverPublicSettings(
+      supportPhone: payload['supportPhone']?.toString() ?? '',
+    );
+  }
+
   Future<DriverProfileDetails> fetchDriverProfile({
     required String token,
     required String userId,
@@ -122,23 +160,49 @@ class DriverAuthRepository {
       ),
       fallbackMessage: 'No se pudo cargar el perfil del conductor',
     );
-    await _throwIfError(response, fallbackMessage: 'No se pudo cargar el perfil del conductor');
+    await _throwIfError(
+      response,
+      fallbackMessage: 'No se pudo cargar el perfil del conductor',
+    );
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
     final vehicle = payload['vehicle'] as Map<String, dynamic>? ?? const {};
     return DriverProfileDetails(
-      licenseNumber: payload['license_number']?.toString() ?? payload['licenseNumber']?.toString() ?? '',
-      vehicleType: vehicle['vehicle_type']?.toString() ?? vehicle['type']?.toString() ?? 'taxi',
+      licenseNumber:
+          payload['license_number']?.toString() ??
+          payload['licenseNumber']?.toString() ??
+          '',
+      licenseCategory:
+          payload['license_category']?.toString() ??
+          payload['licenseCategory']?.toString() ??
+          '',
+      licenseIssueDate:
+          payload['license_issue_date']?.toString() ??
+          payload['licenseIssueDate']?.toString() ??
+          '',
+      licenseExpiryDate:
+          payload['license_expiry_date']?.toString() ??
+          payload['licenseExpiryDate']?.toString() ??
+          '',
+      vehicleType:
+          vehicle['vehicle_type']?.toString() ??
+          vehicle['type']?.toString() ??
+          'taxi',
       driverId: payload['id']?.toString() ?? '',
       accessStatus: payload['access_status']?.toString() ?? 'AUTORIZADO',
       plate: vehicle['plate']?.toString() ?? '',
       brand: vehicle['brand']?.toString() ?? '',
       model: vehicle['model']?.toString() ?? '',
       color: vehicle['color']?.toString() ?? '',
-      year: vehicle['year'] is num ? (vehicle['year'] as num).toInt() : int.tryParse(vehicle['year']?.toString() ?? ''),
+      year: vehicle['year'] is num
+          ? (vehicle['year'] as num).toInt()
+          : int.tryParse(vehicle['year']?.toString() ?? ''),
     );
   }
 
-  Future<DriverOtpRequestResult> requestRegistrationOtp(String phone, String firstName) async {
+  Future<DriverOtpRequestResult> requestRegistrationOtp(
+    String phone,
+    String firstName,
+  ) async {
     final response = await _safeRequest(
       () => http.post(
         Uri.parse('${AppConfig.apiBaseUrl}/auth/register/request-otp'),
@@ -151,7 +215,10 @@ class DriverAuthRepository {
       ),
       fallbackMessage: 'No se pudo solicitar el OTP',
     );
-    await _throwIfError(response, fallbackMessage: 'No se pudo solicitar el OTP');
+    await _throwIfError(
+      response,
+      fallbackMessage: 'No se pudo solicitar el OTP',
+    );
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
     return DriverOtpRequestResult(
       smsDelivered: payload['smsDelivered'] == true,
@@ -184,8 +251,26 @@ class DriverAuthRepository {
       ),
       fallbackMessage: 'No se pudo completar el registro',
     );
-    await _throwIfError(verify, fallbackMessage: 'No se pudo completar el registro');
+    await _throwIfError(
+      verify,
+      fallbackMessage: 'No se pudo completar el registro',
+    );
     return _resolveDriverAuth(verify.body, fallbackPhone: phone);
+  }
+
+  Future<void> cancelRegistration({required String phone}) async {
+    final response = await _safeRequest(
+      () => http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/auth/register/cancel'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'phone': phone, 'role': 'driver'}),
+      ),
+      fallbackMessage: 'No se pudo cancelar el registro',
+    );
+    await _throwIfError(
+      response,
+      fallbackMessage: 'No se pudo cancelar el registro',
+    );
   }
 
   Future<DriverAuthResult> login({
@@ -221,7 +306,10 @@ class DriverAuthRepository {
       ),
       fallbackMessage: 'No se pudo solicitar el OTP de recuperacion',
     );
-    await _throwIfError(response, fallbackMessage: 'No se pudo solicitar el OTP de recuperacion');
+    await _throwIfError(
+      response,
+      fallbackMessage: 'No se pudo solicitar el OTP de recuperacion',
+    );
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
     return DriverOtpRequestResult(
       smsDelivered: payload['smsDelivered'] == true,
@@ -239,15 +327,14 @@ class DriverAuthRepository {
       () => http.post(
         Uri.parse('${AppConfig.apiBaseUrl}/auth/password/reset'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'phone': phone,
-          'otp': otp,
-          'password': password,
-        }),
+        body: jsonEncode({'phone': phone, 'otp': otp, 'password': password}),
       ),
       fallbackMessage: 'No se pudo cambiar la contrasena',
     );
-    await _throwIfError(response, fallbackMessage: 'No se pudo cambiar la contrasena');
+    await _throwIfError(
+      response,
+      fallbackMessage: 'No se pudo cambiar la contrasena',
+    );
   }
 
   Future<DriverAuthResult> completeProfile({
@@ -260,6 +347,9 @@ class DriverAuthRepository {
     required String email,
     required String address,
     required String licenseNumber,
+    required String licenseCategory,
+    required String licenseIssueDate,
+    required String licenseExpiryDate,
     required String vehicleType,
     required String plate,
     required String brand,
@@ -277,6 +367,9 @@ class DriverAuthRepository {
         body: jsonEncode({
           'userId': userId,
           'licenseNumber': licenseNumber,
+          'licenseCategory': licenseCategory,
+          'licenseIssueDate': licenseIssueDate,
+          'licenseExpiryDate': licenseExpiryDate,
           'vehicle': {
             'type': vehicleType,
             'plate': plate,
@@ -289,7 +382,10 @@ class DriverAuthRepository {
       ),
       fallbackMessage: 'No se pudo guardar el vehiculo',
     );
-    await _throwIfError(driverProfileResponse, fallbackMessage: 'No se pudo guardar el vehiculo');
+    await _throwIfError(
+      driverProfileResponse,
+      fallbackMessage: 'No se pudo guardar el vehiculo',
+    );
 
     final authProfileResponse = await _safeRequest(
       () => http.post(
@@ -308,11 +404,16 @@ class DriverAuthRepository {
       ),
       fallbackMessage: 'No se pudo guardar el perfil',
     );
-    await _throwIfError(authProfileResponse, fallbackMessage: 'No se pudo guardar el perfil');
+    await _throwIfError(
+      authProfileResponse,
+      fallbackMessage: 'No se pudo guardar el perfil',
+    );
 
-    final payload = jsonDecode(authProfileResponse.body) as Map<String, dynamic>;
+    final payload =
+        jsonDecode(authProfileResponse.body) as Map<String, dynamic>;
     final user = payload['user'] as Map<String, dynamic>? ?? const {};
-    final driverPayload = jsonDecode(driverProfileResponse.body) as Map<String, dynamic>;
+    final driverPayload =
+        jsonDecode(driverProfileResponse.body) as Map<String, dynamic>;
     final driver = driverPayload['driver'] as Map<String, dynamic>? ?? const {};
     return DriverAuthResult(
       userId: user['id']?.toString() ?? userId,
@@ -337,7 +438,9 @@ class DriverAuthRepository {
     final device = await DeviceIdentityService.load();
     final response = await _safeRequest(
       () => http.get(
-        Uri.parse('${AppConfig.apiBaseUrl}/auth/session-status?deviceIdentifier=${Uri.encodeQueryComponent(device.identifier)}'),
+        Uri.parse(
+          '${AppConfig.apiBaseUrl}/auth/session-status?deviceIdentifier=${Uri.encodeQueryComponent(device.identifier)}',
+        ),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -345,7 +448,10 @@ class DriverAuthRepository {
       ),
       fallbackMessage: 'No se pudo revisar el estado del conductor',
     );
-    await _throwIfError(response, fallbackMessage: 'No se pudo revisar el estado del conductor');
+    await _throwIfError(
+      response,
+      fallbackMessage: 'No se pudo revisar el estado del conductor',
+    );
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
     final user = payload['user'] as Map<String, dynamic>? ?? const {};
     return DriverSessionStatusResult(
@@ -359,7 +465,10 @@ class DriverAuthRepository {
     );
   }
 
-  Future<void> _throwIfError(http.Response response, {required String fallbackMessage}) async {
+  Future<void> _throwIfError(
+    http.Response response, {
+    required String fallbackMessage,
+  }) async {
     if (response.statusCode < 400) {
       return;
     }
@@ -382,13 +491,20 @@ class DriverAuthRepository {
     try {
       return await request();
     } on SocketException {
-      throw Exception('No se pudo conectar con RAPIGO - PRO. Revisa internet o el acceso al servidor.');
+      throw Exception(
+        'No se pudo conectar con RAPIGO - PRO. Revisa internet o el acceso al servidor.',
+      );
     } on http.ClientException {
-      throw Exception('No se pudo conectar con RAPIGO - PRO. Revisa internet o el acceso al servidor.');
+      throw Exception(
+        'No se pudo conectar con RAPIGO - PRO. Revisa internet o el acceso al servidor.',
+      );
     }
   }
 
-  Future<DriverAuthResult> _resolveDriverAuth(String body, {required String fallbackPhone}) async {
+  Future<DriverAuthResult> _resolveDriverAuth(
+    String body, {
+    required String fallbackPhone,
+  }) async {
     final payload = jsonDecode(body) as Map<String, dynamic>;
     final user = payload['user'] as Map<String, dynamic>? ?? const {};
     final token = payload['token']?.toString() ?? '';
@@ -396,7 +512,9 @@ class DriverAuthRepository {
     final role = user['role']?.toString() ?? '';
 
     if (role.isNotEmpty && role != 'driver') {
-      throw Exception('Este numero ya esta registrado con rol de pasajero. La central debe habilitar un conductor aparte.');
+      throw Exception(
+        'Este numero ya esta registrado con rol de pasajero. La central debe habilitar un conductor aparte.',
+      );
     }
 
     final ensureProfile = await http.post(
@@ -411,16 +529,23 @@ class DriverAuthRepository {
         'phone': user['phone']?.toString() ?? fallbackPhone,
       }),
     );
-    await _throwIfError(ensureProfile, fallbackMessage: 'No se pudo crear el perfil del conductor');
+    await _throwIfError(
+      ensureProfile,
+      fallbackMessage: 'No se pudo crear el perfil del conductor',
+    );
 
-    final ensurePayload = jsonDecode(ensureProfile.body) as Map<String, dynamic>;
+    final ensurePayload =
+        jsonDecode(ensureProfile.body) as Map<String, dynamic>;
     final driver = ensurePayload['driver'] as Map<String, dynamic>? ?? const {};
     final vehicle = driver['vehicle'] as Map<String, dynamic>? ?? const {};
 
     return DriverAuthResult(
       userId: userId,
       driverId: driver['id']?.toString() ?? '',
-      vehicleType: vehicle['vehicle_type']?.toString() ?? vehicle['type']?.toString() ?? 'taxi',
+      vehicleType:
+          vehicle['vehicle_type']?.toString() ??
+          vehicle['type']?.toString() ??
+          'taxi',
       accessStatus: driver['access_status']?.toString() ?? 'AUTORIZADO',
       phone: user['phone']?.toString() ?? fallbackPhone,
       fullName: user['fullName']?.toString() ?? 'Perfil pendiente',
@@ -465,7 +590,10 @@ class DriverSessionController extends Notifier<DriverSession> {
     return initial;
   }
 
-  Future<DriverOtpRequestResult?> requestRegistrationOtp(String phone, String firstName) async {
+  Future<DriverOtpRequestResult?> requestRegistrationOtp(
+    String phone,
+    String firstName,
+  ) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       final result = await _repository.requestRegistrationOtp(phone, firstName);
@@ -481,7 +609,10 @@ class DriverSessionController extends Notifier<DriverSession> {
       );
       return result;
     } catch (error) {
-      state = state.copyWith(isLoading: false, errorMessage: error.toString().replaceFirst('Exception: ', ''));
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: error.toString().replaceFirst('Exception: ', ''),
+      );
       return null;
     }
   }
@@ -497,7 +628,10 @@ class DriverSessionController extends Notifier<DriverSession> {
       );
       await _persistSession(result);
     } catch (error) {
-      state = state.copyWith(isLoading: false, errorMessage: error.toString().replaceFirst('Exception: ', ''));
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: error.toString().replaceFirst('Exception: ', ''),
+      );
     }
   }
 
@@ -509,6 +643,22 @@ class DriverSessionController extends Notifier<DriverSession> {
     );
   }
 
+  Future<void> cancelRegistration() async {
+    final phone = state.phone;
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      if (phone.isNotEmpty) {
+        await _repository.cancelRegistration(phone: phone);
+      }
+      await logout();
+    } catch (error) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: error.toString().replaceFirst('Exception: ', ''),
+      );
+    }
+  }
+
   Future<void> login(String phone, String password) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
@@ -516,7 +666,10 @@ class DriverSessionController extends Notifier<DriverSession> {
       await _persistSession(result);
       state = state.copyWith(otpRequested: false);
     } catch (error) {
-      state = state.copyWith(isLoading: false, errorMessage: error.toString().replaceFirst('Exception: ', ''));
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: error.toString().replaceFirst('Exception: ', ''),
+      );
     }
   }
 
@@ -526,6 +679,9 @@ class DriverSessionController extends Notifier<DriverSession> {
     required String email,
     required String address,
     required String licenseNumber,
+    required String licenseCategory,
+    required String licenseIssueDate,
+    required String licenseExpiryDate,
     required String vehicleType,
     required String plate,
     required String brand,
@@ -545,6 +701,9 @@ class DriverSessionController extends Notifier<DriverSession> {
         email: email,
         address: address,
         licenseNumber: licenseNumber,
+        licenseCategory: licenseCategory,
+        licenseIssueDate: licenseIssueDate,
+        licenseExpiryDate: licenseExpiryDate,
         vehicleType: vehicleType,
         plate: plate,
         brand: brand,
@@ -554,7 +713,10 @@ class DriverSessionController extends Notifier<DriverSession> {
       );
       await _persistSession(result);
     } catch (error) {
-      state = state.copyWith(isLoading: false, errorMessage: error.toString().replaceFirst('Exception: ', ''));
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: error.toString().replaceFirst('Exception: ', ''),
+      );
     }
   }
 
@@ -615,17 +777,27 @@ class DriverSessionController extends Notifier<DriverSession> {
         userId: state.userId,
       );
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('driver_session_access_status', profile.accessStatus);
+      await prefs.setString(
+        'driver_session_access_status',
+        profile.accessStatus,
+      );
       if (profile.driverId.isNotEmpty) {
         await prefs.setString('driver_session_driver_id', profile.driverId);
       }
       if (profile.vehicleType.isNotEmpty) {
-        await prefs.setString('driver_session_vehicle_type', profile.vehicleType);
+        await prefs.setString(
+          'driver_session_vehicle_type',
+          profile.vehicleType,
+        );
       }
       state = state.copyWith(
         accessStatus: profile.accessStatus,
-        driverId: profile.driverId.isNotEmpty ? profile.driverId : state.driverId,
-        vehicleType: profile.vehicleType.isNotEmpty ? profile.vehicleType : state.vehicleType,
+        driverId: profile.driverId.isNotEmpty
+            ? profile.driverId
+            : state.driverId,
+        vehicleType: profile.vehicleType.isNotEmpty
+            ? profile.vehicleType
+            : state.vehicleType,
         clearError: true,
       );
     } catch (error) {
@@ -649,7 +821,10 @@ class DriverSessionController extends Notifier<DriverSession> {
     await prefs.setString('driver_session_email', result.email);
     await prefs.setString('driver_session_address', result.address);
     await prefs.setString('driver_session_token', result.token);
-    await prefs.setBool('driver_session_profile_completed', result.profileCompleted);
+    await prefs.setBool(
+      'driver_session_profile_completed',
+      result.profileCompleted,
+    );
     await prefs.setString('driver_session_device_status', result.deviceStatus);
 
     state = state.copyWith(
@@ -680,9 +855,11 @@ class DriverSessionController extends Notifier<DriverSession> {
       userId: prefs.getString('driver_session_user_id') ?? '',
       driverId: prefs.getString('driver_session_driver_id') ?? '',
       vehicleType: prefs.getString('driver_session_vehicle_type') ?? 'taxi',
-      accessStatus: prefs.getString('driver_session_access_status') ?? 'AUTORIZADO',
+      accessStatus:
+          prefs.getString('driver_session_access_status') ?? 'AUTORIZADO',
       phone: prefs.getString('driver_session_phone') ?? '',
-      fullName: prefs.getString('driver_session_full_name') ?? 'Perfil pendiente',
+      fullName:
+          prefs.getString('driver_session_full_name') ?? 'Perfil pendiente',
       firstName: prefs.getString('driver_session_first_name') ?? '',
       lastName: prefs.getString('driver_session_last_name') ?? '',
       email: prefs.getString('driver_session_email') ?? '',
@@ -690,8 +867,10 @@ class DriverSessionController extends Notifier<DriverSession> {
       token: prefs.getString('driver_session_token') ?? '',
       otpRequested: false,
       loggedIn: loggedIn,
-      profileCompleted: prefs.getBool('driver_session_profile_completed') ?? false,
-      deviceStatus: prefs.getString('driver_session_device_status') ?? 'AUTORIZADO',
+      profileCompleted:
+          prefs.getBool('driver_session_profile_completed') ?? false,
+      deviceStatus:
+          prefs.getString('driver_session_device_status') ?? 'AUTORIZADO',
       isRestoring: false,
       clearError: true,
     );
@@ -726,11 +905,20 @@ class DriverSessionController extends Notifier<DriverSession> {
         }
       }
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('driver_session_device_status', status.deviceStatus);
-      await prefs.setString('driver_session_access_status', resolvedAccessStatus);
+      await prefs.setString(
+        'driver_session_device_status',
+        status.deviceStatus,
+      );
+      await prefs.setString(
+        'driver_session_access_status',
+        resolvedAccessStatus,
+      );
       await prefs.setString('driver_session_driver_id', resolvedDriverId);
       await prefs.setString('driver_session_vehicle_type', resolvedVehicleType);
-      await prefs.setBool('driver_session_profile_completed', status.profileCompleted);
+      await prefs.setBool(
+        'driver_session_profile_completed',
+        status.profileCompleted,
+      );
       await prefs.setString('driver_session_full_name', status.fullName);
       await prefs.setString('driver_session_first_name', status.firstName);
       await prefs.setString('driver_session_last_name', status.lastName);
@@ -750,7 +938,9 @@ class DriverSessionController extends Notifier<DriverSession> {
         clearError: true,
       );
     } catch (error) {
-      state = state.copyWith(errorMessage: error.toString().replaceFirst('Exception: ', ''));
+      state = state.copyWith(
+        errorMessage: error.toString().replaceFirst('Exception: ', ''),
+      );
     }
   }
 }

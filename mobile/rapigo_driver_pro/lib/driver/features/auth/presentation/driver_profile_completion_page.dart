@@ -222,6 +222,9 @@ class _DriverProfileCompletionPageState
           email: _emailController.text.trim(),
           address: _addressController.text.trim(),
           licenseNumber: _licenseController.text.trim(),
+          licenseCategory: _licenseCategoryController.text.trim(),
+          licenseIssueDate: _licenseIssueController.text.trim(),
+          licenseExpiryDate: _licenseExpiryController.text.trim(),
           vehicleType: _vehicleType,
           plate: _plateController.text.trim(),
           brand: _brandController.text.trim(),
@@ -243,6 +246,18 @@ class _DriverProfileCompletionPageState
     }
   }
 
+  Future<void> _cancelRegistration() async {
+    await ref.read(driverSessionProvider.notifier).cancelRegistration();
+    if (!mounted) {
+      return;
+    }
+    showTopNotice(
+      context,
+      'Registro cancelado. Puedes volver a empezar con otro numero.',
+      tone: NoticeTone.info,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(driverSessionProvider);
@@ -260,9 +275,9 @@ class _DriverProfileCompletionPageState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 12),
                     _RegisterProgressBar(step: _step),
-                    const SizedBox(height: 26),
+                    const SizedBox(height: 18),
                     AnimatedSwitcher(
                       duration: const Duration(milliseconds: 260),
                       switchInCurve: Curves.easeOutCubic,
@@ -300,19 +315,19 @@ class _DriverProfileCompletionPageState
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF0C43B9), Color(0xFF0F2F9F)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: Color(0xFFFFFFFF),
+        border: Border(bottom: BorderSide(color: Color(0xFFE2E8F8))),
       ),
       child: Row(
         children: [
           IconButton(
             onPressed: _step > 4 ? () => setState(() => _step -= 1) : null,
-            icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+            icon: const Icon(
+              Icons.arrow_back_rounded,
+              color: Color(0xFF1746B5),
+            ),
           ),
           Expanded(
             child: Row(
@@ -320,8 +335,8 @@ class _DriverProfileCompletionPageState
               children: [
                 Image.asset(
                   'assets/icons/rapigo_driver_icon.png',
-                  width: 44,
-                  height: 44,
+                  width: 34,
+                  height: 34,
                 ),
                 const SizedBox(width: 12),
                 Text.rich(
@@ -330,15 +345,15 @@ class _DriverProfileCompletionPageState
                       TextSpan(
                         text: 'RAPIGO',
                         style: GoogleFonts.plusJakartaSans(
-                          fontSize: 28,
+                          fontSize: 20,
                           fontWeight: FontWeight.w900,
-                          color: Colors.white,
+                          color: Color(0xFF1746B5),
                         ),
                       ),
                       TextSpan(
                         text: ' PRO',
                         style: GoogleFonts.plusJakartaSans(
-                          fontSize: 28,
+                          fontSize: 20,
                           fontWeight: FontWeight.w900,
                           color: const Color(0xFFF6C311),
                         ),
@@ -349,7 +364,7 @@ class _DriverProfileCompletionPageState
               ],
             ),
           ),
-          const SizedBox(width: 48),
+          const SizedBox(width: 44),
         ],
       ),
     );
@@ -425,6 +440,7 @@ class _DriverProfileCompletionPageState
         _WizardButtons(
           primaryLabel: 'CONTINUAR',
           onPrimaryPressed: _goNextFromCurrent,
+          onCancelPressed: _cancelRegistration,
         ),
       ],
     );
@@ -481,6 +497,7 @@ class _DriverProfileCompletionPageState
           primaryLabel: 'CONTINUAR',
           onPrimaryPressed: _goNextFromCurrent,
           onBackPressed: () => setState(() => _step = 4),
+          onCancelPressed: _cancelRegistration,
         ),
       ],
     );
@@ -575,6 +592,7 @@ class _DriverProfileCompletionPageState
           primaryLabel: 'CONTINUAR',
           onPrimaryPressed: _goNextFromCurrent,
           onBackPressed: () => setState(() => _step = 5),
+          onCancelPressed: _cancelRegistration,
         ),
       ],
     );
@@ -649,6 +667,7 @@ class _DriverProfileCompletionPageState
           primaryLabel: 'CONTINUAR',
           onPrimaryPressed: _goNextFromCurrent,
           onBackPressed: () => setState(() => _step = 6),
+          onCancelPressed: _cancelRegistration,
         ),
       ],
     );
@@ -729,6 +748,7 @@ class _DriverProfileCompletionPageState
               : 'CONFIRMAR Y ENVIAR',
           onPrimaryPressed: session.isLoading ? null : _confirmAndSend,
           onBackPressed: () => setState(() => _step = 7),
+          onCancelPressed: _cancelRegistration,
         ),
       ],
     );
@@ -853,88 +873,63 @@ class _RegisterProgressBar extends StatelessWidget {
       'Fotos': 7,
       'Revision': 8,
     };
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: steps.entries.map((entry) {
-        final current = entry.value;
-        final complete = step > current;
-        final active = step == current;
-        return Expanded(
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      height: 3,
-                      color: current == 1
-                          ? Colors.transparent
-                          : (step >= current
-                                ? const Color(0xFF1650D7)
-                                : const Color(0xFFD3DBF3)),
-                    ),
-                  ),
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: complete || active
-                          ? const Color(0xFF1650D7)
-                          : Colors.white,
-                      border: Border.all(
-                        color: complete || active
-                            ? const Color(0xFF1650D7)
-                            : const Color(0xFFD3DBF3),
-                        width: 2,
-                      ),
-                    ),
-                    child: Center(
-                      child: complete
-                          ? const Icon(
-                              Icons.check_rounded,
-                              color: Colors.white,
-                              size: 20,
-                            )
-                          : Text(
-                              '$current',
-                              style: GoogleFonts.plusJakartaSans(
-                                color: complete || active
-                                    ? Colors.white
-                                    : const Color(0xFF9BA7CB),
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Container(
-                      height: 3,
-                      color: current == steps.length
-                          ? Colors.transparent
-                          : (step > current
-                                ? const Color(0xFF1650D7)
-                                : const Color(0xFFD3DBF3)),
-                    ),
-                  ),
-                ],
+    final activeEntry = steps.entries.firstWhere(
+      (entry) => entry.value == step,
+      orElse: () => const MapEntry('Revision', 8),
+    );
+    final progress = ((step - 1).clamp(0, steps.length) / steps.length);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F8)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: const Color(0xFF1650D7),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              '${activeEntry.value}',
+              style: GoogleFonts.plusJakartaSans(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
               ),
-              const SizedBox(height: 6),
-              Text(
-                entry.key,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: complete || active
-                      ? const Color(0xFF1746B5)
-                      : const Color(0xFF9BA7CB),
-                ),
-              ),
-            ],
+            ),
           ),
-        );
-      }).toList(),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  activeEntry.key,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF1746B5),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 5,
+                  backgroundColor: const Color(0xFFE2E8F8),
+                  color: const Color(0xFFF6BE00),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -958,7 +953,7 @@ class _TitleBlock extends StatelessWidget {
         Text(
           titleBlue,
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 27,
+            fontSize: 21,
             fontWeight: FontWeight.w900,
             color: const Color(0xFF1746B5),
           ),
@@ -966,7 +961,7 @@ class _TitleBlock extends StatelessWidget {
         Text(
           titleYellow,
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 27,
+            fontSize: 21,
             fontWeight: FontWeight.w900,
             color: const Color(0xFFF6BE00),
           ),
@@ -975,7 +970,7 @@ class _TitleBlock extends StatelessWidget {
         Text(
           subtitle,
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 15,
+            fontSize: 12.5,
             fontWeight: FontWeight.w600,
             color: const Color(0xFF6C789F),
             height: 1.45,
@@ -1011,30 +1006,24 @@ class _FormField extends StatelessWidget {
         Text(
           label,
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 15,
+            fontSize: 12,
             fontWeight: FontWeight.w800,
             color: const Color(0xFF1746B5),
           ),
         ),
         const SizedBox(height: 8),
         Container(
-          height: 62,
+          height: 50,
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x120F2F9F),
-                blurRadius: 16,
-                offset: Offset(0, 7),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE2E8F8)),
           ),
           child: Row(
             children: [
-              const SizedBox(width: 16),
-              Icon(icon, color: const Color(0xFF1650D7), size: 24),
               const SizedBox(width: 12),
+              Icon(icon, color: const Color(0xFF1650D7), size: 18),
+              const SizedBox(width: 9),
               Expanded(
                 child: TextField(
                   controller: controller,
@@ -1047,22 +1036,22 @@ class _FormField extends StatelessWidget {
                     contentPadding: EdgeInsets.zero,
                     hintText: hintText,
                     hintStyle: GoogleFonts.plusJakartaSans(
-                      fontSize: 15,
+                      fontSize: 12.5,
                       fontWeight: FontWeight.w500,
                       color: const Color(0xFFA3AEC9),
                     ),
                     border: InputBorder.none,
                   ),
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 16,
+                    fontSize: 13,
                     fontWeight: FontWeight.w700,
                     color: const Color(0xFF1D2D59),
                   ),
                 ),
               ),
               if (suffixIcon != null) ...[
-                Icon(suffixIcon, color: const Color(0xFF1650D7), size: 24),
-                const SizedBox(width: 14),
+                Icon(suffixIcon, color: const Color(0xFF1650D7), size: 18),
+                const SizedBox(width: 12),
               ],
             ],
           ),
@@ -1097,30 +1086,24 @@ class _DropdownField extends StatelessWidget {
         Text(
           label,
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 15,
+            fontSize: 12,
             fontWeight: FontWeight.w800,
             color: const Color(0xFF1746B5),
           ),
         ),
         const SizedBox(height: 8),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x120F2F9F),
-                blurRadius: 16,
-                offset: Offset(0, 7),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE2E8F8)),
           ),
           child: DropdownButtonFormField<String>(
             initialValue: value.isEmpty ? null : value,
             dropdownColor: Colors.white,
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 15,
+              fontSize: 13,
               fontWeight: FontWeight.w700,
               color: const Color(0xFF1D2D59),
             ),
@@ -1189,7 +1172,7 @@ class _DateField extends StatelessWidget {
         Text(
           label,
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 15,
+            fontSize: 12,
             fontWeight: FontWeight.w800,
             color: const Color(0xFF1746B5),
           ),
@@ -1197,36 +1180,30 @@ class _DateField extends StatelessWidget {
         const SizedBox(height: 8),
         InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(14),
           child: Container(
-            height: 62,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            height: 50,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x120F2F9F),
-                  blurRadius: 16,
-                  offset: Offset(0, 7),
-                ),
-              ],
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE2E8F8)),
             ),
             child: Row(
               children: [
                 const Icon(
                   Icons.calendar_month_rounded,
                   color: Color(0xFF1650D7),
-                  size: 24,
+                  size: 18,
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 9),
                 Expanded(
                   child: Text(
                     controller.text.isEmpty
                         ? 'Selecciona la fecha'
                         : controller.text,
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: 15,
+                      fontSize: 12.5,
                       fontWeight: controller.text.isEmpty
                           ? FontWeight.w500
                           : FontWeight.w700,
@@ -1239,7 +1216,7 @@ class _DateField extends StatelessWidget {
                 const Icon(
                   Icons.calendar_today_outlined,
                   color: Color(0xFF1650D7),
-                  size: 24,
+                  size: 18,
                 ),
               ],
             ),
@@ -1544,11 +1521,13 @@ class _WizardButtons extends StatelessWidget {
     required this.primaryLabel,
     required this.onPrimaryPressed,
     this.onBackPressed,
+    this.onCancelPressed,
   });
 
   final String primaryLabel;
   final VoidCallback? onPrimaryPressed;
   final VoidCallback? onBackPressed;
+  final VoidCallback? onCancelPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -1559,28 +1538,39 @@ class _WizardButtons extends StatelessWidget {
           child: FilledButton(
             onPressed: onPrimaryPressed,
             style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(68),
+              minimumSize: const Size.fromHeight(52),
               backgroundColor: const Color(0xFFF6C311),
               foregroundColor: Colors.black,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(16),
               ),
             ),
             child: Text(
               primaryLabel,
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 19,
+                fontSize: 14,
                 fontWeight: FontWeight.w900,
               ),
             ),
           ),
         ),
         if (onBackPressed != null) ...[
-          const SizedBox(height: 14),
+          const SizedBox(height: 8),
           TextButton.icon(
             onPressed: onBackPressed,
             icon: const Icon(Icons.chevron_left_rounded),
             label: const Text('Anterior'),
+          ),
+        ],
+        if (onCancelPressed != null) ...[
+          const SizedBox(height: 4),
+          TextButton.icon(
+            onPressed: onCancelPressed,
+            icon: const Icon(Icons.close_rounded, size: 18),
+            label: const Text(
+              'Cancelar registro',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       ],

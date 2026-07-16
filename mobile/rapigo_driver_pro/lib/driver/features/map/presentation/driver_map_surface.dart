@@ -90,7 +90,8 @@ class DriverMapSurface extends ConsumerStatefulWidget {
     required double iconBearing,
     required double displayLat,
     required double displayLng,
-  })? onDebugTelemetryChanged;
+  })?
+  onDebugTelemetryChanged;
 
   @override
   ConsumerState<DriverMapSurface> createState() => _DriverMapSurfaceState();
@@ -106,6 +107,7 @@ class _DriverMapSurfaceState extends ConsumerState<DriverMapSurface>
   bool _offlinePrepared = false;
   bool _mapLoadFailed = false;
   bool _viewportResolved = false;
+  int _mapRetryNonce = 0;
 
   MapViewportCache get _viewportCache =>
       MapViewportCache(namespace: widget.viewportCacheKey);
@@ -155,10 +157,9 @@ class _DriverMapSurfaceState extends ConsumerState<DriverMapSurface>
     await _resolveOfflineStatus();
   }
 
-  ll.LatLng get _fallbackCenter =>
-      _cachedViewport != null
-          ? ll.LatLng(_cachedViewport!.centerLat, _cachedViewport!.centerLng)
-          : ll.LatLng(widget.driverLat, widget.driverLng);
+  ll.LatLng get _fallbackCenter => _cachedViewport != null
+      ? ll.LatLng(_cachedViewport!.centerLat, _cachedViewport!.centerLng)
+      : ll.LatLng(widget.driverLat, widget.driverLng);
 
   double get _fallbackZoom => _cachedViewport?.zoom ?? AppConfig.mapInitialZoom;
 
@@ -179,6 +180,17 @@ class _DriverMapSurfaceState extends ConsumerState<DriverMapSurface>
             child: RapigoSkeletonMapPlaceholder(
               showOfflineLabel: _offlineReady || offlineState.isReady,
               showErrorState: _mapLoadFailed,
+              onRetry: _mapLoadFailed
+                  ? () {
+                      setState(() {
+                        _mapLoadFailed = false;
+                        _vectorReady = false;
+                        _showSkeleton = true;
+                        _mapRetryNonce++;
+                      });
+                      _prepareOfflineFirstMap();
+                    }
+                  : null,
             ),
           ),
         if (canBuildMap)
@@ -192,6 +204,7 @@ class _DriverMapSurfaceState extends ConsumerState<DriverMapSurface>
                 duration: const Duration(milliseconds: 320),
                 curve: Curves.easeOutCubic,
                 child: DriverMapLibreView(
+                  key: ValueKey('driver-maplibre-$_mapRetryNonce'),
                   available: widget.available,
                   tripAccepted: widget.tripAccepted,
                   driverLat: widget.driverLat,
@@ -211,7 +224,8 @@ class _DriverMapSurfaceState extends ConsumerState<DriverMapSurface>
                   routePersistenceKey: widget.routePersistenceKey,
                   routePersistenceReadKeys: widget.routePersistenceReadKeys,
                   routePersistenceWriteKeys: widget.routePersistenceWriteKeys,
-                  prefetchRoutePersistenceKey: widget.prefetchRoutePersistenceKey,
+                  prefetchRoutePersistenceKey:
+                      widget.prefetchRoutePersistenceKey,
                   idleZoomLevel: widget.idleZoomLevel,
                   maxZoomPreference: widget.maxZoomPreference,
                   idleTilt: widget.idleTilt,
@@ -274,73 +288,99 @@ class RapigoSkeletonMapPlaceholder extends StatelessWidget {
     super.key,
     this.showOfflineLabel = false,
     this.showErrorState = false,
+    this.onRetry,
   });
 
   final bool showOfflineLabel;
   final bool showErrorState;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              const Color(0xFF06204A).withValues(alpha: 0.80),
-              const Color(0xFF0A2C61).withValues(alpha: 0.52),
-              const Color(0xFF04101F).withValues(alpha: 0.66),
-            ],
-          ),
+    final content = DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            const Color(0xFF06204A).withValues(alpha: 0.80),
+            const Color(0xFF0A2C61).withValues(alpha: 0.52),
+            const Color(0xFF04101F).withValues(alpha: 0.66),
+          ],
         ),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const LinearGradient(
-                    colors: [Color(0x55FFFFFF), Color(0x18FFFFFF)],
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: const LinearGradient(
+                  colors: [Color(0x55FFFFFF), Color(0x18FFFFFF)],
+                ),
+                border: Border.all(color: const Color(0x447DB7FF)),
+              ),
+              child: const Icon(
+                Icons.navigation_rounded,
+                color: Colors.white,
+                size: 30,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              showErrorState
+                  ? 'Reiniciando mapa premium'
+                  : 'Preparando mapa offline',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              showOfflineLabel
+                  ? 'Mapa azul listo en unos instantes'
+                  : 'Sincronizando experiencia RAPIGO PRO',
+              style: const TextStyle(
+                color: Color(0xFFAFC8EA),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            if (showErrorState && onRetry != null) ...[
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: onRetry,
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFFACC15),
+                  foregroundColor: const Color(0xFF101828),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 12,
                   ),
-                  border: Border.all(color: const Color(0x447DB7FF)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
                 ),
-                child: const Icon(
-                  Icons.navigation_rounded,
-                  color: Colors.white,
-                  size: 30,
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                showErrorState
-                    ? 'Reiniciando mapa premium'
-                    : 'Preparando mapa offline',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                showOfflineLabel
-                    ? 'Mapa azul listo en unos instantes'
-                    : 'Sincronizando experiencia RAPIGO PRO',
-                style: const TextStyle(
-                  color: Color(0xFFAFC8EA),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text(
+                  'Reintentar mapa',
+                  style: TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),
             ],
-          ),
+          ],
         ),
       ),
     );
+    if (onRetry == null) {
+      return IgnorePointer(child: content);
+    }
+    return content;
   }
 }
 
@@ -362,18 +402,20 @@ class _OfflineFirstBadge extends StatelessWidget {
     final accent = isDownloading
         ? const Color(0xFFFACC15)
         : isOnline
-            ? const Color(0xFF7DB7FF)
-            : const Color(0xFF47D16A);
+        ? const Color(0xFF7DB7FF)
+        : const Color(0xFF47D16A);
     final title = isDownloading
         ? 'Preparando mapa offline'
         : isOnline
-            ? 'Mapa listo en cache'
-            : 'Mapa listo en cache';
+        ? 'Mapa listo en cache'
+        : 'Mapa listo en cache';
     final subtitle = isDownloading
         ? '${(progress * 100).toStringAsFixed(0)}%'
         : isOnline
-            ? (isOfflineReady ? 'Offline activado para Potosi' : 'Vista premium activa')
-            : 'Sin internet, usando cache local';
+        ? (isOfflineReady
+              ? 'Offline activado para Potosi'
+              : 'Vista premium activa')
+        : 'Sin internet, usando cache local';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
@@ -389,8 +431,8 @@ class _OfflineFirstBadge extends StatelessWidget {
             isDownloading
                 ? Icons.download_for_offline_rounded
                 : isOnline
-                    ? Icons.cloud_done_rounded
-                    : Icons.offline_bolt_rounded,
+                ? Icons.cloud_done_rounded
+                : Icons.offline_bolt_rounded,
             color: accent,
             size: 16,
           ),

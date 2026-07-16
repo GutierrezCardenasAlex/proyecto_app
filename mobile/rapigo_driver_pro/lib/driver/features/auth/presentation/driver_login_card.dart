@@ -359,7 +359,7 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
                               TextSpan(
                                 text: 'RAPIGO',
                                 style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 25,
+                                  fontSize: 21,
                                   fontWeight: FontWeight.w900,
                                   color: const Color(0xFF1746B5),
                                 ),
@@ -367,7 +367,7 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
                               TextSpan(
                                 text: ' PRO',
                                 style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 25,
+                                  fontSize: 21,
                                   fontWeight: FontWeight.w900,
                                   color: const Color(0xFFF6BE00),
                                 ),
@@ -380,7 +380,7 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
                     Text(
                       'CONDUCTOR',
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 10,
+                        fontSize: 9,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 4,
                         color: const Color(0xFF7B86B2),
@@ -664,7 +664,7 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
                   child: Text(
                     'RAPIGO PRO',
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: 20,
+                      fontSize: 17,
                       fontWeight: FontWeight.w900,
                       color: const Color(0xFF1746B5),
                     ),
@@ -681,7 +681,7 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
           Text(
             'Bienvenido conductor',
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 26,
+              fontSize: 21,
               fontWeight: FontWeight.w900,
               color: const Color(0xFF1746B5),
             ),
@@ -689,7 +689,7 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
           Text(
             'conductor',
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 26,
+              fontSize: 21,
               fontWeight: FontWeight.w900,
               color: const Color(0xFFF6BE00),
             ),
@@ -698,7 +698,7 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
           Text(
             'Ingresa tu numero de celular para crear tu cuenta.',
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 15,
+              fontSize: 12.5,
               fontWeight: FontWeight.w600,
               color: const Color(0xFF6C789F),
             ),
@@ -736,7 +736,7 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
           Text(
             'Verifica tu',
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 26,
+              fontSize: 21,
               fontWeight: FontWeight.w900,
               color: const Color(0xFF1746B5),
             ),
@@ -744,7 +744,7 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
           Text(
             'celular',
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 26,
+              fontSize: 21,
               fontWeight: FontWeight.w900,
               color: const Color(0xFFF6BE00),
             ),
@@ -753,7 +753,7 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
           Text(
             'Te enviamos un codigo de 6 digitos por SMS al numero:',
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 15,
+              fontSize: 12.5,
               fontWeight: FontWeight.w600,
               color: const Color(0xFF6C789F),
             ),
@@ -804,7 +804,7 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
                 setState(() => _showRegisterPassword = !_showRegisterPassword),
           ),
           const SizedBox(height: 12),
-          const _RegisterPasswordRulesCard(),
+          _RegisterPasswordRulesCard(controller: _registerPasswordController),
           const SizedBox(height: 16),
           _PrimaryYellowButton(
             label: session.isLoading ? 'VERIFICANDO...' : 'VERIFICAR',
@@ -1046,7 +1046,7 @@ class _SectionLabel extends StatelessWidget {
     return Text(
       text,
       style: GoogleFonts.plusJakartaSans(
-        fontSize: 16,
+        fontSize: 12.5,
         fontWeight: FontWeight.w800,
         color: const Color(0xFF1746B5),
       ),
@@ -1062,10 +1062,10 @@ class _PhoneInputField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 60,
+      height: 50,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFE2E9F8)),
         boxShadow: const [
           BoxShadow(
@@ -1077,19 +1077,19 @@ class _PhoneInputField extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const SizedBox(width: 18),
+          const SizedBox(width: 14),
           Text(
             '+591',
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 18,
+              fontSize: 13,
               fontWeight: FontWeight.w800,
               color: const Color(0xFF1D2D59),
             ),
           ),
           Container(
             width: 1,
-            height: 26,
-            margin: const EdgeInsets.symmetric(horizontal: 12),
+            height: 22,
+            margin: const EdgeInsets.symmetric(horizontal: 10),
             color: const Color(0xFFD7DDF1),
           ),
           Expanded(
@@ -1098,7 +1098,7 @@ class _PhoneInputField extends StatelessWidget {
               keyboardType: TextInputType.phone,
               cursorColor: const Color(0xFF1650D7),
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 16,
+                fontSize: 13,
                 fontWeight: FontWeight.w700,
                 color: const Color(0xFF1D2D59),
               ),
@@ -1109,7 +1109,7 @@ class _PhoneInputField extends StatelessWidget {
                 contentPadding: EdgeInsets.zero,
                 hintText: '7XX XXX XX',
                 hintStyle: GoogleFonts.plusJakartaSans(
-                  fontSize: 16,
+                  fontSize: 13,
                   color: const Color(0xFFA2ACC8),
                   fontWeight: FontWeight.w500,
                 ),
@@ -1121,11 +1121,11 @@ class _PhoneInputField extends StatelessWidget {
             ),
           ),
           const Padding(
-            padding: EdgeInsets.only(right: 18),
+            padding: EdgeInsets.only(right: 14),
             child: Icon(
               Icons.phone_in_talk_outlined,
               color: Color(0xFF1650D7),
-              size: 24,
+              size: 19,
             ),
           ),
         ],
@@ -1142,10 +1142,10 @@ class _NameInputField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 58,
+      height: 50,
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F9FF),
-        borderRadius: BorderRadius.circular(18),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFE1E8F8)),
       ),
       child: Row(
@@ -1200,10 +1200,10 @@ class _PasswordInputField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 60,
+      height: 50,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFE2E9F8)),
         boxShadow: const [
           BoxShadow(
@@ -1215,20 +1215,20 @@ class _PasswordInputField extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const SizedBox(width: 18),
+          const SizedBox(width: 14),
           const Icon(
             Icons.lock_outline_rounded,
             color: Color(0xFF1650D7),
-            size: 24,
+            size: 19,
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 10),
           Expanded(
             child: TextField(
               controller: controller,
               obscureText: obscureText,
               cursorColor: const Color(0xFF1650D7),
               style: GoogleFonts.plusJakartaSans(
-                fontSize: 16,
+                fontSize: 13,
                 fontWeight: FontWeight.w700,
                 color: const Color(0xFF1D2D59),
               ),
@@ -1239,7 +1239,7 @@ class _PasswordInputField extends StatelessWidget {
                 contentPadding: EdgeInsets.zero,
                 hintText: hintText,
                 hintStyle: GoogleFonts.plusJakartaSans(
-                  fontSize: 16,
+                  fontSize: 13,
                   color: const Color(0xFFA2ACC8),
                   fontWeight: FontWeight.w500,
                 ),
@@ -1258,7 +1258,7 @@ class _PasswordInputField extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
-                  vertical: 8,
+                  vertical: 6,
                 ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF7FAFF),
@@ -1270,13 +1270,13 @@ class _PasswordInputField extends StatelessWidget {
                     const Icon(
                       Icons.remove_red_eye_outlined,
                       color: Color(0xFF1650D7),
-                      size: 18,
+                      size: 15,
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 4),
                     Text(
                       suffixLabel,
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 12,
+                        fontSize: 10.5,
                         fontWeight: FontWeight.w700,
                         color: const Color(0xFF1650D7),
                       ),
@@ -1306,7 +1306,7 @@ class _OtpDigitField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 64,
+      height: 52,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
@@ -1338,7 +1338,7 @@ class _OtpDigitField extends StatelessWidget {
           disabledBorder: InputBorder.none,
         ),
         style: GoogleFonts.plusJakartaSans(
-          fontSize: 28,
+          fontSize: 22,
           fontWeight: FontWeight.w800,
           color: const Color(0xFF1746B5),
         ),
@@ -1349,82 +1349,82 @@ class _OtpDigitField extends StatelessWidget {
 }
 
 class _RegisterPasswordRulesCard extends StatelessWidget {
-  const _RegisterPasswordRulesCard();
+  const _RegisterPasswordRulesCard({required this.controller});
+
+  final TextEditingController controller;
+
+  bool _hasMin(String value) => value.length >= 8;
+  bool _hasLetter(String value) => RegExp(r'[A-Za-z]').hasMatch(value);
+  bool _hasNumber(String value) => RegExp(r'\d').hasMatch(value);
+  bool _hasNoSpaces(String value) => !RegExp(r'\s').hasMatch(value);
 
   @override
   Widget build(BuildContext context) {
-    const rules = [
-      'Minimo 8 caracteres',
-      'Al menos una letra',
-      'Al menos un numero',
-      'No usar espacios',
-    ];
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF2F6FF),
-        borderRadius: BorderRadius.circular(26),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(22),
-            ),
-            child: const Icon(
-              Icons.verified_user_outlined,
-              color: Color(0xFF1650D7),
-              size: 30,
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: controller,
+      builder: (context, value, _) {
+        final password = value.text;
+        final rules = [
+          ('Minimo 8 caracteres', _hasMin(password)),
+          ('Al menos una letra', _hasLetter(password)),
+          ('Al menos un numero', _hasNumber(password)),
+          ('Sin espacios', _hasNoSpaces(password)),
+        ];
+        final valid = rules.every((rule) => rule.$2);
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: valid ? const Color(0xFFEFFBF4) : const Color(0xFFF8FAFF),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: valid ? const Color(0xFFBBF7D0) : const Color(0xFFE2E9F8),
             ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Tu contrasena debe tener:',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF1650D7),
-                  ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                valid ? 'Contrasena correcta' : 'A la contrasena le falta:',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                  color: valid
+                      ? const Color(0xFF15803D)
+                      : const Color(0xFF1650D7),
                 ),
-                const SizedBox(height: 10),
-                for (final rule in rules)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.check_circle,
-                          color: Color(0xFF1650D7),
-                          size: 18,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            rule,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF405079),
-                            ),
+              ),
+              const SizedBox(height: 8),
+              for (final rule in rules)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    children: [
+                      Icon(
+                        rule.$2 ? Icons.check_circle : Icons.cancel_outlined,
+                        color: rule.$2
+                            ? const Color(0xFF16A34A)
+                            : const Color(0xFFDC2626),
+                        size: 15,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          rule.$1,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF405079),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-              ],
-            ),
+                ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -1442,18 +1442,18 @@ class _PrimaryYellowButton extends StatelessWidget {
       child: FilledButton(
         onPressed: onPressed,
         style: FilledButton.styleFrom(
-          minimumSize: const Size.fromHeight(58),
+          minimumSize: const Size.fromHeight(48),
           backgroundColor: const Color(0xFFF6C311),
           foregroundColor: Colors.black,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(15),
           ),
           elevation: 0,
         ),
         child: Text(
           label,
           style: GoogleFonts.plusJakartaSans(
-            fontSize: 20,
+            fontSize: 14,
             fontWeight: FontWeight.w900,
             letterSpacing: 0.2,
           ),
