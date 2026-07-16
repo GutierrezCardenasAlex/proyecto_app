@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../core/ui/top_notice.dart';
 import '../data/auth_repository.dart';
@@ -185,6 +186,45 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
     final passwordError = _validatePassword(_registerPasswordController.text);
     if (passwordError != null) {
       _showInlineError(passwordError);
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: Text(
+          'Confirmar registro',
+          style: GoogleFonts.plusJakartaSans(
+            color: const Color(0xFF1746B5),
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        content: Text(
+          'Estas seguro de registrar el numero ${_normalizedPhone()}? Este numero se guardara para continuar con tus datos personales.',
+          style: GoogleFonts.plusJakartaSans(
+            color: const Color(0xFF42517F),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFF6C311),
+              foregroundColor: Colors.black,
+            ),
+            child: const Text('Si, registrar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) {
       return;
     }
 
@@ -485,20 +525,29 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
               ),
             ),
             const SizedBox(width: 10),
-            Text(
-              'Recordar sesion',
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF42517F),
+            Expanded(
+              child: Text(
+                'Recordar sesion',
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF42517F),
+                ),
               ),
             ),
-            const Spacer(),
             TextButton(
               onPressed: _showResetPasswordDialog,
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                minimumSize: const Size(0, 36),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
               child: Text(
                 '¿Olvidaste tu contrasena?',
+                overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.plusJakartaSans(
+                  fontSize: 11.5,
                   fontWeight: FontWeight.w700,
                   color: const Color(0xFF1746B5),
                 ),
@@ -657,63 +706,13 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
                 color: Color(0xFF1746B5),
               ),
             ),
-            Expanded(
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 48),
-                  child: Text(
-                    'RAPIGO PRO',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w900,
-                      color: const Color(0xFF1746B5),
-                    ),
-                  ),
-                ),
-              ),
-            ),
+            const Expanded(child: SizedBox.shrink()),
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 4),
         _RegisterStepper(currentStep: currentStep),
         const SizedBox(height: 18),
         if (!showRegisterOtp) ...[
-          Text(
-            'Bienvenido conductor',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 21,
-              fontWeight: FontWeight.w900,
-              color: const Color(0xFF1746B5),
-            ),
-          ),
-          Text(
-            'conductor',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 21,
-              fontWeight: FontWeight.w900,
-              color: const Color(0xFFF6BE00),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Ingresa tu numero de celular para crear tu cuenta.',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF6C789F),
-            ),
-          ),
-          const SizedBox(height: 18),
-          _RegisterInfoCard(
-            title: 'Verificacion rapida',
-            bulletItems: const [
-              'Iniciar sesion',
-              'Recuperar tu cuenta',
-              'Recibir solicitudes de viaje',
-              'Comunicaciones de la central',
-            ],
-          ),
-          const SizedBox(height: 16),
           _SectionLabel('Nombre real'),
           const SizedBox(height: 10),
           _NameInputField(controller: _registerFirstNameController),
@@ -759,7 +758,14 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
             ),
           ),
           const SizedBox(height: 14),
-          _DestinationPreviewCard(phone: _normalizedPhone()),
+          _DestinationPreviewCard(
+            phone: _normalizedPhone(),
+            onChangePhone: () {
+              ref.read(driverSessionProvider.notifier).cancelRegistrationOtp();
+              _clearOtp();
+              setState(() => _fallbackOtpCode = null);
+            },
+          ),
           const SizedBox(height: 18),
           _SectionLabel('Ingresa el codigo de 6 digitos'),
           const SizedBox(height: 10),
@@ -897,89 +903,14 @@ class _RegisterStepper extends StatelessWidget {
   }
 }
 
-class _RegisterInfoCard extends StatelessWidget {
-  const _RegisterInfoCard({required this.title, required this.bulletItems});
-
-  final String title;
-  final List<String> bulletItems;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: const Color(0xFFDCE4F8)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 76,
-            height: 76,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEAF1FF),
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: const Icon(
-              Icons.verified_user_rounded,
-              color: Color(0xFF1650D7),
-              size: 38,
-            ),
-          ),
-          const SizedBox(width: 18),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF1650D7),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                for (final item in bulletItems)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.check_circle_rounded,
-                          size: 18,
-                          color: Color(0xFF1650D7),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            item,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF41507A),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _DestinationPreviewCard extends StatelessWidget {
-  const _DestinationPreviewCard({required this.phone});
+  const _DestinationPreviewCard({
+    required this.phone,
+    required this.onChangePhone,
+  });
 
   final String phone;
+  final VoidCallback onChangePhone;
 
   @override
   Widget build(BuildContext context) {
@@ -1019,12 +950,24 @@ class _DestinationPreviewCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 6),
-                Text(
-                  'Cambiar numero',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF1650D7),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: onChangePhone,
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(0, 30),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      foregroundColor: const Color(0xFF1650D7),
+                    ),
+                    icon: const Icon(Icons.edit_outlined, size: 15),
+                    label: Text(
+                      'Cambiar numero',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -1096,6 +1039,10 @@ class _PhoneInputField extends StatelessWidget {
             child: TextField(
               controller: controller,
               keyboardType: TextInputType.phone,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(8),
+              ],
               cursorColor: const Color(0xFF1650D7),
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 13,

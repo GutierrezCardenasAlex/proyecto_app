@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../core/ui/top_notice.dart';
 import '../data/auth_repository.dart';
@@ -158,8 +159,10 @@ class _DriverProfileCompletionPageState
     if (result == null || !mounted) {
       return;
     }
-    controller.text =
-        '${result.day.toString().padLeft(2, '0')}/${result.month.toString().padLeft(2, '0')}/${result.year}';
+    setState(() {
+      controller.text =
+          '${result.day.toString().padLeft(2, '0')}/${result.month.toString().padLeft(2, '0')}/${result.year}';
+    });
   }
 
   void _goNextFromCurrent() {
@@ -580,6 +583,10 @@ class _DriverProfileCompletionPageState
           icon: Icons.calendar_month_outlined,
           hintText: 'Ej: 2020',
           keyboardType: TextInputType.number,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(4),
+          ],
         ),
         const SizedBox(height: 20),
         const _SoftInfoCard(
@@ -989,6 +996,7 @@ class _FormField extends StatelessWidget {
     required this.hintText,
     this.keyboardType,
     this.suffixIcon,
+    this.inputFormatters,
   });
 
   final String label;
@@ -997,6 +1005,7 @@ class _FormField extends StatelessWidget {
   final String hintText;
   final TextInputType? keyboardType;
   final IconData? suffixIcon;
+  final List<TextInputFormatter>? inputFormatters;
 
   @override
   Widget build(BuildContext context) {
@@ -1028,6 +1037,7 @@ class _FormField extends StatelessWidget {
                 child: TextField(
                   controller: controller,
                   keyboardType: keyboardType,
+                  inputFormatters: inputFormatters,
                   cursorColor: const Color(0xFF1650D7),
                   decoration: InputDecoration(
                     isCollapsed: true,
@@ -1041,6 +1051,9 @@ class _FormField extends StatelessWidget {
                       color: const Color(0xFFA3AEC9),
                     ),
                     border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
                   ),
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 13,
@@ -1111,7 +1124,13 @@ class _DropdownField extends StatelessWidget {
               Icons.keyboard_arrow_down_rounded,
               color: Color(0xFF1650D7),
             ),
-            decoration: const InputDecoration(border: InputBorder.none),
+            decoration: const InputDecoration(
+              isCollapsed: true,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              disabledBorder: InputBorder.none,
+            ),
             hint: Text(
               hintText,
               style: GoogleFonts.plusJakartaSans(

@@ -3,12 +3,10 @@ part of '../home/driver_home_page.dart';
 class _DriverAuthorizationPendingShell extends ConsumerWidget {
   const _DriverAuthorizationPendingShell({
     required this.accessStatus,
-    required this.onRefresh,
     required this.isRefreshing,
   });
 
   final String accessStatus;
-  final Future<void> Function() onRefresh;
   final bool isRefreshing;
 
   String? _normalizeWhatsAppPhone(String? rawPhone) {
@@ -56,11 +54,15 @@ class _DriverAuthorizationPendingShell extends ConsumerWidget {
     final offlineState = ref.watch(offlineMapProvider);
     final publicSettings = ref.watch(driverPublicSettingsProvider);
     final loadedSupportPhone = publicSettings.asData?.value.supportPhone ?? '';
-    final supportPhone =
-        loadedSupportPhone.trim().isNotEmpty
+    final supportPhone = loadedSupportPhone.trim().isNotEmpty
         ? loadedSupportPhone
         : shared_config.AppConfig.supportPhone;
     final mapPercent = (offlineState.progress * 100).clamp(0, 100).round();
+    if (!offlineState.isReady && !offlineState.isDownloading) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(offlineMapProvider.notifier).ensureOfflineAvailability();
+      });
+    }
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8FE),
       body: SafeArea(
@@ -200,8 +202,11 @@ class _DriverAuthorizationPendingShell extends ConsumerWidget {
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
-                        onPressed: () =>
-                            _requestAuthorization(context, session, supportPhone),
+                        onPressed: () => _requestAuthorization(
+                          context,
+                          session,
+                          supportPhone,
+                        ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: const Color(0xFF1746B5),
                           side: const BorderSide(color: Color(0xFFBFD3FF)),
@@ -220,26 +225,30 @@ class _DriverAuthorizationPendingShell extends ConsumerWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: isRefreshing ? null : onRefresh,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFFF6BE00),
-                          foregroundColor: const Color(0xFF101722),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(18),
+                    const SizedBox(height: 12),
+                    Center(
+                      child: Column(
+                        children: [
+                          const SizedBox(
+                            width: 28,
+                            height: 28,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 3,
+                              color: Color(0xFFF6BE00),
+                            ),
                           ),
-                        ),
-                        child: Text(
-                          isRefreshing ? 'REVISANDO...' : 'ACTUALIZAR ESTADO',
-                          style: GoogleFonts.plusJakartaSans(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 15,
+                          const SizedBox(height: 8),
+                          Text(
+                            isRefreshing
+                                ? 'Revisando autorizacion...'
+                                : 'Esperando autorizacion de central',
+                            style: GoogleFonts.plusJakartaSans(
+                              color: const Color(0xFF68779E),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     ),
                   ],

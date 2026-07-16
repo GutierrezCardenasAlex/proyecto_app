@@ -75,6 +75,9 @@ export type PendingDriverAccessRow = {
   id: string
   user_id: string
   license_number: string
+  license_category?: string | null
+  license_issue_date?: string | null
+  license_expiry_date?: string | null
   access_status: 'PENDIENTE' | 'AUTORIZADO' | 'RECHAZADO'
   access_note?: string | null
   created_at: string

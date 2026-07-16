@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/map/offline_map.dart';
 import '../../../../features/maps/services/network_status_service.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../trip/data/trip_repository.dart';
@@ -22,7 +21,9 @@ class DriverStartupTrace {
     if (!kDebugMode) {
       return;
     }
-    debugPrint('[RAPIGO_PRO][startup] main iniciado @ ${_mainStartedAt.toIso8601String()}');
+    debugPrint(
+      '[RAPIGO_PRO][startup] main iniciado @ ${_mainStartedAt.toIso8601String()}',
+    );
   }
 
   static void markSplashVisible() {
@@ -77,18 +78,17 @@ class DriverStartupTrace {
 }
 
 class DriverInitialBootstrap extends ConsumerStatefulWidget {
-  const DriverInitialBootstrap({
-    super.key,
-    required this.child,
-  });
+  const DriverInitialBootstrap({super.key, required this.child});
 
   final Widget child;
 
   @override
-  ConsumerState<DriverInitialBootstrap> createState() => _DriverInitialBootstrapState();
+  ConsumerState<DriverInitialBootstrap> createState() =>
+      _DriverInitialBootstrapState();
 }
 
-class _DriverInitialBootstrapState extends ConsumerState<DriverInitialBootstrap> {
+class _DriverInitialBootstrapState
+    extends ConsumerState<DriverInitialBootstrap> {
   bool _scheduled = false;
 
   @override
@@ -124,11 +124,6 @@ class _DriverInitialBootstrapState extends ConsumerState<DriverInitialBootstrap>
       'driver-state-restore',
       () => ref.read(driverStateProvider.notifier).restoreOperationalState(),
     );
-    await _runStage(
-      'offline-prepare',
-      () => ref.read(offlineMapProvider.notifier).ensureOfflineAvailability(),
-    );
-
     if (!mounted) {
       return;
     }
@@ -176,7 +171,10 @@ class _DriverInitialBootstrapState extends ConsumerState<DriverInitialBootstrap>
     }
   }
 
-  Future<void> _runSoftStage(String label, Future<void> Function() action) async {
+  Future<void> _runSoftStage(
+    String label,
+    Future<void> Function() action,
+  ) async {
     try {
       await _runStage(label, action);
     } catch (_) {

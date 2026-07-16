@@ -57,7 +57,11 @@ export default function DriversPage() {
                 <div>
                   <strong>{driver.full_name || driver.phone}</strong>
                   <p>{driver.phone} · {driver.address || 'sin direccion'}</p>
-                  <p>Licencia {driver.license_number || 'pendiente'} · {driver.plate || 'sin placa'}</p>
+                  <p>
+                    Licencia {driver.license_number || 'pendiente'} · Categoria {driver.license_category || 'sin categoria'} · Emision{' '}
+                    {driver.license_issue_date || 'pendiente'} · Vence {driver.license_expiry_date || 'pendiente'}
+                  </p>
+                  <p>Placa {driver.plate || 'sin placa'}</p>
                   <p>{[driver.vehicle_type, driver.brand, driver.model, driver.color, driver.year].filter(Boolean).join(' ') || 'vehiculo incompleto'}</p>
                   {driver.missing_fields?.length ? (
                     <p className="muted-text">Falta verificar: {driver.missing_fields.join(', ')}</p>

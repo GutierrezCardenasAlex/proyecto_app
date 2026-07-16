@@ -1,10 +1,7 @@
 part of '../driver_home_page.dart';
 
 class PendingAuthorizationView extends ConsumerStatefulWidget {
-  const PendingAuthorizationView({
-    super.key,
-    required this.accessStatus,
-  });
+  const PendingAuthorizationView({super.key, required this.accessStatus});
 
   final String accessStatus;
 
@@ -52,7 +49,6 @@ class _PendingAuthorizationViewState
   Widget build(BuildContext context) {
     return _DriverAuthorizationPendingShell(
       accessStatus: widget.accessStatus,
-      onRefresh: _refreshNow,
       isRefreshing: _refreshing,
     );
   }

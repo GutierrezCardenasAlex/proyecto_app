@@ -91,7 +91,10 @@ export default function OverviewSections(props: Props) {
                   </div>
                   <p>conductor · {driver.phone}</p>
                   <p>{driver.email || 'Sin email'} · {driver.address || 'Sin direccion'}</p>
-                  <p>Licencia: {driver.license_number || 'pendiente'}</p>
+                  <p>
+                    Licencia: {driver.license_number || 'pendiente'} · Categoria {driver.license_category || 'sin categoria'} · Emision{' '}
+                    {driver.license_issue_date || 'pendiente'} · Vence {driver.license_expiry_date || 'pendiente'}
+                  </p>
                   <p>
                     Vehiculo: {driver.vehicle_type || 'sin tipo'} · {driver.plate || 'sin placa'} ·{' '}
                     {[driver.brand, driver.model, driver.color, driver.year].filter(Boolean).join(' ') || 'datos incompletos'}
