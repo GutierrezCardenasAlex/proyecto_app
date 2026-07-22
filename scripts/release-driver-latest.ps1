@@ -8,8 +8,8 @@ param(
 $ErrorActionPreference = "Stop"
 
 # Edita solo estos dos valores para tu siguiente release.
-$DriverBuildName = "1.0.8"
-$DriverBuildNumber = "8"
+$DriverBuildName = "1.0.10"
+$DriverBuildNumber = "10"
 
 & "$PSScriptRoot\release-driver.ps1" `
   -RemoteUser $RemoteUser `

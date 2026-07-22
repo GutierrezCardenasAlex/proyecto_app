@@ -1,15 +1,16 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-enum DriverLocalNotificationKind {
-  rideRequest,
-  promotion,
-}
+enum DriverLocalNotificationKind { rideRequest, promotion }
 
 class LocalNotifications {
   LocalNotifications._();
 
-  static final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
+  static final FlutterLocalNotificationsPlugin _plugin =
+      FlutterLocalNotificationsPlugin();
   static bool _initialized = false;
+  static const String _soundEnabledKey =
+      'rapigo_pro_driver_request_sound_enabled';
 
   static Future<void> ensureInitialized() async {
     if (_initialized) {
@@ -31,22 +32,40 @@ class LocalNotifications {
     DriverLocalNotificationKind kind = DriverLocalNotificationKind.rideRequest,
   }) async {
     await ensureInitialized();
+    final isPromotion = kind == DriverLocalNotificationKind.promotion;
+    final playSound = isPromotion ? true : await isRequestSoundEnabled();
+    final channelSuffix = playSound ? 'sound' : 'silent';
     await _plugin.show(
       id,
       title,
       body,
       NotificationDetails(
         android: AndroidNotificationDetails(
-          kind == DriverLocalNotificationKind.promotion ? 'rapigo_pro_driver_promo' : 'rapigo_pro_driver_trips',
-          kind == DriverLocalNotificationKind.promotion ? 'RAPIGO - PRO promociones' : 'RAPIGO - PRO viajes',
-          channelDescription: kind == DriverLocalNotificationKind.promotion
+          isPromotion
+              ? 'rapigo_pro_driver_promo_$channelSuffix'
+              : 'rapigo_pro_driver_trips_$channelSuffix',
+          isPromotion ? 'RAPIGO - PRO promociones' : 'RAPIGO - PRO viajes',
+          channelDescription: isPromotion
               ? 'Promociones y avisos prioritarios de RAPIGO - PRO'
               : 'Solicitudes y avisos prioritarios de viajes de RAPIGO - PRO',
           importance: Importance.high,
           priority: Priority.high,
-          category: kind == DriverLocalNotificationKind.promotion ? AndroidNotificationCategory.promo : AndroidNotificationCategory.message,
+          playSound: playSound,
+          category: isPromotion
+              ? AndroidNotificationCategory.promo
+              : AndroidNotificationCategory.message,
         ),
       ),
     );
+  }
+
+  static Future<bool> isRequestSoundEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_soundEnabledKey) ?? true;
+  }
+
+  static Future<void> setRequestSoundEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_soundEnabledKey, enabled);
   }
 }

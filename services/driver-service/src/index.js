@@ -45,7 +45,7 @@ const availabilitySchema = z.object({
 });
 
 const ensureProfileSchema = z.object({
-  userId: z.string().uuid(),
+  userId: z.string().uuid().optional(),
   fullName: z.string().min(2).optional(),
   phone: z.string().min(8).optional()
 });
@@ -287,14 +287,26 @@ async function bootstrap() {
   });
 
   app.post("/ensure-profile", async (request, reply) => {
-    const { userId } = ensureProfileSchema.parse(request.body);
-    const user = await requireOwnUserId(request, reply, userId);
+    ensureProfileSchema.parse(request.body || {});
+    const user = await requireDriverUser(request, reply);
     if (!user) return;
+    const userId = user.sub;
 
     const client = await pool.connect();
 
     try {
       await client.query("BEGIN");
+      const userExists = await client.query(
+        "SELECT id FROM users WHERE id = $1 LIMIT 1",
+        [userId]
+      );
+      if (!userExists.rows.length) {
+        await client.query("ROLLBACK");
+        return reply.code(409).send({
+          message: "Tu sesion de conductor no coincide con un usuario activo. Vuelve a iniciar sesion."
+        });
+      }
+
       const existing = await client.query(
         `SELECT d.*, row_to_json(v.*) AS vehicle
          FROM drivers d

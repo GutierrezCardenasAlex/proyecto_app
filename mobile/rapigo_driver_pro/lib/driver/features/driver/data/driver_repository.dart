@@ -21,7 +21,10 @@ final driverRepositoryProvider = Provider<DriverRepository>((ref) {
   return const DriverRepository();
 });
 
-final driverStateProvider = NotifierProvider<DriverStateController, DriverState>(DriverStateController.new);
+final driverStateProvider =
+    NotifierProvider<DriverStateController, DriverState>(
+      DriverStateController.new,
+    );
 
 class DriverRepository {
   const DriverRepository();
@@ -54,14 +57,13 @@ class DriverRepository {
     final response = await http.patch(
       Uri.parse('${AppConfig.apiBaseUrl}/drivers/availability'),
       headers: _headers(token),
-      body: jsonEncode({
-        'driverId': driverId,
-        'isAvailable': available,
-      }),
+      body: jsonEncode({'driverId': driverId, 'isAvailable': available}),
     );
 
     if (response.statusCode >= 400) {
-      throw Exception('No se pudo actualizar disponibilidad (${response.statusCode})');
+      throw Exception(
+        _errorMessage(response, 'No se pudo actualizar disponibilidad'),
+      );
     }
 
     return currentState.copyWith(
@@ -73,22 +75,19 @@ class DriverRepository {
 
   Future<String> ensureDriverProfile({
     required String token,
-    required String userId,
     required String fullName,
     required String phone,
   }) async {
     final response = await http.post(
       Uri.parse('${AppConfig.apiBaseUrl}/drivers/ensure-profile'),
       headers: _headers(token),
-      body: jsonEncode({
-        'userId': userId,
-        'fullName': fullName,
-        'phone': phone,
-      }),
+      body: jsonEncode({'fullName': fullName, 'phone': phone}),
     );
 
     if (response.statusCode >= 400) {
-      throw Exception('No se pudo restaurar el perfil del conductor (${response.statusCode})');
+      throw Exception(
+        _errorMessage(response, 'No se pudo restaurar el perfil del conductor'),
+      );
     }
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
@@ -130,7 +129,8 @@ class DriverRepository {
       permission = await Geolocator.requestPermission();
     }
 
-    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
       throw Exception('Permiso de ubicacion denegado.');
     }
   }
@@ -149,7 +149,9 @@ class DriverRepository {
     );
 
     if (response.statusCode >= 400) {
-      throw Exception('No se pudo consultar el estado del conductor (${response.statusCode})');
+      throw Exception(
+        _errorMessage(response, 'No se pudo consultar el estado del conductor'),
+      );
     }
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
@@ -186,7 +188,9 @@ class DriverRepository {
     } else {
       await prefs.remove(_cacheHeadingKey);
     }
-    final speedKph = position.speed.isFinite && position.speed >= 0 ? position.speed * 3.6 : null;
+    final speedKph = position.speed.isFinite && position.speed >= 0
+        ? position.speed * 3.6
+        : null;
     if (speedKph != null) {
       await prefs.setDouble(_cacheSpeedKey, speedKph);
     } else {
@@ -217,7 +221,9 @@ class DriverRepository {
     String? activeTripId,
   }) async {
     final heading = position.heading.isFinite ? position.heading : null;
-    final speedKph = position.speed.isFinite && position.speed >= 0 ? position.speed * 3.6 : null;
+    final speedKph = position.speed.isFinite && position.speed >= 0
+        ? position.speed * 3.6
+        : null;
     final payload = <String, Object>{
       'driverId': driverId,
       'lat': position.latitude,
@@ -253,9 +259,22 @@ class DriverRepository {
   }
 
   static Map<String, String> _headers(String token) => {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      };
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer $token',
+  };
+
+  static String _errorMessage(http.Response response, String fallback) {
+    try {
+      final payload = jsonDecode(response.body) as Map<String, dynamic>;
+      final message = payload['message']?.toString().trim();
+      if (message != null && message.isNotEmpty) {
+        return '$message (${response.statusCode})';
+      }
+    } catch (_) {
+      // Keep a stable fallback if the backend response is not JSON.
+    }
+    return '$fallback (${response.statusCode})';
+  }
 
   double _toRadians(double value) => (value * pi) / 180;
 
@@ -267,7 +286,8 @@ class DriverRepository {
         intervalDuration: const Duration(seconds: 1),
         foregroundNotificationConfig: const ForegroundNotificationConfig(
           notificationTitle: 'RAPIGO - PRO activo',
-          notificationText: 'Seguimos enviando tu ubicacion para viajes y alertas prioritarias.',
+          notificationText:
+              'Seguimos enviando tu ubicacion para viajes y alertas prioritarias.',
           enableWakeLock: true,
           setOngoing: true,
         ),
@@ -354,10 +374,7 @@ class DriverStateController extends Notifier<DriverState> {
         return;
       }
       final heading = _filterHeading(rawHeading);
-      state = state.copyWith(
-        headingDegrees: heading,
-        clearError: true,
-      );
+      state = state.copyWith(headingDegrees: heading, clearError: true);
     });
   }
 
@@ -389,7 +406,9 @@ class DriverStateController extends Notifier<DriverState> {
   Future<void> toggleAvailability(bool available) async {
     final session = ref.read(driverSessionProvider);
     if (!session.loggedIn || session.token.isEmpty) {
-      state = state.copyWith(errorMessage: 'Inicia sesion para activar disponibilidad.');
+      state = state.copyWith(
+        errorMessage: 'Inicia sesion para activar disponibilidad.',
+      );
       return;
     }
 
@@ -404,15 +423,15 @@ class DriverStateController extends Notifier<DriverState> {
           currentState: state,
         );
       } catch (error) {
-        final message = error.toString();
-        if (message.contains('(404)')) {
+        if (_isNotFound(error) || _isDriverMismatch(error)) {
           effectiveDriverId = await _repository.ensureDriverProfile(
             token: session.token,
-            userId: session.userId,
             fullName: session.fullName,
             phone: session.phone,
           );
-          await ref.read(driverSessionProvider.notifier).updateDriverId(effectiveDriverId);
+          await ref
+              .read(driverSessionProvider.notifier)
+              .updateDriverId(effectiveDriverId);
           state = await _repository.updateAvailability(
             token: session.token,
             driverId: effectiveDriverId,
@@ -448,7 +467,9 @@ class DriverStateController extends Notifier<DriverState> {
     try {
       await _sendLocation();
     } catch (error) {
-      state = state.copyWith(errorMessage: error.toString().replaceFirst('Exception: ', ''));
+      state = state.copyWith(
+        errorMessage: error.toString().replaceFirst('Exception: ', ''),
+      );
     }
   }
 
@@ -467,7 +488,7 @@ class DriverStateController extends Notifier<DriverState> {
           driverId: effectiveDriverId,
         );
       } catch (error) {
-        if (_isNotFound(error)) {
+        if (_isNotFound(error) || _isDriverMismatch(error)) {
           effectiveDriverId = await _recreateDriverProfile(session);
           snapshot = await _repository.fetchDriverSnapshot(
             token: session.token,
@@ -508,7 +529,9 @@ class DriverStateController extends Notifier<DriverState> {
         _stopAvailabilityHeartbeat();
       }
     } catch (error) {
-      state = state.copyWith(errorMessage: error.toString().replaceFirst('Exception: ', ''));
+      state = state.copyWith(
+        errorMessage: error.toString().replaceFirst('Exception: ', ''),
+      );
     }
   }
 
@@ -522,7 +545,6 @@ class DriverStateController extends Notifier<DriverState> {
   Future<String> _recreateDriverProfile(DriverSession session) async {
     final driverId = await _repository.ensureDriverProfile(
       token: session.token,
-      userId: session.userId,
       fullName: session.fullName,
       phone: session.phone,
     );
@@ -531,6 +553,14 @@ class DriverStateController extends Notifier<DriverState> {
   }
 
   bool _isNotFound(Object error) => error.toString().contains('(404)');
+
+  bool _isDriverMismatch(Object error) {
+    final message = error.toString().toLowerCase();
+    return message.contains('(403)') &&
+        (message.contains('otro conductor') ||
+            message.contains('otro driver') ||
+            message.contains('no puedes operar con otro conductor'));
+  }
 
   Future<void> _sendLocation() async {
     final session = ref.read(driverSessionProvider);
@@ -543,9 +573,14 @@ class DriverStateController extends Notifier<DriverState> {
       position: position,
       tripId: trip == null
           ? null
-          : const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(trip.status)
-              ? trip.id
-              : null,
+          : const {
+              'accepted',
+              'arriving',
+              'at_pickup',
+              'in_progress',
+            }.contains(trip.status)
+          ? trip.id
+          : null,
     );
   }
 
@@ -618,9 +653,14 @@ class DriverStateController extends Notifier<DriverState> {
         position: position,
         tripId: trip == null
             ? null
-            : const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(trip.status)
-                ? trip.id
-                : null,
+            : const {
+                'accepted',
+                'arriving',
+                'at_pickup',
+                'in_progress',
+              }.contains(trip.status)
+            ? trip.id
+            : null,
       );
     } catch (error) {
       state = state.copyWith(
@@ -653,7 +693,9 @@ class DriverStateController extends Notifier<DriverState> {
 
   void _applyLocalTrackedPosition(Position position) {
     final heading = position.heading.isFinite ? position.heading : null;
-    final speedKph = position.speed.isFinite && position.speed >= 0 ? position.speed * 3.6 : null;
+    final speedKph = position.speed.isFinite && position.speed >= 0
+        ? position.speed * 3.6
+        : null;
     final smoothedPoint = _smoothedDriverPoint(position);
     state = state.copyWith(
       lat: smoothedPoint.latitude,
@@ -681,10 +723,10 @@ class DriverStateController extends Notifier<DriverState> {
     final factor = distanceMeters <= 2
         ? 0.18
         : distanceMeters <= 6
-            ? 0.30
-            : distanceMeters <= 12
-                ? 0.46
-                : 0.66;
+        ? 0.30
+        : distanceMeters <= 12
+        ? 0.46
+        : 0.66;
 
     return ll.LatLng(
       previous.latitude + ((next.latitude - previous.latitude) * factor),
@@ -694,10 +736,7 @@ class DriverStateController extends Notifier<DriverState> {
 }
 
 class DriverSnapshot {
-  const DriverSnapshot({
-    required this.isAvailable,
-    required this.status,
-  });
+  const DriverSnapshot({required this.isAvailable, required this.status});
 
   final bool isAvailable;
   final String status;

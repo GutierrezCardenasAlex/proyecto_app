@@ -12,6 +12,7 @@ import '../../../../../core/update/app_install_info.dart';
 import '../../../../../core/update/app_update_service.dart';
 import '../../../../../shared/theme/rapigo_theme.dart';
 import '../../../auth/data/auth_repository.dart';
+import '../../../../core/notifications/local_notifications.dart';
 import '../../../trip/data/trip_repository.dart';
 import '../../../trip/domain/driver_trip.dart';
 import '../widgets/driver_ui_kit.dart';
@@ -1109,8 +1110,51 @@ class _DriverProfileDivider extends StatelessWidget {
   }
 }
 
-class DriverSettingsPage extends StatelessWidget {
+class DriverSettingsPage extends StatefulWidget {
   const DriverSettingsPage({super.key});
+
+  @override
+  State<DriverSettingsPage> createState() => _DriverSettingsPageState();
+}
+
+class _DriverSettingsPageState extends State<DriverSettingsPage> {
+  bool _requestSoundEnabled = true;
+  bool _loadingRequestSound = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRequestSoundPreference();
+  }
+
+  Future<void> _loadRequestSoundPreference() async {
+    final enabled = await LocalNotifications.isRequestSoundEnabled();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _requestSoundEnabled = enabled;
+      _loadingRequestSound = false;
+    });
+  }
+
+  Future<void> _setRequestSoundPreference(bool enabled) async {
+    setState(() {
+      _requestSoundEnabled = enabled;
+    });
+    await LocalNotifications.setRequestSoundEnabled(enabled);
+    if (!mounted) {
+      return;
+    }
+    showTopNotice(
+      context,
+      enabled
+          ? 'Sonido activado para solicitudes de viaje.'
+          : 'Sonido desactivado para solicitudes de viaje.',
+      tone: NoticeTone.success,
+      icon: enabled ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1171,6 +1215,80 @@ class DriverSettingsPage extends StatelessWidget {
                       ),
                       label: const Text('Abrir mapa offline'),
                     ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [palette.surfacePrimary, palette.surfaceSecondary],
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: palette.outlineStrong),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color:
+                          (_requestSoundEnabled
+                                  ? palette.accentGreen
+                                  : palette.surfaceMuted)
+                              .withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: _requestSoundEnabled
+                            ? palette.accentGreen.withValues(alpha: 0.45)
+                            : palette.outlineSoft,
+                      ),
+                    ),
+                    child: Icon(
+                      _requestSoundEnabled
+                          ? Icons.volume_up_rounded
+                          : Icons.volume_off_rounded,
+                      color: _requestSoundEnabled
+                          ? palette.accentGreen
+                          : palette.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Sonido de solicitudes',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Alerta sonora cuando llega una solicitud de viaje.',
+                          style: TextStyle(
+                            color: Color(0xFFDCE6F2),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch.adaptive(
+                    value: _requestSoundEnabled,
+                    onChanged: _loadingRequestSound
+                        ? null
+                        : (value) => _setRequestSoundPreference(value),
                   ),
                 ],
               ),
