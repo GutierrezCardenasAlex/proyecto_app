@@ -3,6 +3,7 @@ import type {
   Dashboard,
   DeviceRow,
   Driver,
+  DeliveryDriver,
   DriverPerformanceResponse,
   DriverTripsResponse,
   ManagedUserRow,
@@ -30,6 +31,8 @@ const authHeaders = (token: string) => ({
 export const adminService = {
   getDashboard: (token: string) => apiRequest<Dashboard>(`${API_BASE}/admin/dashboard`, { headers: authHeaders(token) }),
   getLiveDrivers: (token: string) => apiRequest<Driver[]>(`${API_BASE}/admin/drivers/live`, { headers: authHeaders(token) }),
+  getDeliveryDrivers: (token: string) =>
+    apiRequest<DeliveryDriver[]>(`${API_BASE}/admin/drivers/delivery-enabled`, { headers: authHeaders(token) }),
   getActiveTrips: (token: string) => apiRequest<Trip[]>(`${API_BASE}/admin/active-trips`, { headers: authHeaders(token) }),
   getPendingDrivers: (token: string) =>
     apiRequest<PendingDriverAccessRow[]>(`${API_BASE}/admin/drivers/pending-access`, { headers: authHeaders(token) }),

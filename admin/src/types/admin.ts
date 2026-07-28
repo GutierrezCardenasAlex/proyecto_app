@@ -15,6 +15,8 @@ export type Driver = {
   user_id?: string
   status: string
   is_available: boolean
+  accepts_transport_requests?: boolean
+  accepts_delivery_requests?: boolean
   full_name?: string | null
   phone?: string | null
   current_trip_id?: string | null
@@ -23,6 +25,25 @@ export type Driver = {
     lng?: string
     updatedAt?: string
   }
+}
+
+export type DeliveryDriver = {
+  id: string
+  user_id: string
+  status: string
+  is_available: boolean
+  current_trip_id?: string | null
+  accepts_transport_requests: boolean
+  accepts_delivery_requests: boolean
+  updated_at: string
+  full_name?: string | null
+  phone?: string | null
+  email?: string | null
+  vehicle_type?: string | null
+  plate?: string | null
+  brand?: string | null
+  model?: string | null
+  color?: string | null
 }
 
 export type Trip = {

@@ -4,6 +4,7 @@ import type {
   ActivityEvent,
   AppSettings,
   Dashboard,
+  DeliveryDriver,
   DeviceRow,
   Driver,
   DriverPerformanceResponse,
@@ -28,6 +29,7 @@ import { formatClockNow } from '../utils/helpers'
 type CentralContextValue = {
   dashboard: Dashboard
   drivers: Driver[]
+  deliveryDrivers: DeliveryDriver[]
   trips: Trip[]
   pendingDrivers: PendingDriverAccessRow[]
   pendingDevices: DeviceRow[]
@@ -131,6 +133,7 @@ export function CentralProvider({ children }: PropsWithChildren) {
 
   const [dashboard, setDashboard] = useState<Dashboard>(emptyDashboard)
   const [drivers, setDrivers] = useState<Driver[]>([])
+  const [deliveryDrivers, setDeliveryDrivers] = useState<DeliveryDriver[]>([])
   const [trips, setTrips] = useState<Trip[]>([])
   const [pendingDrivers, setPendingDrivers] = useState<PendingDriverAccessRow[]>([])
   const [pendingDevices, setPendingDevices] = useState<DeviceRow[]>([])
@@ -281,13 +284,15 @@ export function CentralProvider({ children }: PropsWithChildren) {
         const results = await Promise.allSettled([
           adminService.getDashboard(token),
           adminService.getLiveDrivers(token),
+          adminService.getDeliveryDrivers(token),
           adminService.getActiveTrips(token),
           adminService.getOfflineStatus(token),
         ])
-        const [dashboardResult, driversResult, tripsResult, offlineResult] = results
+        const [dashboardResult, driversResult, deliveryDriversResult, tripsResult, offlineResult] = results
 
         if (dashboardResult.status === 'fulfilled') setDashboard(dashboardResult.value)
         if (driversResult.status === 'fulfilled') setDrivers(driversResult.value)
+        if (deliveryDriversResult.status === 'fulfilled') setDeliveryDrivers(deliveryDriversResult.value)
         if (tripsResult.status === 'fulfilled') setTrips(tripsResult.value)
         if (offlineResult.status === 'fulfilled') setOfflineMapStatus(offlineResult.value)
 
@@ -296,6 +301,7 @@ export function CentralProvider({ children }: PropsWithChildren) {
           setPendingDevices([])
           setAllDevices([])
           setManagedUsers([])
+          setDeliveryDrivers([])
           setSupportReports([])
           setSelectedDriverTrips(null)
           setSelectedHistoryUser(null)
@@ -312,6 +318,7 @@ export function CentralProvider({ children }: PropsWithChildren) {
         const results = await Promise.allSettled([
           adminService.getDashboard(token),
           adminService.getLiveDrivers(token),
+          adminService.getDeliveryDrivers(token),
           adminService.getActiveTrips(token),
           adminService.getPendingDrivers(token),
           adminService.getPendingDevices(token),
@@ -326,6 +333,7 @@ export function CentralProvider({ children }: PropsWithChildren) {
         const [
           dashboardResult,
           driversResult,
+          deliveryDriversResult,
           tripsResult,
           pendingDriversResult,
           pendingDevicesResult,
@@ -340,6 +348,7 @@ export function CentralProvider({ children }: PropsWithChildren) {
 
         if (dashboardResult.status === 'fulfilled') setDashboard(dashboardResult.value)
         if (driversResult.status === 'fulfilled') setDrivers(driversResult.value)
+        if (deliveryDriversResult.status === 'fulfilled') setDeliveryDrivers(deliveryDriversResult.value)
         if (tripsResult.status === 'fulfilled') setTrips(tripsResult.value)
         if (pendingDriversResult.status === 'fulfilled') setPendingDrivers(pendingDriversResult.value)
         if (pendingDevicesResult.status === 'fulfilled') setPendingDevices(pendingDevicesResult.value)
@@ -673,6 +682,7 @@ export function CentralProvider({ children }: PropsWithChildren) {
     () => ({
       dashboard,
       drivers,
+      deliveryDrivers,
       trips,
       pendingDrivers,
       pendingDevices,
@@ -748,6 +758,7 @@ export function CentralProvider({ children }: PropsWithChildren) {
       allDevices,
       appSettings,
       dashboard,
+      deliveryDrivers,
       driverAccessNote,
       driverPerformance,
       drivers,

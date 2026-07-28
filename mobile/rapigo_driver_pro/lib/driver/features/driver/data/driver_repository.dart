@@ -161,6 +161,27 @@ class DriverRepository {
     );
   }
 
+  Future<void> updateDriverServices({
+    required String token,
+    required String driverId,
+    required bool deliveryEnabled,
+  }) async {
+    final response = await http.patch(
+      Uri.parse('${AppConfig.apiBaseUrl}/drivers/$driverId/services'),
+      headers: _headers(token),
+      body: jsonEncode({
+        'transportEnabled': true,
+        'deliveryEnabled': deliveryEnabled,
+      }),
+    );
+
+    if (response.statusCode >= 400) {
+      throw Exception(
+        _errorMessage(response, 'No se pudieron actualizar tus servicios'),
+      );
+    }
+  }
+
   Future<void> persistDesiredAvailability(bool available) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_desiredAvailabilityKey, available);

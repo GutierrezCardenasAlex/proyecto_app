@@ -251,7 +251,9 @@ async function ensureAdminSchema() {
     ALTER TABLE drivers
       ADD COLUMN IF NOT EXISTS access_status VARCHAR(20) NOT NULL DEFAULT 'AUTORIZADO',
       ADD COLUMN IF NOT EXISTS access_note TEXT,
-      ADD COLUMN IF NOT EXISTS access_granted_at TIMESTAMPTZ
+      ADD COLUMN IF NOT EXISTS access_granted_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS accepts_transport_requests BOOLEAN NOT NULL DEFAULT TRUE,
+      ADD COLUMN IF NOT EXISTS accepts_delivery_requests BOOLEAN NOT NULL DEFAULT FALSE
   `);
 
   await pool.query(`
@@ -443,6 +445,8 @@ async function bootstrap() {
               d.status,
               d.is_available,
               d.current_trip_id,
+              d.accepts_transport_requests,
+              d.accepts_delivery_requests,
               u.full_name,
               u.phone
        FROM drivers d
@@ -478,6 +482,35 @@ async function bootstrap() {
     );
 
     return liveDrivers;
+  });
+
+  app.get("/drivers/delivery-enabled", { preHandler: ensureAdmin }, async () => {
+    const result = await pool.query(
+      `SELECT d.id,
+              d.user_id,
+              d.status,
+              d.is_available,
+              d.current_trip_id,
+              d.accepts_transport_requests,
+              d.accepts_delivery_requests,
+              d.updated_at,
+              u.full_name,
+              u.phone,
+              u.email,
+              v.vehicle_type,
+              v.plate,
+              v.brand,
+              v.model,
+              v.color
+       FROM drivers d
+       INNER JOIN users u ON u.id = d.user_id
+       LEFT JOIN vehicles v ON v.driver_id = d.id
+       WHERE d.accepts_delivery_requests = TRUE
+       ORDER BY d.updated_at DESC
+       LIMIT 500`
+    );
+
+    return result.rows;
   });
 
   app.get("/drivers/performance", { preHandler: ensureAdmin }, async (request) => {

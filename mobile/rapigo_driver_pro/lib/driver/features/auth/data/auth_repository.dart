@@ -82,6 +82,7 @@ class DriverProfileDetails {
     required this.licenseIssueDate,
     required this.licenseExpiryDate,
     required this.vehicleType,
+    required this.deliveryEnabled,
     required this.driverId,
     required this.accessStatus,
     required this.plate,
@@ -96,6 +97,7 @@ class DriverProfileDetails {
   final String licenseIssueDate;
   final String licenseExpiryDate;
   final String vehicleType;
+  final bool deliveryEnabled;
   final String driverId;
   final String accessStatus;
   final String plate;
@@ -187,6 +189,9 @@ class DriverAuthRepository {
           vehicle['vehicle_type']?.toString() ??
           vehicle['type']?.toString() ??
           'taxi',
+      deliveryEnabled:
+          payload['accepts_delivery_requests'] == true ||
+          payload['acceptsDeliveryRequests'] == true,
       driverId: payload['id']?.toString() ?? '',
       accessStatus: payload['access_status']?.toString() ?? 'AUTORIZADO',
       plate: vehicle['plate']?.toString() ?? '',

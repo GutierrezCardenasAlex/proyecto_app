@@ -12,6 +12,7 @@ import '../../../../../core/update/app_install_info.dart';
 import '../../../../../core/update/app_update_service.dart';
 import '../../../../../shared/theme/rapigo_theme.dart';
 import '../../../auth/data/auth_repository.dart';
+import '../../data/driver_repository.dart';
 import '../../../../core/notifications/local_notifications.dart';
 import '../../../trip/data/trip_repository.dart';
 import '../../../trip/domain/driver_trip.dart';
@@ -1110,21 +1111,25 @@ class _DriverProfileDivider extends StatelessWidget {
   }
 }
 
-class DriverSettingsPage extends StatefulWidget {
+class DriverSettingsPage extends ConsumerStatefulWidget {
   const DriverSettingsPage({super.key});
 
   @override
-  State<DriverSettingsPage> createState() => _DriverSettingsPageState();
+  ConsumerState<DriverSettingsPage> createState() => _DriverSettingsPageState();
 }
 
-class _DriverSettingsPageState extends State<DriverSettingsPage> {
+class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
   bool _requestSoundEnabled = true;
   bool _loadingRequestSound = true;
+  bool _deliveryEnabled = false;
+  bool _loadingServices = true;
+  bool _savingServices = false;
 
   @override
   void initState() {
     super.initState();
     _loadRequestSoundPreference();
+    _loadDriverServices();
   }
 
   Future<void> _loadRequestSoundPreference() async {
@@ -1154,6 +1159,88 @@ class _DriverSettingsPageState extends State<DriverSettingsPage> {
       tone: NoticeTone.success,
       icon: enabled ? Icons.volume_up_rounded : Icons.volume_off_rounded,
     );
+  }
+
+  Future<void> _loadDriverServices() async {
+    final session = ref.read(driverSessionProvider);
+    if (session.token.isEmpty || session.userId.isEmpty) {
+      if (mounted) {
+        setState(() => _loadingServices = false);
+      }
+      return;
+    }
+    try {
+      final profile = await ref
+          .read(authRepositoryProvider)
+          .fetchDriverProfile(token: session.token, userId: session.userId);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _deliveryEnabled = profile.deliveryEnabled;
+        _loadingServices = false;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loadingServices = false);
+      }
+    }
+  }
+
+  Future<void> _setDeliveryEnabled(bool enabled) async {
+    if (_savingServices) {
+      return;
+    }
+    final session = ref.read(driverSessionProvider);
+    if (session.token.isEmpty || session.driverId.isEmpty) {
+      showTopNotice(
+        context,
+        'No se pudo identificar tu conductor.',
+        tone: NoticeTone.error,
+      );
+      return;
+    }
+
+    setState(() {
+      _savingServices = true;
+      _deliveryEnabled = enabled;
+    });
+    try {
+      await ref
+          .read(driverRepositoryProvider)
+          .updateDriverServices(
+            token: session.token,
+            driverId: session.driverId,
+            deliveryEnabled: enabled,
+          );
+      if (!mounted) {
+        return;
+      }
+      showTopNotice(
+        context,
+        enabled
+            ? 'Delivery activado como servicio extra.'
+            : 'Delivery desactivado.',
+        tone: NoticeTone.success,
+        icon: enabled
+            ? Icons.delivery_dining_rounded
+            : Icons.local_taxi_rounded,
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() => _deliveryEnabled = !enabled);
+      showTopNotice(
+        context,
+        error.toString().replaceFirst('Exception: ', ''),
+        tone: NoticeTone.error,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _savingServices = false);
+      }
+    }
   }
 
   @override
@@ -1333,13 +1420,26 @@ class _DriverSettingsPageState extends State<DriverSettingsPage> {
                         child: _DriverServiceOptionButton(
                           icon: Icons.delivery_dining_rounded,
                           title: 'Delivery',
-                          subtitle: 'En desarrollo',
-                          active: false,
-                          onTap: () => showTopNotice(
-                            context,
-                            'Delivery en desarrollo proximamente.',
-                            tone: NoticeTone.info,
-                          ),
+                          subtitle: _deliveryEnabled
+                              ? 'Extra activo'
+                              : 'Servicio extra',
+                          active: _deliveryEnabled,
+                          trailing: _loadingServices || _savingServices
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Color(0xFF60A5FA),
+                                  ),
+                                )
+                              : Switch.adaptive(
+                                  value: _deliveryEnabled,
+                                  onChanged: _setDeliveryEnabled,
+                                ),
+                          onTap: _loadingServices || _savingServices
+                              ? null
+                              : () => _setDeliveryEnabled(!_deliveryEnabled),
                         ),
                       ),
                     ],
@@ -1503,6 +1603,7 @@ class _DriverServiceOptionButton extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.active,
+    this.trailing,
     this.onTap,
   });
 
@@ -1510,6 +1611,7 @@ class _DriverServiceOptionButton extends StatelessWidget {
   final String title;
   final String subtitle;
   final bool active;
+  final Widget? trailing;
   final VoidCallback? onTap;
 
   @override
@@ -1541,15 +1643,16 @@ class _DriverServiceOptionButton extends StatelessWidget {
                 children: [
                   Icon(icon, color: iconColor, size: 22),
                   const Spacer(),
-                  Icon(
-                    active
-                        ? Icons.check_circle_rounded
-                        : Icons.schedule_rounded,
-                    color: active
-                        ? const Color(0xFF22C55E)
-                        : const Color(0xFFFACC15),
-                    size: 17,
-                  ),
+                  trailing ??
+                      Icon(
+                        active
+                            ? Icons.check_circle_rounded
+                            : Icons.schedule_rounded,
+                        color: active
+                            ? const Color(0xFF22C55E)
+                            : const Color(0xFFFACC15),
+                        size: 17,
+                      ),
                 ],
               ),
               const SizedBox(height: 9),

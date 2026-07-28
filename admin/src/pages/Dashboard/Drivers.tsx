@@ -6,6 +6,7 @@ import { formatDateTime, getDriverAvailabilityLabel, getDriverDisplayName, getDr
 export default function DriversPage() {
   const central = useCentral()
   const authorized = central.pendingDrivers.filter((driver) => driver.access_status === 'AUTORIZADO').length
+  const deliveryAvailable = central.deliveryDrivers.filter((driver) => driver.is_available).length
 
   return (
     <div className="saas-page-stack">
@@ -22,6 +23,7 @@ export default function DriversPage() {
         <StatCard label="Disponibles" value={`${central.drivers.filter((driver) => driver.is_available).length}`} detail="Listos para operar" icon="🟢" tone="success" />
         <StatCard label="En viaje" value={`${central.drivers.filter((driver) => driver.current_trip_id).length}`} detail="Unidades actualmente en ruta" icon="🚕" tone="warning" />
         <StatCard label="Aprobados" value={`${authorized}`} detail={`${central.pendingDrivers.length} pendientes de revisar`} icon="✅" tone="neutral" />
+        <StatCard label="Delivery activo" value={`${central.deliveryDrivers.length}`} detail={`${deliveryAvailable} disponibles ahora`} icon="📦" tone="success" />
       </section>
 
       <section className="saas-two-column">
@@ -49,6 +51,29 @@ export default function DriversPage() {
           </div>
         </Card>
 
+        <Card title="Delivery activo" subtitle="Conductores que activaron el servicio extra" className="saas-panel-dark">
+          <div className="list">
+            {central.deliveryDrivers.length === 0 && <article className="list-card">Ningun conductor activo delivery todavia.</article>}
+            {central.deliveryDrivers.map((driver) => (
+              <article key={driver.id} className="list-card stack-card">
+                <div>
+                  <strong>{driver.full_name || driver.phone || driver.id}</strong>
+                  <p>{driver.phone || 'sin telefono'} · {driver.is_available ? 'Disponible' : 'No disponible'} · {driver.status}</p>
+                  <p>
+                    Transporte fijo activo · Delivery extra activo
+                  </p>
+                  <p>{[driver.vehicle_type, driver.brand, driver.model, driver.color, driver.plate].filter(Boolean).join(' ') || 'vehiculo sin detalle'}</p>
+                </div>
+                <span className={driver.is_available ? 'status-pill success subtle' : 'status-pill warning subtle'}>
+                  Delivery
+                </span>
+              </article>
+            ))}
+          </div>
+        </Card>
+      </section>
+
+      <section className="saas-two-column">
         <Card title="Solicitudes pendientes" subtitle="Acciones rapidas desde central" className="saas-panel-dark">
           <div className="list">
             {central.pendingDrivers.length === 0 && <article className="list-card">No hay conductores pendientes de aprobacion.</article>}
