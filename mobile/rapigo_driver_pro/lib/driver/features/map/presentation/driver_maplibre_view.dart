@@ -168,6 +168,7 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
   DateTime? _lastRawDriverAt;
   double _estimatedSpeedMps = 0;
   double? _idleMarkerBearing;
+  double? _movementMarkerBearing;
   bool _isRefreshingIdleRoadSnap = false;
 
   static const String _driverMarkerImageId = 'rapigo_driver_navigation_marker';
@@ -689,6 +690,14 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
   }
 
   double get _driverMarkerRotation {
+    final movementBearing = _movementMarkerBearing;
+    if (movementBearing != null &&
+        !movementBearing.isNaN &&
+        !movementBearing.isInfinite) {
+      final viewportRelativeBearing = movementBearing - _currentCameraBearing;
+      final normalized = viewportRelativeBearing % 360;
+      return normalized < 0 ? normalized + 360 : normalized;
+    }
     if (widget.tripAccepted) {
       final route = _routeBundle?.primary;
       final currentPoint = _visualDriverPoint();
@@ -819,6 +828,7 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
         );
       }
     }
+    _updateMovementMarkerBearing(currentPoint, nextPoint);
 
     _displayDriverPoint = nextPoint;
 
@@ -864,6 +874,44 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
         : delta.abs() > 16
         ? 0.22
         : 0.12;
+    final next = previous + (delta * factor);
+    final normalized = next % 360;
+    return normalized < 0 ? normalized + 360 : normalized;
+  }
+
+  void _updateMovementMarkerBearing(ll.LatLng from, ll.LatLng to) {
+    final movementMeters = const ll.Distance().as(
+      ll.LengthUnit.Meter,
+      from,
+      to,
+    );
+    final thresholdMeters = widget.tripAccepted ? 0.20 : 0.12;
+    if (movementMeters < thresholdMeters) {
+      return;
+    }
+    final targetBearing = _bearingBetween(from, to);
+    if (targetBearing.isNaN || targetBearing.isInfinite) {
+      return;
+    }
+    _movementMarkerBearing = _smoothMovementBearing(targetBearing);
+  }
+
+  double _smoothMovementBearing(double targetBearing) {
+    final previous = _movementMarkerBearing;
+    if (previous == null || previous.isNaN || previous.isInfinite) {
+      return targetBearing;
+    }
+    var delta = (targetBearing - previous) % 360;
+    if (delta > 180) {
+      delta -= 360;
+    } else if (delta < -180) {
+      delta += 360;
+    }
+    final factor = delta.abs() > 50
+        ? 0.46
+        : delta.abs() > 24
+        ? 0.34
+        : 0.22;
     final next = previous + (delta * factor);
     final normalized = next % 360;
     return normalized < 0 ? normalized + 360 : normalized;
