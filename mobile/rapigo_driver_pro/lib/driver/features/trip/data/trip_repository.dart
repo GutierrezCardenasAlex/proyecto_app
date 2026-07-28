@@ -14,9 +14,13 @@ final tripRepositoryProvider = Provider<DriverTripRepository>((ref) {
 });
 
 final offeredTripProvider =
-    NotifierProvider<DriverTripController, AsyncValue<DriverTrip?>>(DriverTripController.new);
+    NotifierProvider<DriverTripController, AsyncValue<DriverTrip?>>(
+      DriverTripController.new,
+    );
 final driverOffersProvider =
-    NotifierProvider<DriverOffersController, AsyncValue<List<DriverTrip>>>(DriverOffersController.new);
+    NotifierProvider<DriverOffersController, AsyncValue<List<DriverTrip>>>(
+      DriverOffersController.new,
+    );
 final driverTripHistoryProvider = FutureProvider<List<DriverTrip>>((ref) async {
   final session = ref.watch(driverSessionProvider);
   if (!session.loggedIn || session.driverId.isEmpty || session.token.isEmpty) {
@@ -43,7 +47,9 @@ class DriverTripRepository {
     );
 
     if (response.statusCode >= 400) {
-      throw Exception('No se pudo cargar el viaje activo (${response.statusCode})');
+      throw Exception(
+        'No se pudo cargar el viaje activo (${response.statusCode})',
+      );
     }
 
     if (response.body.trim() == 'null') {
@@ -54,7 +60,8 @@ class DriverTripRepository {
     return DriverTrip(
       id: item['id']?.toString() ?? '',
       passengerPickup: item['pickup_address']?.toString() ?? 'Recojo',
-      destination: item['destination_address']?.toString() ?? 'Destino no esta marcado',
+      destination:
+          item['destination_address']?.toString() ?? 'Destino no esta marcado',
       status: item['status']?.toString() ?? 'accepted',
       pickupLat: _toDouble(item['pickup_lat']),
       pickupLng: _toDouble(item['pickup_lng']),
@@ -63,14 +70,18 @@ class DriverTripRepository {
       fareAmount: _toDouble(item['fare_amount']),
       requestedAt: item['requested_at']?.toString(),
       vehicleType: item['vehicle_type']?.toString(),
-      vehicleLabel: _joinVehicleLabel(item['vehicle_brand'], item['vehicle_model']),
+      vehicleLabel: _joinVehicleLabel(
+        item['vehicle_brand'],
+        item['vehicle_model'],
+      ),
       vehiclePlate: item['vehicle_plate']?.toString(),
       vehicleColor: item['vehicle_color']?.toString(),
       passengerName: item['passenger_name']?.toString(),
       passengerPhone: item['passenger_phone']?.toString(),
       dispatchMode:
           item['dispatch_mode']?.toString() ?? item['dispatchMode']?.toString(),
-      preferredDriverId: item['preferred_driver_id']?.toString() ??
+      preferredDriverId:
+          item['preferred_driver_id']?.toString() ??
           item['preferredDriverId']?.toString(),
       isPromotional: item['promotional_trip'] == true,
     );
@@ -95,7 +106,8 @@ class DriverTripRepository {
     }
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
-    final offers = (payload['offers'] as List<dynamic>? ?? const []).cast<Map<String, dynamic>>();
+    final offers = (payload['offers'] as List<dynamic>? ?? const [])
+        .cast<Map<String, dynamic>>();
     if (offers.isEmpty) {
       return null;
     }
@@ -135,7 +147,9 @@ class DriverTripRepository {
     );
 
     if (response.statusCode >= 400) {
-      throw Exception('No se pudo cargar el historial (${response.statusCode})');
+      throw Exception(
+        'No se pudo cargar el historial (${response.statusCode})',
+      );
     }
 
     final payload = (jsonDecode(response.body) as List<dynamic>? ?? const []);
@@ -153,14 +167,11 @@ class DriverTripRepository {
     final response = await http.post(
       Uri.parse('${AppConfig.apiBaseUrl}/dispatch/accept'),
       headers: _headers(token),
-      body: jsonEncode({
-        'tripId': trip.id,
-        'driverId': driverId,
-      }),
+      body: jsonEncode({'tripId': trip.id, 'driverId': driverId}),
     );
 
     if (response.statusCode >= 400) {
-      throw Exception('No se pudo aceptar el viaje (${response.statusCode})');
+      throw Exception(_errorMessage(response, 'No se pudo aceptar el viaje'));
     }
 
     return trip.copyWith(status: 'accepted');
@@ -174,14 +185,11 @@ class DriverTripRepository {
     final response = await http.post(
       Uri.parse('${AppConfig.apiBaseUrl}/dispatch/reject'),
       headers: _headers(token),
-      body: jsonEncode({
-        'tripId': tripId,
-        'driverId': driverId,
-      }),
+      body: jsonEncode({'tripId': tripId, 'driverId': driverId}),
     );
 
     if (response.statusCode >= 400) {
-      throw Exception('No se pudo rechazar el viaje (${response.statusCode})');
+      throw Exception(_errorMessage(response, 'No se pudo rechazar el viaje'));
     }
   }
 
@@ -197,22 +205,41 @@ class DriverTripRepository {
     );
 
     if (response.statusCode >= 400) {
-      throw Exception('No se pudo actualizar el viaje (${response.statusCode})');
+      throw Exception(
+        'No se pudo actualizar el viaje (${response.statusCode})',
+      );
     }
 
     return trip.copyWith(status: status);
   }
 
   static Map<String, String> _headers(String token) => {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      };
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer $token',
+  };
 
-  static DriverTrip _mapTrip(Map<String, dynamic> item, {String fallbackStatus = 'accepted'}) {
+  static String _errorMessage(http.Response response, String fallback) {
+    try {
+      final payload = jsonDecode(response.body) as Map<String, dynamic>;
+      final message = payload['message']?.toString().trim();
+      if (message != null && message.isNotEmpty) {
+        return '$message (${response.statusCode})';
+      }
+    } catch (_) {
+      // Use the stable fallback when the backend does not send JSON.
+    }
+    return '$fallback (${response.statusCode})';
+  }
+
+  static DriverTrip _mapTrip(
+    Map<String, dynamic> item, {
+    String fallbackStatus = 'accepted',
+  }) {
     return DriverTrip(
       id: item['id']?.toString() ?? '',
       passengerPickup: item['pickup_address']?.toString() ?? 'Recojo',
-      destination: item['destination_address']?.toString() ?? 'Destino no esta marcado',
+      destination:
+          item['destination_address']?.toString() ?? 'Destino no esta marcado',
       status: item['status']?.toString() ?? fallbackStatus,
       pickupLat: _toDouble(item['pickup_lat']),
       pickupLng: _toDouble(item['pickup_lng']),
@@ -221,14 +248,18 @@ class DriverTripRepository {
       fareAmount: _toDouble(item['fare_amount']),
       requestedAt: item['requested_at']?.toString(),
       vehicleType: item['vehicle_type']?.toString(),
-      vehicleLabel: _joinVehicleLabel(item['vehicle_brand'], item['vehicle_model']),
+      vehicleLabel: _joinVehicleLabel(
+        item['vehicle_brand'],
+        item['vehicle_model'],
+      ),
       vehiclePlate: item['vehicle_plate']?.toString(),
       vehicleColor: item['vehicle_color']?.toString(),
       passengerName: item['passenger_name']?.toString(),
       passengerPhone: item['passenger_phone']?.toString(),
       dispatchMode:
           item['dispatch_mode']?.toString() ?? item['dispatchMode']?.toString(),
-      preferredDriverId: item['preferred_driver_id']?.toString() ??
+      preferredDriverId:
+          item['preferred_driver_id']?.toString() ??
           item['preferredDriverId']?.toString(),
       isPromotional: item['promotional_trip'] == true,
     );
@@ -293,7 +324,9 @@ class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
 
   Future<void> loadOffer() async {
     final session = ref.read(driverSessionProvider);
-    if (!session.loggedIn || session.driverId.isEmpty || session.token.isEmpty) {
+    if (!session.loggedIn ||
+        session.driverId.isEmpty ||
+        session.token.isEmpty) {
       state = const AsyncData(null);
       await _persistTrip();
       return;
@@ -416,7 +449,9 @@ class DriverOffersController extends Notifier<AsyncValue<List<DriverTrip>>> {
 
   Future<void> loadOffers() async {
     final session = ref.read(driverSessionProvider);
-    if (!session.loggedIn || session.driverId.isEmpty || session.token.isEmpty) {
+    if (!session.loggedIn ||
+        session.driverId.isEmpty ||
+        session.token.isEmpty) {
       state = const AsyncData([]);
       await _persistOffers();
       return;
@@ -427,8 +462,12 @@ class DriverOffersController extends Notifier<AsyncValue<List<DriverTrip>>> {
 
     final activeTrip = ref.read(offeredTripProvider).value;
     if (activeTrip != null &&
-        const {'accepted', 'arriving', 'at_pickup', 'in_progress'}
-            .contains(activeTrip.status)) {
+        const {
+          'accepted',
+          'arriving',
+          'at_pickup',
+          'in_progress',
+        }.contains(activeTrip.status)) {
       state = const AsyncData([]);
       await _persistOffers();
       return;
@@ -456,7 +495,9 @@ class DriverOffersController extends Notifier<AsyncValue<List<DriverTrip>>> {
 
   Future<void> rejectOffer(String tripId) async {
     final session = ref.read(driverSessionProvider);
-    if (!session.loggedIn || session.driverId.isEmpty || session.token.isEmpty) {
+    if (!session.loggedIn ||
+        session.driverId.isEmpty ||
+        session.token.isEmpty) {
       return;
     }
     try {
@@ -491,6 +532,17 @@ class DriverOffersController extends Notifier<AsyncValue<List<DriverTrip>>> {
 
 String _friendlyAcceptError(Object error) {
   final raw = error.toString();
+  final normalized = raw.toLowerCase();
+  if (normalized.contains('no fue ofertado') ||
+      normalized.contains('solicitud ya no esta disponible')) {
+    return 'La oferta vencio y paso al siguiente conductor disponible.';
+  }
+  if (normalized.contains('conductor ya no esta libre')) {
+    return 'Tu estado cambio a ocupado. Vuelve a ponerte disponible para recibir solicitudes.';
+  }
+  if (normalized.contains('being processed')) {
+    return 'Estamos confirmando esta solicitud. Intenta otra vez en un momento.';
+  }
   if (raw.contains('409')) {
     return 'Este viaje ya fue aceptado por otro conductor.';
   }

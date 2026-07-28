@@ -139,8 +139,12 @@ class _DriverSocketListenerState extends ConsumerState<DriverSocketListener>
     _socket?.on('driver:trip_offer', (_) {
       final currentTrip = ref.read(offeredTripProvider).value;
       if (currentTrip != null &&
-          const {'accepted', 'arriving', 'at_pickup', 'in_progress'}
-              .contains(currentTrip.status)) {
+          const {
+            'accepted',
+            'arriving',
+            'at_pickup',
+            'in_progress',
+          }.contains(currentTrip.status)) {
         return;
       }
       ref.read(offeredTripProvider.notifier).loadOffer();
@@ -159,8 +163,9 @@ class _DriverSocketListenerState extends ConsumerState<DriverSocketListener>
       );
     });
     _socket?.on('trip:status_changed', (data) {
-      final map =
-          data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+      final map = data is Map
+          ? Map<String, dynamic>.from(data)
+          : <String, dynamic>{};
       final tripId = map['tripId']?.toString();
       final status = map['status']?.toString();
       final currentTripId = ref.read(offeredTripProvider).value?.id;
@@ -175,13 +180,13 @@ class _DriverSocketListenerState extends ConsumerState<DriverSocketListener>
           tone: status == 'at_pickup' || status == 'completed'
               ? NoticeTone.success
               : status == 'cancelled'
-                  ? NoticeTone.warning
-                  : NoticeTone.info,
+              ? NoticeTone.warning
+              : NoticeTone.info,
           icon: status == 'completed'
               ? Icons.check_circle_outline_rounded
               : status == 'cancelled'
-                  ? Icons.info_outline_rounded
-                  : Icons.directions_car_filled_rounded,
+              ? Icons.info_outline_rounded
+              : Icons.directions_car_filled_rounded,
         );
         ref.invalidate(driverTripHistoryProvider);
       }
@@ -212,15 +217,17 @@ class _DriverSocketListenerState extends ConsumerState<DriverSocketListener>
       ref.invalidate(driverTripHistoryProvider);
     });
     _socket?.on('driver:trip_unavailable', (data) {
-      final map =
-          data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+      final map = data is Map
+          ? Map<String, dynamic>.from(data)
+          : <String, dynamic>{};
       final tripId = map['tripId']?.toString();
       if (tripId == null || tripId.isEmpty) {
         ref.read(driverOffersProvider.notifier).loadOffers();
         return;
       }
       final currentTrip = ref.read(offeredTripProvider).value;
-      final isPendingCurrentTrip = currentTrip?.id == tripId &&
+      final isPendingCurrentTrip =
+          currentTrip?.id == tripId &&
           const {'requested', 'searching'}.contains(currentTrip?.status);
       ref.read(driverOffersProvider.notifier).removeOfferLocally(tripId);
       ref.read(driverOfferPreviewTripIdProvider.notifier).setTrip(null);
@@ -228,8 +235,12 @@ class _DriverSocketListenerState extends ConsumerState<DriverSocketListener>
         ref.read(offeredTripProvider.notifier).clearTrip();
       }
       ref.read(driverOffersProvider.notifier).loadOffers();
+      final reason = map['reason']?.toString();
+      final message = reason == 'accepted'
+          ? 'Ese viaje ya fue tomado por otro conductor.'
+          : 'La solicitud paso al siguiente conductor disponible.';
       _showDriverOverlayNotice(
-        'Ese viaje ya fue tomado por otro conductor.',
+        message,
         tone: NoticeTone.warning,
         icon: Icons.info_outline_rounded,
       );
@@ -248,7 +259,8 @@ class _DriverSocketListenerState extends ConsumerState<DriverSocketListener>
         return;
       }
       final session = ref.read(driverSessionProvider);
-      if (session.accessStatus == 'AUTORIZADO' && session.driverId == driverId) {
+      if (session.accessStatus == 'AUTORIZADO' &&
+          session.driverId == driverId) {
         _ensureSocket(driverId);
       }
     });
@@ -441,9 +453,13 @@ class _DriverSocketListenerState extends ConsumerState<DriverSocketListener>
 
   @override
   Widget build(BuildContext context) {
-    final accessStatus = ref.watch(driverSessionProvider.select((s) => s.accessStatus));
+    final accessStatus = ref.watch(
+      driverSessionProvider.select((s) => s.accessStatus),
+    );
     final driverId = ref.watch(driverSessionProvider.select((s) => s.driverId));
-    final deviceStatus = ref.watch(driverSessionProvider.select((s) => s.deviceStatus));
+    final deviceStatus = ref.watch(
+      driverSessionProvider.select((s) => s.deviceStatus),
+    );
 
     if (!_bootstrappedExperience) {
       _bootstrappedExperience = true;
@@ -471,8 +487,12 @@ class _DriverSocketListenerState extends ConsumerState<DriverSocketListener>
 
     final currentTrip = ref.watch(offeredTripProvider).value;
     if (currentTrip != null &&
-        const {'accepted', 'arriving', 'at_pickup', 'in_progress'}
-            .contains(currentTrip.status)) {
+        const {
+          'accepted',
+          'arriving',
+          'at_pickup',
+          'in_progress',
+        }.contains(currentTrip.status)) {
       _joinTripRoom(currentTrip.id);
     }
 

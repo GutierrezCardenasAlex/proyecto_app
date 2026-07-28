@@ -14,7 +14,7 @@ class _DriverOfferRoutePreviewPageState
     extends ConsumerState<_DriverOfferRoutePreviewPage> {
   int _mapFocusSignal = 0;
   bool _busy = false;
-  bool _routeReviewed = false;
+  final bool _routeReviewed = true;
   bool _routeReady = false;
   String _busyMessage = 'Procesando viaje...';
   final Completer<void> _routeReadyCompleter = Completer<void>();
@@ -37,7 +37,8 @@ class _DriverOfferRoutePreviewPageState
     const earthRadius = 6371000.0;
     final dLat = (endLat - startLat) * math.pi / 180;
     final dLng = (endLng - startLng) * math.pi / 180;
-    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+    final a =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
         math.cos(startLat * math.pi / 180) *
             math.cos(endLat * math.pi / 180) *
             math.sin(dLng / 2) *
@@ -66,8 +67,11 @@ class _DriverOfferRoutePreviewPageState
       LatLng(driverLat, driverLng),
       LatLng(widget.trip.pickupLat, widget.trip.pickupLng),
     ];
-    if (widget.trip.destinationLat != null && widget.trip.destinationLng != null) {
-      points.add(LatLng(widget.trip.destinationLat!, widget.trip.destinationLng!));
+    if (widget.trip.destinationLat != null &&
+        widget.trip.destinationLng != null) {
+      points.add(
+        LatLng(widget.trip.destinationLat!, widget.trip.destinationLng!),
+      );
     }
     final rawBounds = LatLngBounds.fromPoints(points);
     final latSpan = (rawBounds.north - rawBounds.south).abs();
@@ -124,7 +128,9 @@ class _DriverOfferRoutePreviewPageState
       _busyMessage = 'Cargando ruta del viaje...';
     });
     try {
-      ref.read(driverOfferPreviewTripIdProvider.notifier).setTrip(widget.trip.id);
+      ref
+          .read(driverOfferPreviewTripIdProvider.notifier)
+          .setTrip(widget.trip.id);
       await Future.wait<void>([
         ref.read(offeredTripProvider.notifier).acceptTrip(widget.trip),
         _routeReadyCompleter.future.timeout(
@@ -132,7 +138,9 @@ class _DriverOfferRoutePreviewPageState
           onTimeout: () {},
         ),
       ]);
-      ref.read(driverOffersProvider.notifier).removeOfferLocally(widget.trip.id);
+      ref
+          .read(driverOffersProvider.notifier)
+          .removeOfferLocally(widget.trip.id);
       if (!mounted) {
         return;
       }
@@ -163,14 +171,6 @@ class _DriverOfferRoutePreviewPageState
     }
   }
 
-  Future<void> _showRouteFirst() async {
-    if (_busy) {
-      return;
-    }
-    HapticFeedback.lightImpact();
-    setState(() => _routeReviewed = true);
-  }
-
   @override
   Widget build(BuildContext context) {
     final driverState = ref.watch(driverStateProvider);
@@ -184,16 +184,17 @@ class _DriverOfferRoutePreviewPageState
     );
     final destinationDistance =
         trip.destinationLat != null && trip.destinationLng != null
-            ? _distanceMeters(
-                startLat: trip.pickupLat,
-                startLng: trip.pickupLng,
-                endLat: trip.destinationLat!,
-                endLng: trip.destinationLng!,
-              )
-            : 0.0;
+        ? _distanceMeters(
+            startLat: trip.pickupLat,
+            startLng: trip.pickupLng,
+            endLat: trip.destinationLat!,
+            endLng: trip.destinationLng!,
+          )
+        : 0.0;
 
-    final passengerName =
-        trip.passengerName?.trim().isNotEmpty == true ? trip.passengerName!.trim() : 'Pasajero';
+    final passengerName = trip.passengerName?.trim().isNotEmpty == true
+        ? trip.passengerName!.trim()
+        : 'Pasajero';
     final phone = (trip.passengerPhone ?? '').trim();
 
     return PopScope(
@@ -212,9 +213,18 @@ class _DriverOfferRoutePreviewPageState
               child: DriverMapSurface(
                 viewportCacheKey: 'driver_offer_preview_${trip.id}',
                 routePersistenceKey: 'driver_trip_route_${trip.id}',
-                routePersistenceReadKeys: driverTripRouteReadKeys(trip.id, 'accepted'),
-                routePersistenceWriteKeys: driverTripRouteWriteKeys(trip.id, 'accepted'),
-                prefetchRoutePersistenceKey: driverTripRoutePrefetchKey(trip.id, 'accepted'),
+                routePersistenceReadKeys: driverTripRouteReadKeys(
+                  trip.id,
+                  'accepted',
+                ),
+                routePersistenceWriteKeys: driverTripRouteWriteKeys(
+                  trip.id,
+                  'accepted',
+                ),
+                prefetchRoutePersistenceKey: driverTripRoutePrefetchKey(
+                  trip.id,
+                  'accepted',
+                ),
                 available: driverState.available,
                 tripAccepted: true,
                 driverLat: driverState.lat,
@@ -262,9 +272,7 @@ class _DriverOfferRoutePreviewPageState
               Positioned.fill(
                 child: IgnorePointer(
                   child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: const Color(0xCC020817),
-                    ),
+                    decoration: BoxDecoration(color: const Color(0xCC020817)),
                     child: Center(
                       child: Container(
                         margin: const EdgeInsets.symmetric(horizontal: 28),
@@ -278,7 +286,9 @@ class _DriverOfferRoutePreviewPageState
                           border: Border.all(color: const Color(0xFF22304A)),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF020617).withValues(alpha: 0.45),
+                              color: const Color(
+                                0xFF020617,
+                              ).withValues(alpha: 0.45),
                               blurRadius: 24,
                               offset: const Offset(0, 14),
                             ),
@@ -325,7 +335,10 @@ class _DriverOfferRoutePreviewPageState
                         ),
                         const Spacer(),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 12,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xE60B1730),
                             borderRadius: BorderRadius.circular(18),
@@ -339,7 +352,9 @@ class _DriverOfferRoutePreviewPageState
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                _routeReviewed ? Icons.alt_route_rounded : Icons.route_rounded,
+                                _routeReviewed
+                                    ? Icons.alt_route_rounded
+                                    : Icons.route_rounded,
                                 color: _routeReviewed
                                     ? const Color(0xFF4ADE80)
                                     : const Color(0xFF7DB7FF),
@@ -360,7 +375,9 @@ class _DriverOfferRoutePreviewPageState
                         const SizedBox(width: 10),
                         _DriverMapCircleButton(
                           icon: Icons.my_location_rounded,
-                          onTap: _busy ? () {} : () => setState(() => _mapFocusSignal++),
+                          onTap: _busy
+                              ? () {}
+                              : () => setState(() => _mapFocusSignal++),
                         ),
                       ],
                     ),
@@ -393,7 +410,9 @@ class _DriverOfferRoutePreviewPageState
                                 radius: 24,
                                 backgroundColor: const Color(0xFF0E1A2C),
                                 child: Text(
-                                  passengerName.isNotEmpty ? passengerName[0].toUpperCase() : 'P',
+                                  passengerName.isNotEmpty
+                                      ? passengerName[0].toUpperCase()
+                                      : 'P',
                                   style: GoogleFonts.plusJakartaSans(
                                     color: const Color(0xFFFFC400),
                                     fontSize: 20,
@@ -449,14 +468,17 @@ class _DriverOfferRoutePreviewPageState
                             decoration: BoxDecoration(
                               color: const Color(0xFF0A1424),
                               borderRadius: BorderRadius.circular(22),
-                              border: Border.all(color: const Color(0x18FFFFFF)),
+                              border: Border.all(
+                                color: const Color(0x18FFFFFF),
+                              ),
                             ),
                             child: Row(
                               children: [
                                 Expanded(
                                   child: _PreviewStopTile(
                                     label: 'A · Recogida',
-                                    title: trip.passengerPickup.trim().isNotEmpty
+                                    title:
+                                        trip.passengerPickup.trim().isNotEmpty
                                         ? trip.passengerPickup.trim()
                                         : 'Punto de recogida',
                                     meta:
@@ -471,7 +493,9 @@ class _DriverOfferRoutePreviewPageState
                                     title: trip.destination.trim().isNotEmpty
                                         ? trip.destination.trim()
                                         : 'Destino por confirmar',
-                                    meta: trip.destinationLat != null && trip.destinationLng != null
+                                    meta:
+                                        trip.destinationLat != null &&
+                                            trip.destinationLng != null
                                         ? '${_formatDistance(destinationDistance)} · ${_formatEta(destinationDistance)}'
                                         : 'Sin punto final',
                                     accent: const Color(0xFFEF4444),
@@ -484,8 +508,8 @@ class _DriverOfferRoutePreviewPageState
                           Text(
                             _routeReviewed
                                 ? (_routeReady
-                                    ? 'La ruta ya esta lista. Si confirmas, entras directo al flujo del viaje activo.'
-                                    : 'Preparando el trazado final para entrar directo al viaje...')
+                                      ? 'La ruta ya esta lista. Si confirmas, entras directo al flujo del viaje activo.'
+                                      : 'Preparando el trazado final para entrar directo al viaje...')
                                 : 'Primero revisa el recorrido completo con los puntos A y B. Luego podras aceptar el viaje.',
                             style: const TextStyle(
                               color: Color(0xFFB8C4D6),
@@ -502,7 +526,9 @@ class _DriverOfferRoutePreviewPageState
                                   onPressed: _busy ? null : _reject,
                                   style: OutlinedButton.styleFrom(
                                     minimumSize: const Size.fromHeight(58),
-                                    side: const BorderSide(color: Color(0x33FFFFFF)),
+                                    side: const BorderSide(
+                                      color: Color(0x33FFFFFF),
+                                    ),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(22),
                                     ),
@@ -510,16 +536,17 @@ class _DriverOfferRoutePreviewPageState
                                   ),
                                   child: Text(
                                     rejectLabel,
-                                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 17,
+                                    ),
                                   ),
                                 ),
                               ),
                               const SizedBox(width: 14),
                               Expanded(
                                 child: FilledButton(
-                                  onPressed: _busy
-                                      ? null
-                                      : (_routeReviewed ? _accept : _showRouteFirst),
+                                  onPressed: _busy ? null : _accept,
                                   style: FilledButton.styleFrom(
                                     minimumSize: const Size.fromHeight(58),
                                     backgroundColor: _routeReviewed
@@ -534,10 +561,14 @@ class _DriverOfferRoutePreviewPageState
                                       ? const SizedBox(
                                           width: 22,
                                           height: 22,
-                                          child: CircularProgressIndicator(strokeWidth: 2.4),
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.4,
+                                          ),
                                         )
                                       : Text(
-                                          _routeReviewed ? 'Aceptar' : 'Recorrido',
+                                          _routeReviewed
+                                              ? 'Aceptar'
+                                              : 'Recorrido',
                                           style: const TextStyle(
                                             fontWeight: FontWeight.w900,
                                             fontSize: 17,

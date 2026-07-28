@@ -720,6 +720,28 @@ async function bootstrap() {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
+      const driverUpdate = await client.query(
+        `UPDATE drivers
+         SET status = 'busy', is_available = FALSE, current_trip_id = $2, updated_at = NOW()
+         WHERE id = $1
+           AND status = 'available'
+           AND is_available = TRUE
+           AND current_trip_id IS NULL
+           AND NOT EXISTS (
+             SELECT 1
+             FROM trips active_trip
+             WHERE active_trip.driver_id = drivers.id
+               AND active_trip.status IN ('accepted', 'arriving', 'at_pickup', 'in_progress')
+           )
+         RETURNING id`,
+        [driverId, tripId]
+      );
+
+      if (!driverUpdate.rows.length) {
+        await client.query("ROLLBACK");
+        return reply.code(409).send({ message: "El conductor ya no esta libre para aceptar este viaje" });
+      }
+
       const tripUpdate = await client.query(
         `UPDATE trips
          SET driver_id = $1, status = 'accepted', accepted_at = NOW(), updated_at = NOW()
@@ -735,29 +757,6 @@ async function bootstrap() {
       }
 
       const trip = tripUpdate.rows[0];
-
-      const driverUpdate = await client.query(
-        `UPDATE drivers
-         SET status = 'busy', is_available = FALSE, current_trip_id = $2, updated_at = NOW()
-         WHERE id = $1
-           AND status = 'available'
-           AND is_available = TRUE
-           AND current_trip_id IS NULL
-           AND NOT EXISTS (
-             SELECT 1
-             FROM trips active_trip
-             WHERE active_trip.driver_id = drivers.id
-               AND active_trip.id <> $2
-               AND active_trip.status IN ('accepted', 'arriving', 'at_pickup', 'in_progress')
-           )
-         RETURNING id`,
-        [driverId, tripId]
-      );
-
-      if (!driverUpdate.rows.length) {
-        await client.query("ROLLBACK");
-        return reply.code(409).send({ message: "El conductor ya no esta libre para aceptar este viaje" });
-      }
 
       await client.query(
         `INSERT INTO trip_events (trip_id, event_type, payload)
