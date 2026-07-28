@@ -1004,6 +1004,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
         ? trip.passengerName!.trim()
         : 'Pasajero';
     const rejectLabel = 'Ignorar';
+    final offerCountdownExpiresAt = _visibleOfferExpiresAt(trip);
 
     showModalBottomSheet<void>(
       context: context,
@@ -1143,6 +1144,26 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                         ],
                       ),
                     ),
+                    if (offerCountdownExpiresAt != null) ...[
+                      const SizedBox(height: 18),
+                      Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 280),
+                          child: _DriverOfferCountdown(
+                            expiresAt: offerCountdownExpiresAt,
+                            onExpired: () {
+                              ref
+                                  .read(driverOffersProvider.notifier)
+                                  .loadOffers();
+                              ref
+                                  .read(offeredTripProvider.notifier)
+                                  .loadOffer();
+                            },
+                            showLabel: true,
+                          ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 18),
                     Row(
                       children: [
@@ -2800,6 +2821,7 @@ class _DriverHomeOfferCard extends StatelessWidget {
     required this.onCall,
     required this.onReject,
     required this.onPrimaryAction,
+    required this.onExpired,
   });
 
   final DriverTrip trip;
@@ -2811,6 +2833,7 @@ class _DriverHomeOfferCard extends StatelessWidget {
   final VoidCallback onCall;
   final VoidCallback onReject;
   final VoidCallback onPrimaryAction;
+  final VoidCallback onExpired;
 
   @override
   Widget build(BuildContext context) {
@@ -2831,6 +2854,7 @@ class _DriverHomeOfferCard extends StatelessWidget {
     final primaryIcon = isPreviewingRoute
         ? Icons.check_circle_rounded
         : Icons.route_rounded;
+    final offerCountdownExpiresAt = _visibleOfferExpiresAt(trip);
     return Container(
       width: double.infinity,
       constraints: const BoxConstraints(minHeight: 450),
@@ -2871,23 +2895,49 @@ class _DriverHomeOfferCard extends StatelessWidget {
                   ),
                 ),
               ),
-              Container(
-                width: 70,
-                height: 70,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: accentColor, width: 5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: accentColor.withValues(alpha: 0.18),
-                      blurRadius: 20,
-                      spreadRadius: 1,
-                    ),
-                  ],
+              const SizedBox(width: 12),
+              if (offerCountdownExpiresAt != null)
+                SizedBox(
+                  width: 132,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const Text(
+                        'Tiempo restante',
+                        textAlign: TextAlign.right,
+                        style: TextStyle(
+                          color: Color(0xFFCBD5E1),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 7),
+                      _DriverOfferCountdown(
+                        expiresAt: offerCountdownExpiresAt,
+                        compact: true,
+                        onExpired: onExpired,
+                      ),
+                    ],
+                  ),
+                )
+              else
+                Container(
+                  width: 70,
+                  height: 70,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: accentColor, width: 5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: accentColor.withValues(alpha: 0.18),
+                        blurRadius: 20,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(primaryIcon, color: Colors.white, size: 28),
                 ),
-                alignment: Alignment.center,
-                child: Icon(primaryIcon, color: Colors.white, size: 28),
-              ),
             ],
           ),
           if (isPreviewingRoute) ...[
@@ -3019,6 +3069,19 @@ class _DriverHomeOfferCard extends StatelessWidget {
               ),
             ],
           ),
+          if (offerCountdownExpiresAt != null) ...[
+            const SizedBox(height: 18),
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 280),
+                child: _DriverOfferCountdown(
+                  expiresAt: offerCountdownExpiresAt,
+                  onExpired: onExpired,
+                  showLabel: true,
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 18),
           Row(
             children: [
@@ -3122,6 +3185,23 @@ class _DriverHomeOfferCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String? _visibleOfferExpiresAt(DriverTrip trip) {
+  final rawExpiresAt = trip.offerExpiresAt?.trim();
+  if (rawExpiresAt != null && rawExpiresAt.isNotEmpty) {
+    return rawExpiresAt;
+  }
+  if (!const {'requested', 'searching'}.contains(trip.status)) {
+    return null;
+  }
+  final requestedAt = DateTime.tryParse(trip.requestedAt ?? '')?.toLocal();
+  final fallbackBase = requestedAt ?? DateTime.now();
+  final fallbackExpiresAt = fallbackBase.add(const Duration(seconds: 15));
+  if (!fallbackExpiresAt.isAfter(DateTime.now())) {
+    return DateTime.now().add(const Duration(seconds: 15)).toIso8601String();
+  }
+  return fallbackExpiresAt.toIso8601String();
 }
 
 class _DriverHomePlaceRow extends StatelessWidget {
@@ -3309,6 +3389,7 @@ class _DriverIncomingRequestOverlay extends ConsumerWidget {
         : 0.0;
     final pickupDistanceLabel = _formatDistance(pickupDistance);
     final pickupEtaLabel = _formatEta(pickupDistance);
+    final offerCountdownExpiresAt = _visibleOfferExpiresAt(trip);
     final destinationDistanceLabel =
         trip.destinationLat != null && trip.destinationLng != null
         ? _formatDistance(destinationDistance)
@@ -3382,12 +3463,29 @@ class _DriverIncomingRequestOverlay extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    if (trip.offerExpiresAt?.trim().isNotEmpty ?? false) ...[
+                    const Spacer(),
+                    if (isPreviewingRoute) ...[
                       const SizedBox(width: 12),
-                      Expanded(
+                      Flexible(
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: _DriverPreviewRouteBadge(
+                            pickupEtaLabel: pickupEtaLabel,
+                            pickupDistanceLabel: pickupDistanceLabel,
+                            destinationEtaLabel: destinationEtaLabel,
+                            destinationDistanceLabel: destinationDistanceLabel,
+                          ),
+                        ),
+                      ),
+                    ],
+                    if (offerCountdownExpiresAt != null) ...[
+                      const SizedBox(width: 12),
+                      SizedBox(
+                        width: 132,
                         child: _DriverOfferCountdown(
-                          expiresAt: trip.offerExpiresAt!,
+                          expiresAt: offerCountdownExpiresAt,
                           compact: true,
+                          showLabel: true,
                           onExpired: () {
                             ref
                                 .read(driverOffersProvider.notifier)
@@ -3397,20 +3495,6 @@ class _DriverIncomingRequestOverlay extends ConsumerWidget {
                                 .read(driverOfferPreviewTripIdProvider.notifier)
                                 .setTrip(null);
                           },
-                        ),
-                      ),
-                    ],
-                    if (isPreviewingRoute) ...[
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: _DriverPreviewRouteBadge(
-                            pickupEtaLabel: pickupEtaLabel,
-                            pickupDistanceLabel: pickupDistanceLabel,
-                            destinationEtaLabel: destinationEtaLabel,
-                            destinationDistanceLabel: destinationDistanceLabel,
-                          ),
                         ),
                       ),
                     ],
@@ -3446,6 +3530,13 @@ class _DriverIncomingRequestOverlay extends ConsumerWidget {
                           'tel:${phone.replaceAll(RegExp(r"[^0-9+]"), "")}',
                         );
                         await launchUrl(telUri);
+                      },
+                      onExpired: () {
+                        ref.read(driverOffersProvider.notifier).loadOffers();
+                        ref.read(offeredTripProvider.notifier).loadOffer();
+                        ref
+                            .read(driverOfferPreviewTripIdProvider.notifier)
+                            .setTrip(null);
                       },
                       onReject: () async {
                         try {
@@ -3756,11 +3847,13 @@ class _DriverOfferCountdown extends StatefulWidget {
     required this.expiresAt,
     required this.onExpired,
     this.compact = false,
+    this.showLabel = false,
   });
 
   final String expiresAt;
   final VoidCallback onExpired;
   final bool compact;
+  final bool showLabel;
 
   @override
   State<_DriverOfferCountdown> createState() => _DriverOfferCountdownState();
@@ -3828,39 +3921,72 @@ class _DriverOfferCountdownState extends State<_DriverOfferCountdown> {
     final color = urgent ? const Color(0xFFFB7185) : const Color(0xFFFFC400);
 
     return Container(
-      padding: EdgeInsets.all(widget.compact ? 10 : 12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(widget.compact ? 16 : 18),
-        border: Border.all(color: color.withValues(alpha: 0.32)),
+      padding: EdgeInsets.symmetric(
+        horizontal: widget.compact ? 10 : 16,
+        vertical: widget.compact ? 10 : 14,
       ),
-      child: Row(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: widget.compact ? 0.12 : 0.16),
+        borderRadius: BorderRadius.circular(widget.compact ? 16 : 20),
+        border: Border.all(
+          color: color.withValues(alpha: widget.compact ? 0.32 : 0.52),
+          width: widget.compact ? 1 : 1.4,
+        ),
+        boxShadow: widget.compact
+            ? null
+            : [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.16),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(
-            Icons.timer_rounded,
-            color: color,
-            size: widget.compact ? 16 : 18,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(
-                minHeight: widget.compact ? 6 : 8,
-                value: progress,
-                backgroundColor: Colors.white.withValues(alpha: 0.12),
-                valueColor: AlwaysStoppedAnimation<Color>(color),
+          if (widget.showLabel) ...[
+            Text(
+              'Tiempo para aceptar',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.86),
+                fontSize: widget.compact ? 10 : 12,
+                fontWeight: FontWeight.w900,
               ),
             ),
-          ),
-          const SizedBox(width: 10),
-          Text(
-            remaining > 0 ? '${remaining}s' : '0s',
-            style: TextStyle(
-              color: color,
-              fontSize: widget.compact ? 12 : 13,
-              fontWeight: FontWeight.w900,
-            ),
+            SizedBox(height: widget.compact ? 5 : 8),
+          ],
+          Row(
+            children: [
+              Icon(
+                Icons.timer_rounded,
+                color: color,
+                size: widget.compact ? 16 : 22,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    minHeight: widget.compact ? 6 : 8,
+                    value: progress,
+                    backgroundColor: Colors.white.withValues(alpha: 0.12),
+                    valueColor: AlwaysStoppedAnimation<Color>(color),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                remaining > 0 ? '${remaining}s' : '0s',
+                style: TextStyle(
+                  color: color,
+                  fontSize: widget.compact ? 12 : 22,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
           ),
         ],
       ),

@@ -14,7 +14,7 @@ const redis = new Redis(process.env.REDIS_URL);
 const OFFER_TTL_SECONDS = Number(process.env.DISPATCH_OFFER_TTL_SECONDS || 600);
 const NEARBY_STAGE_RADIUS_METERS = Number(process.env.DISPATCH_NEARBY_STAGE_RADIUS_METERS || 100);
 const NEARBY_STAGE_LIMIT = Number(process.env.DISPATCH_NEARBY_STAGE_LIMIT || 8);
-const OFFER_RESPONSE_TIMEOUT_MS = Number(process.env.DISPATCH_OFFER_RESPONSE_TIMEOUT_MS || 12000);
+const OFFER_RESPONSE_TIMEOUT_MS = Number(process.env.DISPATCH_OFFER_RESPONSE_TIMEOUT_MS || 15000);
 const DIRECTED_STAGE_TIMEOUT_MS = Number(process.env.DISPATCH_DIRECTED_STAGE_TIMEOUT_MS || 25000);
 const BROADCAST_STAGE_LIMIT = Number(process.env.DISPATCH_BROADCAST_STAGE_LIMIT || 1000);
 
@@ -158,7 +158,8 @@ async function clearTripOffers(tripId) {
     `trip:${tripId}:broadcast_timer`,
     `trip:${tripId}:nearby_queue`,
     `trip:${tripId}:active_offer_driver`,
-    `trip:${tripId}:active_offer_token`
+    `trip:${tripId}:active_offer_token`,
+    `trip:${tripId}:rejected_drivers`
   );
 }
 
@@ -321,7 +322,7 @@ async function expandTripOffersToBroadcast({ tripId, pickupLat, pickupLng, reaso
     excludeDriverIds: offeredDriverIds
   });
 
-  await redis.set(`trip:${tripId}:dispatch_stage`, "broadcast", "EX", OFFER_TTL_SECONDS);
+  await redis.set(`trip:${tripId}:dispatch_stage`, "broadcast");
   await redis.set(`trip:${tripId}:candidate_count`, String(offeredDriverIds.length + candidates.length), "EX", OFFER_TTL_SECONDS);
   await offerTripToCandidates(tripId, candidates, "broadcast");
   await publish("dispatch.search.expanded", {
@@ -364,6 +365,65 @@ async function isCandidateStillAvailable(driverId) {
     [driverId]
   );
   return result.rows.length > 0;
+}
+
+async function scanBroadcastTripIds() {
+  const stream = redis.scanStream({
+    match: "trip:*:dispatch_stage",
+    count: 100
+  });
+  const tripIds = [];
+
+  for await (const keys of stream) {
+    if (!keys.length) {
+      continue;
+    }
+    const stages = await redis.mget(keys);
+    keys.forEach((key, index) => {
+      if (stages[index] !== "broadcast") {
+        return;
+      }
+      const match = key.match(/^trip:([^:]+):dispatch_stage$/);
+      if (match?.[1]) {
+        tripIds.push(match[1]);
+      }
+    });
+  }
+
+  return tripIds;
+}
+
+async function findVisibleBroadcastTripIds(driverId) {
+  if (!(await isCandidateStillAvailable(driverId))) {
+    return [];
+  }
+
+  const broadcastTripIds = await scanBroadcastTripIds();
+  if (!broadcastTripIds.length) {
+    return [];
+  }
+
+  const visibleTripIds = [];
+  for (const tripId of broadcastTripIds) {
+    const rejected = await redis.sismember(`trip:${tripId}:rejected_drivers`, driverId);
+    if (!rejected) {
+      visibleTripIds.push(tripId);
+    }
+  }
+
+  return visibleTripIds;
+}
+
+async function canAcceptBroadcastOffer(tripId, driverId) {
+  const stage = await redis.get(`trip:${tripId}:dispatch_stage`);
+  if (stage !== "broadcast") {
+    return false;
+  }
+  const rejected = await redis.sismember(`trip:${tripId}:rejected_drivers`, driverId);
+  if (rejected) {
+    return false;
+  }
+  return isCandidateStillAvailable(driverId);
 }
 
 async function loadTripDispatchContext(tripId) {
@@ -618,7 +678,9 @@ async function bootstrap() {
     const user = await requireOwnDriverId(request, reply, driverId);
     if (!user) return;
 
-    const tripIds = await redis.smembers(`driver:${driverId}:offers`);
+    const directTripIds = await redis.smembers(`driver:${driverId}:offers`);
+    const broadcastTripIds = await findVisibleBroadcastTripIds(driverId);
+    const tripIds = [...new Set([...directTripIds, ...broadcastTripIds])];
 
     if (!tripIds.length) {
       return { offers: [] };
@@ -724,8 +786,15 @@ async function bootstrap() {
     if (!user) return;
 
     const wasOffered = await redis.sismember(`driver:${driverId}:offers`, tripId);
-    if (!wasOffered) {
+    const canAcceptOpenBroadcast = !wasOffered && await canAcceptBroadcastOffer(tripId, driverId);
+    if (!wasOffered && !canAcceptOpenBroadcast) {
       return reply.code(403).send({ message: "Este viaje no fue ofertado a tu conductor" });
+    }
+    if (canAcceptOpenBroadcast) {
+      await redis.sadd(`driver:${driverId}:offers`, tripId);
+      await redis.expire(`driver:${driverId}:offers`, OFFER_TTL_SECONDS);
+      await redis.sadd(`trip:${tripId}:offered_drivers`, driverId);
+      await redis.expire(`trip:${tripId}:offered_drivers`, OFFER_TTL_SECONDS);
     }
 
     const lockKey = `trip:${tripId}:accept_lock`;
@@ -843,6 +912,8 @@ async function bootstrap() {
     const dispatchStage = await redis.get(`trip:${tripId}:dispatch_stage`);
     const runId = await redis.get(`trip:${tripId}:dispatch_run`);
     await redis.srem(`driver:${driverId}:offers`, tripId);
+    await redis.hdel(`driver:${driverId}:offer_expires_at`, tripId);
+    await redis.sadd(`trip:${tripId}:rejected_drivers`, driverId);
     await emitRealtime("driver:trip_rejected", `driver:${driverId}`, {
       tripId,
       driverId

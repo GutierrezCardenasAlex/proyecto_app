@@ -196,6 +196,7 @@ class _DriverOfferRoutePreviewPageState
         ? trip.passengerName!.trim()
         : 'Pasajero';
     final phone = (trip.passengerPhone ?? '').trim();
+    final offerCountdownExpiresAt = _visibleOfferExpiresAt(trip);
 
     return PopScope(
       canPop: false,
@@ -518,23 +519,30 @@ class _DriverOfferRoutePreviewPageState
                               height: 1.4,
                             ),
                           ),
-                          if (trip.offerExpiresAt?.trim().isNotEmpty ??
-                              false) ...[
+                          if (offerCountdownExpiresAt != null) ...[
                             const SizedBox(height: 12),
-                            _DriverOfferCountdown(
-                              expiresAt: trip.offerExpiresAt!,
-                              onExpired: () async {
-                                final navigator = Navigator.of(context);
-                                await ref
-                                    .read(offeredTripProvider.notifier)
-                                    .loadOffer();
-                                await ref
-                                    .read(driverOffersProvider.notifier)
-                                    .loadOffers();
-                                if (mounted) {
-                                  navigator.maybePop();
-                                }
-                              },
+                            Center(
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 280,
+                                ),
+                                child: _DriverOfferCountdown(
+                                  expiresAt: offerCountdownExpiresAt,
+                                  onExpired: () async {
+                                    final navigator = Navigator.of(context);
+                                    await ref
+                                        .read(offeredTripProvider.notifier)
+                                        .loadOffer();
+                                    await ref
+                                        .read(driverOffersProvider.notifier)
+                                        .loadOffers();
+                                    if (mounted) {
+                                      navigator.maybePop();
+                                    }
+                                  },
+                                  showLabel: true,
+                                ),
+                              ),
                             ),
                           ],
                           const SizedBox(height: 16),
