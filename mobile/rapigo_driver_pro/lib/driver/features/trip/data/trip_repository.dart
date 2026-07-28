@@ -83,6 +83,9 @@ class DriverTripRepository {
       preferredDriverId:
           item['preferred_driver_id']?.toString() ??
           item['preferredDriverId']?.toString(),
+      offerExpiresAt:
+          item['offer_expires_at']?.toString() ??
+          item['offerExpiresAt']?.toString(),
       isPromotional: item['promotional_trip'] == true,
     );
   }
@@ -112,8 +115,15 @@ class DriverTripRepository {
       return null;
     }
 
-    final item = offers.first;
-    return _mapTrip(item, fallbackStatus: 'requested');
+    final mappedOffers = offers
+        .map((item) => _mapTrip(item, fallbackStatus: 'requested'))
+        .where((offer) => !_isExpiredOffer(offer))
+        .toList(growable: false);
+    if (mappedOffers.isEmpty) {
+      return null;
+    }
+
+    return mappedOffers.first;
   }
 
   Future<List<DriverTrip>> fetchOffers({
@@ -133,6 +143,7 @@ class DriverTripRepository {
     final offers = (payload['offers'] as List<dynamic>? ?? const [])
         .whereType<Map<String, dynamic>>()
         .map((item) => _mapTrip(item, fallbackStatus: 'requested'))
+        .where((offer) => !_isExpiredOffer(offer))
         .toList(growable: false);
     return offers;
   }
@@ -229,6 +240,18 @@ class DriverTripRepository {
       // Use the stable fallback when the backend does not send JSON.
     }
     return '$fallback (${response.statusCode})';
+  }
+
+  static bool _isExpiredOffer(DriverTrip offer) {
+    final rawExpiresAt = offer.offerExpiresAt?.trim();
+    if (rawExpiresAt == null || rawExpiresAt.isEmpty) {
+      return false;
+    }
+    final expiresAt = DateTime.tryParse(rawExpiresAt)?.toLocal();
+    if (expiresAt == null) {
+      return false;
+    }
+    return !expiresAt.isAfter(DateTime.now());
   }
 
   static DriverTrip _mapTrip(

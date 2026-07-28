@@ -518,6 +518,25 @@ class _DriverOfferRoutePreviewPageState
                               height: 1.4,
                             ),
                           ),
+                          if (trip.offerExpiresAt?.trim().isNotEmpty ??
+                              false) ...[
+                            const SizedBox(height: 12),
+                            _DriverOfferCountdown(
+                              expiresAt: trip.offerExpiresAt!,
+                              onExpired: () async {
+                                final navigator = Navigator.of(context);
+                                await ref
+                                    .read(offeredTripProvider.notifier)
+                                    .loadOffer();
+                                await ref
+                                    .read(driverOffersProvider.notifier)
+                                    .loadOffers();
+                                if (mounted) {
+                                  navigator.maybePop();
+                                }
+                              },
+                            ),
+                          ],
                           const SizedBox(height: 16),
                           Row(
                             children: [

@@ -18,6 +18,7 @@ class DriverTrip {
     this.passengerPhone,
     this.dispatchMode,
     this.preferredDriverId,
+    this.offerExpiresAt,
     this.isPromotional = false,
   });
 
@@ -39,6 +40,7 @@ class DriverTrip {
   final String? passengerPhone;
   final String? dispatchMode;
   final String? preferredDriverId;
+  final String? offerExpiresAt;
   final bool isPromotional;
 
   bool get isDirectedRequest {
@@ -66,6 +68,7 @@ class DriverTrip {
     String? passengerPhone,
     String? dispatchMode,
     String? preferredDriverId,
+    String? offerExpiresAt,
     bool? isPromotional,
   }) {
     return DriverTrip(
@@ -87,6 +90,7 @@ class DriverTrip {
       passengerPhone: passengerPhone ?? this.passengerPhone,
       dispatchMode: dispatchMode ?? this.dispatchMode,
       preferredDriverId: preferredDriverId ?? this.preferredDriverId,
+      offerExpiresAt: offerExpiresAt ?? this.offerExpiresAt,
       isPromotional: isPromotional ?? this.isPromotional,
     );
   }

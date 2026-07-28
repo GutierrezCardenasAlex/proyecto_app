@@ -163,6 +163,7 @@ class DriverTripStateCache {
       'passengerPhone': trip.passengerPhone,
       'dispatchMode': trip.dispatchMode,
       'preferredDriverId': trip.preferredDriverId,
+      'offerExpiresAt': trip.offerExpiresAt,
       'isPromotional': trip.isPromotional,
     };
   }
@@ -188,6 +189,7 @@ class DriverTripStateCache {
       passengerPhone: payload['passengerPhone']?.toString(),
       dispatchMode: payload['dispatchMode']?.toString(),
       preferredDriverId: payload['preferredDriverId']?.toString(),
+      offerExpiresAt: payload['offerExpiresAt']?.toString(),
       isPromotional: payload['isPromotional'] == true,
     );
   }
@@ -211,8 +213,9 @@ class DriverTripStateCache {
 
   static DriverTripFlowMetadata metadataFromTrip(DriverTrip trip) {
     final status = trip.status.trim().toLowerCase();
-    final routeStage =
-        status == 'in_progress' || status == 'completed' ? 'destination' : 'pickup';
+    final routeStage = status == 'in_progress' || status == 'completed'
+        ? 'destination'
+        : 'pickup';
     final stage = switch (status) {
       'accepted' => 'accepted',
       'arriving' => 'pickup_navigation',

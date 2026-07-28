@@ -714,6 +714,10 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
           onReject: (offer) async {
             await _rejectOfferForCurrentDriver(offer);
           },
+          onExpired: () {
+            ref.read(driverOffersProvider.notifier).loadOffers();
+            ref.read(offeredTripProvider.notifier).loadOffer();
+          },
         ),
       ),
     );
@@ -969,6 +973,14 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                                   await _rejectOfferForCurrentDriver(
                                     pendingOffer,
                                   );
+                                },
+                                onExpired: () {
+                                  ref
+                                      .read(driverOffersProvider.notifier)
+                                      .loadOffers();
+                                  ref
+                                      .read(offeredTripProvider.notifier)
+                                      .loadOffer();
                                 },
                               );
                             },
@@ -3370,6 +3382,24 @@ class _DriverIncomingRequestOverlay extends ConsumerWidget {
                         ],
                       ),
                     ),
+                    if (trip.offerExpiresAt?.trim().isNotEmpty ?? false) ...[
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _DriverOfferCountdown(
+                          expiresAt: trip.offerExpiresAt!,
+                          compact: true,
+                          onExpired: () {
+                            ref
+                                .read(driverOffersProvider.notifier)
+                                .loadOffers();
+                            ref.read(offeredTripProvider.notifier).loadOffer();
+                            ref
+                                .read(driverOfferPreviewTripIdProvider.notifier)
+                                .setTrip(null);
+                          },
+                        ),
+                      ),
+                    ],
                     if (isPreviewingRoute) ...[
                       const SizedBox(width: 12),
                       Expanded(
@@ -3646,6 +3676,7 @@ class _DriverAvailableTripsPage extends StatelessWidget {
     required this.onViewDetails,
     required this.onAccept,
     required this.onReject,
+    required this.onExpired,
   });
 
   final bool hasLiveTrip;
@@ -3654,6 +3685,7 @@ class _DriverAvailableTripsPage extends StatelessWidget {
   final ValueChanged<DriverTrip> onViewDetails;
   final ValueChanged<DriverTrip?> onAccept;
   final ValueChanged<DriverTrip> onReject;
+  final VoidCallback onExpired;
 
   @override
   Widget build(BuildContext context) {
@@ -3707,12 +3739,130 @@ class _DriverAvailableTripsPage extends StatelessWidget {
                     onViewDetails: () => onViewDetails(pendingOffer),
                     onAccept: () => onAccept(pendingOffer),
                     onReject: () => onReject(pendingOffer),
+                    onExpired: onExpired,
                   );
                 },
               );
             },
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _DriverOfferCountdown extends StatefulWidget {
+  const _DriverOfferCountdown({
+    required this.expiresAt,
+    required this.onExpired,
+    this.compact = false,
+  });
+
+  final String expiresAt;
+  final VoidCallback onExpired;
+  final bool compact;
+
+  @override
+  State<_DriverOfferCountdown> createState() => _DriverOfferCountdownState();
+}
+
+class _DriverOfferCountdownState extends State<_DriverOfferCountdown> {
+  Timer? _timer;
+  late DateTime? _expiresAt;
+  late int _initialSeconds;
+  bool _notifiedExpired = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _configure();
+  }
+
+  @override
+  void didUpdateWidget(covariant _DriverOfferCountdown oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.expiresAt != widget.expiresAt) {
+      _configure();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _configure() {
+    _timer?.cancel();
+    _expiresAt = DateTime.tryParse(widget.expiresAt)?.toLocal();
+    _initialSeconds = _remainingSeconds().clamp(1, 999).toInt();
+    _notifiedExpired = false;
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) {
+        return;
+      }
+      final remaining = _remainingSeconds();
+      if (remaining <= 0 && !_notifiedExpired) {
+        _notifiedExpired = true;
+        widget.onExpired();
+      }
+      setState(() {});
+    });
+  }
+
+  int _remainingSeconds() {
+    final expiresAt = _expiresAt;
+    if (expiresAt == null) {
+      return 0;
+    }
+    return expiresAt.difference(DateTime.now()).inSeconds.clamp(0, 999);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final remaining = _remainingSeconds();
+    final progress = _initialSeconds <= 0
+        ? 0.0
+        : (remaining / _initialSeconds).clamp(0.0, 1.0).toDouble();
+    final urgent = remaining <= 5;
+    final color = urgent ? const Color(0xFFFB7185) : const Color(0xFFFFC400);
+
+    return Container(
+      padding: EdgeInsets.all(widget.compact ? 10 : 12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(widget.compact ? 16 : 18),
+        border: Border.all(color: color.withValues(alpha: 0.32)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.timer_rounded,
+            color: color,
+            size: widget.compact ? 16 : 18,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                minHeight: widget.compact ? 6 : 8,
+                value: progress,
+                backgroundColor: Colors.white.withValues(alpha: 0.12),
+                valueColor: AlwaysStoppedAnimation<Color>(color),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            remaining > 0 ? '${remaining}s' : '0s',
+            style: TextStyle(
+              color: color,
+              fontSize: widget.compact ? 12 : 13,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -3725,6 +3875,7 @@ class _DriverAvailableTripCard extends StatelessWidget {
     required this.onViewDetails,
     required this.onAccept,
     required this.onReject,
+    required this.onExpired,
   });
 
   final DriverTrip trip;
@@ -3732,6 +3883,7 @@ class _DriverAvailableTripCard extends StatelessWidget {
   final VoidCallback onViewDetails;
   final VoidCallback onAccept;
   final VoidCallback onReject;
+  final VoidCallback onExpired;
 
   @override
   Widget build(BuildContext context) {
@@ -3846,6 +3998,13 @@ class _DriverAvailableTripCard extends StatelessWidget {
           _InfoTile(label: 'Destino', value: trip.destination),
           if (trip.passengerPhone?.trim().isNotEmpty ?? false)
             _InfoTile(label: 'Telefono', value: trip.passengerPhone!.trim()),
+          if (trip.offerExpiresAt?.trim().isNotEmpty ?? false) ...[
+            const SizedBox(height: 10),
+            _DriverOfferCountdown(
+              expiresAt: trip.offerExpiresAt!,
+              onExpired: onExpired,
+            ),
+          ],
           const SizedBox(height: 8),
           Row(
             children: [

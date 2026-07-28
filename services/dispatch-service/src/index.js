@@ -147,6 +147,7 @@ async function clearTripOffers(tripId) {
   if (offeredDriverIds.length) {
     for (const offeredDriverId of offeredDriverIds) {
       await redis.srem(`driver:${offeredDriverId}:offers`, tripId);
+      await redis.hdel(`driver:${offeredDriverId}:offer_expires_at`, tripId);
     }
   }
   await redis.del(
@@ -253,6 +254,7 @@ async function offerTripToCandidates(tripId, candidates, stage) {
     const payload = buildOfferPayload(tripId, candidate, stage);
     await redis.sadd(`driver:${candidate.driver_id}:offers`, tripId);
     await redis.expire(`driver:${candidate.driver_id}:offers`, OFFER_TTL_SECONDS);
+    await redis.hdel(`driver:${candidate.driver_id}:offer_expires_at`, tripId);
     await redis.sadd(`trip:${tripId}:offered_drivers`, candidate.driver_id);
     await redis.expire(`trip:${tripId}:offered_drivers`, OFFER_TTL_SECONDS);
     await publish("dispatch.trip.offer", payload);
@@ -260,13 +262,20 @@ async function offerTripToCandidates(tripId, candidates, stage) {
   }
 }
 
-async function offerTripToCandidate({ tripId, candidate, stage, offerToken = null }) {
+async function offerTripToCandidate({ tripId, candidate, stage, offerToken = null, offerExpiresAt = null }) {
   const payload = {
     ...buildOfferPayload(tripId, candidate, stage),
-    offerToken
+    offerToken,
+    offerExpiresAt
   };
   await redis.sadd(`driver:${candidate.driver_id}:offers`, tripId);
   await redis.expire(`driver:${candidate.driver_id}:offers`, OFFER_TTL_SECONDS);
+  if (offerExpiresAt) {
+    await redis.hset(`driver:${candidate.driver_id}:offer_expires_at`, tripId, offerExpiresAt);
+    await redis.expire(`driver:${candidate.driver_id}:offer_expires_at`, OFFER_TTL_SECONDS);
+  } else {
+    await redis.hdel(`driver:${candidate.driver_id}:offer_expires_at`, tripId);
+  }
   await redis.sadd(`trip:${tripId}:offered_drivers`, candidate.driver_id);
   await redis.expire(`trip:${tripId}:offered_drivers`, OFFER_TTL_SECONDS);
   await publish("dispatch.trip.offer", payload);
@@ -278,6 +287,7 @@ async function removeActiveOffer({ tripId, driverId, reason }) {
     return;
   }
   await redis.srem(`driver:${driverId}:offers`, tripId);
+  await redis.hdel(`driver:${driverId}:offer_expires_at`, tripId);
   await emitRealtime("driver:trip_unavailable", `driver:${driverId}`, {
     tripId,
     reason
@@ -427,10 +437,11 @@ async function advanceSequentialOffer({ tripId, pickupLat = null, pickupLng = nu
   }
 
   const offerToken = crypto.randomUUID();
+  const offerExpiresAt = new Date(Date.now() + OFFER_RESPONSE_TIMEOUT_MS).toISOString();
   await redis.set(`trip:${tripId}:active_offer_driver`, candidate.driver_id, "EX", OFFER_TTL_SECONDS);
   await redis.set(`trip:${tripId}:active_offer_token`, offerToken, "EX", OFFER_TTL_SECONDS);
   await redis.set(`trip:${tripId}:dispatch_stage`, "nearby", "EX", OFFER_TTL_SECONDS);
-  await offerTripToCandidate({ tripId, candidate, stage: "nearby", offerToken });
+  await offerTripToCandidate({ tripId, candidate, stage: "nearby", offerToken, offerExpiresAt });
   scheduleSequentialOfferTimeout({
     tripId,
     pickupLat: resolvedPickupLat,
@@ -637,7 +648,14 @@ async function bootstrap() {
       [tripIds]
     );
 
-    return { offers: result.rows };
+    const offers = await Promise.all(
+      result.rows.map(async (row) => ({
+        ...row,
+        offer_expires_at: await redis.hget(`driver:${driverId}:offer_expires_at`, row.id)
+      }))
+    );
+
+    return { offers };
   });
 
   app.get("/nearby", async (request, reply) => {
