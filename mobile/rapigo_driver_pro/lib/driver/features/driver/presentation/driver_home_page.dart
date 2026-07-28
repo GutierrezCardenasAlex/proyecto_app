@@ -1509,7 +1509,6 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
   }
 
   Future<void> _openDriverCenterSheet() async {
-    final offlineState = ref.read(offlineMapProvider);
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -1562,65 +1561,6 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                     Expanded(
                       child: ListView(
                         children: [
-                          Container(
-                            margin: const EdgeInsets.only(bottom: 14),
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF6F8FE),
-                              borderRadius: BorderRadius.circular(22),
-                              border: Border.all(
-                                color: const Color(0xFFE3EAF9),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFEAF2FF),
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  child: const Icon(
-                                    Icons.offline_pin_rounded,
-                                    color: Color(0xFF1D4ED8),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        offlineState.isDownloading
-                                            ? 'Preparando mapa offline'
-                                            : 'Mapa listo en cache',
-                                        style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w800,
-                                          color: const Color(0xFF111827),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        offlineState.isDownloading
-                                            ? '${(offlineState.progress * 100).toStringAsFixed(0)}% completado'
-                                            : (offlineState.isReady
-                                                  ? 'Potosi guardado para usar sin conexion'
-                                                  : 'Cache inteligente activo'),
-                                        style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: const Color(0xFF64748B),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
                           _HomeQuickActionTile(
                             icon: Icons.my_location_rounded,
                             label: 'Actualizar GPS',
@@ -1648,33 +1588,6 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                                 'Ubicacion actualizada en el mapa.',
                                 tone: NoticeTone.success,
                               );
-                            },
-                          ),
-                          _HomeQuickActionTile(
-                            icon: Icons.sync_rounded,
-                            label: 'Sincronizar solicitudes',
-                            onTap: () async {
-                              Navigator.of(context).pop();
-                              await ref
-                                  .read(offeredTripProvider.notifier)
-                                  .loadOffer();
-                              await ref
-                                  .read(driverOffersProvider.notifier)
-                                  .loadOffers();
-                              if (!mounted) return;
-                              showTopNotice(
-                                this.context,
-                                'Solicitudes sincronizadas.',
-                                tone: NoticeTone.success,
-                              );
-                            },
-                          ),
-                          _HomeQuickActionTile(
-                            icon: Icons.download_for_offline_rounded,
-                            label: 'Mapa offline',
-                            onTap: () {
-                              Navigator.of(context).pop();
-                              showOfflineMapSheet(this.context);
                             },
                           ),
                           _HomeQuickActionTile(
@@ -3197,9 +3110,9 @@ String? _visibleOfferExpiresAt(DriverTrip trip) {
   }
   final requestedAt = DateTime.tryParse(trip.requestedAt ?? '')?.toLocal();
   final fallbackBase = requestedAt ?? DateTime.now();
-  final fallbackExpiresAt = fallbackBase.add(const Duration(seconds: 15));
+  final fallbackExpiresAt = fallbackBase.add(const Duration(seconds: 20));
   if (!fallbackExpiresAt.isAfter(DateTime.now())) {
-    return DateTime.now().add(const Duration(seconds: 15)).toIso8601String();
+    return DateTime.now().add(const Duration(seconds: 20)).toIso8601String();
   }
   return fallbackExpiresAt.toIso8601String();
 }

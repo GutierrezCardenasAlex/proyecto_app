@@ -16,6 +16,7 @@ class _DriverOfferRoutePreviewPageState
   bool _busy = false;
   final bool _routeReviewed = true;
   bool _routeReady = false;
+  bool _showRouteStops = false;
   String _busyMessage = 'Procesando viaje...';
   final Completer<void> _routeReadyCompleter = Completer<void>();
 
@@ -463,62 +464,86 @@ class _DriverOfferRoutePreviewPageState
                               ),
                             ],
                           ),
-                          const SizedBox(height: 16),
-                          Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF0A1424),
-                              borderRadius: BorderRadius.circular(22),
-                              border: Border.all(
-                                color: const Color(0x18FFFFFF),
+                          const SizedBox(height: 12),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: OutlinedButton.icon(
+                              onPressed: () => setState(
+                                () => _showRouteStops = !_showRouteStops,
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFFD7E7FF),
+                                side: const BorderSide(
+                                  color: Color(0x337DB7FF),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 10,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                              icon: Icon(
+                                _showRouteStops
+                                    ? Icons.visibility_off_rounded
+                                    : Icons.visibility_rounded,
+                                size: 18,
+                              ),
+                              label: Text(
+                                _showRouteStops
+                                    ? 'Ocultar puntos'
+                                    : 'Ver puntos A/B',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
                             ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: _PreviewStopTile(
-                                    label: 'A · Recogida',
-                                    title:
-                                        trip.passengerPickup.trim().isNotEmpty
-                                        ? trip.passengerPickup.trim()
-                                        : 'Punto de recogida',
-                                    meta:
-                                        '${_formatDistance(pickupDistance)} · ${_formatEta(pickupDistance)}',
-                                    accent: const Color(0xFF22C55E),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _PreviewStopTile(
-                                    label: 'B · Destino',
-                                    title: trip.destination.trim().isNotEmpty
-                                        ? trip.destination.trim()
-                                        : 'Destino por confirmar',
-                                    meta:
-                                        trip.destinationLat != null &&
-                                            trip.destinationLng != null
-                                        ? '${_formatDistance(destinationDistance)} · ${_formatEta(destinationDistance)}'
-                                        : 'Sin punto final',
-                                    accent: const Color(0xFFEF4444),
-                                  ),
-                                ),
-                              ],
-                            ),
                           ),
-                          const SizedBox(height: 14),
-                          Text(
-                            _routeReviewed
-                                ? (_routeReady
-                                      ? 'La ruta ya esta lista. Si confirmas, entras directo al flujo del viaje activo.'
-                                      : 'Preparando el trazado final para entrar directo al viaje...')
-                                : 'Primero revisa el recorrido completo con los puntos A y B. Luego podras aceptar el viaje.',
-                            style: const TextStyle(
-                              color: Color(0xFFB8C4D6),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              height: 1.4,
+                          if (_showRouteStops) ...[
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0A1424),
+                                borderRadius: BorderRadius.circular(22),
+                                border: Border.all(
+                                  color: const Color(0x18FFFFFF),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: _PreviewStopTile(
+                                      label: 'A · Recogida',
+                                      title:
+                                          trip.passengerPickup.trim().isNotEmpty
+                                          ? trip.passengerPickup.trim()
+                                          : 'Punto de recogida',
+                                      meta:
+                                          '${_formatDistance(pickupDistance)} · ${_formatEta(pickupDistance)}',
+                                      accent: const Color(0xFF22C55E),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: _PreviewStopTile(
+                                      label: 'B · Destino',
+                                      title: trip.destination.trim().isNotEmpty
+                                          ? trip.destination.trim()
+                                          : 'Destino por confirmar',
+                                      meta:
+                                          trip.destinationLat != null &&
+                                              trip.destinationLng != null
+                                          ? '${_formatDistance(destinationDistance)} · ${_formatEta(destinationDistance)}'
+                                          : 'Sin punto final',
+                                      accent: const Color(0xFFEF4444),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
+                          ],
                           if (offerCountdownExpiresAt != null) ...[
                             const SizedBox(height: 12),
                             Center(
