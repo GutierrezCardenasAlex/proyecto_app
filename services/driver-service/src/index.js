@@ -44,6 +44,14 @@ const availabilitySchema = z.object({
   isAvailable: z.boolean()
 });
 
+const driverServicesSchema = z.object({
+  transportEnabled: z.boolean().optional(),
+  deliveryEnabled: z.boolean().optional()
+}).refine(
+  (value) => value.transportEnabled !== undefined || value.deliveryEnabled !== undefined,
+  "Debes enviar al menos un servicio."
+);
+
 const ensureProfileSchema = z.object({
   userId: z.string().uuid().optional(),
   fullName: z.string().min(2).optional(),
@@ -189,7 +197,9 @@ async function bootstrap() {
       ADD COLUMN IF NOT EXISTS access_granted_at TIMESTAMPTZ,
       ADD COLUMN IF NOT EXISTS license_category VARCHAR(16),
       ADD COLUMN IF NOT EXISTS license_issue_date VARCHAR(32),
-      ADD COLUMN IF NOT EXISTS license_expiry_date VARCHAR(32)
+      ADD COLUMN IF NOT EXISTS license_expiry_date VARCHAR(32),
+      ADD COLUMN IF NOT EXISTS accepts_transport_requests BOOLEAN NOT NULL DEFAULT TRUE,
+      ADD COLUMN IF NOT EXISTS accepts_delivery_requests BOOLEAN NOT NULL DEFAULT FALSE
   `);
 
   app.get("/health", async () => ({ status: "ok", service: "driver-service" }));
@@ -282,6 +292,35 @@ async function bootstrap() {
       isAvailable: String(isAvailable)
     });
     await publish("driver.availability.changed", { driverId, status, isAvailable });
+
+    reply.send({ driver: result.rows[0] });
+  });
+
+  app.patch("/:driverId/services", async (request, reply) => {
+    const { driverId } = request.params;
+    const user = await requireOwnDriverId(request, reply, driverId);
+    if (!user) return;
+
+    const { transportEnabled, deliveryEnabled } = driverServicesSchema.parse(request.body);
+    const result = await pool.query(
+      `UPDATE drivers
+       SET accepts_transport_requests = COALESCE($2, accepts_transport_requests),
+           accepts_delivery_requests = COALESCE($3, accepts_delivery_requests),
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [driverId, transportEnabled ?? null, deliveryEnabled ?? null]
+    );
+
+    if (!result.rows.length) {
+      return reply.code(404).send({ message: "Driver not found" });
+    }
+
+    await publish("driver.services.updated", {
+      driverId,
+      transportEnabled: result.rows[0].accepts_transport_requests,
+      deliveryEnabled: result.rows[0].accepts_delivery_requests
+    });
 
     reply.send({ driver: result.rows[0] });
   });

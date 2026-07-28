@@ -210,6 +210,7 @@ async function findCandidateDrivers({
      WHERE d.is_available = TRUE
        AND d.status = 'available'
        AND d.current_trip_id IS NULL
+       AND d.accepts_transport_requests = TRUE
        AND ll.recorded_at >= NOW() - INTERVAL '5 minutes'
        AND ($3::uuid IS NULL OR d.id = $3)
        AND NOT (d.id = ANY($4::uuid[]))
@@ -355,6 +356,7 @@ async function isCandidateStillAvailable(driverId) {
        AND d.is_available = TRUE
        AND d.status = 'available'
        AND d.current_trip_id IS NULL
+       AND d.accepts_transport_requests = TRUE
        AND NOT EXISTS (
          SELECT 1
          FROM trips active_trip
@@ -599,6 +601,12 @@ async function scheduleDirectedFallback({ tripId, pickupLat, pickupLng, runId })
 async function bootstrap() {
   await app.register(cors, { origin: true, credentials: true });
 
+  await pool.query(`
+    ALTER TABLE drivers
+      ADD COLUMN IF NOT EXISTS accepts_transport_requests BOOLEAN NOT NULL DEFAULT TRUE,
+      ADD COLUMN IF NOT EXISTS accepts_delivery_requests BOOLEAN NOT NULL DEFAULT FALSE
+  `);
+
   app.get("/health", async () => ({ status: "ok", service: "dispatch-service" }));
 
   app.post("/search", async (request, reply) => {
@@ -755,6 +763,7 @@ async function bootstrap() {
        WHERE d.is_available = TRUE
          AND d.status = 'available'
          AND d.current_trip_id IS NULL
+         AND d.accepts_transport_requests = TRUE
          AND ll.recorded_at >= NOW() - INTERVAL '5 minutes'
          AND NOT EXISTS (
            SELECT 1

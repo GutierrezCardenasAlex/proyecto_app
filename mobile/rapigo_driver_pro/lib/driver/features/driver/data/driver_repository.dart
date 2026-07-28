@@ -285,9 +285,8 @@ class DriverRepository {
         distanceFilter: 2,
         intervalDuration: const Duration(seconds: 1),
         foregroundNotificationConfig: const ForegroundNotificationConfig(
-          notificationTitle: 'RAPIGO - PRO activo',
-          notificationText:
-              'Seguimos enviando tu ubicacion para viajes y alertas prioritarias.',
+          notificationTitle: 'RAPIGO - PRO',
+          notificationText: 'Buscando Pasajeros Cercanos......',
           enableWakeLock: true,
           setOngoing: true,
         ),

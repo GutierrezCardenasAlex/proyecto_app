@@ -152,8 +152,8 @@ class _DriverSocketListenerState extends ConsumerState<DriverSocketListener>
       ref.invalidate(driverTripHistoryProvider);
       LocalNotifications.show(
         id: 2001,
-        title: 'RAPIGO - PRO',
-        body: 'Tienes una solicitud de viaje disponible.',
+        title: 'RAPIGO',
+        body: 'Nueva solicitud de viaje.',
         kind: DriverLocalNotificationKind.rideRequest,
       );
       _showDriverOverlayNotice(
@@ -398,7 +398,7 @@ class _DriverSocketListenerState extends ConsumerState<DriverSocketListener>
             ),
           ),
           content: const Text(
-            'Veras una notificacion fija mientras RAPIGO PRO conductor envie ubicacion en segundo plano. Es normal y necesaria para no perder viajes, seguir mandando GPS y recibir alertas aunque bloquees el celular.',
+            'Veras una notificacion fija con el estado "Buscando Pasajeros Cercanos......" mientras RAPIGO - PRO siga activo en segundo plano.',
             style: TextStyle(color: Color(0xFFFFD8BF), height: 1.5),
           ),
           actions: [
