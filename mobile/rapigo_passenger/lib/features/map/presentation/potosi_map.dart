@@ -827,10 +827,10 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
       _routeSourceId,
       _routeGlowLayerId,
       const ml.LineLayerProperties(
-        lineColor: '#9EC5FF',
-        lineOpacity: 0.22,
-        lineWidth: 11.5,
-        lineBlur: 0.9,
+        lineColor: '#38BDF8',
+        lineOpacity: 0.38,
+        lineWidth: 15.0,
+        lineBlur: 1.2,
         lineJoin: 'round',
         lineCap: 'round',
       ),
@@ -840,9 +840,9 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
       _routeMainLayerId,
       ml.LineLayerProperties(
         lineColor: _hex(widget.routeColor),
-        lineOpacity: 0.97,
-        lineWidth: 5.8,
-        lineBlur: 0.25,
+        lineOpacity: 0.98,
+        lineWidth: 6.6,
+        lineBlur: 0.12,
         lineJoin: 'round',
         lineCap: 'round',
       ),
@@ -1019,18 +1019,18 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
 
     for (final driver in ordered) {
       final point = _toMlLatLng(driver.point);
-      final haloColor = driver.isHighlighted ? '#22C55E' : '#86EFAC';
-      final markerColor = driver.isHighlighted ? '#BBF7D0' : '#DCFCE7';
-      final markerRadius = driver.isHighlighted ? 10.0 : 8.0;
-      final haloRadius = driver.isHighlighted ? 22.0 : 17.0;
+      final haloColor = driver.isHighlighted ? '#FACC15' : '#34D399';
+      final markerColor = driver.isHighlighted ? '#FBBF24' : '#DCFCE7';
+      final markerRadius = driver.isHighlighted ? 10.8 : 8.4;
+      final haloRadius = driver.isHighlighted ? 24.0 : 18.0;
 
       final halo = await controller.addCircle(
         ml.CircleOptions(
           geometry: point,
           circleRadius: haloRadius,
           circleColor: haloColor,
-          circleOpacity: driver.isHighlighted ? 0.26 : 0.18,
-          circleBlur: 0.78,
+          circleOpacity: driver.isHighlighted ? 0.28 : 0.2,
+          circleBlur: 0.86,
         ),
       );
       final marker = await controller.addCircle(
@@ -1039,16 +1039,16 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
           circleRadius: markerRadius,
           circleColor: markerColor,
           circleStrokeColor: '#FFFFFF',
-          circleStrokeWidth: driver.isHighlighted ? 2.2 : 1.5,
-          circleStrokeOpacity: driver.isHighlighted ? 0.95 : 0.75,
-          circleOpacity: driver.isHighlighted ? 0.82 : 0.48,
+          circleStrokeWidth: driver.isHighlighted ? 2.8 : 1.8,
+          circleStrokeOpacity: driver.isHighlighted ? 0.98 : 0.82,
+          circleOpacity: driver.isHighlighted ? 0.92 : 0.58,
         ),
       );
       final symbol = await controller.addSymbol(
         ml.SymbolOptions(
           geometry: point,
           iconImage: _driverMarkerImageId,
-          iconSize: driver.isHighlighted ? 1.02 : 0.86,
+          iconSize: driver.isHighlighted ? 1.08 : 0.9,
           iconAnchor: 'center',
         ),
       );
@@ -1064,8 +1064,8 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
   ) async {
     final point = _toMlLatLng(_visualPassengerPoint());
     final accuracyMeters = (widget.userAccuracyMeters ?? 20).clamp(8, 120);
-    final haloRadius = 22 + (accuracyMeters / 16);
-    final pulseRadius = 14 + (accuracyMeters / 24);
+    final haloRadius = 24 + (accuracyMeters / 15);
+    final pulseRadius = 15 + (accuracyMeters / 23);
 
     if (_passengerHaloCircle == null) {
       _passengerHaloCircle = await controller.addCircle(
@@ -1073,7 +1073,7 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
           geometry: point,
           circleRadius: haloRadius,
           circleColor: _hex(widget.userMarkerHaloColor),
-          circleOpacity: 0.14,
+          circleOpacity: 0.18,
           circleBlur: 0.94,
         ),
       );
@@ -1089,7 +1089,7 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
           geometry: point,
           circleRadius: pulseRadius,
           circleColor: _hex(widget.userMarkerAccentColor),
-          circleOpacity: 0.24,
+          circleOpacity: 0.28,
           circleBlur: 0.88,
         ),
       );
@@ -1103,10 +1103,10 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
       _passengerCoreCircle = await controller.addCircle(
         ml.CircleOptions(
           geometry: point,
-          circleRadius: 8.6,
+          circleRadius: 9.2,
           circleColor: '#F8FBFF',
           circleStrokeColor: _hex(widget.userMarkerAccentColor),
-          circleStrokeWidth: 4.2,
+          circleStrokeWidth: 4.6,
           circleStrokeOpacity: 0.98,
           circleOpacity: 1,
         ),
@@ -1123,7 +1123,7 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
         ml.SymbolOptions(
           geometry: point,
           iconImage: _passengerMarkerImageId,
-          iconSize: 1.18,
+          iconSize: 1.24,
           iconRotate: _visualHeading(),
           iconAnchor: 'center',
         ),
@@ -1150,8 +1150,8 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
 
     final point = _toMlLatLng(_visualPassengerPoint());
     final accuracyMeters = (widget.userAccuracyMeters ?? 20).clamp(8, 120);
-    final haloRadius = 22 + (accuracyMeters / 16);
-    final pulseRadius = 14 + (accuracyMeters / 24);
+    final haloRadius = 24 + (accuracyMeters / 15);
+    final pulseRadius = 15 + (accuracyMeters / 23);
 
     try {
       await controller.updateCircle(
@@ -1202,83 +1202,83 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
   }
 
   Future<Uint8List> _buildDriverMarkerImageBytes() async {
-    const size = 160.0;
+    const size = 168.0;
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     const center = Offset(size / 2, size / 2);
 
     canvas.drawCircle(
       center,
-      48,
+      52,
       Paint()
-        ..color = const Color(0x6634D399)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 22),
+        ..color = const Color(0x554F46E5)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 24),
     );
-    canvas.drawCircle(center, 36, Paint()..color = const Color(0x2234D399));
+    canvas.drawCircle(center, 38, Paint()..color = const Color(0x2634D399));
     canvas
       ..save()
       ..translate(center.dx, center.dy)
       ..rotate(-0.55);
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromCenter(center: const Offset(2, 5), width: 82, height: 52),
+        Rect.fromCenter(center: const Offset(2, 7), width: 88, height: 54),
         const Radius.circular(18),
       ),
       Paint()
-        ..color = const Color(0x55000000)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10),
+        ..color = const Color(0x66040E1D)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
     );
     final carRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset.zero, width: 82, height: 50),
+      Rect.fromCenter(center: Offset.zero, width: 88, height: 52),
       const Radius.circular(18),
     );
-    canvas.drawRRect(carRect, Paint()..color = const Color(0xFFFACC15));
+    canvas.drawRRect(carRect, Paint()..color = const Color(0xFFFFC928));
     canvas.drawRRect(
       carRect,
       Paint()
         ..color = const Color(0xFF111827)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 4,
+        ..strokeWidth = 4.4,
     );
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromCenter(center: const Offset(0, -11), width: 44, height: 18),
+        Rect.fromCenter(center: const Offset(0, -12), width: 48, height: 19),
         const Radius.circular(8),
       ),
       Paint()..color = const Color(0xFF172554),
     );
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromCenter(center: const Offset(-23, -6), width: 18, height: 12),
+        Rect.fromCenter(center: const Offset(-25, -6), width: 18, height: 12),
         const Radius.circular(5),
       ),
       Paint()..color = Colors.white.withValues(alpha: 0.74),
     );
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromCenter(center: const Offset(23, -6), width: 18, height: 12),
+        Rect.fromCenter(center: const Offset(25, -6), width: 18, height: 12),
         const Radius.circular(5),
       ),
       Paint()..color = Colors.white.withValues(alpha: 0.74),
     );
     canvas.drawCircle(
-      const Offset(-30, 18),
-      8,
+      const Offset(-32, 19),
+      8.5,
       Paint()..color = const Color(0xFF111827),
     );
     canvas.drawCircle(
-      const Offset(30, 18),
-      8,
+      const Offset(32, 19),
+      8.5,
       Paint()..color = const Color(0xFF111827),
     );
     canvas.drawCircle(
-      const Offset(-30, 18),
-      3.2,
+      const Offset(-32, 19),
+      3.4,
       Paint()..color = const Color(0xFFE5E7EB),
     );
     canvas.drawCircle(
-      const Offset(30, 18),
-      3.2,
+      const Offset(32, 19),
+      3.4,
       Paint()..color = const Color(0xFFE5E7EB),
     );
     canvas.restore();
@@ -1290,41 +1290,62 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
   }
 
   Future<Uint8List> _buildPassengerMarkerImageBytes() async {
-    const size = 144.0;
+    const size = 164.0;
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     const center = Offset(size / 2, size / 2);
 
     final haloOuter = Paint()
-      ..color = widget.userMarkerHaloColor.withValues(alpha: 0.16)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 24);
+      ..color = widget.userMarkerHaloColor.withValues(alpha: 0.22)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 28);
     final haloInner = Paint()
-      ..color = widget.userMarkerHaloColor.withValues(alpha: 0.28)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
-    canvas.drawCircle(center, 33, haloOuter);
-    canvas.drawCircle(center, 25, haloInner);
+      ..color = widget.userMarkerHaloColor.withValues(alpha: 0.34)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
+    canvas.drawCircle(center, 40, haloOuter);
+    canvas.drawCircle(center, 30, haloInner);
+    canvas.drawCircle(
+      center,
+      30,
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.16)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.4,
+    );
+
+    final arrowPath = ui.Path()
+      ..moveTo(center.dx, center.dy - 56)
+      ..cubicTo(
+        center.dx + 15,
+        center.dy - 36,
+        center.dx + 19,
+        center.dy - 20,
+        center.dx + 9,
+        center.dy - 11,
+      )
+      ..lineTo(center.dx, center.dy - 18)
+      ..lineTo(center.dx - 9, center.dy - 11)
+      ..cubicTo(
+        center.dx - 19,
+        center.dy - 20,
+        center.dx - 15,
+        center.dy - 36,
+        center.dx,
+        center.dy - 56,
+      )
+      ..close();
+    canvas.drawPath(
+      arrowPath.shift(const Offset(0, 4)),
+      Paint()
+        ..color = const Color(0x55000000)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
+    );
+
     canvas.drawCircle(
       center,
       24,
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.08)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0,
-    );
-
-    final arrowPath = ui.Path()
-      ..moveTo(center.dx, center.dy - 48)
-      ..lineTo(center.dx + 12, center.dy - 22)
-      ..lineTo(center.dx + 3, center.dy - 26)
-      ..lineTo(center.dx, center.dy - 8)
-      ..lineTo(center.dx - 3, center.dy - 26)
-      ..lineTo(center.dx - 12, center.dy - 22)
-      ..close();
-    canvas.drawPath(
-      arrowPath.shift(const Offset(0, 3)),
-      Paint()
-        ..color = const Color(0x44000000)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10),
+        ..color = const Color(0xAAFFFFFF)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
     );
     canvas.drawPath(
       arrowPath,
@@ -1332,10 +1353,7 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
         ..shader = ui.Gradient.linear(
           Offset(center.dx, center.dy - 48),
           Offset(center.dx, center.dy - 8),
-          <Color>[
-            widget.userMarkerBorderColor.withValues(alpha: 0.96),
-            widget.userMarkerAccentColor,
-          ],
+          <Color>[widget.userMarkerAccentColor, const Color(0xFF38BDF8)],
         ),
     );
     canvas.drawPath(
@@ -1343,18 +1361,27 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
       Paint()
         ..color = Colors.white.withValues(alpha: 0.94)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.2,
+        ..strokeWidth = 2.8,
     );
 
-    final discPaint = Paint()..color = const Color(0xFF0B0D12);
-    canvas.drawCircle(center, 20, discPaint);
+    final discPaint = Paint()
+      ..shader = ui.Gradient.radial(center, 24, <Color>[
+        Colors.white,
+        widget.userMarkerBorderColor.withValues(alpha: 0.92),
+      ]);
+    canvas.drawCircle(center, 23, discPaint);
     canvas.drawCircle(
       center,
-      20,
+      23,
       Paint()
-        ..color = widget.userMarkerBorderColor
+        ..color = widget.userMarkerAccentColor
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 3.4,
+        ..strokeWidth = 4.2,
+    );
+    canvas.drawCircle(
+      center,
+      8.5,
+      Paint()..color = widget.userMarkerAccentColor,
     );
 
     final picture = recorder.endRecording();
@@ -1370,10 +1397,10 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
         _targetHaloCircle = await controller.addCircle(
           ml.CircleOptions(
             geometry: targetPoint,
-            circleRadius: 16.5,
-            circleColor: '#FF6B6B',
-            circleOpacity: 0.16,
-            circleBlur: 0.86,
+            circleRadius: 22.0,
+            circleColor: '#F97316',
+            circleOpacity: 0.24,
+            circleBlur: 0.92,
           ),
         );
       } else {
@@ -1386,10 +1413,10 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
         _targetCoreCircle = await controller.addCircle(
           ml.CircleOptions(
             geometry: targetPoint,
-            circleRadius: 7.4,
-            circleColor: '#FFFFFF',
-            circleStrokeColor: '#EF4444',
-            circleStrokeWidth: 3.8,
+            circleRadius: 9.4,
+            circleColor: '#FFF7ED',
+            circleStrokeColor: '#F97316',
+            circleStrokeWidth: 4.8,
             circleStrokeOpacity: 0.96,
             circleOpacity: 1,
           ),
@@ -1417,9 +1444,9 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
         _secondaryTargetHaloCircle = await controller.addCircle(
           ml.CircleOptions(
             geometry: secondaryPoint,
-            circleRadius: 14.2,
+            circleRadius: 16.2,
             circleColor: '#4ADE80',
-            circleOpacity: 0.16,
+            circleOpacity: 0.18,
             circleBlur: 0.8,
           ),
         );
@@ -1433,10 +1460,10 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
         _secondaryTargetCoreCircle = await controller.addCircle(
           ml.CircleOptions(
             geometry: secondaryPoint,
-            circleRadius: 6.6,
+            circleRadius: 7.4,
             circleColor: '#FFFFFF',
             circleStrokeColor: '#22C55E',
-            circleStrokeWidth: 3.0,
+            circleStrokeWidth: 3.5,
             circleStrokeOpacity: 0.95,
             circleOpacity: 1,
           ),
@@ -1835,11 +1862,12 @@ class _PotosiMapLibreViewState extends ConsumerState<_PotosiMapLibreView>
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    const Color(0xFF74A7E2).withValues(alpha: 0.10),
+                    Colors.white.withValues(alpha: 0.10),
+                    const Color(0xFF64748B).withValues(alpha: 0.08),
                     Colors.transparent,
-                    Colors.transparent,
-                    const Color(0xFF3E7BC0).withValues(alpha: 0.08),
+                    const Color(0xFF0F172A).withValues(alpha: 0.10),
                   ],
+                  stops: const [0, 0.18, 0.62, 1],
                 ),
               ),
             ),
@@ -2434,8 +2462,8 @@ class _PotosiMapState extends ConsumerState<PotosiMap>
                     .map(
                       (route) => Polyline(
                         points: route,
-                        strokeWidth: 2.5,
-                        color: const Color(0xFF8AB4FF).withValues(alpha: 0.16),
+                        strokeWidth: 3.0,
+                        color: const Color(0xFF22D3EE).withValues(alpha: 0.20),
                       ),
                     )
                     .toList(growable: false),
@@ -2447,12 +2475,10 @@ class _PotosiMapState extends ConsumerState<PotosiMap>
                 polylines: [
                   Polyline(
                     points: visiblePrimaryRoute!,
-                    strokeWidth: 4.6,
+                    strokeWidth: 5.4,
                     color: widget.routeColor,
-                    borderColor: const Color(
-                      0xFFB9D5FF,
-                    ).withValues(alpha: 0.24),
-                    borderStrokeWidth: 7.8,
+                    borderColor: Colors.white.withValues(alpha: 0.52),
+                    borderStrokeWidth: 9.2,
                   ),
                 ],
               ),
@@ -2460,8 +2486,8 @@ class _PotosiMapState extends ConsumerState<PotosiMap>
               markers: [
                 Marker(
                   point: widget.userLocation,
-                  width: 64,
-                  height: 64,
+                  width: 72,
+                  height: 72,
                   child: _PassengerLocationMarker(
                     headingDegrees: widget.userHeadingDegrees,
                     accuracyMeters: widget.userAccuracyMeters,
@@ -2473,8 +2499,8 @@ class _PotosiMapState extends ConsumerState<PotosiMap>
                 if (widget.showTargetMarker && widget.routeTarget != null)
                   Marker(
                     point: widget.routeTarget!,
-                    width: 112,
-                    height: 94,
+                    width: 118,
+                    height: 98,
                     child: InteractiveDestinationMarker(
                       icon: Icons.place_rounded,
                       color: const Color(0xFF3B82F6),
@@ -2500,8 +2526,8 @@ class _PotosiMapState extends ConsumerState<PotosiMap>
                 ...orderedDrivers.map(
                   (driver) => Marker(
                     point: driver.point,
-                    width: driver.isHighlighted ? 104 : 72,
-                    height: driver.isHighlighted ? 88 : 72,
+                    width: driver.isHighlighted ? 112 : 78,
+                    height: driver.isHighlighted ? 94 : 78,
                     child: _NearbyDriverMapMarker(
                       icon: _vehicleIcon(driver.vehicleType),
                       isHighlighted: driver.isHighlighted,
@@ -2520,11 +2546,12 @@ class _PotosiMapState extends ConsumerState<PotosiMap>
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    const Color(0xFF04101F).withValues(alpha: 0.16),
+                    const Color(0xFF111827).withValues(alpha: 0.10),
+                    Colors.white.withValues(alpha: 0.04),
                     Colors.transparent,
-                    Colors.transparent,
-                    const Color(0xFF030814).withValues(alpha: 0.22),
+                    const Color(0xFF030712).withValues(alpha: 0.18),
                   ],
+                  stops: const [0, 0.22, 0.64, 1],
                 ),
               ),
             ),
@@ -2541,17 +2568,17 @@ class _PotosiMapState extends ConsumerState<PotosiMap>
                 IconButton(
                   onPressed: () => showOfflineMapSheet(context),
                   style: IconButton.styleFrom(
-                    backgroundColor: Colors.white.withValues(alpha: 0.96),
+                    backgroundColor: Colors.white.withValues(alpha: 0.92),
                     foregroundColor: offlineState.isDownloading
                         ? const Color(0xFFFACC15)
                         : offlineState.isReady
                         ? const Color(0xFF0F6CBD)
                         : const Color(0xFFF59E0B),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                      side: const BorderSide(color: Color(0xFFE2E8F0)),
+                      borderRadius: BorderRadius.circular(16),
+                      side: const BorderSide(color: Color(0xDDE2E8F0)),
                     ),
-                    padding: const EdgeInsets.all(14),
+                    padding: const EdgeInsets.all(13),
                   ),
                   tooltip: 'Offline listo',
                   icon: Icon(
@@ -2706,7 +2733,7 @@ class _PassengerLocationMarkerState extends State<_PassengerLocationMarker>
                 (accuracyFactor * 0.05);
             final coneScale = 0.88 + ((accuracyMeters - 6) / 54) * 0.38;
             final coneAlpha = 0.11 + ((accuracyMeters - 6) / 54) * 0.12;
-            final haloSize = 56 + (accuracyFactor * 18);
+            final haloSize = 62 + (accuracyFactor * 20);
             return Center(
               child: Stack(
                 alignment: Alignment.center,
@@ -2720,6 +2747,10 @@ class _PassengerLocationMarkerState extends State<_PassengerLocationMarker>
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: widget.haloColor.withValues(alpha: pulseAlpha),
+                        border: Border.all(
+                          color: widget.accentColor.withValues(alpha: 0.16),
+                          width: 1.2,
+                        ),
                       ),
                     ),
                   ),
@@ -2729,7 +2760,7 @@ class _PassengerLocationMarkerState extends State<_PassengerLocationMarker>
                     child: Transform.scale(
                       scale: coneScale,
                       child: CustomPaint(
-                        size: const Size(54, 54),
+                        size: const Size(60, 60),
                         painter: _HeadingConePainter(
                           color: widget.accentColor.withValues(
                             alpha: coneAlpha,
@@ -2739,23 +2770,52 @@ class _PassengerLocationMarkerState extends State<_PassengerLocationMarker>
                     ),
                   ),
                   Container(
-                    width: 40,
-                    height: 40,
+                    width: 48,
+                    height: 48,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.white,
+                          widget.borderColor.withValues(alpha: 0.88),
+                        ],
+                      ),
                       shape: BoxShape.circle,
-                      border: Border.all(color: widget.borderColor, width: 2),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.96),
+                        width: 3,
+                      ),
                       boxShadow: const [
                         BoxShadow(
-                          color: Color(0x220F172A),
-                          blurRadius: 16,
-                          offset: Offset(0, 8),
+                          color: Color(0x260F172A),
+                          blurRadius: 18,
+                          offset: Offset(0, 9),
+                        ),
+                        BoxShadow(
+                          color: Color(0x120F172A),
+                          blurRadius: 4,
+                          offset: Offset(0, 2),
                         ),
                       ],
                     ),
+                    child: Center(
+                      child: Container(
+                        width: 31,
+                        height: 31,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: const Color(0xFF08111F),
+                          border: Border.all(
+                            color: widget.accentColor.withValues(alpha: 0.92),
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                   _NavigationArrowIcon(
-                    size: 26,
+                    size: 25,
                     headingDegrees: animatedHeading,
                   ),
                 ],
@@ -2840,20 +2900,29 @@ class _NearbyDriverMapMarkerState extends State<_NearbyDriverMapMarker>
   Widget build(BuildContext context) {
     final isHighlighted = widget.isHighlighted;
     final markerCore = Container(
-      width: isHighlighted ? 52 : 44,
-      height: isHighlighted ? 52 : 44,
+      width: isHighlighted ? 56 : 46,
+      height: isHighlighted ? 56 : 46,
       decoration: BoxDecoration(
-        color: const Color(0xFFFACC15),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFE066), Color(0xFFF59E0B)],
+        ),
         shape: BoxShape.circle,
         border: Border.all(
           color: isHighlighted ? Colors.white : const Color(0xFFFFF7CC),
-          width: isHighlighted ? 3 : 2,
+          width: isHighlighted ? 3.2 : 2.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0x55FACC15),
-            blurRadius: isHighlighted ? 18 : 14,
-            offset: const Offset(0, 6),
+            color: const Color(0x55F59E0B),
+            blurRadius: isHighlighted ? 22 : 16,
+            offset: const Offset(0, 8),
+          ),
+          const BoxShadow(
+            color: Color(0x18040E1D),
+            blurRadius: 4,
+            offset: Offset(0, 2),
           ),
         ],
       ),
@@ -2870,11 +2939,12 @@ class _NearbyDriverMapMarkerState extends State<_NearbyDriverMapMarker>
           alignment: Alignment.center,
           children: [
             Container(
-              width: 64,
-              height: 64,
-              decoration: const BoxDecoration(
+              width: 68,
+              height: 68,
+              decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Color(0x2234D399),
+                color: const Color(0x2234D399),
+                border: Border.all(color: const Color(0x5534D399), width: 1.2),
               ),
             ),
             markerCore,
@@ -2895,11 +2965,12 @@ class _NearbyDriverMapMarkerState extends State<_NearbyDriverMapMarker>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                color: const Color(0xFF1D4ED8),
+                color: const Color(0xFF0F172A),
                 borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: const Color(0xFFFACC15), width: 1),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0x331D4ED8),
+                    color: const Color(0x33040E1D),
                     blurRadius: 14,
                     offset: const Offset(0, 6),
                   ),
@@ -2917,16 +2988,16 @@ class _NearbyDriverMapMarkerState extends State<_NearbyDriverMapMarker>
             ),
             const SizedBox(height: 8),
             SizedBox(
-              width: 66,
-              height: 66,
+              width: 72,
+              height: 72,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
                   Transform.scale(
                     scale: pulseScale,
                     child: Container(
-                      width: 66,
-                      height: 66,
+                      width: 72,
+                      height: 72,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: Color.lerp(
@@ -2944,8 +3015,8 @@ class _NearbyDriverMapMarkerState extends State<_NearbyDriverMapMarker>
                     ),
                   ),
                   Container(
-                    width: 58,
-                    height: 58,
+                    width: 62,
+                    height: 62,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: const Color(0x3334D399),

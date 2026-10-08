@@ -10,7 +10,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/config/potosi_geo.dart';
 
 final passengerLocationProvider =
-    NotifierProvider<PassengerLocationController, PassengerLocationState>(PassengerLocationController.new);
+    NotifierProvider<PassengerLocationController, PassengerLocationState>(
+      PassengerLocationController.new,
+    );
 
 class PassengerLocationState {
   const PassengerLocationState({
@@ -85,7 +87,9 @@ class PassengerLocationController extends Notifier<PassengerLocationState> {
       Position? resolvedPosition;
       try {
         resolvedPosition = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+          ),
         );
       } catch (_) {
         resolvedPosition = await Geolocator.getLastKnownPosition();
@@ -96,7 +100,9 @@ class PassengerLocationController extends Notifier<PassengerLocationState> {
       } else {
         state = state.copyWith(
           isLoading: false,
-          errorMessage: state.position == null ? 'No se pudo obtener tu ubicacion.' : null,
+          errorMessage: state.position == null
+              ? 'No se pudo obtener tu ubicacion.'
+              : null,
         );
       }
     } catch (error) {
@@ -157,24 +163,26 @@ class PassengerLocationController extends Notifier<PassengerLocationState> {
       permission = await Geolocator.requestPermission();
     }
 
-    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
       throw Exception('Permiso de ubicacion denegado.');
     }
   }
 
   Future<void> _startTracking() async {
     await _positionSubscription?.cancel();
-    _positionSubscription = Geolocator.getPositionStream(
-      locationSettings: _locationSettings(),
-    ).listen(
-      _applyPosition,
-      onError: (_) {
-        state = state.copyWith(
-          isLoading: false,
-          errorMessage: 'No se pudo seguir tu ubicacion en segundo plano.',
+    _positionSubscription =
+        Geolocator.getPositionStream(
+          locationSettings: _locationSettings(),
+        ).listen(
+          _applyPosition,
+          onError: (_) {
+            state = state.copyWith(
+              isLoading: false,
+              errorMessage: 'No se pudo seguir tu ubicacion en segundo plano.',
+            );
+          },
         );
-      },
-    );
   }
 
   Future<void> _startCompassTracking() async {
@@ -185,10 +193,7 @@ class PassengerLocationController extends Notifier<PassengerLocationState> {
         return;
       }
       final heading = _filterHeading(rawHeading);
-      state = state.copyWith(
-        headingDegrees: heading,
-        clearError: true,
-      );
+      state = state.copyWith(headingDegrees: heading, clearError: true);
     });
   }
 
@@ -236,10 +241,10 @@ class PassengerLocationController extends Notifier<PassengerLocationState> {
     final factor = distanceMeters <= 2
         ? 0.18
         : distanceMeters <= 6
-            ? 0.30
-            : distanceMeters <= 12
-                ? 0.44
-                : 0.62;
+        ? 0.30
+        : distanceMeters <= 12
+        ? 0.44
+        : 0.62;
 
     return LatLng(
       previous.latitude + ((next.latitude - previous.latitude) * factor),
@@ -254,8 +259,8 @@ class PassengerLocationController extends Notifier<PassengerLocationState> {
         distanceFilter: 3,
         intervalDuration: const Duration(seconds: 2),
         foregroundNotificationConfig: const ForegroundNotificationConfig(
-          notificationTitle: 'RAPIGO activo',
-          notificationText: 'Seguimos actualizando tu ubicacion para viajes y alertas.',
+          notificationTitle: 'RAPIGO',
+          notificationText: 'Escuchamos tus necesidades....',
           enableWakeLock: true,
           setOngoing: true,
         ),

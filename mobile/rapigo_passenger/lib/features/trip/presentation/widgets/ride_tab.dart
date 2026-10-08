@@ -89,6 +89,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
   bool _suspendTakeTaxiAutoOpen = false;
   bool _isEndingTripFlow = false;
   bool _journeyDetailsExpanded = false;
+  bool _journeyTrackingMode = false;
   bool _journeyStartedFromTakeTaxi = false;
   String _selectedServiceType = 'taxi';
   LatLng? _lastKnownLocation;
@@ -182,6 +183,9 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       _selectedDriverId = payload[6].isEmpty ? null : payload[6];
       _selectedServiceType = payload[7].isEmpty ? 'taxi' : payload[7];
       _journeyDetailsExpanded = payload[8] == '1';
+      if (payload.length > 9) {
+        _journeyTrackingMode = payload[9] == '1';
+      }
       if (customLat != null && customLng != null) {
         _customDestinationPoint = LatLng(customLat, customLng);
       }
@@ -203,6 +207,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       _selectedDriverId ?? '',
       _selectedServiceType,
       _journeyDetailsExpanded ? '1' : '0',
+      _journeyTrackingMode ? '1' : '0',
     ].join('|');
     await preferences.setString(_rideUiStateKey, raw);
   }
@@ -934,6 +939,16 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
   }
 
   Future<void> _cancelActiveTrip() async {
+    final confirmed = await _confirmDestinationAction(
+      title: 'Cancelar viaje',
+      message: '¿Seguro que quieres cancelar este viaje?',
+      confirmLabel: 'Sí, cancelar',
+      icon: Icons.close_rounded,
+      accent: const Color(0xFFDC2626),
+    );
+    if (!confirmed || !mounted) {
+      return;
+    }
     final session = ref.read(sessionProvider);
     final request = ref.read(tripProvider).request;
     final tripId = request.activeTripId;
@@ -956,10 +971,6 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       return;
     }
     await _syncDashboard();
-    _showFloatingNotification(
-      'Viaje cancelado. Puedes volver a solicitar cuando quieras.',
-      tone: NoticeTone.warning,
-    );
   }
 
   Future<void> _retryRideRequest() async {
@@ -967,29 +978,156 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
   }
 
   void _editDestinationFromStatus() {
+    unawaited(_confirmAndEditDestinationFromStatus());
+  }
+
+  Future<void> _confirmAndEditDestinationFromStatus() async {
+    final confirmed = await _confirmDestinationAction(
+      title: 'Editar destino',
+      message: '¿Quieres cambiar la ubicación del destino desde el mapa?',
+      confirmLabel: 'Sí, editar',
+      icon: Icons.edit_location_alt_rounded,
+      accent: AppBrand.primaryBlue,
+    );
+    if (!confirmed || !mounted) {
+      return;
+    }
+    _startDestinationMapEdit();
+  }
+
+  void _startDestinationMapEdit() {
+    final request = ref.read(tripProvider).request;
+    final activeDestinationPoint =
+        request.destinationLat != null && request.destinationLng != null
+        ? LatLng(request.destinationLat!, request.destinationLng!)
+        : null;
+    final initialPoint =
+        _customDestinationPoint ??
+        _resolveDestinationPlace()?.point ??
+        activeDestinationPoint ??
+        ref.read(passengerLocationProvider).position ??
+        _lastKnownLocation;
     if (_rideMode != RideMode.destino) {
       setState(() {
         _rideMode = RideMode.destino;
       });
     }
     setState(() {
-      _flowState = RideFlowState.busquedaTexto;
+      _destinationMoveMode = true;
+      _isDraggingDestinationMap = false;
+      _journeyTrackingMode = false;
+      _movingDestinationCenter = initialPoint;
+      _manualCameraCenterTarget = initialPoint;
+      _currentAddressText = 'Buscando ubicación...';
+      _mapCenterSignal++;
+      _flowState = RideFlowState.seleccionManual;
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _destinationFocusNode.requestFocus();
-      }
-    });
+    if (initialPoint != null) {
+      unawaited(_resolveMovingDestinationAddress(initialPoint));
+    }
   }
 
   void _clearDestinationSelection() {
+    unawaited(_confirmAndClearDestinationSelection());
+  }
+
+  Future<void> _confirmAndClearDestinationSelection() async {
+    final confirmed = await _confirmDestinationAction(
+      title: 'Quitar destino',
+      message: '¿Seguro que quieres eliminar el destino actual?',
+      confirmLabel: 'Sí, quitar',
+      icon: Icons.delete_outline_rounded,
+      accent: const Color(0xFFDC2626),
+    );
+    if (!confirmed || !mounted) {
+      return;
+    }
     _destinationController.clear();
     setState(() {
       _selectedDestinationPlace = null;
       _customDestinationPoint = null;
       _destinationMoveMode = false;
+      _journeyTrackingMode = false;
       _flowState = RideFlowState.busquedaTexto;
     });
+  }
+
+  Future<bool> _confirmDestinationAction({
+    required String title,
+    required String message,
+    required String confirmLabel,
+    required IconData icon,
+    required Color accent,
+  }) async {
+    if (!mounted) {
+      return false;
+    }
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(26),
+          ),
+          titlePadding: const EdgeInsets.fromLTRB(22, 22, 22, 0),
+          contentPadding: const EdgeInsets.fromLTRB(22, 14, 22, 4),
+          actionsPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+          title: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(icon, color: accent, size: 24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: GoogleFonts.plusJakartaSans(
+                    color: AppBrand.textPrimary,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            message,
+            style: const TextStyle(
+              color: AppBrand.textSecondary,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              height: 1.35,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('No'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: accent,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: Text(confirmLabel),
+            ),
+          ],
+        );
+      },
+    );
+    return result == true;
   }
 
   void _toggleDestinationMoveMode() {
@@ -1348,6 +1486,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       _customDestinationPoint = null;
       _selectedDriverId = null;
       _homeDrawerExpanded = false;
+      _journeyTrackingMode = false;
     });
     if (_sheetController.isAttached) {
       await _sheetController.animateTo(
@@ -2010,6 +2149,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
   void _showFloatingNotification(
     String message, {
     NoticeTone tone = NoticeTone.info,
+    bool showLocalNotification = false,
   }) {
     if (mounted) {
       showTopNotice(
@@ -2022,21 +2162,27 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
         duration: const Duration(seconds: 5),
       );
     }
-    LocalNotifications.show(
-      id: message.hashCode,
-      title: 'RAPIGO',
-      body: message,
-    );
+    if (showLocalNotification) {
+      LocalNotifications.show(
+        id: message.hashCode,
+        title: 'RAPIGO',
+        body: message,
+      );
+    }
   }
 
   void _handleTripStatusChange(TripRequest request) {
+    if (request.status == 'accepted') {
+      setState(() {
+        _journeyDetailsExpanded = true;
+        _journeyTrackingMode = false;
+      });
+    }
+
     final message = switch (request.status) {
-      'accepted' => 'Tu taxi fue aceptado.',
-      'arriving' => 'El conductor va en camino a recogerte.',
-      'at_pickup' => 'Tu taxi ya llegó al punto de recogida.',
-      'in_progress' => 'Viaje en progreso.',
-      'completed' => 'Viaje finalizado.',
-      'cancelled' => 'El viaje fue cancelado.',
+      'accepted' => 'Taxi aceptado',
+      'completed' => 'Viaje finalizado',
+      'cancelled' => 'Viaje cancelado',
       _ => null,
     };
 
@@ -2045,13 +2191,11 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
         message,
         tone: switch (request.status) {
           'accepted' => NoticeTone.info,
-          'arriving' => NoticeTone.info,
-          'at_pickup' => NoticeTone.success,
-          'in_progress' => NoticeTone.info,
           'completed' => NoticeTone.success,
           'cancelled' => NoticeTone.warning,
           _ => NoticeTone.info,
         },
+        showLocalNotification: true,
       );
     }
 
@@ -2072,12 +2216,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
         if (!mounted) {
           return;
         }
-        unawaited(
-          _returnToMainMapAfterTripEnd(
-            noticeMessage: 'Puedes volver a solicitar un taxi cuando quieras.',
-            tone: NoticeTone.warning,
-          ),
-        );
+        unawaited(_returnToMainMapAfterTripEnd(tone: NoticeTone.warning));
       });
     }
 
@@ -2085,93 +2224,121 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
         request.activeTripId != null &&
         _ratingPromptedTripId != request.activeTripId) {
       _ratingPromptedTripId = request.activeTripId;
-      _runAfterBuild(() => _showPassengerRatingDialog(request.activeTripId!));
+      _runAfterBuild(_showTripCompletedDialogAndReset);
     }
   }
 
-  Future<void> _showPassengerRatingDialog(String tripId) async {
-    int selectedScore = 5;
-    final commentController = TextEditingController();
-    try {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) {
-          return StatefulBuilder(
-            builder: (context, setDialogState) {
-              return AlertDialog(
-                title: const Text('Califica al conductor'),
-                content: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Wrap(
-                        spacing: 4,
-                        children: List<Widget>.generate(5, (index) {
-                          final value = index + 1;
-                          return IconButton(
-                            onPressed: () =>
-                                setDialogState(() => selectedScore = value),
-                            icon: Icon(
-                              value <= selectedScore
-                                  ? Icons.star
-                                  : Icons.star_border,
-                              color: const Color(0xFFF97316),
-                            ),
-                          );
-                        }),
-                      ),
-                      TextField(
-                        controller: commentController,
-                        maxLines: 3,
-                        decoration: const InputDecoration(
-                          hintText: 'Comentario opcional',
-                        ),
-                      ),
-                    ],
+  Future<void> _showTripCompletedDialogAndReset() async {
+    if (!mounted) {
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
+          ),
+          titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+          contentPadding: const EdgeInsets.fromLTRB(24, 14, 24, 8),
+          actionsPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+          title: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF16A34A).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: const Icon(
+                  Icons.check_circle_rounded,
+                  color: Color(0xFF16A34A),
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Su viaje ha concluido',
+                  style: GoogleFonts.plusJakartaSans(
+                    color: AppBrand.textPrimary,
+                    fontSize: 21,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(false),
-                    child: const Text('Luego'),
-                  ),
-                  FilledButton(
-                    onPressed: () => Navigator.of(context).pop(true),
-                    child: const Text('Enviar'),
-                  ),
-                ],
-              );
-            },
-          );
-        },
-      );
-
-      if (confirmed == true) {
-        await ref
-            .read(tripProvider.notifier)
-            .submitRating(
-              token: ref.read(sessionProvider).token,
-              tripId: tripId,
-              score: selectedScore,
-              comment: commentController.text,
-            );
-        await _syncDashboard();
-      }
-    } finally {
-      commentController.dispose();
-      if (mounted) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) {
-            return;
-          }
-          unawaited(
-            _returnToMainMapAfterTripEnd(
-              noticeMessage: 'Gracias por utilizar RAPIGO',
-              tone: NoticeTone.success,
+              ),
+            ],
+          ),
+          content: const Text(
+            'Gracias por preferirnos. Le estaremos esperando para su siguiente viaje.',
+            style: TextStyle(
+              color: AppBrand.textSecondary,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              height: 1.38,
             ),
-          );
-        });
+          ),
+          actions: [
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF16A34A),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                ),
+                child: const Text('De acuerdo'),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    if (!mounted) {
+      return;
+    }
+    await _resetTripFlowToHome();
+  }
+
+  Future<void> _resetTripFlowToHome() async {
+    _destinationController.clear();
+    _destinationMoveDebounce?.cancel();
+    await ref.read(tripProvider.notifier).clearActiveTrip();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _rideMode = RideMode.destino;
+      _flowState = RideFlowState.reposo;
+      _selectedDestinationPlace = null;
+      _customDestinationPoint = null;
+      _destinationMoveMode = false;
+      _isDraggingDestinationMap = false;
+      _homeDrawerExpanded = false;
+      _selectedDriverId = null;
+      _journeyDetailsExpanded = false;
+      _journeyTrackingMode = false;
+      _journeyStartedFromTakeTaxi = false;
+      _movingDestinationCenter = null;
+      _manualCameraCenterTarget =
+          ref.read(passengerLocationProvider).position ?? _lastKnownLocation;
+      _mapCenterSignal++;
+      _mapFocusSignal++;
+    });
+    if (_isRoutePreviewPageOpen || _isTakeTaxiPageOpen) {
+      final navigator = Navigator.of(context);
+      while (navigator.canPop()) {
+        navigator.pop();
       }
+      _isRoutePreviewPageOpen = false;
+      _isTakeTaxiPageOpen = false;
     }
   }
 
@@ -2764,6 +2931,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       _selectedDriverId ?? '',
       _selectedServiceType,
       _journeyDetailsExpanded ? '1' : '0',
+      _journeyTrackingMode ? '1' : '0',
     ].join('|');
     if (_lastUiStateSignature != uiStateSignature) {
       _lastUiStateSignature = uiStateSignature;
@@ -2915,6 +3083,10 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
         !isSearchScene &&
         !activeTripNeedsDestination &&
         hasActiveTrip;
+    final showActiveTripDetailView =
+        showActiveTripJourneyView && !_journeyTrackingMode;
+    final showActiveTripTrackingView =
+        showActiveTripJourneyView && _journeyTrackingMode;
     final showTakeTaxiView =
         _rideMode == RideMode.cercano &&
         !_destinationMoveMode &&
@@ -2997,15 +3169,6 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
               showTargetEditBadge: editingDestination,
               showUtilityControls: false,
               showLiveNavigationMode: isRideInProgress,
-              onRouteUpdated: () {
-                if (!mounted) {
-                  return;
-                }
-                _showFloatingNotification(
-                  'Ruta actualizada. Seguimos el mejor camino hacia tu destino.',
-                  tone: NoticeTone.info,
-                );
-              },
               onMapCenterChanged: _destinationMoveMode
                   ? _handleDestinationMapCenterChanged
                   : null,
@@ -3130,7 +3293,12 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                       left: 0,
                       right: 0,
                       child: _PremiumRequestTaxiTopBar(
-                        onBack: _reopenServiceLauncher,
+                        onBack: () {
+                          _showFloatingNotification(
+                            'Tienes un viaje activo. Usa Seguimiento o cancela el viaje si necesitas salir.',
+                            tone: NoticeTone.info,
+                          );
+                        },
                         onProfile: () {
                           widget.onMenuTap();
                         },
@@ -3307,7 +3475,60 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                         },
                       ),
                     ),
-                  if (showActiveTripJourneyView)
+                  if (showActiveTripDetailView)
+                    Positioned.fill(
+                      child: _PassengerActiveTripDetailView(
+                        request: tripState.request,
+                        originLabel: 'Potosí · ubicación actual',
+                        destinationLabel:
+                            _destinationController.text.trim().isEmpty
+                            ? (tripState.request.destinationAddress
+                                      .trim()
+                                      .isEmpty
+                                  ? _currentAddressText
+                                  : tripState.request.destinationAddress.trim())
+                            : _destinationController.text.trim(),
+                        summaryLabel:
+                            routeSummaryLabel ?? _compactStatusText(tripState),
+                        durationLabel:
+                            routePreview?.durationLabel ??
+                            (tripState.request.etaMinutes == null
+                                ? '-- min'
+                                : '${tripState.request.etaMinutes} min'),
+                        distanceLabel:
+                            routePreview?.distanceLabel ??
+                            _compactStatusText(tripState),
+                        serviceType: _selectedServiceType,
+                        statusText: _compactStatusText(tripState),
+                        statusAccent: _compactStatusColor(tripState),
+                        onBack: _reopenServiceLauncher,
+                        onTracking: () {
+                          setState(() {
+                            _journeyTrackingMode = true;
+                            _journeyDetailsExpanded = true;
+                          });
+                        },
+                        onCancel:
+                            const {
+                              'accepted',
+                              'arriving',
+                              'at_pickup',
+                            }.contains(tripState.request.status)
+                            ? _cancelActiveTrip
+                            : null,
+                        onEditDestination:
+                            const {
+                              'requested',
+                              'searching',
+                              'accepted',
+                              'arriving',
+                              'at_pickup',
+                            }.contains(tripState.request.status)
+                            ? _editDestinationFromStatus
+                            : null,
+                      ),
+                    ),
+                  if (showActiveTripTrackingView)
                     Positioned(
                       top: 14,
                       left: 0,
@@ -3332,7 +3553,12 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                             routePreview?.distanceLabel ??
                             _compactStatusText(tripState),
                         serviceType: _selectedServiceType,
-                        onBack: _reopenServiceLauncher,
+                        onBack: () {
+                          setState(() {
+                            _journeyTrackingMode = false;
+                            _journeyDetailsExpanded = true;
+                          });
+                        },
                         onSelectTaxi: () => _selectServiceType('taxi'),
                         onSelectMoto: () => _selectServiceType('moto'),
                         onEdit: _editDestinationFromStatus,
@@ -3363,6 +3589,17 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                                 onTap: action.onTap,
                               ),
                             )
+                            .followedBy([
+                              RouteReviewActionData(
+                                label: 'Detalles',
+                                onTap: () {
+                                  setState(() {
+                                    _journeyTrackingMode = false;
+                                    _journeyDetailsExpanded = true;
+                                  });
+                                },
+                              ),
+                            ])
                             .toList(growable: false),
                         navigationBadgeLabel: _journeyNavigationBadgeLabel(
                           tripState,
@@ -5524,6 +5761,751 @@ class _EmptyRideCard extends StatelessWidget {
           color: AppBrand.textSecondary,
           fontWeight: FontWeight.w700,
         ),
+      ),
+    );
+  }
+}
+
+class _PassengerActiveTripDetailView extends StatelessWidget {
+  const _PassengerActiveTripDetailView({
+    required this.request,
+    required this.originLabel,
+    required this.destinationLabel,
+    required this.summaryLabel,
+    required this.durationLabel,
+    required this.distanceLabel,
+    required this.serviceType,
+    required this.statusText,
+    required this.statusAccent,
+    required this.onBack,
+    required this.onTracking,
+    this.onCancel,
+    this.onEditDestination,
+  });
+
+  final TripRequest request;
+  final String originLabel;
+  final String destinationLabel;
+  final String summaryLabel;
+  final String durationLabel;
+  final String distanceLabel;
+  final String serviceType;
+  final String statusText;
+  final Color statusAccent;
+  final VoidCallback onBack;
+  final VoidCallback onTracking;
+  final VoidCallback? onCancel;
+  final VoidCallback? onEditDestination;
+
+  String get _headline => switch (request.status) {
+    'requested' || 'searching' => 'Buscando conductor',
+    'accepted' => 'Taxi aceptado',
+    'arriving' => 'Tu taxi va en camino',
+    'at_pickup' => 'Tu taxi llegó',
+    'in_progress' => 'Viaje en curso',
+    'completed' => 'Viaje finalizado',
+    'cancelled' => 'Viaje cancelado',
+    _ => 'Tu viaje',
+  };
+
+  String get _supportText => switch (request.status) {
+    'requested' ||
+    'searching' => 'Estamos enviando tu solicitud a conductores cercanos.',
+    'accepted' => 'El conductor ya confirmó. Revisa los datos antes de subir.',
+    'arriving' => 'Mira los datos del vehículo y prepárate para la recogida.',
+    'at_pickup' => 'Verifica placa, color y conductor antes de abordar.',
+    'in_progress' => 'El viaje está activo hacia tu destino.',
+    'completed' => 'Gracias por viajar con RAPIGO.',
+    'cancelled' => 'Puedes volver a solicitar cuando quieras.',
+    _ => 'Estamos actualizando el estado del viaje.',
+  };
+
+  IconData get _vehicleIcon {
+    final vehicle = [
+      request.vehicleType,
+      request.vehicleLabel,
+      serviceType,
+    ].whereType<String>().join(' ').toLowerCase();
+    return vehicle.contains('moto')
+        ? Icons.two_wheeler_rounded
+        : Icons.local_taxi_rounded;
+  }
+
+  String get _serviceLabel {
+    final vehicleLabel = (request.vehicleLabel ?? '').trim();
+    if (vehicleLabel.isNotEmpty) {
+      return vehicleLabel;
+    }
+    return serviceType == 'moto' ? 'Moto RAPIGO' : 'Taxi RAPIGO';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final driverName = (request.driverName ?? '').trim();
+    final driverPhone = (request.driverPhone ?? '').trim();
+    final vehiclePlate = (request.vehiclePlate ?? '').trim();
+    final vehicleColor = (request.vehicleColor ?? '').trim();
+    final vehicleType = (request.vehicleType ?? '').trim();
+    final etaLabel = request.etaMinutes == null
+        ? durationLabel
+        : '${request.etaMinutes} min';
+    final canCancel = onCancel != null;
+    final canEdit = onEditDestination != null;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.white.withValues(alpha: 0.94),
+            const Color(0xFFF5F7FA).withValues(alpha: 0.98),
+          ],
+        ),
+      ),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(0, 8, 0, 18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _TripDetailIconButton(
+                    icon: Icons.arrow_back_rounded,
+                    onTap: onBack,
+                  ),
+                  const Spacer(),
+                  _TripStatusPill(
+                    label: statusText,
+                    color: statusAccent,
+                    icon: Icons.radio_button_checked_rounded,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              _TripHeroStatusCard(
+                headline: _headline,
+                supportText: _supportText,
+                status: request.status,
+                statusAccent: statusAccent,
+                etaLabel: etaLabel,
+                distanceLabel: distanceLabel,
+              ),
+              const SizedBox(height: 14),
+              _DriverAcceptedCard(
+                driverName: driverName.isEmpty
+                    ? 'Conductor RAPIGO'
+                    : driverName,
+                driverPhone: driverPhone,
+                vehicleLabel: _serviceLabel,
+                vehiclePlate: vehiclePlate,
+                vehicleColor: vehicleColor,
+                vehicleType: vehicleType,
+                vehicleIcon: _vehicleIcon,
+                statusAccent: statusAccent,
+              ),
+              const SizedBox(height: 14),
+              _TripRouteDetailCard(
+                originLabel: originLabel,
+                destinationLabel: destinationLabel,
+                summaryLabel: summaryLabel,
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: onTracking,
+                      icon: const Icon(Icons.map_rounded, size: 19),
+                      label: const Text('Seguimiento'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF111827),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        textStyle: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (canCancel) ...[
+                    const SizedBox(width: 10),
+                    _TripDetailIconButton(
+                      icon: Icons.close_rounded,
+                      onTap: onCancel!,
+                      danger: true,
+                    ),
+                  ],
+                ],
+              ),
+              if (canEdit) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: onEditDestination,
+                    icon: const Icon(Icons.edit_location_alt_rounded, size: 19),
+                    label: const Text('Editar destino'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppBrand.textPrimary,
+                      side: const BorderSide(color: Color(0xFFD7DEE8)),
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      textStyle: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TripHeroStatusCard extends StatelessWidget {
+  const _TripHeroStatusCard({
+    required this.headline,
+    required this.supportText,
+    required this.status,
+    required this.statusAccent,
+    required this.etaLabel,
+    required this.distanceLabel,
+  });
+
+  final String headline;
+  final String supportText;
+  final String status;
+  final Color statusAccent;
+  final String etaLabel;
+  final String distanceLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x220F172A),
+            blurRadius: 28,
+            offset: Offset(0, 14),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  headline,
+                  style: GoogleFonts.plusJakartaSans(
+                    color: Colors.white,
+                    fontSize: 30,
+                    fontWeight: FontWeight.w900,
+                    height: 1.02,
+                  ),
+                ),
+              ),
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  color: statusAccent.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: statusAccent.withValues(alpha: 0.34),
+                  ),
+                ),
+                child: Icon(
+                  Icons.local_taxi_rounded,
+                  color: statusAccent,
+                  size: 28,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            supportText,
+            style: const TextStyle(
+              color: Color(0xFFE2E8F0),
+              fontWeight: FontWeight.w700,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _TripProgressBar(status: status),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _DarkMetricTile(
+                  icon: Icons.schedule_rounded,
+                  label: 'Llegada',
+                  value: etaLabel,
+                  color: statusAccent,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _DarkMetricTile(
+                  icon: Icons.route_rounded,
+                  label: 'Ruta',
+                  value: distanceLabel,
+                  color: const Color(0xFFFACC15),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DriverAcceptedCard extends StatelessWidget {
+  const _DriverAcceptedCard({
+    required this.driverName,
+    required this.driverPhone,
+    required this.vehicleLabel,
+    required this.vehiclePlate,
+    required this.vehicleColor,
+    required this.vehicleType,
+    required this.vehicleIcon,
+    required this.statusAccent,
+  });
+
+  final String driverName;
+  final String driverPhone;
+  final String vehicleLabel;
+  final String vehiclePlate;
+  final String vehicleColor;
+  final String vehicleType;
+  final IconData vehicleIcon;
+  final Color statusAccent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x100F172A),
+            blurRadius: 20,
+            offset: Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Conductor asignado',
+            style: TextStyle(
+              color: AppBrand.textSecondary,
+              fontWeight: FontWeight.w800,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  color: statusAccent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Icon(
+                  Icons.person_rounded,
+                  color: statusAccent,
+                  size: 30,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      driverName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.plusJakartaSans(
+                        color: AppBrand.textPrimary,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      vehicleLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppBrand.textSecondary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (vehiclePlate.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 9,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF111827),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Text(
+                    vehiclePlate,
+                    style: GoogleFonts.plusJakartaSans(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _LightInfoPill(
+                icon: vehicleIcon,
+                label: vehicleType.isEmpty ? vehicleLabel : vehicleType,
+              ),
+              if (vehicleColor.isNotEmpty)
+                _LightInfoPill(
+                  icon: Icons.palette_outlined,
+                  label: vehicleColor,
+                ),
+              if (driverPhone.isNotEmpty)
+                _LightInfoPill(icon: Icons.phone_outlined, label: driverPhone),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TripRouteDetailCard extends StatelessWidget {
+  const _TripRouteDetailCard({
+    required this.originLabel,
+    required this.destinationLabel,
+    required this.summaryLabel,
+  });
+
+  final String originLabel;
+  final String destinationLabel;
+  final String summaryLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        children: [
+          _RoutePointLine(
+            icon: Icons.navigation_rounded,
+            color: const Color(0xFF2563EB),
+            title: 'Ubicación',
+            value: originLabel,
+          ),
+          const SizedBox(height: 10),
+          _RoutePointLine(
+            icon: Icons.flag_rounded,
+            color: const Color(0xFFF97316),
+            title: 'Destino',
+            value: destinationLabel,
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.timeline_rounded,
+                  color: AppBrand.textSecondary,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    summaryLabel,
+                    style: const TextStyle(
+                      color: AppBrand.textPrimary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RoutePointLine extends StatelessWidget {
+  const _RoutePointLine({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.value,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(icon, color: color, size: 20),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: AppBrand.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.plusJakartaSans(
+                  color: AppBrand.textPrimary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TripStatusPill extends StatelessWidget {
+  const _TripStatusPill({
+    required this.label,
+    required this.color,
+    required this.icon,
+  });
+
+  final String label;
+  final Color color;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 14),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w900,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TripDetailIconButton extends StatelessWidget {
+  const _TripDetailIconButton({
+    required this.icon,
+    required this.onTap,
+    this.danger = false,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool danger;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: danger ? const Color(0xFFFFE7E7) : Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      elevation: 8,
+      shadowColor: const Color(0x120F172A),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: SizedBox(
+          width: 50,
+          height: 50,
+          child: Icon(
+            icon,
+            color: danger ? const Color(0xFFDC2626) : AppBrand.textPrimary,
+            size: 23,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DarkMetricTile extends StatelessWidget {
+  const _DarkMetricTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Color(0xFFCBD5E1),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.plusJakartaSans(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LightInfoPill extends StatelessWidget {
+  const _LightInfoPill({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: AppBrand.textSecondary),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppBrand.textPrimary,
+              fontWeight: FontWeight.w800,
+              fontSize: 12,
+            ),
+          ),
+        ],
       ),
     );
   }

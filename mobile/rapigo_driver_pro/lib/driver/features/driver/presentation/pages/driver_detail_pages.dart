@@ -13,6 +13,7 @@ import '../../../../../core/update/app_update_service.dart';
 import '../../../../../shared/theme/rapigo_theme.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../data/driver_repository.dart';
+import '../../navigation/navigation_service.dart' as trip_navigation;
 import '../../../../core/notifications/local_notifications.dart';
 import '../../../trip/data/trip_repository.dart';
 import '../../../trip/domain/driver_trip.dart';
@@ -1121,6 +1122,12 @@ class DriverSettingsPage extends ConsumerStatefulWidget {
 class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
   bool _requestSoundEnabled = true;
   bool _loadingRequestSound = true;
+  trip_navigation.NavigationPreference _navigationPreference =
+      trip_navigation.NavigationPreference.askAlways;
+  Set<trip_navigation.NavigationProvider> _availableNavigationProviders = {
+    trip_navigation.NavigationProvider.rapigo,
+  };
+  bool _loadingNavigationPreference = true;
   bool _deliveryEnabled = false;
   bool _loadingServices = true;
   bool _savingServices = false;
@@ -1129,6 +1136,7 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
   void initState() {
     super.initState();
     _loadRequestSoundPreference();
+    _loadNavigationPreference();
     _loadDriverServices();
   }
 
@@ -1158,6 +1166,37 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
           : 'Sonido desactivado para solicitudes de viaje.',
       tone: NoticeTone.success,
       icon: enabled ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+    );
+  }
+
+  Future<void> _loadNavigationPreference() async {
+    final service = ref.read(trip_navigation.navigationServiceProvider);
+    final preference = await service.loadPreference();
+    final providers = await service.availableProviders();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _navigationPreference = preference;
+      _availableNavigationProviders = providers.toSet();
+      _loadingNavigationPreference = false;
+    });
+  }
+
+  Future<void> _setNavigationPreference(
+    trip_navigation.NavigationPreference preference,
+  ) async {
+    final service = ref.read(trip_navigation.navigationServiceProvider);
+    await service.savePreference(preference);
+    if (!mounted) {
+      return;
+    }
+    setState(() => _navigationPreference = preference);
+    showTopNotice(
+      context,
+      'Aplicacion de navegacion: ${preference.label}.',
+      tone: NoticeTone.success,
+      icon: Icons.navigation_rounded,
     );
   }
 
@@ -1376,6 +1415,130 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                     onChanged: _loadingRequestSound
                         ? null
                         : (value) => _setRequestSoundPreference(value),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [palette.surfacePrimary, palette.surfaceSecondary],
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: palette.outlineStrong),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: palette.accentBlue.withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: palette.accentBlue.withValues(alpha: 0.36),
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.navigation_rounded,
+                          color: palette.accentBlue,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Text(
+                              'Aplicacion de navegacion',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Elige que app abrir al presionar Navegar.',
+                              style: TextStyle(
+                                color: Color(0xFFDCE6F2),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<trip_navigation.NavigationPreference>(
+                    initialValue: _navigationPreference,
+                    dropdownColor: palette.surfacePrimary,
+                    iconEnabledColor: palette.textPrimary,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: const Color(0xFF0B1627),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: palette.outlineSoft),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: palette.accentBlue),
+                      ),
+                    ),
+                    items: trip_navigation.NavigationPreference.values.map((
+                      preference,
+                    ) {
+                      final provider = ref
+                          .read(trip_navigation.navigationServiceProvider)
+                          .providerForPreference(preference);
+                      final available =
+                          provider == null ||
+                          _availableNavigationProviders.contains(provider);
+                      return DropdownMenuItem<
+                        trip_navigation.NavigationPreference
+                      >(
+                        value: preference,
+                        enabled: available,
+                        child: Text(
+                          available
+                              ? preference.label
+                              : '${preference.label} no instalado',
+                          style: TextStyle(
+                            color: available
+                                ? Colors.white
+                                : const Color(0xFF64748B),
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: _loadingNavigationPreference
+                        ? null
+                        : (preference) {
+                            if (preference != null) {
+                              _setNavigationPreference(preference);
+                            }
+                          },
                   ),
                 ],
               ),

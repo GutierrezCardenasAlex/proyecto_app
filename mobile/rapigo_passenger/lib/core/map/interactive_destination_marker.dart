@@ -59,15 +59,22 @@ class _InteractiveDestinationMarkerState
             if (widget.showLabel)
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
+                  horizontal: 11,
+                  vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xEE111214),
+                  color: const Color(0xF70F172A),
                   borderRadius: BorderRadius.circular(999),
                   border: Border.all(
-                    color: widget.color.withValues(alpha: 0.35),
+                    color: widget.color.withValues(alpha: 0.52),
                   ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x220F172A),
+                      blurRadius: 12,
+                      offset: Offset(0, 5),
+                    ),
+                  ],
                 ),
                 child: Text(
                   widget.label,
@@ -149,29 +156,58 @@ class _PremiumDestinationPin extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final headSize = size + (showShell ? 8 : 2);
-    final tailSize = size * 0.34;
+    final headSize = size + (showShell ? 10 : 6);
+    final tailSize = size * 0.4;
 
     return SizedBox(
-      width: headSize + 18,
-      height: headSize + 18,
+      width: headSize + 24,
+      height: headSize + 24,
       child: Stack(
         alignment: Alignment.topCenter,
         clipBehavior: Clip.none,
         children: [
           Positioned(
-            bottom: 4,
+            bottom: 1,
+            child: Container(
+              width: tailSize + 10,
+              height: 8,
+              decoration: BoxDecoration(
+                color: const Color(0x330F172A),
+                borderRadius: BorderRadius.circular(999),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x220F172A),
+                    blurRadius: 10,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 8,
             child: Transform.rotate(
               angle: 0.78,
               child: Container(
                 width: tailSize,
                 height: tailSize,
                 decoration: BoxDecoration(
-                  color: showShell ? const Color(0xFF111214) : color,
-                  borderRadius: BorderRadius.circular(7),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      color,
+                      Color.lerp(color, const Color(0xFF7C2D12), 0.28)!,
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    width: 1.5,
+                  ),
                   boxShadow: [
                     BoxShadow(
-                      color: color.withValues(alpha: 0.26),
+                      color: color.withValues(alpha: 0.3),
                       blurRadius: 18,
                       offset: const Offset(0, 10),
                     ),
@@ -185,32 +221,51 @@ class _PremiumDestinationPin extends StatelessWidget {
             height: headSize,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: showShell ? const Color(0xFF111214) : Colors.white,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: showShell
+                    ? const [Color(0xFF111827), Color(0xFF030712)]
+                    : const [Colors.white, Color(0xFFFFF7ED)],
+              ),
               border: Border.all(
-                color: showShell ? color.withValues(alpha: 0.45) : color,
-                width: showShell ? 2.2 : 2.8,
+                color: showShell ? color.withValues(alpha: 0.72) : color,
+                width: showShell ? 2.8 : 3.2,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: color.withValues(alpha: showShell ? 0.18 : 0.28),
-                  blurRadius: showShell ? 14 : 20,
-                  offset: const Offset(0, 8),
+                  color: color.withValues(alpha: showShell ? 0.26 : 0.34),
+                  blurRadius: showShell ? 18 : 22,
+                  offset: const Offset(0, 10),
+                ),
+                const BoxShadow(
+                  color: Color(0x160F172A),
+                  blurRadius: 4,
+                  offset: Offset(0, 2),
                 ),
               ],
             ),
             child: Center(
               child: Container(
-                width: headSize * 0.5,
-                height: headSize * 0.5,
+                width: headSize * 0.58,
+                height: headSize * 0.58,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: color,
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color.lerp(color, Colors.white, 0.12)!, color],
+                  ),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.86),
+                    width: 2,
+                  ),
                 ),
                 child: Center(
                   child: Icon(
                     _resolvedIcon,
                     color: Colors.white,
-                    size: headSize * 0.24,
+                    size: headSize * 0.28,
                   ),
                 ),
               ),
@@ -218,19 +273,19 @@ class _PremiumDestinationPin extends StatelessWidget {
           ),
           if (!showShell)
             Positioned(
-              bottom: -2,
+              bottom: 3,
               child: Container(
-                width: 10,
-                height: 10,
+                width: 12,
+                height: 12,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFACC15),
+                  color: color,
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 1.6),
-                  boxShadow: const [
+                  border: Border.all(color: Colors.white, width: 2),
+                  boxShadow: [
                     BoxShadow(
-                      color: Color(0x22FACC15),
+                      color: color.withValues(alpha: 0.26),
                       blurRadius: 10,
-                      offset: Offset(0, 5),
+                      offset: const Offset(0, 5),
                     ),
                   ],
                 ),

@@ -21,6 +21,41 @@ function realTextSchema(min, label) {
     .refine((value) => !looseFieldPattern.test(value), `${label} no puede ser generico.`);
 }
 
+const cloudinaryConfig = {
+  cloudName: process.env.CLOUDINARY_CLOUD_NAME || "",
+  apiKey: process.env.CLOUDINARY_API_KEY || "",
+  apiSecret: process.env.CLOUDINARY_API_SECRET || ""
+};
+
+function normalizeFolderName(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .replace(/_+/g, "_")
+    .slice(0, 80) || "conductor";
+}
+
+function signCloudinaryParams(params) {
+  const serialized = Object.keys(params)
+    .filter((key) => params[key] !== undefined && params[key] !== null && params[key] !== "")
+    .sort()
+    .map((key) => `${key}=${params[key]}`)
+    .join("&");
+  return crypto
+    .createHash("sha1")
+    .update(`${serialized}${cloudinaryConfig.apiSecret}`)
+    .digest("hex");
+}
+
+const driverPhotoSchema = z.object({
+  url: z.string().url(),
+  publicId: z.string().trim().min(3).max(255),
+  folder: z.string().trim().min(1).max(120)
+});
+
 const driverProfileSchema = z.object({
   userId: z.string().uuid(),
   licenseNumber: realTextSchema(4, "La licencia")
@@ -36,7 +71,19 @@ const driverProfileSchema = z.object({
     model: realTextSchema(1, "El modelo"),
     color: realTextSchema(2, "El color"),
     year: z.number().int().min(1990).max(2100).optional()
-  })
+  }),
+  documents: z.object({
+    driverPhoto: driverPhotoSchema,
+    licensePhoto: driverPhotoSchema,
+    vehiclePhoto: driverPhotoSchema
+  }).optional()
+});
+
+const uploadSignatureSchema = z.object({
+  userId: z.string().uuid(),
+  firstName: realTextSchema(2, "El nombre"),
+  lastName: realTextSchema(2, "El apellido"),
+  documentType: z.enum(["driver_photo", "license_photo", "vehicle_photo"])
 });
 
 const availabilitySchema = z.object({
@@ -198,14 +245,51 @@ async function bootstrap() {
       ADD COLUMN IF NOT EXISTS license_category VARCHAR(16),
       ADD COLUMN IF NOT EXISTS license_issue_date VARCHAR(32),
       ADD COLUMN IF NOT EXISTS license_expiry_date VARCHAR(32),
+      ADD COLUMN IF NOT EXISTS documents_folder VARCHAR(120),
+      ADD COLUMN IF NOT EXISTS driver_photo_url TEXT,
+      ADD COLUMN IF NOT EXISTS driver_photo_public_id TEXT,
+      ADD COLUMN IF NOT EXISTS license_photo_url TEXT,
+      ADD COLUMN IF NOT EXISTS license_photo_public_id TEXT,
       ADD COLUMN IF NOT EXISTS accepts_transport_requests BOOLEAN NOT NULL DEFAULT TRUE,
       ADD COLUMN IF NOT EXISTS accepts_delivery_requests BOOLEAN NOT NULL DEFAULT FALSE
   `);
 
+  await pool.query(`
+    ALTER TABLE vehicles
+      ADD COLUMN IF NOT EXISTS vehicle_photo_url TEXT,
+      ADD COLUMN IF NOT EXISTS vehicle_photo_public_id TEXT
+  `);
+
   app.get("/health", async () => ({ status: "ok", service: "driver-service" }));
 
+  app.post("/uploads/signature", async (request, reply) => {
+    if (!cloudinaryConfig.cloudName || !cloudinaryConfig.apiKey || !cloudinaryConfig.apiSecret) {
+      reply.code(503).send({ message: "Cloudinary no esta configurado en el servidor." });
+      return;
+    }
+
+    const { userId, firstName, lastName, documentType } = uploadSignatureSchema.parse(request.body);
+    const user = await requireOwnUserId(request, reply, userId);
+    if (!user) return;
+
+    const folder = normalizeFolderName(`${firstName} ${lastName}`);
+    const timestamp = Math.floor(Date.now() / 1000);
+    const publicId = `${documentType}_${timestamp}`;
+    const signature = signCloudinaryParams({ folder, public_id: publicId, timestamp });
+
+    reply.send({
+      cloudName: cloudinaryConfig.cloudName,
+      apiKey: cloudinaryConfig.apiKey,
+      timestamp,
+      folder,
+      publicId,
+      signature,
+      uploadUrl: `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloudName}/image/upload`
+    });
+  });
+
   app.post("/profile", async (request, reply) => {
-    const { userId, licenseNumber, licenseCategory, licenseIssueDate, licenseExpiryDate, vehicle } = driverProfileSchema.parse(request.body);
+    const { userId, licenseNumber, licenseCategory, licenseIssueDate, licenseExpiryDate, vehicle, documents } = driverProfileSchema.parse(request.body);
     const user = await requireOwnUserId(request, reply, userId);
     if (!user) return;
 
@@ -213,23 +297,111 @@ async function bootstrap() {
 
     try {
       await client.query("BEGIN");
+      let driverDocuments = documents;
+      if (!driverDocuments) {
+        const currentDocuments = await client.query(
+          `SELECT d.documents_folder,
+                  d.driver_photo_url,
+                  d.driver_photo_public_id,
+                  d.license_photo_url,
+                  d.license_photo_public_id,
+                  v.vehicle_photo_url,
+                  v.vehicle_photo_public_id
+             FROM drivers d
+             LEFT JOIN vehicles v ON v.driver_id = d.id
+            WHERE d.user_id = $1
+            LIMIT 1`,
+          [userId]
+        );
+        const current = currentDocuments.rows[0];
+        if (
+          !current?.documents_folder ||
+          !current?.driver_photo_url ||
+          !current?.driver_photo_public_id ||
+          !current?.license_photo_url ||
+          !current?.license_photo_public_id ||
+          !current?.vehicle_photo_url ||
+          !current?.vehicle_photo_public_id
+        ) {
+          reply.code(400).send({ message: "Debes subir las tres fotografias para continuar." });
+          await client.query("ROLLBACK");
+          return;
+        }
+        driverDocuments = {
+          driverPhoto: {
+            folder: current.documents_folder,
+            url: current.driver_photo_url,
+            publicId: current.driver_photo_public_id
+          },
+          licensePhoto: {
+            folder: current.documents_folder,
+            url: current.license_photo_url,
+            publicId: current.license_photo_public_id
+          },
+          vehiclePhoto: {
+            folder: current.documents_folder,
+            url: current.vehicle_photo_url,
+            publicId: current.vehicle_photo_public_id
+          }
+        };
+      }
+
       const driverResult = await client.query(
-        `INSERT INTO drivers (user_id, license_number, license_category, license_issue_date, license_expiry_date, status, is_available)
-         VALUES ($1, $2, $3, $4, $5, 'offline', FALSE)
+        `INSERT INTO drivers (
+           user_id,
+           license_number,
+           license_category,
+           license_issue_date,
+           license_expiry_date,
+           documents_folder,
+           driver_photo_url,
+           driver_photo_public_id,
+           license_photo_url,
+           license_photo_public_id,
+           status,
+           is_available
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'offline', FALSE)
          ON CONFLICT (user_id)
          DO UPDATE SET license_number = EXCLUDED.license_number,
                        license_category = COALESCE(EXCLUDED.license_category, drivers.license_category),
                        license_issue_date = COALESCE(EXCLUDED.license_issue_date, drivers.license_issue_date),
                        license_expiry_date = COALESCE(EXCLUDED.license_expiry_date, drivers.license_expiry_date),
+                       documents_folder = EXCLUDED.documents_folder,
+                       driver_photo_url = EXCLUDED.driver_photo_url,
+                       driver_photo_public_id = EXCLUDED.driver_photo_public_id,
+                       license_photo_url = EXCLUDED.license_photo_url,
+                       license_photo_public_id = EXCLUDED.license_photo_public_id,
                        updated_at = NOW()
          RETURNING *`,
-        [userId, licenseNumber, licenseCategory || null, licenseIssueDate || null, licenseExpiryDate || null]
+        [
+          userId,
+          licenseNumber,
+          licenseCategory || null,
+          licenseIssueDate || null,
+          licenseExpiryDate || null,
+          driverDocuments.driverPhoto.folder,
+          driverDocuments.driverPhoto.url,
+          driverDocuments.driverPhoto.publicId,
+          driverDocuments.licensePhoto.url,
+          driverDocuments.licensePhoto.publicId
+        ]
       );
 
       const driver = driverResult.rows[0];
       await client.query(
-        `INSERT INTO vehicles (driver_id, vehicle_type, plate, brand, model, color, year)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `INSERT INTO vehicles (
+           driver_id,
+           vehicle_type,
+           plate,
+           brand,
+           model,
+           color,
+           year,
+           vehicle_photo_url,
+           vehicle_photo_public_id
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          ON CONFLICT (driver_id)
          DO UPDATE SET vehicle_type = EXCLUDED.vehicle_type,
                        plate = EXCLUDED.plate,
@@ -237,6 +409,8 @@ async function bootstrap() {
                        model = EXCLUDED.model,
                        color = EXCLUDED.color,
                        year = EXCLUDED.year,
+                       vehicle_photo_url = EXCLUDED.vehicle_photo_url,
+                       vehicle_photo_public_id = EXCLUDED.vehicle_photo_public_id,
                        updated_at = NOW()`,
         [
           driver.id,
@@ -245,7 +419,9 @@ async function bootstrap() {
           vehicle.brand,
           vehicle.model,
           vehicle.color,
-          vehicle.year || null
+          vehicle.year || null,
+          driverDocuments.vehiclePhoto.url,
+          driverDocuments.vehiclePhoto.publicId
         ]
       );
       await client.query("COMMIT");

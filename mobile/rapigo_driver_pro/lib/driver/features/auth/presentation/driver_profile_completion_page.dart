@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/ui/top_notice.dart';
 import '../data/auth_repository.dart';
@@ -30,11 +33,17 @@ class _DriverProfileCompletionPageState
   final _modelController = TextEditingController();
   final _colorController = TextEditingController();
   final _yearController = TextEditingController();
+  final _imagePicker = ImagePicker();
   int _step = 4;
   String _vehicleType = 'taxi';
-  bool _driverPhotoReady = false;
-  bool _licensePhotoReady = false;
-  bool _vehiclePhotoReady = false;
+  DriverUploadedDocument? _driverPhoto;
+  DriverUploadedDocument? _licensePhoto;
+  DriverUploadedDocument? _vehiclePhoto;
+  File? _driverPhotoFile;
+  File? _licensePhotoFile;
+  File? _vehiclePhotoFile;
+  String? _uploadedPhotosOwnerKey;
+  String? _uploadingDocumentType;
   bool _profileSubmitted = false;
 
   @override
@@ -146,8 +155,157 @@ class _DriverProfileCompletionPageState
     return null;
   }
 
+  String get _currentPhotoOwnerKey =>
+      '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'
+          .trim()
+          .toLowerCase();
+
   bool get _photosReady =>
-      _driverPhotoReady && _licensePhotoReady && _vehiclePhotoReady;
+      _driverPhoto != null &&
+      _licensePhoto != null &&
+      _vehiclePhoto != null &&
+      _uploadedPhotosOwnerKey == _currentPhotoOwnerKey;
+
+  Future<void> _pickAndUploadPhoto(String documentType) async {
+    final personalError = _validatePersonalStep();
+    if (personalError != null) {
+      showTopNotice(context, personalError, tone: NoticeTone.error);
+      setState(() => _step = 4);
+      return;
+    }
+    if (_uploadedPhotosOwnerKey != null &&
+        _uploadedPhotosOwnerKey != _currentPhotoOwnerKey) {
+      setState(() {
+        _driverPhoto = null;
+        _licensePhoto = null;
+        _vehiclePhoto = null;
+        _driverPhotoFile = null;
+        _licensePhotoFile = null;
+        _vehiclePhotoFile = null;
+        _uploadedPhotosOwnerKey = null;
+      });
+    }
+
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_camera_rounded),
+                title: Text(
+                  'Tomar foto',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                onTap: () => Navigator.pop(context, ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_rounded),
+                title: Text(
+                  'Elegir de galeria',
+                  style: GoogleFonts.plusJakartaSans(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                onTap: () => Navigator.pop(context, ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (source == null) return;
+
+    final pickedFile = await _imagePicker.pickImage(
+      source: source,
+      imageQuality: 82,
+      maxWidth: 1800,
+    );
+    if (pickedFile == null || !mounted) return;
+
+    final file = File(pickedFile.path);
+    setState(() {
+      _uploadingDocumentType = documentType;
+      switch (documentType) {
+        case 'driver_photo':
+          _driverPhotoFile = file;
+          _driverPhoto = null;
+          break;
+        case 'license_photo':
+          _licensePhotoFile = file;
+          _licensePhoto = null;
+          break;
+        case 'vehicle_photo':
+          _vehiclePhotoFile = file;
+          _vehiclePhoto = null;
+          break;
+      }
+    });
+
+    try {
+      final document = await ref
+          .read(driverSessionProvider.notifier)
+          .uploadDriverDocument(
+            firstName: _firstNameController.text.trim(),
+            lastName: _lastNameController.text.trim(),
+            documentType: documentType,
+            file: file,
+          );
+      if (!mounted) return;
+      setState(() {
+        _uploadedPhotosOwnerKey = _currentPhotoOwnerKey;
+        switch (documentType) {
+          case 'driver_photo':
+            _driverPhoto = document;
+            break;
+          case 'license_photo':
+            _licensePhoto = document;
+            break;
+          case 'vehicle_photo':
+            _vehiclePhoto = document;
+            break;
+        }
+      });
+      showTopNotice(
+        context,
+        'Fotografia subida correctamente.',
+        tone: NoticeTone.success,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        switch (documentType) {
+          case 'driver_photo':
+            _driverPhoto = null;
+            break;
+          case 'license_photo':
+            _licensePhoto = null;
+            break;
+          case 'vehicle_photo':
+            _vehiclePhoto = null;
+            break;
+        }
+      });
+      showTopNotice(
+        context,
+        error.toString().replaceFirst('Exception: ', ''),
+        tone: NoticeTone.error,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _uploadingDocumentType = null);
+      }
+    }
+  }
 
   Future<void> _pickDate(TextEditingController controller) async {
     final result = await showDatePicker(
@@ -179,7 +337,7 @@ class _DriverProfileCompletionPageState
         break;
       case 7:
         if (!_photosReady) {
-          error = 'Marca las tres fotografias como listas para continuar.';
+          error = 'Sube las tres fotografias para continuar.';
         }
         break;
     }
@@ -234,6 +392,9 @@ class _DriverProfileCompletionPageState
           model: _modelController.text.trim(),
           color: _colorController.text.trim(),
           year: int.tryParse(_yearController.text.trim()),
+          driverPhoto: _driverPhoto!,
+          licensePhoto: _licensePhoto!,
+          vehiclePhoto: _vehiclePhoto!,
         );
     if (!mounted) {
       return;
@@ -626,9 +787,10 @@ class _DriverProfileCompletionPageState
             'Sin gafas oscuras',
             'Fondo claro',
           ],
-          ready: _driverPhotoReady,
-          onToggle: () =>
-              setState(() => _driverPhotoReady = !_driverPhotoReady),
+          file: _driverPhotoFile,
+          ready: _driverPhoto != null,
+          isUploading: _uploadingDocumentType == 'driver_photo',
+          onPick: () => _pickAndUploadPhoto('driver_photo'),
         ),
         const SizedBox(height: 16),
         _PhotoRequirementCard(
@@ -640,9 +802,10 @@ class _DriverProfileCompletionPageState
             'Sin reflejos',
             'Buena calidad',
           ],
-          ready: _licensePhotoReady,
-          onToggle: () =>
-              setState(() => _licensePhotoReady = !_licensePhotoReady),
+          file: _licensePhotoFile,
+          ready: _licensePhoto != null,
+          isUploading: _uploadingDocumentType == 'license_photo',
+          onPick: () => _pickAndUploadPhoto('license_photo'),
         ),
         const SizedBox(height: 16),
         _PhotoRequirementCard(
@@ -654,14 +817,10 @@ class _DriverProfileCompletionPageState
             'Buena iluminacion',
             'Sin objetos que lo cubran',
           ],
-          ready: _vehiclePhotoReady,
-          onToggle: () =>
-              setState(() => _vehiclePhotoReady = !_vehiclePhotoReady),
-        ),
-        const SizedBox(height: 18),
-        const _DevelopmentTagBanner(
-          message:
-              'Etapa de desarrollo. La carga real de imagenes se integrara despues; por ahora puedes marcar cada bloque como listo y seguir al siguiente paso.',
+          file: _vehiclePhotoFile,
+          ready: _vehiclePhoto != null,
+          isUploading: _uploadingDocumentType == 'vehicle_photo',
+          onPick: () => _pickAndUploadPhoto('vehicle_photo'),
         ),
         const SizedBox(height: 20),
         const _SoftInfoCard(
@@ -736,9 +895,9 @@ class _DriverProfileCompletionPageState
           icon: Icons.camera_alt_rounded,
           title: 'Fotografias',
           lines: [
-            _driverPhotoReady ? 'Conductor listo' : 'Conductor pendiente',
-            _licensePhotoReady ? 'Licencia lista' : 'Licencia pendiente',
-            _vehiclePhotoReady ? 'Vehiculo listo' : 'Vehiculo pendiente',
+            _driverPhoto != null ? 'Conductor listo' : 'Conductor pendiente',
+            _licensePhoto != null ? 'Licencia lista' : 'Licencia pendiente',
+            _vehiclePhoto != null ? 'Vehiculo listo' : 'Vehiculo pendiente',
           ],
           onEdit: () => setState(() => _step = 7),
         ),
@@ -1340,18 +1499,33 @@ class _PhotoRequirementCard extends StatelessWidget {
     required this.title,
     required this.description,
     required this.bulletItems,
+    required this.file,
     required this.ready,
-    required this.onToggle,
+    required this.isUploading,
+    required this.onPick,
   });
 
   final String title;
   final String description;
   final List<String> bulletItems;
+  final File? file;
   final bool ready;
-  final VoidCallback onToggle;
+  final bool isUploading;
+  final VoidCallback onPick;
 
   @override
   Widget build(BuildContext context) {
+    final statusColor = ready
+        ? const Color(0xFF22A863)
+        : isUploading
+        ? const Color(0xFFE0A20B)
+        : const Color(0xFF1650D7);
+    final statusLabel = ready
+        ? 'Subida'
+        : isUploading
+        ? 'Subiendo...'
+        : 'Subir foto';
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -1369,15 +1543,18 @@ class _PhotoRequirementCard extends StatelessWidget {
               Container(
                 width: 64,
                 height: 64,
+                clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
                   color: const Color(0xFFEAF1FF),
                   borderRadius: BorderRadius.circular(18),
                 ),
-                child: const Icon(
-                  Icons.camera_alt_rounded,
-                  color: Color(0xFF1650D7),
-                  size: 30,
-                ),
+                child: file == null
+                    ? const Icon(
+                        Icons.camera_alt_rounded,
+                        color: Color(0xFF1650D7),
+                        size: 30,
+                      )
+                    : Image.file(file!, fit: BoxFit.cover),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -1436,37 +1613,42 @@ class _PhotoRequirementCard extends StatelessWidget {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: onToggle,
+                  onPressed: isUploading ? null : onPick,
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 12,
                     ),
-                    side: BorderSide(
-                      color: ready
-                          ? const Color(0xFF22A863)
-                          : const Color(0xFF1650D7),
-                    ),
+                    side: BorderSide(color: statusColor),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
-                  icon: Icon(
-                    ready ? Icons.check_circle_rounded : Icons.upload_rounded,
-                    color: ready
-                        ? const Color(0xFF22A863)
-                        : const Color(0xFF1650D7),
-                    size: 18,
-                  ),
+                  icon: isUploading
+                      ? SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              statusColor,
+                            ),
+                          ),
+                        )
+                      : Icon(
+                          ready
+                              ? Icons.check_circle_rounded
+                              : Icons.upload_rounded,
+                          color: statusColor,
+                          size: 18,
+                        ),
                   label: Text(
-                    ready ? 'Lista' : 'Etapa de desarrollo',
+                    statusLabel,
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
-                      color: ready
-                          ? const Color(0xFF22A863)
-                          : const Color(0xFF1650D7),
+                      color: statusColor,
                     ),
                   ),
                 ),
@@ -1686,34 +1868,6 @@ class _ReviewBlock extends StatelessWidget {
               ),
             ),
         ],
-      ),
-    );
-  }
-}
-
-class _DevelopmentTagBanner extends StatelessWidget {
-  const _DevelopmentTagBanner({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF7DD),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFF6D873)),
-      ),
-      child: Text(
-        message,
-        style: GoogleFonts.plusJakartaSans(
-          fontSize: 15,
-          fontWeight: FontWeight.w700,
-          color: const Color(0xFF8C6A08),
-          height: 1.4,
-        ),
       ),
     );
   }

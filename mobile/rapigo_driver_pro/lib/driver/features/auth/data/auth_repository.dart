@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -29,6 +30,22 @@ class DriverPublicSettings {
   const DriverPublicSettings({required this.supportPhone});
 
   final String supportPhone;
+}
+
+class DriverUploadedDocument {
+  const DriverUploadedDocument({
+    required this.url,
+    required this.publicId,
+    required this.folder,
+  });
+
+  final String url;
+  final String publicId;
+  final String folder;
+
+  Map<String, dynamic> toJson() {
+    return {'url': url, 'publicId': publicId, 'folder': folder};
+  }
 }
 
 class DriverAuthResult {
@@ -342,6 +359,74 @@ class DriverAuthRepository {
     );
   }
 
+  Future<DriverUploadedDocument> uploadDriverDocument({
+    required String token,
+    required String userId,
+    required String firstName,
+    required String lastName,
+    required String documentType,
+    required File file,
+  }) async {
+    final signatureResponse = await _safeRequest(
+      () => http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}/drivers/uploads/signature'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'userId': userId,
+          'firstName': firstName,
+          'lastName': lastName,
+          'documentType': documentType,
+        }),
+      ),
+      fallbackMessage: 'No se pudo preparar la subida de la fotografia',
+    );
+    await _throwIfError(
+      signatureResponse,
+      fallbackMessage: 'No se pudo preparar la subida de la fotografia',
+    );
+
+    final signature =
+        jsonDecode(signatureResponse.body) as Map<String, dynamic>;
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse(signature['uploadUrl']?.toString() ?? ''),
+    )
+      ..fields['api_key'] = signature['apiKey']?.toString() ?? ''
+      ..fields['timestamp'] = signature['timestamp']?.toString() ?? ''
+      ..fields['folder'] = signature['folder']?.toString() ?? ''
+      ..fields['public_id'] = signature['publicId']?.toString() ?? ''
+      ..fields['signature'] = signature['signature']?.toString() ?? ''
+      ..files.add(await http.MultipartFile.fromPath('file', file.path));
+
+    http.StreamedResponse streamedResponse;
+    try {
+      streamedResponse = await request.send().timeout(
+        const Duration(seconds: 35),
+      );
+    } on TimeoutException {
+      throw Exception('La subida de la fotografia tardo demasiado');
+    } on SocketException {
+      throw Exception('Sin conexion para subir la fotografia');
+    } on HttpException {
+      throw Exception('No se pudo conectar con Cloudinary');
+    }
+
+    final response = await http.Response.fromStream(streamedResponse);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('No se pudo subir la fotografia a Cloudinary');
+    }
+
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    return DriverUploadedDocument(
+      url: payload['secure_url']?.toString() ?? payload['url']?.toString() ?? '',
+      publicId: payload['public_id']?.toString() ?? '',
+      folder: signature['folder']?.toString() ?? '',
+    );
+  }
+
   Future<DriverAuthResult> completeProfile({
     required String token,
     required String userId,
@@ -361,7 +446,37 @@ class DriverAuthRepository {
     required String model,
     required String color,
     required int? year,
+    DriverUploadedDocument? driverPhoto,
+    DriverUploadedDocument? licensePhoto,
+    DriverUploadedDocument? vehiclePhoto,
   }) async {
+    final documents = driverPhoto != null &&
+            licensePhoto != null &&
+            vehiclePhoto != null
+        ? {
+            'driverPhoto': driverPhoto.toJson(),
+            'licensePhoto': licensePhoto.toJson(),
+            'vehiclePhoto': vehiclePhoto.toJson(),
+          }
+        : null;
+    final profileBody = <String, dynamic>{
+      'userId': userId,
+      'licenseNumber': licenseNumber,
+      'licenseCategory': licenseCategory,
+      'licenseIssueDate': licenseIssueDate,
+      'licenseExpiryDate': licenseExpiryDate,
+      'vehicle': {
+        'type': vehicleType,
+        'plate': plate,
+        'brand': brand,
+        'model': model,
+        'color': color,
+        'year': year,
+      },
+    };
+    if (documents != null) {
+      profileBody['documents'] = documents;
+    }
     final driverProfileResponse = await _safeRequest(
       () => http.post(
         Uri.parse('${AppConfig.apiBaseUrl}/drivers/profile'),
@@ -369,21 +484,7 @@ class DriverAuthRepository {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: jsonEncode({
-          'userId': userId,
-          'licenseNumber': licenseNumber,
-          'licenseCategory': licenseCategory,
-          'licenseIssueDate': licenseIssueDate,
-          'licenseExpiryDate': licenseExpiryDate,
-          'vehicle': {
-            'type': vehicleType,
-            'plate': plate,
-            'brand': brand,
-            'model': model,
-            'color': color,
-            'year': year,
-          },
-        }),
+        body: jsonEncode(profileBody),
       ),
       fallbackMessage: 'No se pudo guardar el vehiculo',
     );
@@ -693,6 +794,9 @@ class DriverSessionController extends Notifier<DriverSession> {
     required String model,
     required String color,
     required int? year,
+    DriverUploadedDocument? driverPhoto,
+    DriverUploadedDocument? licensePhoto,
+    DriverUploadedDocument? vehiclePhoto,
   }) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
@@ -715,6 +819,9 @@ class DriverSessionController extends Notifier<DriverSession> {
         model: model,
         color: color,
         year: year,
+        driverPhoto: driverPhoto,
+        licensePhoto: licensePhoto,
+        vehiclePhoto: vehiclePhoto,
       );
       await _persistSession(result);
     } catch (error) {
@@ -723,6 +830,22 @@ class DriverSessionController extends Notifier<DriverSession> {
         errorMessage: error.toString().replaceFirst('Exception: ', ''),
       );
     }
+  }
+
+  Future<DriverUploadedDocument> uploadDriverDocument({
+    required String firstName,
+    required String lastName,
+    required String documentType,
+    required File file,
+  }) async {
+    return _repository.uploadDriverDocument(
+      token: state.token,
+      userId: state.userId,
+      firstName: firstName,
+      lastName: lastName,
+      documentType: documentType,
+      file: file,
+    );
   }
 
   Future<void> logout() async {

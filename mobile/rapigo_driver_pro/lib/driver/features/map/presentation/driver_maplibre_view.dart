@@ -155,7 +155,7 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
   double _currentCameraCenterLat = 0;
   double _currentCameraCenterLng = 0;
   double _currentCameraZoom = AppConfig.mapInitialZoom;
-  double _currentCameraTilt = 48;
+  double _currentCameraTilt = 0;
   double _currentCameraBearing = 0;
   DateTime? _lastCameraAnimationAt;
   bool _routeLayersReady = false;
@@ -177,7 +177,6 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
       'rapigo_trip_destination_marker_b';
   static const String _routeSourceId = 'rapigo_driver_route_source';
   static const String _routeCasingLayerId = 'rapigo_driver_route_casing';
-  static const String _routeGlowLayerId = 'rapigo_driver_route_glow';
   static const String _routeMainLayerId = 'rapigo_driver_route_main';
 
   String get _activeDriverMarkerImageId =>
@@ -213,9 +212,7 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
     _currentCameraCenterLng =
         widget.initialCenter?.longitude ?? widget.driverLng;
     _currentCameraZoom = widget.initialZoom ?? AppConfig.mapInitialZoom;
-    _currentCameraTilt = widget.tripAccepted
-        ? (widget.navigationTilt ?? 56)
-        : (widget.idleTilt ?? 48);
+    _currentCameraTilt = 0;
     _currentCameraBearing = widget.initialBearing ?? 0;
     WidgetsBinding.instance.addObserver(this);
     unawaited(_loadStyleString());
@@ -401,21 +398,9 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
       _routeCasingLayerId,
       const ml.LineLayerProperties(
         lineColor: '#082D57',
-        lineOpacity: 0.88,
-        lineWidth: 10.6,
-        lineBlur: 0.12,
-        lineJoin: 'round',
-        lineCap: 'round',
-      ),
-    );
-    await controller.addLineLayer(
-      _routeSourceId,
-      _routeGlowLayerId,
-      const ml.LineLayerProperties(
-        lineColor: '#6EE7FF',
-        lineOpacity: 0.18,
-        lineWidth: 15.2,
-        lineBlur: 1.02,
+        lineOpacity: 0.78,
+        lineWidth: 8.4,
+        lineBlur: 0,
         lineJoin: 'round',
         lineCap: 'round',
       ),
@@ -425,9 +410,9 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
       _routeMainLayerId,
       const ml.LineLayerProperties(
         lineColor: '#3EDBFF',
-        lineOpacity: 0.96,
-        lineWidth: 6.6,
-        lineBlur: 0.08,
+        lineOpacity: 0.94,
+        lineWidth: 5.4,
+        lineBlur: 0,
         lineJoin: 'round',
         lineCap: 'round',
       ),
@@ -1206,7 +1191,7 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
         previous,
         _driverPoint,
       );
-      if (delta < 3.5) {
+      if (delta < 8.0) {
         return;
       }
     }
@@ -1233,7 +1218,7 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
               previousSnapped,
               snapped,
             );
-      if (snappedDelta > 0.55) {
+      if (snappedDelta > 1.2) {
         final bearingAnchor = previousSnapped ?? sourcePoint;
         _idleMarkerBearing = _smoothIdleBearing(
           _bearingBetween(bearingAnchor, snapped),
@@ -1252,7 +1237,8 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
 
   Future<void> _upsertDriverMarker(ml.MapLibreMapController controller) async {
     final point = _toMlLatLng(_visualDriverPoint());
-    final iconScale = widget.driverMarkerScale ?? 1.56;
+    final iconScale =
+        widget.driverMarkerScale ?? (widget.tripAccepted ? 1.34 : 1.16);
     final iconOffset = Offset(
       widget.driverMarkerOffsetX ?? 0,
       widget.driverMarkerOffsetY ?? 0,
@@ -1308,7 +1294,8 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
       previous,
       _driverPoint,
     );
-    return distance >= 8;
+    final threshold = widget.tripStatus == 'in_progress' ? 18.0 : 24.0;
+    return distance >= threshold;
   }
 
   Future<void> _updateDriverVisuals() async {
@@ -1344,9 +1331,11 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
             visualPoint,
           );
     final elapsed = previousAt == null ? null : now.difference(previousAt);
-    if (movedMeters < 1.2 &&
-        elapsed != null &&
-        elapsed < const Duration(milliseconds: 700)) {
+    final minMove = widget.tripAccepted ? 3.2 : 6.5;
+    final minElapsed = widget.tripAccepted
+        ? const Duration(milliseconds: 1200)
+        : const Duration(milliseconds: 1800);
+    if (movedMeters < minMove && elapsed != null && elapsed < minElapsed) {
       return false;
     }
     _lastRouteSourceVisualPoint = visualPoint;
@@ -1496,29 +1485,21 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
     if (style == 'rapigo') {
       const haloColor = Color(0xFF1976FF);
       final haloOuter = Paint()
-        ..color = haloColor.withValues(alpha: 0.16)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 22);
+        ..color = haloColor.withValues(alpha: 0.10)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
       final haloInner = Paint()
-        ..color = haloColor.withValues(alpha: 0.28)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 9);
-      canvas.drawCircle(center, 36, haloOuter);
-      canvas.drawCircle(center, 25, haloInner);
-
-      final groundShadow = Paint()
-        ..color = const Color(0x421976FF)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
-      canvas.drawOval(
-        Rect.fromCenter(center: center.translate(0, 35), width: 34, height: 11),
-        groundShadow,
-      );
+        ..color = haloColor.withValues(alpha: 0.20)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
+      canvas.drawCircle(center, 33, haloOuter);
+      canvas.drawCircle(center, 22, haloInner);
 
       _drawNavigationSvgRepoMarker(
         canvas,
         center,
         Paint()
-          ..color = const Color(0x3A000000)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10),
-        offset: const Offset(0, 5),
+          ..color = const Color(0x22000000)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+        offset: const Offset(0, 3),
       );
       _drawNavigationSvgRepoMarker(
         canvas,
@@ -1837,7 +1818,9 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
       if (!force &&
           _lastCameraAnimationAt != null &&
           now.difference(_lastCameraAnimationAt!) <
-              const Duration(milliseconds: 140)) {
+              (widget.tripAccepted
+                  ? const Duration(milliseconds: 350)
+                  : const Duration(milliseconds: 900))) {
         return;
       }
       if (widget.lockToFocusBounds && widget.focusBounds != null) {
@@ -1876,10 +1859,10 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
               : currentVisualPoint,
         );
         final nextZoom = math.min(
-          _isOnDestinationStage ? 18.15 : 17.85,
+          _isOnDestinationStage ? 16.7 : 16.55,
           widget.maxZoomPreference ?? _defaultMaxZoom,
         );
-        final nextTilt = widget.navigationTilt ?? 56;
+        const nextTilt = 0.0;
         final rawBearing = route != null && route.length >= 2
             ? _navigationCameraBearing(currentVisualPoint, route)
             : 0.0;
@@ -1904,11 +1887,11 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
               })();
         final tiltDelta = (_currentCameraTilt - nextTilt).abs();
         if (!force &&
-            targetDelta < 2.2 &&
-            bearingDelta < 2.2 &&
+            targetDelta < 5.5 &&
+            bearingDelta < 5.0 &&
             tiltDelta < 0.8 &&
             _lastAnimatedCameraZoom != null &&
-            (_lastAnimatedCameraZoom! - nextZoom).abs() < 0.08) {
+            (_lastAnimatedCameraZoom! - nextZoom).abs() < 0.12) {
           return;
         }
         await controller.animateCamera(
@@ -1931,7 +1914,7 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
           widget.idleZoomLevel ?? 16.15,
           widget.maxZoomPreference ?? _defaultMaxZoom,
         );
-        final nextTilt = widget.idleTilt ?? 48;
+        const nextTilt = 0.0;
         final nextBearing = widget.idleBearingOverride ?? 0;
         final targetDelta = _lastAnimatedCameraTarget == null
             ? double.infinity
@@ -1953,11 +1936,11 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
               })();
         final tiltDelta = (_currentCameraTilt - nextTilt).abs();
         if (!force &&
-            targetDelta < 2.2 &&
-            bearingDelta < 2.2 &&
+            targetDelta < 12.0 &&
+            bearingDelta < 8.0 &&
             tiltDelta < 0.8 &&
             _lastAnimatedCameraZoom != null &&
-            (_lastAnimatedCameraZoom! - nextZoom).abs() < 0.08) {
+            (_lastAnimatedCameraZoom! - nextZoom).abs() < 0.12) {
           return;
         }
         await controller.animateCamera(

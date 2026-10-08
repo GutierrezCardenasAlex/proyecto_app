@@ -8,7 +8,6 @@ import '../../auth/data/auth_repository.dart';
 import '../../auth/presentation/login_card.dart';
 import '../../auth/presentation/passenger_profile_completion_page.dart';
 import '../../../core/config/app_brand.dart';
-import '../../../core/notifications/local_notifications.dart';
 import '../../map/data/location_controller.dart';
 import 'pages/profile_hub_page.dart';
 import 'widgets/destination_search_sheet.dart';
@@ -59,13 +58,17 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
         .read(sessionProvider.notifier)
         .refreshSessionStatus();
     if (earnedFreeTrip) {
-      await LocalNotifications.ensureInitialized();
-      await LocalNotifications.show(
-        id: 3001,
-        title: 'Tienes un viaje gratis',
-        body:
-            'Completaste 5 viajes. Tu siguiente viaje sera gratis a donde sea.',
-      );
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Tienes un viaje gratis disponible.'),
+            duration: Duration(seconds: 4),
+          ),
+        );
     }
   }
 

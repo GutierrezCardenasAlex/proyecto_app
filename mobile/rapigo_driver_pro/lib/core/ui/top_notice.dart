@@ -21,23 +21,32 @@ void showTopNotice(
   double horizontalInset = 24,
   bool compact = false,
   bool centered = false,
+  bool iconOnly = false,
+  bool rightSide = false,
   VoidCallback? onTap,
 }) {
   _activeTopNoticeTimer?.cancel();
   _activeTopNotice?.remove();
 
   final overlay = Overlay.of(context, rootOverlay: true);
+  final isConnectivityError = _looksLikeBackendConnectivityError(message);
+  final effectiveIconOnly = iconOnly || isConnectivityError;
+  final effectiveRightSide = rightSide || isConnectivityError;
+  final effectiveTone = isConnectivityError ? NoticeTone.error : tone;
+  final effectiveIcon = isConnectivityError ? Icons.wifi_off_rounded : icon;
+  final effectiveMessage = effectiveIconOnly ? '' : message;
 
   _activeTopNotice = OverlayEntry(
     builder: (context) {
       final topPadding = MediaQuery.of(context).padding.top;
       final child = _TopNoticeCard(
-        message: message,
-        backgroundColor: backgroundColor ?? _backgroundForTone(tone),
-        foregroundColor: foregroundColor ?? _foregroundForTone(tone),
-        icon: icon,
-        tone: tone,
+        message: effectiveMessage,
+        backgroundColor: backgroundColor ?? _backgroundForTone(effectiveTone),
+        foregroundColor: foregroundColor ?? _foregroundForTone(effectiveTone),
+        icon: effectiveIcon,
+        tone: effectiveTone,
         compact: compact,
+        iconOnly: effectiveIconOnly,
         onTap: onTap == null
             ? null
             : () {
@@ -49,18 +58,20 @@ void showTopNotice(
               },
       );
 
+      if (effectiveRightSide) {
+        return Positioned(
+          top: topPadding + 118,
+          right: 16,
+          child: IgnorePointer(ignoring: onTap == null, child: child),
+        );
+      }
+
       if (centered) {
-        return Positioned.fill(
-          child: IgnorePointer(
-            ignoring: onTap == null,
-            child: Align(
-              alignment: const Alignment(0, -0.06),
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: horizontalInset),
-                child: child,
-              ),
-            ),
-          ),
+        return Positioned(
+          top: topPadding + 64,
+          left: horizontalInset + 8,
+          right: horizontalInset + 8,
+          child: IgnorePointer(ignoring: onTap == null, child: child),
         );
       }
 
@@ -68,10 +79,7 @@ void showTopNotice(
         top: topPadding + topOffset,
         left: horizontalInset,
         right: horizontalInset,
-        child: IgnorePointer(
-          ignoring: onTap == null,
-          child: child,
-        ),
+        child: IgnorePointer(ignoring: onTap == null, child: child),
       );
     },
   );
@@ -82,6 +90,24 @@ void showTopNotice(
     _activeTopNotice = null;
     _activeTopNoticeTimer = null;
   });
+}
+
+bool _looksLikeBackendConnectivityError(String message) {
+  final text = message.toLowerCase();
+  return text.contains('backend') ||
+      text.contains('servidor') ||
+      text.contains('server') ||
+      text.contains('socket') ||
+      text.contains('websocket') ||
+      text.contains('connection refused') ||
+      text.contains('connection failed') ||
+      text.contains('failed host lookup') ||
+      text.contains('network is unreachable') ||
+      text.contains('timed out') ||
+      text.contains('timeout') ||
+      text.contains('dioexception') ||
+      text.contains('clientexception') ||
+      text.contains('/api');
 }
 
 Color _backgroundForTone(NoticeTone tone) {
@@ -115,6 +141,7 @@ class _TopNoticeCard extends StatefulWidget {
     required this.foregroundColor,
     required this.tone,
     required this.compact,
+    required this.iconOnly,
     required this.onTap,
     this.icon,
   });
@@ -125,6 +152,7 @@ class _TopNoticeCard extends StatefulWidget {
   final NoticeTone tone;
   final IconData? icon;
   final bool compact;
+  final bool iconOnly;
   final VoidCallback? onTap;
 
   @override
@@ -149,59 +177,74 @@ class _TopNoticeCardState extends State<_TopNoticeCard>
     return FadeTransition(
       opacity: CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
       child: SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(0, -0.18),
-          end: Offset.zero,
-        ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic)),
+        position: Tween<Offset>(begin: const Offset(0, -0.18), end: Offset.zero)
+            .animate(
+              CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
+            ),
         child: Material(
           color: Colors.transparent,
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 440),
+              constraints: widget.iconOnly
+                  ? const BoxConstraints.tightFor(width: 44, height: 44)
+                  : BoxConstraints(maxWidth: widget.compact ? 320 : 380),
               child: InkWell(
                 onTap: widget.onTap,
-                borderRadius: BorderRadius.circular(widget.compact ? 16 : 18),
+                borderRadius: BorderRadius.circular(
+                  widget.iconOnly ? 22 : (widget.compact ? 14 : 16),
+                ),
                 child: Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: widget.compact ? 14 : 18,
-                    vertical: widget.compact ? 11 : 14,
-                  ),
+                  alignment: Alignment.center,
+                  padding: widget.iconOnly
+                      ? EdgeInsets.zero
+                      : EdgeInsets.symmetric(
+                          horizontal: widget.compact ? 12 : 16,
+                          vertical: widget.compact ? 9 : 12,
+                        ),
                   decoration: BoxDecoration(
                     color: widget.backgroundColor,
-                    borderRadius: BorderRadius.circular(widget.compact ? 16 : 18),
-                  border: Border.all(
-                    color: widget.foregroundColor.withValues(alpha: 0.18),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: widget.backgroundColor.withValues(alpha: 0.28),
-                      blurRadius: 20,
-                      offset: Offset(0, 10),
+                    borderRadius: BorderRadius.circular(
+                      widget.iconOnly ? 22 : (widget.compact ? 14 : 16),
                     ),
-                  ],
-                ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        widget.icon ?? _resolveIcon(widget.tone),
-                        color: widget.foregroundColor,
-                        size: widget.compact ? 18 : 20,
-                      ),
-                      SizedBox(width: widget.compact ? 8 : 10),
-                      Expanded(
-                        child: Text(
-                          widget.message,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: widget.foregroundColor,
-                            fontWeight: FontWeight.w700,
-                            fontSize: widget.compact ? 13 : 14,
-                          ),
-                        ),
+                    border: Border.all(
+                      color: widget.foregroundColor.withValues(alpha: 0.18),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: widget.backgroundColor.withValues(alpha: 0.28),
+                        blurRadius: widget.iconOnly ? 12 : 16,
+                        offset: const Offset(0, 8),
                       ),
                     ],
                   ),
+                  child: widget.iconOnly
+                      ? Icon(
+                          widget.icon ?? _resolveIcon(widget.tone),
+                          color: widget.foregroundColor,
+                          size: 21,
+                        )
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              widget.icon ?? _resolveIcon(widget.tone),
+                              color: widget.foregroundColor,
+                              size: widget.compact ? 16 : 18,
+                            ),
+                            SizedBox(width: widget.compact ? 7 : 9),
+                            Expanded(
+                              child: Text(
+                                widget.message,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: widget.foregroundColor,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: widget.compact ? 12 : 13,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                 ),
               ),
             ),

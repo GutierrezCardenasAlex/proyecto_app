@@ -11,8 +11,6 @@ class _DriverShellState extends ConsumerState<DriverShell> {
   static const _shellTabKey = 'rapigo_driver_shell_tab_v1';
   int _selectedIndex = 0;
   bool _openOffersFromDashboard = false;
-  bool _incomingOfferPageOpen = false;
-  String? _incomingOfferPageTripId;
   DateTime? _lastBackPressedAt;
 
   DriverTrip? _resolvePendingOffer(
@@ -26,7 +24,8 @@ class _DriverShellState extends ConsumerState<DriverShell> {
         activeTrip.status == 'accepted') {
       return activeTrip;
     }
-    if (activeTrip != null && const {'requested', 'searching'}.contains(activeTrip.status)) {
+    if (activeTrip != null &&
+        const {'requested', 'searching'}.contains(activeTrip.status)) {
       return activeTrip;
     }
     for (final offer in offers) {
@@ -49,7 +48,10 @@ class _DriverShellState extends ConsumerState<DriverShell> {
   Future<void> _restoreShellTab() async {
     final preferences = await SharedPreferences.getInstance();
     final restoredIndex = preferences.getInt(_shellTabKey);
-    if (!mounted || restoredIndex == null || restoredIndex < 0 || restoredIndex > 4) {
+    if (!mounted ||
+        restoredIndex == null ||
+        restoredIndex < 0 ||
+        restoredIndex > 4) {
       return;
     }
     setState(() => _selectedIndex = restoredIndex);
@@ -95,11 +97,8 @@ class _DriverShellState extends ConsumerState<DriverShell> {
     unawaited(_persistShellTab(index));
   }
 
-  void _maybeOpenIncomingOfferPage(DriverTrip? pendingOffer, DriverTrip? activeTrip) {
-    if (pendingOffer == null) {
-      _incomingOfferPageTripId = null;
-      return;
-    }
+  void _clearIgnoredOfferWhenNeeded(DriverTrip? pendingOffer) {
+    if (pendingOffer == null) return;
     final ignoredTripId = ref.read(driverIgnoredIncomingTripIdProvider);
     if (ignoredTripId != null) {
       if (ignoredTripId == pendingOffer.id) {
@@ -111,57 +110,28 @@ class _DriverShellState extends ConsumerState<DriverShell> {
         }
       });
     }
-    if (_incomingOfferPageOpen) {
-      return;
-    }
-    if (activeTrip != null &&
-        const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(activeTrip.status)) {
-      return;
-    }
-    if (_incomingOfferPageTripId == pendingOffer.id) {
-      return;
-    }
-    _incomingOfferPageOpen = true;
-    _incomingOfferPageTripId = pendingOffer.id;
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) {
-        _incomingOfferPageOpen = false;
-        return;
-      }
-      await Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => _DriverOfferRoutePreviewPage(trip: pendingOffer),
-        ),
-      );
-      _incomingOfferPageOpen = false;
-      if (mounted) {
-        final latestTrip = ref.read(offeredTripProvider).value;
-        final latestOffers = ref.read(driverOffersProvider).value ?? const <DriverTrip>[];
-        final latestPreviewTripId = ref.read(driverOfferPreviewTripIdProvider);
-        final latestPending = _resolvePendingOffer(latestTrip, latestOffers, latestPreviewTripId);
-        if (latestPending?.id != pendingOffer.id) {
-          _incomingOfferPageTripId = null;
-        }
-      }
-    });
   }
 
   @override
   Widget build(BuildContext context) {
     final activeTrip = ref.watch(offeredTripProvider).value;
-    final offers = ref.watch(driverOffersProvider).value ?? const <DriverTrip>[];
+    final offers =
+        ref.watch(driverOffersProvider).value ?? const <DriverTrip>[];
     final previewTripId = ref.watch(driverOfferPreviewTripIdProvider);
-    final suppressIncomingOfferOverlay =
-        ref.watch(driverSuppressIncomingOfferOverlayProvider);
-    final pendingOffer = _resolvePendingOffer(activeTrip, offers, previewTripId);
+    final suppressIncomingOfferOverlay = ref.watch(
+      driverSuppressIncomingOfferOverlayProvider,
+    );
+    final pendingOffer = _resolvePendingOffer(
+      activeTrip,
+      offers,
+      previewTripId,
+    );
     if (!suppressIncomingOfferOverlay) {
-      _maybeOpenIncomingOfferPage(pendingOffer, activeTrip);
+      _clearIgnoredOfferWhenNeeded(pendingOffer);
     } else {
       Future<void>.delayed(const Duration(milliseconds: 900), () {
         if (mounted) {
-          ref
-              .read(driverSuppressIncomingOfferOverlayProvider.notifier)
-              .clear();
+          ref.read(driverSuppressIncomingOfferOverlayProvider.notifier).clear();
         }
       });
     }

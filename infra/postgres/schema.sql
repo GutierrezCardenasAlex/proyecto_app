@@ -82,6 +82,11 @@ CREATE TABLE IF NOT EXISTS drivers (
   access_status VARCHAR(20) NOT NULL DEFAULT 'AUTORIZADO',
   access_note TEXT,
   access_granted_at TIMESTAMPTZ,
+  documents_folder VARCHAR(120),
+  driver_photo_url TEXT,
+  driver_photo_public_id TEXT,
+  license_photo_url TEXT,
+  license_photo_public_id TEXT,
   current_trip_id UUID,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -96,6 +101,8 @@ CREATE TABLE IF NOT EXISTS vehicles (
   model VARCHAR(64) NOT NULL,
   color VARCHAR(32) NOT NULL,
   year SMALLINT,
+  vehicle_photo_url TEXT,
+  vehicle_photo_public_id TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

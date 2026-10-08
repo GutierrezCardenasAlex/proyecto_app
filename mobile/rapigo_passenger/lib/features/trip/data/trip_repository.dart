@@ -660,4 +660,12 @@ class TripController extends Notifier<TripState> {
     );
     await _persistRequest();
   }
+
+  Future<void> clearActiveTrip() async {
+    state = state.copyWith(
+      request: state.request.copyWith(status: 'idle', clearTripId: true),
+      clearError: true,
+    );
+    await _persistRequest();
+  }
 }

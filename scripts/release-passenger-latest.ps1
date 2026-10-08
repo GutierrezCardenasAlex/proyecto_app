@@ -8,8 +8,8 @@ param(
 $ErrorActionPreference = "Stop"
 
 # Edita solo estos dos valores para tu siguiente release.
-$PassengerBuildName = "1.0.5"
-$PassengerBuildNumber = "5"
+$PassengerBuildName = "1.0.6"
+$PassengerBuildNumber = "6"
 
 & "$PSScriptRoot\release-passenger.ps1" `
   -RemoteUser $RemoteUser `
