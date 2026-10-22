@@ -68,6 +68,10 @@ class DriverTripRepository {
       destinationLat: _toNullableDouble(item['destination_lat']),
       destinationLng: _toNullableDouble(item['destination_lng']),
       fareAmount: _toDouble(item['fare_amount']),
+      counterOfferAmount: double.tryParse(
+        item['counter_offer_amount']?.toString() ?? '',
+      ),
+      counterOfferStatus: item['counter_offer_status']?.toString(),
       requestedAt: item['requested_at']?.toString(),
       vehicleType: item['vehicle_type']?.toString(),
       vehicleLabel: _joinVehicleLabel(
@@ -86,6 +90,7 @@ class DriverTripRepository {
       offerExpiresAt:
           item['offer_expires_at']?.toString() ??
           item['offerExpiresAt']?.toString(),
+      paymentMethod: _paymentMethodValue(item['payment_method']),
       isPromotional: item['promotional_trip'] == true,
     );
   }
@@ -174,18 +179,30 @@ class DriverTripRepository {
     required String token,
     required String driverId,
     required DriverTrip trip,
+    double? counterFare,
   }) async {
     final response = await http.post(
       Uri.parse('${AppConfig.apiBaseUrl}/dispatch/accept'),
       headers: _headers(token),
-      body: jsonEncode({'tripId': trip.id, 'driverId': driverId}),
+      body: jsonEncode({
+        'tripId': trip.id,
+        'driverId': driverId,
+        'counterFare': ?counterFare,
+      }),
     );
 
     if (response.statusCode >= 400) {
       throw Exception(_errorMessage(response, 'No se pudo aceptar el viaje'));
     }
 
-    return trip.copyWith(status: 'accepted');
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    return trip.copyWith(
+      status: payload['status']?.toString() ?? 'accepted',
+      counterOfferAmount: double.tryParse(
+        payload['counter_offer_amount']?.toString() ?? '',
+      ),
+      counterOfferStatus: payload['counter_offer_status']?.toString(),
+    );
   }
 
   Future<void> reject({
@@ -269,6 +286,10 @@ class DriverTripRepository {
       destinationLat: _toNullableDouble(item['destination_lat']),
       destinationLng: _toNullableDouble(item['destination_lng']),
       fareAmount: _toDouble(item['fare_amount']),
+      counterOfferAmount: double.tryParse(
+        item['counter_offer_amount']?.toString() ?? '',
+      ),
+      counterOfferStatus: item['counter_offer_status']?.toString(),
       requestedAt: item['requested_at']?.toString(),
       vehicleType: item['vehicle_type']?.toString(),
       vehicleLabel: _joinVehicleLabel(
@@ -284,6 +305,10 @@ class DriverTripRepository {
       preferredDriverId:
           item['preferred_driver_id']?.toString() ??
           item['preferredDriverId']?.toString(),
+      offerExpiresAt:
+          item['offer_expires_at']?.toString() ??
+          item['offerExpiresAt']?.toString(),
+      paymentMethod: _paymentMethodValue(item['payment_method']),
       isPromotional: item['promotional_trip'] == true,
     );
   }
@@ -310,6 +335,11 @@ class DriverTripRepository {
     final modelText = model?.toString().trim() ?? '';
     final value = '$brandText $modelText'.trim();
     return value.isEmpty ? null : value;
+  }
+
+  static String _paymentMethodValue(Object? value) {
+    final normalized = value?.toString().trim().toLowerCase() ?? '';
+    return normalized == 'qr' ? 'qr' : 'cash';
   }
 }
 
@@ -401,6 +431,33 @@ class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
     } finally {
       ref.invalidate(driverTripHistoryProvider);
       ref.invalidate(driverOffersProvider);
+    }
+  }
+
+  Future<void> sendCounterOffer(DriverTrip trip, double amount) async {
+    final session = ref.read(driverSessionProvider);
+    if (session.token.isEmpty || session.driverId.isEmpty) {
+      throw Exception('Inicia sesión para enviar una contraoferta');
+    }
+    try {
+      final reserved = await _repository.accept(
+        token: session.token,
+        driverId: session.driverId,
+        trip: trip,
+        counterFare: amount,
+      );
+      state = AsyncData(reserved);
+      await _persistTrip();
+      ref.read(driverOffersProvider.notifier).removeOfferLocally(trip.id);
+      ref.invalidate(driverTripHistoryProvider);
+    } catch (_) {
+      // Recover a reservation if the response was lost after the server committed.
+      await loadOffer();
+      if (state.value?.id == trip.id &&
+          state.value?.hasPendingCounterOffer == true) {
+        return;
+      }
+      rethrow;
     }
   }
 

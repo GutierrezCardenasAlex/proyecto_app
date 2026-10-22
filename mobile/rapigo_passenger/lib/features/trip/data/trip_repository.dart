@@ -48,6 +48,10 @@ class TripRepository {
       driverName: payload['driver_name']?.toString(),
       driverPhone: payload['driver_phone']?.toString(),
       etaMinutes: _toNullableInt(payload['eta_minutes']),
+      fareAmount: _toNullableDouble(payload['fare_amount']),
+      counterOfferAmount: _toNullableDouble(payload['counter_offer_amount']),
+      counterOfferStatus: payload['counter_offer_status']?.toString(),
+      paymentMethod: _paymentMethodValue(payload['payment_method']),
       isPromotional: payload['promotional_trip'] == true,
     );
   }
@@ -227,6 +231,8 @@ class TripRepository {
     required String dispatchMode,
     LatLng? destinationLocation,
     String? preferredDriverId,
+    double? fareAmount,
+    String paymentMethod = 'cash',
   }) async {
     final destination = destinationLocation;
     final distanceMeters = destination == null
@@ -235,9 +241,13 @@ class TripRepository {
     final durationSeconds = destination == null
         ? 300
         : max(300, (distanceMeters / 5.5).round());
-    final fareAmount = destination == null
+    final estimatedFareAmount = destination == null
         ? 10
         : max(10, (distanceMeters / 700).ceil() * 3).toDouble();
+    final requestedFareAmount =
+        (fareAmount == null ? estimatedFareAmount : max(1, fareAmount))
+            .toDouble();
+    final requestedPaymentMethod = _paymentMethodValue(paymentMethod);
 
     final response = await http.post(
       Uri.parse('${AppConfig.apiBaseUrl}/trips'),
@@ -250,7 +260,8 @@ class TripRepository {
         'pickupLng': pickup.longitude,
         'estimatedDistanceMeters': distanceMeters,
         'estimatedDurationSeconds': durationSeconds,
-        'fareAmount': fareAmount,
+        'fareAmount': requestedFareAmount,
+        'paymentMethod': requestedPaymentMethod,
         'dispatchMode': dispatchMode,
         if (destination != null) 'destinationLat': destination.latitude,
         if (destination != null) 'destinationLng': destination.longitude,
@@ -282,10 +293,34 @@ class TripRepository {
       destinationLat: destination?.latitude,
       destinationLng: destination?.longitude,
       etaMinutes: _toNullableInt(payload['eta_minutes']),
+      fareAmount:
+          _toNullableDouble(payload['fare_amount']) ?? requestedFareAmount,
+      paymentMethod: _paymentMethodValue(
+        payload['payment_method'] ?? requestedPaymentMethod,
+      ),
       isPromotional:
           payload['reward_applied'] == true ||
           payload['promotional_trip'] == true,
     );
+  }
+
+  Future<TripRequest> respondCounterOffer({
+    required String token,
+    required String tripId,
+    required bool accept,
+  }) async {
+    final response = await http.post(
+      Uri.parse('${AppConfig.apiBaseUrl}/trips/$tripId/counter-offer/response'),
+      headers: _headers(token),
+      body: jsonEncode({'accept': accept}),
+    );
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode >= 400) {
+      throw Exception(
+        payload['message'] ?? 'No se pudo responder la contraoferta',
+      );
+    }
+    return _mapTripRequest(payload);
   }
 
   Future<TripRequest> updateTripStatus({
@@ -417,6 +452,11 @@ class TripRepository {
     return value.isEmpty ? null : value;
   }
 
+  static String _paymentMethodValue(Object? value) {
+    final normalized = value?.toString().trim().toLowerCase() ?? '';
+    return normalized == 'qr' ? 'qr' : 'cash';
+  }
+
   static String _guessVehicleType(String raw) {
     final normalized = raw.toLowerCase();
     if (normalized.contains('moto')) {
@@ -473,6 +513,29 @@ class TripController extends Notifier<TripState> {
     await _cache.writeRequest(request);
   }
 
+  Future<void> refreshCounterOffer({
+    required String token,
+    required String passengerId,
+  }) async {
+    final request = await _repository.fetchActiveTrip(
+      token: token,
+      passengerId: passengerId,
+    );
+    if (request != null) {
+      state = state.copyWith(request: request, clearError: true);
+      await _persistRequest();
+    } else if (state.request.hasPendingCounterOffer) {
+      state = state.copyWith(
+        request: state.request.copyWith(
+          status: 'cancelled',
+          counterOfferStatus: 'rejected',
+        ),
+        clearError: true,
+      );
+      await _persistRequest();
+    }
+  }
+
   Future<void> loadDashboard({
     required String token,
     required String passengerId,
@@ -520,6 +583,8 @@ class TripController extends Notifier<TripState> {
     required String dispatchMode,
     LatLng? destinationLocation,
     String? preferredDriverId,
+    double? fareAmount,
+    String paymentMethod = 'cash',
   }) async {
     state = state.copyWith(isRequestingTrip: true, clearError: true);
     try {
@@ -532,6 +597,8 @@ class TripController extends Notifier<TripState> {
         dispatchMode: dispatchMode,
         destinationLocation: destinationLocation,
         preferredDriverId: preferredDriverId,
+        fareAmount: fareAmount,
+        paymentMethod: paymentMethod,
       );
 
       state = state.copyWith(
@@ -584,6 +651,28 @@ class TripController extends Notifier<TripState> {
     }
     updated.sort((a, b) => a.distanceMeters.compareTo(b.distanceMeters));
     state = state.copyWith(nearbyDrivers: updated, clearError: true);
+  }
+
+  Future<void> respondCounterOffer({
+    required String token,
+    required String tripId,
+    required bool accept,
+  }) async {
+    final request = await _repository.respondCounterOffer(
+      token: token,
+      tripId: tripId,
+      accept: accept,
+    );
+    state = state.copyWith(
+      request: state.request.copyWith(
+        status: request.status,
+        fareAmount: request.fareAmount,
+        counterOfferAmount: request.counterOfferAmount,
+        counterOfferStatus: request.counterOfferStatus,
+      ),
+      clearError: true,
+    );
+    await _persistRequest();
   }
 
   Future<void> updateTripStatus({

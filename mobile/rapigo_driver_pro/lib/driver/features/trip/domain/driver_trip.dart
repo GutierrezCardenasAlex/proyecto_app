@@ -19,7 +19,10 @@ class DriverTrip {
     this.dispatchMode,
     this.preferredDriverId,
     this.offerExpiresAt,
+    this.paymentMethod = 'cash',
     this.isPromotional = false,
+    this.counterOfferAmount,
+    this.counterOfferStatus,
   });
 
   final String id;
@@ -41,7 +44,15 @@ class DriverTrip {
   final String? dispatchMode;
   final String? preferredDriverId;
   final String? offerExpiresAt;
+  final String paymentMethod;
   final bool isPromotional;
+  final double? counterOfferAmount;
+  final String? counterOfferStatus;
+
+  bool get hasPendingCounterOffer =>
+      status == 'accepted' && counterOfferStatus == 'pending';
+
+  String get paymentMethodLabel => paymentMethod == 'qr' ? 'QR' : 'Efectivo';
 
   bool get isDirectedRequest {
     final mode = dispatchMode?.trim().toLowerCase();
@@ -69,7 +80,10 @@ class DriverTrip {
     String? dispatchMode,
     String? preferredDriverId,
     String? offerExpiresAt,
+    String? paymentMethod,
     bool? isPromotional,
+    double? counterOfferAmount,
+    String? counterOfferStatus,
   }) {
     return DriverTrip(
       id: id ?? this.id,
@@ -91,7 +105,10 @@ class DriverTrip {
       dispatchMode: dispatchMode ?? this.dispatchMode,
       preferredDriverId: preferredDriverId ?? this.preferredDriverId,
       offerExpiresAt: offerExpiresAt ?? this.offerExpiresAt,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
       isPromotional: isPromotional ?? this.isPromotional,
+      counterOfferAmount: counterOfferAmount ?? this.counterOfferAmount,
+      counterOfferStatus: counterOfferStatus ?? this.counterOfferStatus,
     );
   }
 }

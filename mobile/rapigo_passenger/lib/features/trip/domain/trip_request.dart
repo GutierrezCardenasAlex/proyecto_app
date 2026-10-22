@@ -17,7 +17,11 @@ class TripRequest {
     this.driverName,
     this.driverPhone,
     this.etaMinutes,
+    this.fareAmount,
+    this.paymentMethod = 'cash',
     this.isPromotional = false,
+    this.counterOfferAmount,
+    this.counterOfferStatus,
   });
 
   final String pickupAddress;
@@ -37,7 +41,14 @@ class TripRequest {
   final String? driverName;
   final String? driverPhone;
   final int? etaMinutes;
+  final double? fareAmount;
+  final String paymentMethod;
   final bool isPromotional;
+  final double? counterOfferAmount;
+  final String? counterOfferStatus;
+
+  bool get hasPendingCounterOffer =>
+      status == 'accepted' && counterOfferStatus == 'pending';
 
   TripRequest copyWith({
     String? pickupAddress,
@@ -57,7 +68,11 @@ class TripRequest {
     String? driverName,
     String? driverPhone,
     int? etaMinutes,
+    double? fareAmount,
+    String? paymentMethod,
     bool? isPromotional,
+    double? counterOfferAmount,
+    String? counterOfferStatus,
     bool clearTripId = false,
   }) {
     return TripRequest(
@@ -78,7 +93,11 @@ class TripRequest {
       driverName: driverName ?? this.driverName,
       driverPhone: driverPhone ?? this.driverPhone,
       etaMinutes: etaMinutes ?? this.etaMinutes,
+      fareAmount: fareAmount ?? this.fareAmount,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
       isPromotional: isPromotional ?? this.isPromotional,
+      counterOfferAmount: counterOfferAmount ?? this.counterOfferAmount,
+      counterOfferStatus: counterOfferStatus ?? this.counterOfferStatus,
     );
   }
 }

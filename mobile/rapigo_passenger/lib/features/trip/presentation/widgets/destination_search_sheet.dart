@@ -68,203 +68,140 @@ class _DestinationSearchSheetState extends State<DestinationSearchSheet> {
   @override
   Widget build(BuildContext context) {
     final suggestions = _suggestions;
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-
     return ColoredBox(
-      color: const Color(0xFFF8FAFC),
+      color: const Color(0xFFF5F6FA),
       child: SafeArea(
-        bottom: false,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final availableHeight =
-                (constraints.maxHeight - bottomInset).clamp(0.0, double.infinity);
-            return Padding(
-              padding: EdgeInsets.fromLTRB(20, 14, 20, bottomInset),
-              child: SizedBox(
-                width: constraints.maxWidth,
-                height: availableHeight,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 46,
-                        height: 5,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFD7DCE4),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
+        child: Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          child: ListView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            children: [
+              Row(
+                children: [
+                  IconButton(
+                    tooltip: 'Volver al mapa',
+                    onPressed: _handleClose,
+                    icon: const Icon(Icons.arrow_back_rounded),
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Agrega tu destino',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        IconButton.filled(
-                          onPressed: _handleClose,
-                          style: IconButton.styleFrom(
-                            backgroundColor: AppBrand.surfaceSoft,
-                            foregroundColor: AppBrand.textPrimary,
-                          ),
-                          icon: const Icon(Icons.arrow_back_rounded),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'Agregar parada',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800,
-                              color: AppBrand.textPrimary,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 56),
-                      ],
-                    ),
-                    const SizedBox(height: 22),
-                    Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(28),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color(0x100F172A),
-                            blurRadius: 18,
-                            offset: Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          _SheetFieldRow(
-                            dotColor: const Color(0xFF16A34A),
-                            title: 'Origen',
-                            value: widget.originLabel,
-                          ),
-                          const SizedBox(height: 12),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppBrand.surfaceSoft,
-                              borderRadius: BorderRadius.circular(24),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.search_rounded,
-                                  color: AppBrand.primaryBlue,
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                   child: TextField(
-                                     controller: _controller,
-                                     autofocus: widget.autofocusSearch,
-                                     textInputAction: TextInputAction.search,
-                                    onChanged: (_) => setState(() {}),
-                                    onSubmitted: (_) {
-                                      final first = suggestions.isEmpty
-                                          ? null
-                                          : suggestions.first;
-                                      if (first != null) {
-                                        _handleSuggestionTap(first);
-                                      }
-                                    },
-                                    decoration: const InputDecoration(
-                                      hintText: 'Destino - ¿A dónde vas?',
-                                      border: InputBorder.none,
-                                      hintStyle: TextStyle(
-                                        color: AppBrand.textSecondary,
-                                      ),
-                                    ),
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppBrand.textPrimary,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                FilledButton.tonal(
-                                  onPressed: _handleMapTap,
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor: AppBrand.surfaceMuted,
-                                    foregroundColor: AppBrand.primaryBlue,
-                                    minimumSize: const Size(66, 42),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                  ),
-                                  child: const Text('Mapa'),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    if (_controller.text.trim().isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 14),
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 12,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
-                          ),
-                          child: Text(
-                            'Ingresa una ubicación o usa Mapa para fijar el punto exacto.',
-                            style: GoogleFonts.plusJakartaSans(
-                              color: AppBrand.textSecondary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                    Expanded(
-                      child: suggestions.isEmpty
-                          ? Center(
-                              child: Text(
-                                'No encontramos coincidencias todavía.',
-                                style: GoogleFonts.plusJakartaSans(
-                                  color: AppBrand.textSecondary,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            )
-                          : ListView.separated(
-                              padding: const EdgeInsets.only(bottom: 28),
-                              itemCount: suggestions.length,
-                              separatorBuilder: (_, _) =>
-                                  const SizedBox(height: 10),
-                              itemBuilder: (context, index) {
-                                final place = suggestions[index];
-                                return _SheetSuggestionTile(
-                                  place: place,
-                                  onTap: () => _handleSuggestionTap(place),
-                                );
-                              },
-                            ),
-                    ),
-                  ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                '¿A dónde quieres ir?',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  color: AppBrand.textPrimary,
                 ),
               ),
-            );
-          },
+              const SizedBox(height: 8),
+              const Text(
+                'Busca un lugar o marca el punto exacto en el mapa.',
+                style: TextStyle(color: AppBrand.textSecondary, height: 1.5),
+              ),
+              const SizedBox(height: 22),
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: _SheetFieldRow(
+                  dotColor: AppBrand.success,
+                  title: 'Origen',
+                  value: widget.originLabel,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _controller,
+                autofocus: widget.autofocusSearch,
+                textInputAction: TextInputAction.search,
+                onChanged: (_) => setState(() {}),
+                onSubmitted: (_) {
+                  if (suggestions.isNotEmpty) {
+                    _handleSuggestionTap(suggestions.first);
+                  }
+                },
+                decoration: InputDecoration(
+                  labelText: 'Destino',
+                  hintText: 'Escribe una dirección o lugar',
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: _controller.text.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: 'Borrar búsqueda',
+                          onPressed: () => setState(_controller.clear),
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    borderSide: const BorderSide(color: Color(0xFFE8EBF2)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _handleMapTap,
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(50),
+                  foregroundColor: AppBrand.secondaryBlue,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                icon: const Icon(Icons.add_location_alt_outlined),
+                label: const Text('Elegir en el mapa'),
+              ),
+              const SizedBox(height: 26),
+              Text(
+                _controller.text.trim().isEmpty
+                    ? 'Lugares sugeridos'
+                    : 'Resultados',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (suggestions.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(18),
+                  child: Text(
+                    'No encontramos ese lugar. Prueba otro nombre o elige el punto en el mapa.',
+                    style: TextStyle(
+                      color: AppBrand.textSecondary,
+                      height: 1.5,
+                    ),
+                  ),
+                )
+              else
+                ...suggestions.map(
+                  (place) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _SheetSuggestionTile(
+                      place: place,
+                      onTap: () => _handleSuggestionTap(place),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

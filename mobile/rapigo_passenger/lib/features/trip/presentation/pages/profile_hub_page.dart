@@ -27,453 +27,289 @@ class ProfileHubPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
-    final safeCycleLength = session.promoCycleLength <= 0
+    final cycleLength = session.promoCycleLength <= 0
         ? 5
         : session.promoCycleLength;
-    final normalizedProgress = session.promoProgressCount
-        .clamp(0, safeCycleLength)
-        .toInt();
-    final cycleProgress = session.freeTripCredits > 0 ? 0 : normalizedProgress;
-    final progressValue = cycleProgress / safeCycleLength;
+    final progress = session.promoProgressCount.clamp(0, cycleLength).toInt();
+    final hasFreeTrip = session.freeTripCredits > 0;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F7),
+      backgroundColor: const Color(0xFFF5F6FA),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFF5F6FA),
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+          tooltip: 'Volver',
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text(
+          'Cuenta',
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            color: AppBrand.textPrimary,
+          ),
+        ),
+      ),
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  Row(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 600),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _AccountIdentity(
+                    name: session.fullName.trim().isEmpty
+                        ? 'Pasajero'
+                        : session.fullName.trim(),
+                    phone: session.phone,
+                    onEdit: () => _openPage(context, const ProfilePage()),
+                  ),
+                  if (session.promoEnabled) ...[
+                    const SizedBox(height: 20),
+                    _BenefitsCard(
+                      progress: progress,
+                      cycleLength: cycleLength,
+                      credits: session.freeTripCredits,
+                      hasFreeTrip: hasFreeTrip,
+                      onTap: () => _openPage(context, const PromotionsPage()),
+                    ),
+                  ],
+                  const SizedBox(height: 28),
+                  _AccountSection(
+                    title: 'Tu actividad',
                     children: [
-                      IconButton.filled(
-                        onPressed: () => Navigator.of(context).pop(),
-                        style: IconButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: AppBrand.textPrimary,
-                        ),
-                        icon: const Icon(Icons.arrow_back_rounded),
+                      _AccountMenuTile(
+                        icon: Icons.receipt_long_outlined,
+                        title: 'Mis viajes',
+                        subtitle:
+                            '${session.completedTripCount} viajes completados',
+                        onTap: () {
+                          onGoTrips();
+                          Navigator.of(context).pop();
+                        },
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Cuenta',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 26,
-                                fontWeight: FontWeight.w900,
-                                color: AppBrand.textPrimary,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            const Text(
-                              'Tu perfil y accesos de RAPIGO',
-                              style: TextStyle(
-                                color: AppBrand.textSecondary,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
+                      _AccountMenuTile(
+                        icon: Icons.notifications_none_rounded,
+                        title: 'Notificaciones',
+                        subtitle: 'Avisos y novedades',
+                        trailing: _InboxBadge(token: session.token),
+                        onTap: () =>
+                            _openPage(context, const NotificationsPage()),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 24),
+                  _AccountSection(
+                    title: 'Preferencias y ayuda',
+                    children: [
+                      _AccountMenuTile(
+                        icon: Icons.tune_rounded,
+                        title: 'Configuración',
+                        subtitle: 'Preferencias de la aplicación',
+                        onTap: () => _openPage(context, const SettingsPage()),
+                      ),
+                      _AccountMenuTile(
+                        icon: Icons.support_agent_rounded,
+                        title: 'Soporte',
+                        subtitle: 'Ayuda y seguimiento de reportes',
+                        trailing: _SupportBadge(token: session.token),
+                        onTap: () => _openPage(context, const SupportPage()),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      onLogout();
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppBrand.danger,
+                      side: const BorderSide(color: Color(0xFFE8EBF2)),
+                      minimumSize: const Size.fromHeight(52),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    icon: const Icon(Icons.logout_rounded, size: 20),
+                    label: const Text('Cerrar sesión'),
                   ),
                   const SizedBox(height: 20),
-                  Container(
-                    padding: const EdgeInsets.all(22),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(32),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x120F172A),
-                          blurRadius: 28,
-                          offset: Offset(0, 12),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 82,
-                              height: 82,
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: LinearGradient(
-                                  colors: [
-                                    Color(0xFF0F6CBD),
-                                    Color(0xFF38BDF8),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                              ),
-                              child: const Icon(
-                                Icons.person_rounded,
-                                size: 36,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    session.fullName,
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppBrand.textPrimary,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    session.phone,
-                                    style: const TextStyle(
-                                      color: AppBrand.textSecondary,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Wrap(
-                                    spacing: 8,
-                                    runSpacing: 8,
-                                    children: const [
-                                      _ProfilePill(
-                                        icon: Icons.verified_rounded,
-                                        label: 'Verificado',
-                                      ),
-                                      _ProfilePill(
-                                        icon: Icons.star_rounded,
-                                        label: 'Cuenta activa',
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF0F6CBD), Color(0xFF38BDF8)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(28),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x220F6CBD),
-                          blurRadius: 28,
-                          offset: Offset(0, 12),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                session.freeTripCredits > 0
-                                    ? 'Tu viaje gratis ya esta listo'
-                                    : 'Viajes y beneficios',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.16),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Text(
-                                '${session.completedTripCount} viajes',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          session.freeTripCredits > 0
-                              ? 'Tu siguiente viaje ya puede salir gratis.'
-                              : '$cycleProgress de $safeCycleLength viajes para desbloquear tu siguiente beneficio.',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                            height: 1.4,
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(999),
-                          child: LinearProgressIndicator(
-                            value: progressValue.clamp(0.0, 1.0),
-                            minHeight: 10,
-                            backgroundColor: Colors.white.withValues(
-                              alpha: 0.18,
-                            ),
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              Color(0xFFFACC15),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _QuickAccessCard(
-                          icon: Icons.home_rounded,
-                          label: 'Inicio',
-                          onTap: () {
-                            onGoHome();
-                            Navigator.of(context).pop();
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _QuickAccessCard(
-                          icon: Icons.history_rounded,
-                          label: 'Tus viajes',
-                          onTap: () {
-                            onGoTrips();
-                            Navigator.of(context).pop();
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _QuickAccessCard(
-                          icon: Icons.edit_outlined,
-                          label: 'Editar',
-                          onTap: () {
-                            _openPage(context, const ProfilePage());
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(28),
-                    ),
-                    child: Column(
-                      children: [
-                        _ProfileMenuTile(
-                          icon: Icons.edit_outlined,
-                          title: 'Editar perfil',
-                          subtitle:
-                              'Nombre, telefono, correo y datos visuales.',
-                          onTap: () => _openPage(context, const ProfilePage()),
-                        ),
-                        const SizedBox(height: 8),
-                        _ProfileMenuTile(
-                          icon: Icons.sell_rounded,
-                          title: 'Promociones',
-                          subtitle:
-                              'Beneficios, descuentos y regalos disponibles.',
-                          onTap: () =>
-                              _openPage(context, const PromotionsPage()),
-                        ),
-                        const SizedBox(height: 8),
-                        _ProfileMenuTile(
-                          icon: Icons.notifications_none_rounded,
-                          title: 'Notificaciones',
-                          subtitle: 'Mensajes, avisos y novedades recientes.',
-                          trailing: _InboxBadge(token: session.token),
-                          onTap: () =>
-                              _openPage(context, const NotificationsPage()),
-                        ),
-                        const SizedBox(height: 8),
-                        _ProfileMenuTile(
-                          icon: Icons.support_agent_rounded,
-                          title: 'Soporte',
-                          subtitle: 'Ayuda, reportes y asistencia.',
-                          trailing: _SupportBadge(token: session.token),
-                          onTap: () => _openPage(context, const SupportPage()),
-                        ),
-                        const SizedBox(height: 8),
-                        _ProfileMenuTile(
-                          icon: Icons.settings_rounded,
-                          title: 'Configuraciones',
-                          subtitle: 'Preferencias, mapas y ajustes de la app.',
-                          onTap: () => _openPage(context, const SettingsPage()),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  const _AppVersionCard(),
-                  const SizedBox(height: 18),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        onLogout();
-                      },
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppBrand.danger,
-                        side: const BorderSide(color: Color(0xFFFECACA)),
-                        backgroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                      ),
-                      icon: const Icon(Icons.logout_rounded),
-                      label: const Text('Cerrar sesion'),
-                    ),
-                  ),
-                ]),
+                  const _AppVersionFooter(),
+                ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _AppVersionCard extends StatelessWidget {
-  const _AppVersionCard();
+class _AccountIdentity extends StatelessWidget {
+  const _AccountIdentity({
+    required this.name,
+    required this.phone,
+    required this.onEdit,
+  });
+
+  final String name;
+  final String phone;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<PackageInfo>(
-      future: PackageInfo.fromPlatform(),
-      builder: (context, snapshot) {
-        final info = snapshot.data;
-        final version = info == null
-            ? 'Cargando version...'
-            : 'Version ${info.version}+${info.buildNumber}';
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: const Color(0xFFE5E7EB)),
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: const Color(0xFFE8EBF2)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 76,
+            height: 76,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8EEFF),
+              borderRadius: BorderRadius.circular(26),
+            ),
+            child: const Icon(
+              Icons.person_rounded,
+              size: 38,
+              color: AppBrand.secondaryBlue,
+            ),
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Color(0xFFEFF6FF),
-                ),
-                child: const Icon(
-                  Icons.info_outline_rounded,
-                  color: AppBrand.primaryBlue,
-                  size: 21,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'RAPIGO Pasajero',
-                      style: TextStyle(
-                        color: AppBrand.textPrimary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      version,
-                      style: const TextStyle(
-                        color: AppBrand.textSecondary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          const SizedBox(height: 16),
+          Text(
+            name,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.plusJakartaSans(
+              color: AppBrand.textPrimary,
+              fontSize: 24,
+              height: 1.25,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.6,
+            ),
           ),
-        );
-      },
+          if (phone.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              phone,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppBrand.textSecondary,
+                fontSize: 15,
+              ),
+            ),
+          ],
+          const SizedBox(height: 20),
+          FilledButton.icon(
+            onPressed: onEdit,
+            style: FilledButton.styleFrom(
+              backgroundColor: AppBrand.secondaryBlue,
+              foregroundColor: Colors.white,
+              minimumSize: const Size.fromHeight(48),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            icon: const Icon(Icons.edit_outlined, size: 18),
+            label: const Text('Editar perfil'),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _QuickAccessCard extends StatelessWidget {
-  const _QuickAccessCard({
-    required this.icon,
-    required this.label,
+class _BenefitsCard extends StatelessWidget {
+  const _BenefitsCard({
+    required this.progress,
+    required this.cycleLength,
+    required this.credits,
+    required this.hasFreeTrip,
     required this.onTap,
   });
 
-  final IconData icon;
-  final String label;
+  final int progress;
+  final int cycleLength;
+  final int credits;
+  final bool hasFreeTrip;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: AppBrand.secondaryBlue,
       borderRadius: BorderRadius.circular(24),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(24),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
+          padding: const EdgeInsets.all(22),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: AppBrand.surfaceSoft,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(icon, color: AppBrand.primaryBlue),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.redeem_rounded,
+                    color: AppBrand.accentYellow,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Tus beneficios',
+                      style: GoogleFonts.plusJakartaSans(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: Colors.white70,
+                  ),
+                ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 16),
               Text(
-                label,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: AppBrand.textPrimary,
-                  fontWeight: FontWeight.w800,
+                hasFreeTrip
+                    ? (credits == 1
+                          ? 'Tienes un viaje gratis disponible'
+                          : 'Tienes $credits viajes gratis disponibles')
+                    : '$progress de $cycleLength viajes para tu próximo beneficio',
+                style: const TextStyle(color: Colors.white, height: 1.5),
+              ),
+              const SizedBox(height: 14),
+              LinearProgressIndicator(
+                value: hasFreeTrip ? 1 : progress / cycleLength,
+                minHeight: 6,
+                borderRadius: BorderRadius.circular(99),
+                backgroundColor: Colors.white24,
+                color: AppBrand.accentYellow,
+                semanticsLabel: 'Progreso de beneficios',
+                semanticsValue: hasFreeTrip
+                    ? 'Beneficio disponible'
+                    : '$progress de $cycleLength viajes',
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Ver promociones y beneficios',
+                style: TextStyle(
+                  color: Colors.white,
                   fontSize: 12,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
@@ -484,8 +320,57 @@ class _QuickAccessCard extends StatelessWidget {
   }
 }
 
-class _ProfileMenuTile extends StatelessWidget {
-  const _ProfileMenuTile({
+class _AccountSection extends StatelessWidget {
+  const _AccountSection({required this.title, required this.children});
+
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 12),
+          child: Text(
+            title,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: AppBrand.textPrimary,
+            ),
+          ),
+        ),
+        Material(
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+            side: const BorderSide(color: Color(0xFFE8EBF2)),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              for (var index = 0; index < children.length; index++) ...[
+                if (index > 0)
+                  const Divider(
+                    height: 1,
+                    indent: 68,
+                    endIndent: 18,
+                    color: Color(0xFFEEF0F5),
+                  ),
+                children[index],
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AccountMenuTile extends StatelessWidget {
+  const _AccountMenuTile({
     required this.icon,
     required this.title,
     required this.subtitle,
@@ -501,92 +386,80 @@ class _ProfileMenuTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: AppBrand.surfaceSoft,
-      borderRadius: BorderRadius.circular(24),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(24),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(icon, color: AppBrand.primaryBlue),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: AppBrand.textPrimary,
-                      ),
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+        child: Row(
+          children: [
+            Icon(icon, color: AppBrand.secondaryBlue, size: 24),
+            const SizedBox(width: 18),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppBrand.textPrimary,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        color: AppBrand.textSecondary,
-                        fontWeight: FontWeight.w600,
-                        height: 1.35,
-                      ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: AppBrand.textSecondary,
+                      fontSize: 12,
+                      height: 1.4,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              if (trailing != null) ...[trailing!, const SizedBox(width: 10)],
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: AppBrand.textSecondary,
-              ),
-            ],
-          ),
+            ),
+            if (trailing != null) ...[const SizedBox(width: 8), trailing!],
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppBrand.textSecondary,
+              size: 20,
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _ProfilePill extends StatelessWidget {
-  const _ProfilePill({required this.icon, required this.label});
+class _AppVersionFooter extends StatefulWidget {
+  const _AppVersionFooter();
 
-  final IconData icon;
-  final String label;
+  @override
+  State<_AppVersionFooter> createState() => _AppVersionFooterState();
+}
+
+class _AppVersionFooterState extends State<_AppVersionFooter> {
+  late final Future<PackageInfo> _info = PackageInfo.fromPlatform();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppBrand.surfaceSoft,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: AppBrand.primaryBlue),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              color: AppBrand.textPrimary,
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
-            ),
+    return FutureBuilder<PackageInfo>(
+      future: _info,
+      builder: (context, snapshot) {
+        final info = snapshot.data;
+        return Text(
+          info == null
+              ? 'Rápigo Pasajero'
+              : 'Rápigo Pasajero · Versión ${info.version}+${info.buildNumber}',
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: AppBrand.textSecondary,
+            fontSize: 11,
+            height: 1.5,
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

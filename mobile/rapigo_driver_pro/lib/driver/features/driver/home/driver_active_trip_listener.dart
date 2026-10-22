@@ -19,8 +19,13 @@ class _DriverActiveTripListenerState
 
   bool _shouldOpenTripFlow(DriverTrip? trip) {
     return trip != null &&
-        const {'accepted', 'arriving', 'at_pickup', 'in_progress'}
-            .contains(trip.status);
+        !trip.hasPendingCounterOffer &&
+        const {
+          'accepted',
+          'arriving',
+          'at_pickup',
+          'in_progress',
+        }.contains(trip.status);
   }
 
   void _handleTrip(DriverTrip? trip) {

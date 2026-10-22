@@ -453,6 +453,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
   double? _savedHomeZoom;
   double? _savedHomeBearing;
   Timer? _mapViewPersistDebounce;
+  Timer? _counterOfferRefresh;
   final String _debugMarkerStyle = 'rapigo';
   final double _debugMarkerScale = 1.08;
   final double _debugMarkerOffsetX = 0;
@@ -468,6 +469,20 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
   @override
   void initState() {
     super.initState();
+    _counterOfferRefresh = Timer.periodic(const Duration(seconds: 5), (
+      _,
+    ) async {
+      if (ref.read(offeredTripProvider).value?.hasPendingCounterOffer == true) {
+        await ref.read(offeredTripProvider.notifier).loadOffer();
+        if (mounted &&
+            ref.read(offeredTripProvider).value?.hasPendingCounterOffer !=
+                true) {
+          await ref
+              .read(driverStateProvider.notifier)
+              .restoreOperationalState(force: true);
+        }
+      }
+    });
     unawaited(_restoreMapViewPreferences());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _mapReadyLogged) {
@@ -618,6 +633,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
 
   @override
   void dispose() {
+    _counterOfferRefresh?.cancel();
     _mapViewPersistDebounce?.cancel();
     super.dispose();
   }
@@ -1506,7 +1522,9 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final palette = context.rapigoPalette;
+    ref.listen(driverStateProvider.select((s) => (s.lat, s.lng)), (_, next) {
+      unawaited(_refreshStreetChip());
+    });
     final metrics = context.rapigoMetrics;
     final textTheme = Theme.of(context).textTheme;
     ref.listen<String?>(driverStateProvider.select((s) => s.errorMessage), (
@@ -1553,7 +1571,8 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
     final selectedIncomingOffer = pendingOffers
         .where((offer) => offer.id == _selectedIncomingOfferId)
         .firstOrNull;
-    final incomingOverlayTrip = isPreviewingRoute
+    final incomingOverlayTrip =
+        (isPreviewingRoute || trip?.hasPendingCounterOffer == true)
         ? trip
         : (selectedIncomingOffer ??
               (pendingOffers.isNotEmpty ? pendingOffers.first : null));
@@ -1563,7 +1582,6 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
         ? 'accepted'
         : mapTrip?.status;
     final showIncomingRouteOnMap = incomingOverlayTrip != null;
-    final availableOffersCount = pendingOffers.length;
     final defaultHomeIdleZoom = _wideMapMode
         ? (_kFixedZoom - 0.33)
         : _kFixedZoom;
@@ -1745,335 +1763,99 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                 children: [
                   Positioned(
                     left: 0,
-                    top: 0,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _DriverMapCircleButton(
-                          icon: Icons.menu_rounded,
-                          onTap: () => _openHomeQuickSheet(
-                            available: available,
-                            fullName: session.fullName,
-                            trip: trip,
-                            offersAsync: offersAsync,
-                          ),
-                          size: 66,
-                          backgroundColor: palette.surfaceInteractive
-                              .withValues(alpha: 0.98),
-                          iconColor: const Color(0xFF111111),
-                          shadowColor: palette.shadowSoft,
-                        ),
-                        SizedBox(height: metrics.itemGap - 2),
-                        GestureDetector(
-                          onTap: () async {
-                            await ref
-                                .read(driverStateProvider.notifier)
-                                .toggleAvailability(!available);
-                          },
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 220),
-                            width: 38,
-                            height: 38,
-                            decoration: BoxDecoration(
-                              color: palette.surfaceInteractive.withValues(
-                                alpha: 0.96,
-                              ),
-                              borderRadius: BorderRadius.circular(999),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: palette.shadowSoft.withValues(
-                                    alpha: 0.72,
-                                  ),
-                                  blurRadius: 18,
-                                  offset: const Offset(0, 8),
-                                ),
-                              ],
-                            ),
-                            child: Center(
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 220),
-                                width: 16,
-                                height: 16,
-                                decoration: BoxDecoration(
-                                  color: available
-                                      ? palette.accentGreen
-                                      : palette.accentDanger,
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color:
-                                          (available
-                                                  ? palette.accentGreen
-                                                  : palette.accentDanger)
-                                              .withValues(alpha: 0.45),
-                                      blurRadius: 10,
-                                      spreadRadius: 1,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Positioned(
-                    top: 0,
                     right: 0,
-                    child: GestureDetector(
-                      onTap: () async {
+                    top: 0,
+                    child: DriverHomeHeader(
+                      available: available,
+                      onMenuTap: () => _openHomeQuickSheet(
+                        available: available,
+                        fullName: session.fullName,
+                        trip: trip,
+                        offersAsync: offersAsync,
+                      ),
+                      onAvailabilityTap: () async {
                         await ref
                             .read(driverStateProvider.notifier)
                             .toggleAvailability(!available);
                       },
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 220),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 18,
-                          vertical: 14,
-                        ),
-                        decoration: BoxDecoration(
-                          color: palette.surfaceInteractive.withValues(
-                            alpha: 0.97,
-                          ),
-                          borderRadius: BorderRadius.circular(
-                            metrics.radiusMedium,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: palette.shadowSoft.withValues(alpha: 0.72),
-                              blurRadius: 18,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              available
-                                  ? Icons.toggle_on_rounded
-                                  : Icons.toggle_off_rounded,
-                              color: available
-                                  ? palette.accentGreen
-                                  : palette.accentDanger,
-                              size: 28,
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
-                              available ? 'Activo' : 'Inactivo',
-                              style: textTheme.labelLarge?.copyWith(
-                                color: const Color(0xFF111111),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                     ),
                   ),
                   Positioned(
                     left: 0,
-                    bottom: 120,
+                    bottom: 100,
                     child: _DriverSpeedBubble(speedKph: speedKph),
                   ),
                   Positioned(
-                    right: 0,
-                    bottom: 116,
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        _DriverMapCircleButton(
-                          icon: Icons.warning_amber_rounded,
-                          onTap: _toggleAdvancedMapMode,
-                          onLongPress: () => _openAvailableTripsPage(
-                            trip: trip,
-                            offersAsync: offersAsync,
-                          ),
-                          size: 78,
-                          backgroundColor: palette.accentYellow,
-                          iconColor: const Color(0xFF111111),
-                          shadowColor: const Color(0x33B45309),
-                        ),
-                        if (availableOffersCount > 0)
-                          Positioned(
-                            right: 8,
-                            top: 8,
-                            child: Container(
-                              constraints: const BoxConstraints(minWidth: 22),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: palette.surfacePrimary,
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Text(
-                                '$availableOffersCount',
-                                textAlign: TextAlign.center,
-                                style: textTheme.labelSmall?.copyWith(
-                                  color: palette.textPrimary,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  Positioned(
                     left: 0,
-                    right: 0,
-                    bottom: 116,
-                    child: Center(
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(22),
-                          onTap: _toggleAdvancedMapMode,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 13,
-                            ),
-                            decoration: BoxDecoration(
-                              color: palette.accentBlueSoft,
-                              borderRadius: BorderRadius.circular(
-                                metrics.radiusMedium,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: palette.accentBlueSoft.withValues(
-                                    alpha: 0.28,
-                                  ),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 6),
-                                ),
-                              ],
-                            ),
-                            child: Row(
+                    right: 72,
+                    bottom: 18,
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFDFEFE),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x200D1828),
+                            blurRadius: 18,
+                            offset: Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.near_me_outlined,
+                            color: Color(0xFF087F5B),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text(
-                                  (session.vehicleType.isNotEmpty
-                                          ? session.vehicleType
-                                          : 'Vehiculo')
-                                      .replaceFirstMapped(
-                                        RegExp(r'^[a-z]'),
-                                        (m) => m.group(0)!.toUpperCase(),
-                                      ),
-                                  style: textTheme.headlineMedium?.copyWith(
-                                    color: palette.textPrimary,
-                                    fontSize: 22,
+                                const Text(
+                                  'CALLE ACTUAL',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Color(0xFF64748B),
                                     fontWeight: FontWeight.w800,
                                   ),
                                 ),
-                                const SizedBox(width: 10),
-                                Icon(
-                                  Icons.keyboard_arrow_down_rounded,
-                                  color: palette.textPrimary,
-                                  size: 28,
+                                const SizedBox(height: 4),
+                                Text(
+                                  _streetChipLabel,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Color(0xFF0D1828),
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ],
                             ),
                           ),
-                        ),
+                        ],
                       ),
                     ),
                   ),
-                  if (_wideMapMode)
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 190,
-                      child: Center(
-                        child: Container(
-                          constraints: const BoxConstraints(maxWidth: 240),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 22,
-                            vertical: 16,
-                          ),
-                          decoration: BoxDecoration(
-                            color: palette.surfaceInteractive,
-                            borderRadius: BorderRadius.circular(
-                              metrics.radiusLarge,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: palette.shadowSoft.withValues(
-                                  alpha: 0.68,
-                                ),
-                                blurRadius: 18,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: Text(
-                            _streetChipLabel,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
-                            style: textTheme.titleMedium?.copyWith(
-                              color: const Color(0xFF111111),
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
                   Positioned(
-                    left: 0,
                     right: 0,
-                    bottom: 18,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(28),
-                        onTap: _openDriverCenterSheet,
-                        child: Container(
-                          height: 76,
-                          padding: const EdgeInsets.symmetric(horizontal: 22),
-                          decoration: BoxDecoration(
-                            color: palette.surfaceMuted,
-                            borderRadius: BorderRadius.circular(
-                              metrics.radiusLarge,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: palette.shadowSoft.withValues(
-                                  alpha: 0.35,
-                                ),
-                                blurRadius: 18,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.search_rounded,
-                                size: 34,
-                                color: palette.textMuted,
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Text(
-                                  'Centro del conductor',
-                                  style: textTheme.headlineMedium?.copyWith(
-                                    fontSize: 21,
-                                    fontWeight: FontWeight.w700,
-                                    color: const Color(0xFF4B5563),
-                                  ),
-                                ),
-                              ),
-                              const Icon(
-                                Icons.mic_none_rounded,
-                                size: 34,
-                                color: Color(0xFF111111),
-                              ),
-                            ],
-                          ),
+                    bottom: 22,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.sizeOf(context).width - 40,
+                      ),
+                      child: DriverHomeFab(
+                        vehicleLabel: session.vehicleType.isEmpty
+                            ? 'Vehículo'
+                            : session.vehicleType,
+                        onCenter: _openDriverCenterSheet,
+                        onMapMode: _toggleAdvancedMapMode,
+                        onOffers: () => _openAvailableTripsPage(
+                          trip: trip,
+                          offersAsync: offersAsync,
                         ),
                       ),
                     ),
@@ -2575,47 +2357,6 @@ class _DriverCompactInfoRow extends StatelessWidget {
   }
 }
 
-class _DriverMapCircleButton extends StatelessWidget {
-  const _DriverMapCircleButton({
-    required this.icon,
-    required this.onTap,
-    this.onLongPress,
-    this.iconColor = Colors.white,
-    this.size = 58,
-    this.backgroundColor,
-    this.shadowColor,
-  });
-
-  final IconData icon;
-  final VoidCallback onTap;
-  final VoidCallback? onLongPress;
-  final Color iconColor;
-  final double size;
-  final Color? backgroundColor;
-  final Color? shadowColor;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.rapigoPalette;
-    return Material(
-      color: backgroundColor ?? palette.surfacePrimary.withValues(alpha: 0.95),
-      shape: const CircleBorder(),
-      shadowColor: shadowColor ?? palette.shadowSoft,
-      elevation: 7,
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        onLongPress: onLongPress,
-        child: SizedBox(
-          width: size,
-          height: size,
-          child: Icon(icon, color: iconColor, size: size * 0.46),
-        ),
-      ),
-    );
-  }
-}
-
 class _DriverHomeOfferCard extends StatelessWidget {
   const _DriverHomeOfferCard({
     required this.trip,
@@ -2625,6 +2366,7 @@ class _DriverHomeOfferCard extends StatelessWidget {
     required this.onReject,
     required this.onPrimaryAction,
     required this.onExpired,
+    required this.onCounterOffer,
   });
 
   final DriverTrip trip;
@@ -2634,200 +2376,176 @@ class _DriverHomeOfferCard extends StatelessWidget {
   final VoidCallback onReject;
   final VoidCallback onPrimaryAction;
   final VoidCallback onExpired;
+  final VoidCallback onCounterOffer;
 
   @override
   Widget build(BuildContext context) {
     final passengerName = trip.passengerName?.trim().isNotEmpty == true
         ? trip.passengerName!.trim()
         : 'Pasajero';
-    const rejectLabel = 'Ignorar';
-    final accentColor = isPreviewingRoute
-        ? const Color(0xFF2979FF)
-        : const Color(0xFFFFC400);
-    const primaryLabel = 'Aceptar';
-    final primaryIcon = isPreviewingRoute
-        ? Icons.check_circle_rounded
-        : Icons.route_rounded;
-    final offerCountdownExpiresAt = _visibleOfferExpiresAt(trip);
-    final passengerPhone = (trip.passengerPhone ?? '').trim();
+    final pending = trip.hasPendingCounterOffer;
+    final expiresAt = pending ? null : _visibleOfferExpiresAt(trip);
     return Container(
       width: double.infinity,
-      constraints: const BoxConstraints(minHeight: 274),
-      padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xF207111D),
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: const Color(0x263A4558)),
+        color: const Color(0xFF0D1828),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: const Color(0xFF29374A)),
         boxShadow: const [
           BoxShadow(
-            color: Color(0xAA000000),
-            blurRadius: 34,
-            offset: Offset(0, 16),
+            color: Color(0x40000000),
+            blurRadius: 28,
+            offset: Offset(0, 10),
           ),
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Text(
+            pending
+                ? 'Esperando al pasajero'
+                : isPreviewingRoute
+                ? 'Confirma tu viaje'
+                : 'Un nuevo viaje para ti',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            pending
+                ? 'Propusiste Bs ${trip.counterOfferAmount?.toStringAsFixed(2)}. El viaje continúa solo si el pasajero acepta.'
+                : isPreviewingRoute
+                ? 'Revisa el recorrido y confirma para ir a recoger al pasajero.'
+                : 'Reserva el recorrido para revisarlo antes de confirmar.',
+            style: const TextStyle(
+              color: Color(0xFFADBBD0),
+              fontSize: 13,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _DriverOfferFarePanel(trip: trip),
+          const SizedBox(height: 16),
+          DriverRequestRoute(
+            pickup: trip.passengerPickup,
+            destination: trip.destination,
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 16,
+            runSpacing: 8,
             children: [
-              Expanded(
-                child: _DriverRequestTopMetric(
-                  icon: Icons.location_on_rounded,
-                  label: pickupDistanceLabel,
-                  color: const Color(0xFFFFC400),
-                ),
+              _DriverRequestTopMetric(
+                icon: Icons.near_me_outlined,
+                label: '$pickupDistanceLabel a recogida',
+                color: const Color(0xFFFFC400),
               ),
-              Expanded(
-                child: _DriverRequestTopMetric(
-                  icon: Icons.schedule_rounded,
-                  label: pickupEtaLabel,
-                  color: const Color(0xFFE6B93E),
-                ),
+              _DriverRequestTopMetric(
+                icon: Icons.schedule_rounded,
+                label: '~$pickupEtaLabel',
+                color: const Color(0xFFADBBD0),
               ),
             ],
           ),
           const SizedBox(height: 14),
-          const Divider(color: Color(0x243A4558), height: 1),
-          const SizedBox(height: 18),
           _DriverRequestPassengerBlock(
             passengerName: passengerName,
-            passengerPhone: passengerPhone,
+            passengerPhone: (trip.passengerPhone ?? '').trim(),
           ),
-          if (offerCountdownExpiresAt != null) ...[
-            const SizedBox(height: 16),
+          if (expiresAt != null) ...[
+            const SizedBox(height: 12),
             _DriverOfferCountdown(
-              expiresAt: offerCountdownExpiresAt,
+              expiresAt: expiresAt,
               onExpired: onExpired,
               showLabel: true,
-            ),
-          ] else ...[
-            const SizedBox(height: 16),
-            Center(child: Icon(primaryIcon, color: accentColor, size: 38)),
-          ],
-          if (isPreviewingRoute) ...[
-            const SizedBox(height: 12),
-            _DriverRequestSecondaryAction(
-              icon: Icons.visibility_rounded,
-              label: 'Recorrido revisado',
-              color: const Color(0xFF7DB7FF),
+              compact: true,
             ),
           ],
-          const SizedBox(height: 18),
-          const Divider(color: Color(0x243A4558), height: 1),
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              Expanded(
-                child: FilledButton(
-                  onPressed: onReject,
-                  style: ButtonStyle(
-                    minimumSize: const WidgetStatePropertyAll(
-                      Size.fromHeight(58),
-                    ),
-                    backgroundColor: WidgetStateProperty.resolveWith((states) {
-                      return states.contains(WidgetState.pressed)
-                          ? const Color(0xFF182235)
-                          : const Color(0xFF0B1422);
-                    }),
-                    foregroundColor: const WidgetStatePropertyAll(Colors.white),
-                    overlayColor: const WidgetStatePropertyAll(
-                      Color(0x22FFFFFF),
-                    ),
-                    elevation: WidgetStateProperty.resolveWith(
-                      (states) => states.contains(WidgetState.pressed) ? 1 : 0,
-                    ),
-                    shape: WidgetStatePropertyAll(
-                      RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(26),
-                        side: const BorderSide(color: Color(0xFF303B4D)),
+          const SizedBox(height: 16),
+          if (!pending && !isPreviewingRoute && !trip.isPromotional) ...[
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onCounterOffer,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFFFC400),
+                  minimumSize: const Size(0, 48),
+                ),
+                icon: const Icon(Icons.price_change_outlined),
+                label: const Text('Proponer otro precio'),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+          if (pending)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: onReject,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(0, 48),
+                ),
+                child: const Text('Cancelar solicitud'),
+              ),
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: OutlinedButton(
+                    onPressed: onReject,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: Color(0xFF536176)),
+                      minimumSize: const Size(0, 54),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 14,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.close_rounded, size: 22),
-                      SizedBox(width: 8),
-                      Text(
-                        rejectLabel,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 15,
-                        ),
-                      ),
-                    ],
+                    child: const Text('Ignorar'),
                   ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: FilledButton(
-                  onPressed: onPrimaryAction,
-                  style: ButtonStyle(
-                    minimumSize: const WidgetStatePropertyAll(
-                      Size.fromHeight(58),
-                    ),
-                    backgroundColor: WidgetStateProperty.resolveWith((states) {
-                      final base = isPreviewingRoute
-                          ? const Color(0xFF2979FF)
-                          : const Color(0xFFFFC400);
-                      final pressed = isPreviewingRoute
-                          ? const Color(0xFF2265E5)
-                          : const Color(0xFFEAB308);
-                      return states.contains(WidgetState.pressed)
-                          ? pressed
-                          : base;
-                    }),
-                    foregroundColor: const WidgetStatePropertyAll(
-                      Color(0xFF091223),
-                    ),
-                    overlayColor: const WidgetStatePropertyAll(
-                      Color(0x22000000),
-                    ),
-                    elevation: WidgetStateProperty.resolveWith(
-                      (states) => states.contains(WidgetState.pressed) ? 2 : 0,
-                    ),
-                    shadowColor: WidgetStatePropertyAll(
-                      accentColor.withValues(alpha: 0.35),
-                    ),
-                    shape: WidgetStatePropertyAll(
-                      RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(26),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 3,
+                  child: FilledButton(
+                    onPressed: onPrimaryAction,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFFFC400),
+                      foregroundColor: const Color(0xFF0D1828),
+                      minimumSize: const Size(0, 54),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 14,
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                  ),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      if (!isPreviewingRoute)
-                        const Align(
-                          alignment: Alignment.topRight,
-                          child: Icon(
-                            Icons.auto_awesome_rounded,
-                            color: Color(0x99FFFFFF),
-                            size: 22,
-                          ),
-                        ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            primaryLabel.toUpperCase(),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 15,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                    child: Text(
+                      isPreviewingRoute ? 'Confirmar viaje' : 'Ver recorrido',
+                      textAlign: TextAlign.center,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
         ],
       ),
     );
@@ -2866,6 +2584,93 @@ class _DriverRequestTopMetric extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _DriverOfferFarePanel extends StatelessWidget {
+  const _DriverOfferFarePanel({required this.trip});
+
+  final DriverTrip trip;
+
+  @override
+  Widget build(BuildContext context) {
+    final paymentIcon = trip.paymentMethod == 'qr'
+        ? Icons.qr_code_2_rounded
+        : Icons.payments_rounded;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF101A2B),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0x33FFC400)),
+      ),
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFC400),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: const Icon(
+              Icons.local_offer_rounded,
+              color: Color(0xFF091223),
+              size: 24,
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Oferta del pasajero',
+                style: TextStyle(
+                  color: Color(0xFFB9C4D6),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Bs ${trip.fareAmount.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  height: 1,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0B1422),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0x243A4558)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(paymentIcon, color: const Color(0xFFFFC400), size: 18),
+                const SizedBox(width: 7),
+                Text(
+                  trip.paymentMethodLabel,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -2943,50 +2748,6 @@ class _DriverRequestPassengerBlock extends StatelessWidget {
   }
 }
 
-class _DriverRequestSecondaryAction extends StatelessWidget {
-  const _DriverRequestSecondaryAction({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 44,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.11),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.26)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: color, size: 19),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 String? _visibleOfferExpiresAt(DriverTrip trip) {
   final rawExpiresAt = trip.offerExpiresAt?.trim();
   if (rawExpiresAt != null && rawExpiresAt.isNotEmpty) {
@@ -3004,7 +2765,6 @@ String? _visibleOfferExpiresAt(DriverTrip trip) {
   return fallbackExpiresAt.toIso8601String();
 }
 
-// ignore: unused_element
 class _DriverIncomingRequestOverlay extends ConsumerWidget {
   const _DriverIncomingRequestOverlay({
     required this.trip,
@@ -3065,7 +2825,6 @@ class _DriverIncomingRequestOverlay extends ConsumerWidget {
         : 0.0;
     final pickupDistanceLabel = _formatDistance(pickupDistance);
     final pickupEtaLabel = _formatEta(pickupDistance);
-    final offerCountdownExpiresAt = _visibleOfferExpiresAt(trip);
     final destinationDistanceLabel =
         trip.destinationLat != null && trip.destinationLng != null
         ? _formatDistance(destinationDistance)
@@ -3100,7 +2859,10 @@ class _DriverIncomingRequestOverlay extends ConsumerWidget {
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(18, 8, 18, 0),
-                child: Row(
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -3121,7 +2883,7 @@ class _DriverIncomingRequestOverlay extends ConsumerWidget {
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
-                        children: const [
+                        children: [
                           Icon(
                             Icons.notifications_active_rounded,
                             color: Color(0xFFFFC400),
@@ -3129,7 +2891,11 @@ class _DriverIncomingRequestOverlay extends ConsumerWidget {
                           ),
                           SizedBox(width: 8),
                           Text(
-                            'Solicitud entrante',
+                            trip.hasPendingCounterOffer
+                                ? 'Contraoferta enviada'
+                                : isPreviewingRoute
+                                ? 'Recorrido reservado'
+                                : 'Solicitud entrante',
                             style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w800,
@@ -3139,29 +2905,41 @@ class _DriverIncomingRequestOverlay extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    const Spacer(),
-                    if (isPreviewingRoute) ...[
-                      const SizedBox(width: 12),
-                      Flexible(
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: _DriverPreviewRouteBadge(
-                            pickupEtaLabel: pickupEtaLabel,
-                            pickupDistanceLabel: pickupDistanceLabel,
-                            destinationEtaLabel: destinationEtaLabel,
-                            destinationDistanceLabel: destinationDistanceLabel,
-                          ),
-                        ),
+                    if (isPreviewingRoute)
+                      _DriverPreviewRouteBadge(
+                        pickupEtaLabel: pickupEtaLabel,
+                        pickupDistanceLabel: pickupDistanceLabel,
+                        destinationEtaLabel: destinationEtaLabel,
+                        destinationDistanceLabel: destinationDistanceLabel,
                       ),
-                    ],
-                    if (offerCountdownExpiresAt != null) ...[
-                      const SizedBox(width: 12),
-                      SizedBox(
-                        width: 132,
-                        child: _DriverOfferCountdown(
-                          expiresAt: offerCountdownExpiresAt,
-                          compact: true,
-                          showLabel: true,
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: SingleChildScrollView(
+                  reverse: true,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 560),
+                        child: _DriverHomeOfferCard(
+                          trip: trip,
+                          isPreviewingRoute: isPreviewingRoute,
+                          pickupDistanceLabel: pickupDistanceLabel,
+                          pickupEtaLabel: pickupEtaLabel,
+                          onCounterOffer: () => showDialog<void>(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (_) => DriverCounterOfferDialog(
+                              originalFare: trip.fareAmount,
+                              onSubmit: (amount) => ref
+                                  .read(offeredTripProvider.notifier)
+                                  .sendCounterOffer(trip, amount),
+                            ),
+                          ),
                           onExpired: () {
                             ref
                                 .read(driverOffersProvider.notifier)
@@ -3171,129 +2949,129 @@ class _DriverIncomingRequestOverlay extends ConsumerWidget {
                                 .read(driverOfferPreviewTripIdProvider.notifier)
                                 .setTrip(null);
                           },
+                          onReject: () async {
+                            try {
+                              if (trip.hasPendingCounterOffer) {
+                                await ref
+                                    .read(offeredTripProvider.notifier)
+                                    .updateTripStatus('cancelled');
+                                await ref
+                                    .read(offeredTripProvider.notifier)
+                                    .loadOffer();
+                                return;
+                              }
+                              if (isPreviewingRoute) {
+                                ref
+                                    .read(
+                                      driverOfferPreviewTripIdProvider.notifier,
+                                    )
+                                    .setTrip(null);
+                              }
+                              await ref
+                                  .read(driverOffersProvider.notifier)
+                                  .rejectOffer(trip.id);
+                              final currentOffer = ref
+                                  .read(offeredTripProvider)
+                                  .value;
+                              if (currentOffer?.id == trip.id) {
+                                await ref
+                                    .read(offeredTripProvider.notifier)
+                                    .clearTrip();
+                              }
+                              await ref
+                                  .read(driverOffersProvider.notifier)
+                                  .loadOffers();
+                              if (context.mounted) {
+                                showTopNotice(
+                                  context,
+                                  'Solicitud ignorada para tu conductor.',
+                                  tone: NoticeTone.info,
+                                );
+                              }
+                            } catch (error) {
+                              if (context.mounted) {
+                                showTopNotice(
+                                  context,
+                                  error.toString().replaceFirst(
+                                    'Exception: ',
+                                    '',
+                                  ),
+                                  tone: NoticeTone.error,
+                                );
+                              }
+                            }
+                          },
+                          onPrimaryAction: () async {
+                            if (isPreviewingRoute) {
+                              ref
+                                  .read(
+                                    driverOfferPreviewTripIdProvider.notifier,
+                                  )
+                                  .setTrip(null);
+                              try {
+                                await ref
+                                    .read(offeredTripProvider.notifier)
+                                    .updateTripStatus('arriving');
+                                if (context.mounted) {
+                                  showTopNotice(
+                                    context,
+                                    'Viaje aceptado. Dirigete al punto de recogida.',
+                                    tone: NoticeTone.success,
+                                  );
+                                }
+                              } catch (error) {
+                                if (context.mounted) {
+                                  showTopNotice(
+                                    context,
+                                    error.toString().replaceFirst(
+                                      'Exception: ',
+                                      '',
+                                    ),
+                                    tone: NoticeTone.error,
+                                  );
+                                }
+                              }
+                              return;
+                            }
+                            try {
+                              await ref
+                                  .read(offeredTripProvider.notifier)
+                                  .acceptTrip(trip);
+                              ref
+                                  .read(driverOffersProvider.notifier)
+                                  .removeOfferLocally(trip.id);
+                              ref
+                                  .read(
+                                    driverOfferPreviewTripIdProvider.notifier,
+                                  )
+                                  .setTrip(trip.id);
+                              if (context.mounted) {
+                                showTopNotice(
+                                  context,
+                                  'Recorrido bloqueado para ti. Revisa la ruta y luego acepta.',
+                                  tone: NoticeTone.info,
+                                );
+                              }
+                            } catch (error) {
+                              ref
+                                  .read(
+                                    driverOfferPreviewTripIdProvider.notifier,
+                                  )
+                                  .setTrip(null);
+                              if (context.mounted) {
+                                showTopNotice(
+                                  context,
+                                  error.toString().replaceFirst(
+                                    'Exception: ',
+                                    '',
+                                  ),
+                                  tone: NoticeTone.warning,
+                                );
+                              }
+                            }
+                          },
                         ),
                       ),
-                    ],
-                  ],
-                ),
-              ),
-              const Spacer(),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-                child: Align(
-                  alignment: Alignment.bottomCenter,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 920),
-                    child: _DriverHomeOfferCard(
-                      trip: trip,
-                      isPreviewingRoute: isPreviewingRoute,
-                      pickupDistanceLabel: pickupDistanceLabel,
-                      pickupEtaLabel: pickupEtaLabel,
-                      onExpired: () {
-                        ref.read(driverOffersProvider.notifier).loadOffers();
-                        ref.read(offeredTripProvider.notifier).loadOffer();
-                        ref
-                            .read(driverOfferPreviewTripIdProvider.notifier)
-                            .setTrip(null);
-                      },
-                      onReject: () async {
-                        try {
-                          if (isPreviewingRoute) {
-                            ref
-                                .read(driverOfferPreviewTripIdProvider.notifier)
-                                .setTrip(null);
-                          }
-                          await ref
-                              .read(driverOffersProvider.notifier)
-                              .rejectOffer(trip.id);
-                          final currentOffer = ref
-                              .read(offeredTripProvider)
-                              .value;
-                          if (currentOffer?.id == trip.id) {
-                            await ref
-                                .read(offeredTripProvider.notifier)
-                                .clearTrip();
-                          }
-                          await ref
-                              .read(driverOffersProvider.notifier)
-                              .loadOffers();
-                          if (context.mounted) {
-                            showTopNotice(
-                              context,
-                              'Solicitud ignorada para tu conductor.',
-                              tone: NoticeTone.info,
-                            );
-                          }
-                        } catch (error) {
-                          if (context.mounted) {
-                            showTopNotice(
-                              context,
-                              error.toString().replaceFirst('Exception: ', ''),
-                              tone: NoticeTone.error,
-                            );
-                          }
-                        }
-                      },
-                      onPrimaryAction: () async {
-                        if (isPreviewingRoute) {
-                          ref
-                              .read(driverOfferPreviewTripIdProvider.notifier)
-                              .setTrip(null);
-                          try {
-                            await ref
-                                .read(offeredTripProvider.notifier)
-                                .updateTripStatus('arriving');
-                            if (context.mounted) {
-                              showTopNotice(
-                                context,
-                                'Viaje aceptado. Dirigete al punto de recogida.',
-                                tone: NoticeTone.success,
-                              );
-                            }
-                          } catch (error) {
-                            if (context.mounted) {
-                              showTopNotice(
-                                context,
-                                error.toString().replaceFirst(
-                                  'Exception: ',
-                                  '',
-                                ),
-                                tone: NoticeTone.error,
-                              );
-                            }
-                          }
-                          return;
-                        }
-                        try {
-                          await ref
-                              .read(offeredTripProvider.notifier)
-                              .acceptTrip(trip);
-                          ref
-                              .read(driverOffersProvider.notifier)
-                              .removeOfferLocally(trip.id);
-                          ref
-                              .read(driverOfferPreviewTripIdProvider.notifier)
-                              .setTrip(trip.id);
-                          if (context.mounted) {
-                            showTopNotice(
-                              context,
-                              'Recorrido bloqueado para ti. Revisa la ruta y luego acepta.',
-                              tone: NoticeTone.info,
-                            );
-                          }
-                        } catch (error) {
-                          ref
-                              .read(driverOfferPreviewTripIdProvider.notifier)
-                              .setTrip(null);
-                          if (context.mounted) {
-                            showTopNotice(
-                              context,
-                              error.toString().replaceFirst('Exception: ', ''),
-                              tone: NoticeTone.warning,
-                            );
-                          }
-                        }
-                      },
                     ),
                   ),
                 ),

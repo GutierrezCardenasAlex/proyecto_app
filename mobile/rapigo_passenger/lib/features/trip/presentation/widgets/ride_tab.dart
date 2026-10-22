@@ -1,7 +1,9 @@
+import 'passenger_counter_offer_dialog.dart';
 // ignore_for_file: unused_element, unused_local_variable, unused_element_parameter
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -29,6 +31,8 @@ import '../pages/take_taxi_page.dart';
 import 'destination_search_sheet.dart';
 import 'map_home_drawer.dart';
 import 'route_review_view.dart';
+import 'trip_status_banner.dart';
+import 'trip_completion_dialog.dart';
 
 class RideTab extends ConsumerStatefulWidget {
   const RideTab({
@@ -40,6 +44,7 @@ class RideTab extends ConsumerStatefulWidget {
     this.initialDestinationPoint,
     this.startInMapPicker = false,
     this.onBackToLauncher,
+    this.onBackHandlerChanged,
   });
 
   final VoidCallback onMenuTap;
@@ -49,6 +54,8 @@ class RideTab extends ConsumerStatefulWidget {
   final LatLng? initialDestinationPoint;
   final bool startInMapPicker;
   final VoidCallback? onBackToLauncher;
+  final void Function(Future<void> Function() handler, bool attached)?
+  onBackHandlerChanged;
 
   @override
   ConsumerState<RideTab> createState() => _RideTabState();
@@ -83,7 +90,6 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
   bool _isSyncingDashboard = false;
   bool _isPreparingExperience = false;
   bool _isDraggingDestinationMap = false;
-  bool _homeDrawerExpanded = false;
   bool _isRoutePreviewPageOpen = false;
   bool _isTakeTaxiPageOpen = false;
   bool _suspendTakeTaxiAutoOpen = false;
@@ -92,6 +98,8 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
   bool _journeyTrackingMode = false;
   bool _journeyStartedFromTakeTaxi = false;
   String _selectedServiceType = 'taxi';
+  double? _proposedFareAmount;
+  String _paymentMethod = 'cash';
   LatLng? _lastKnownLocation;
   LatLng? _movingDestinationCenter;
   String _currentAddressText = 'Buscando ubicación...';
@@ -107,6 +115,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    widget.onBackHandlerChanged?.call(_handleRideBack, true);
     _rideMode = widget.initialMode;
     _flowState =
         widget.openFlowOnStart && widget.initialMode == RideMode.destino
@@ -144,10 +153,28 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
         }
       });
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && ref.read(tripProvider).request.hasPendingCounterOffer) {
+        _showCounterOffer();
+      }
+    });
     _tripSubscription = ref.listenManual<TripState>(tripProvider, (
       previous,
       next,
     ) {
+      if (next.request.hasPendingCounterOffer) {
+        if (previous?.request.hasPendingCounterOffer != true) {
+          LocalNotifications.show(
+            id: 2015,
+            title: 'Nueva contraoferta',
+            body:
+                'Tu conductor propone Bs ${next.request.counterOfferAmount?.toStringAsFixed(2)}. Abre la app para responder.',
+          );
+        }
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _showCounterOffer(),
+        );
+      }
       final previousStatus = previous?.request.status;
       final currentStatus = next.request.status;
       if (previousStatus != currentStatus) {
@@ -373,6 +400,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    widget.onBackHandlerChanged?.call(_handleRideBack, false);
     final location = _lastKnownLocation;
     if (location != null) {
       unawaited(_persistLastKnownLocation(location));
@@ -466,6 +494,55 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     }
   }
 
+  bool _counterOfferDialogOpen = false;
+
+  Future<void> _showCounterOffer() async {
+    if (_counterOfferDialogOpen || !mounted) return;
+    _counterOfferDialogOpen = true;
+    var closing = false;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => Consumer(
+        builder: (context, ref, _) {
+          final request = ref.watch(tripProvider).request;
+          if (!request.hasPendingCounterOffer) {
+            if (!closing) {
+              closing = true;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+              });
+            }
+            return const SizedBox.shrink();
+          }
+          return PopScope(
+            canPop: false,
+            child: PassengerCounterOfferDialog(
+              originalFare: request.fareAmount ?? 0,
+              counterFare: request.counterOfferAmount ?? 0,
+              driverName: request.driverName ?? '',
+              onRespond: (accept) async {
+                final session = ref.read(sessionProvider);
+                try {
+                  await ref
+                      .read(tripProvider.notifier)
+                      .respondCounterOffer(
+                        token: session.token,
+                        tripId: request.activeTripId!,
+                        accept: accept,
+                      );
+                } finally {
+                  _scheduleDashboardSync();
+                }
+              },
+            ),
+          );
+        },
+      ),
+    );
+    _counterOfferDialogOpen = false;
+  }
+
   void _connectSocket() {
     _socket?.dispose();
     _socket = io.io(
@@ -484,6 +561,19 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
         _joinTripRoom(tripId);
       }
       _scheduleDashboardSync();
+    });
+    _socket?.on('trip:counter_offer', (_) async {
+      final session = ref.read(sessionProvider);
+      try {
+        await ref
+            .read(tripProvider.notifier)
+            .refreshCounterOffer(
+              token: session.token,
+              passengerId: session.userId,
+            );
+      } catch (_) {
+        _scheduleDashboardSync();
+      }
     });
     _socket?.on('trip:accepted', (data) {
       final map = data is Map
@@ -938,7 +1028,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _cancelActiveTrip() async {
+  Future<bool> _cancelActiveTrip() async {
     final confirmed = await _confirmDestinationAction(
       title: 'Cancelar viaje',
       message: '¿Seguro que quieres cancelar este viaje?',
@@ -947,13 +1037,13 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       accent: const Color(0xFFDC2626),
     );
     if (!confirmed || !mounted) {
-      return;
+      return false;
     }
     final session = ref.read(sessionProvider);
     final request = ref.read(tripProvider).request;
     final tripId = request.activeTripId;
     if (!session.isAuthenticated || tripId == null || tripId.isEmpty) {
-      return;
+      return false;
     }
     await ref
         .read(tripProvider.notifier)
@@ -968,9 +1058,10 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
         error.replaceFirst('Exception: ', ''),
         tone: NoticeTone.error,
       );
-      return;
+      return false;
     }
     await _syncDashboard();
+    return true;
   }
 
   Future<void> _retryRideRequest() async {
@@ -1027,11 +1118,11 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     }
   }
 
-  void _clearDestinationSelection() {
-    unawaited(_confirmAndClearDestinationSelection());
+  Future<bool> _clearDestinationSelection() {
+    return _confirmAndClearDestinationSelection();
   }
 
-  Future<void> _confirmAndClearDestinationSelection() async {
+  Future<bool> _confirmAndClearDestinationSelection() async {
     final confirmed = await _confirmDestinationAction(
       title: 'Quitar destino',
       message: '¿Seguro que quieres eliminar el destino actual?',
@@ -1040,7 +1131,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       accent: const Color(0xFFDC2626),
     );
     if (!confirmed || !mounted) {
-      return;
+      return false;
     }
     _destinationController.clear();
     setState(() {
@@ -1048,8 +1139,10 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       _customDestinationPoint = null;
       _destinationMoveMode = false;
       _journeyTrackingMode = false;
+      _proposedFareAmount = null;
       _flowState = RideFlowState.busquedaTexto;
     });
+    return true;
   }
 
   Future<bool> _confirmDestinationAction({
@@ -1241,6 +1334,12 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       return;
     }
 
+    final distanceMeters = const Distance().as(
+      LengthUnit.Meter,
+      location,
+      resolvedDestinationPoint,
+    );
+
     await ref
         .read(tripProvider.notifier)
         .requestRide(
@@ -1251,6 +1350,8 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
           dispatchMode: _rideMode == RideMode.destino ? 'broadcast' : 'nearby',
           destinationLocation: resolvedDestinationPoint,
           preferredDriverId: selectedDriverId,
+          fareAmount: _currentFareAmount(distanceMeters),
+          paymentMethod: _paymentMethod,
         );
 
     final error = ref.read(tripProvider).errorMessage;
@@ -1295,7 +1396,6 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     setState(() {
       _rideMode = RideMode.cercano;
       _flowState = RideFlowState.rutaConfirmacion;
-      _homeDrawerExpanded = false;
     });
     unawaited(_expandSheet(0.58));
   }
@@ -1310,7 +1410,6 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       _selectedDestinationPlace = null;
       _customDestinationPoint = null;
       _flowState = RideFlowState.busquedaTexto;
-      _homeDrawerExpanded = false;
     });
     if (focusSearch) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1332,7 +1431,6 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       _selectedDestinationPlace = null;
       _customDestinationPoint = point;
       _flowState = RideFlowState.rutaConfirmacion;
-      _homeDrawerExpanded = false;
     });
     unawaited(_expandSheet(0.58));
   }
@@ -1347,7 +1445,6 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       _selectedDestinationPlace = null;
       _customDestinationPoint = point;
       _flowState = RideFlowState.rutaConfirmacion;
-      _homeDrawerExpanded = false;
     });
     if (_canChooseDestinationForActiveTrip(ref.read(tripProvider).request)) {
       unawaited(_saveActiveTripDestination());
@@ -1472,6 +1569,42 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _handleRideBack() async {
+    if (!mounted) return;
+    if (ref.read(tripProvider).isRequestingTrip) {
+      _showFloatingNotification(
+        'Espera mientras se envía tu solicitud.',
+        tone: NoticeTone.info,
+      );
+      return;
+    }
+    FocusManager.instance.primaryFocus?.unfocus();
+    if (_destinationMoveMode) {
+      _toggleDestinationMoveMode();
+      return;
+    }
+    final request = ref.read(tripProvider).request;
+    if (const {
+      'requested',
+      'searching',
+      'accepted',
+      'arriving',
+      'at_pickup',
+      'in_progress',
+    }.contains(request.status)) {
+      if (_journeyTrackingMode) {
+        setState(() => _journeyTrackingMode = false);
+      } else {
+        _showFloatingNotification(
+          'Tu viaje sigue activo. Puedes consultarlo o cancelarlo desde esta pantalla.',
+          tone: NoticeTone.info,
+        );
+      }
+      return;
+    }
+    await _reopenServiceLauncher();
+  }
+
   Future<void> _reopenServiceLauncher() async {
     FocusManager.instance.primaryFocus?.unfocus();
     _suspendTakeTaxiAutoOpen = false;
@@ -1485,7 +1618,8 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       _selectedDestinationPlace = null;
       _customDestinationPoint = null;
       _selectedDriverId = null;
-      _homeDrawerExpanded = false;
+      _proposedFareAmount = null;
+      _paymentMethod = 'cash';
       _journeyTrackingMode = false;
     });
     if (_sheetController.isAttached) {
@@ -1610,18 +1744,15 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
         return;
       }
 
-      if (_isRoutePreviewPageOpen) {
-        final navigator = Navigator.of(context);
-        if (navigator.canPop()) {
-          await navigator.maybePop(RoutePreviewAction.back);
-          await Future<void>.delayed(const Duration(milliseconds: 160));
-        }
-      }
-
+      final ownerRoute = ModalRoute.of(context);
+      Navigator.of(
+        context,
+      ).popUntil((route) => route == ownerRoute || route.isFirst);
       if (!mounted) {
         return;
       }
-      await _reopenServiceLauncher();
+      await ref.read(tripProvider.notifier).clearActiveTrip();
+      if (mounted) await _reopenServiceLauncher();
     } finally {
       _isEndingTripFlow = false;
     }
@@ -1661,6 +1792,43 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     return destination.isEmpty
         ? TripRepository.destinationPendingLabel
         : destination;
+  }
+
+  double _estimateFareAmount(double? distanceMeters) {
+    final meters = distanceMeters ?? 350;
+    final base = _selectedServiceType == 'moto' ? 8.0 : 10.0;
+    final step = _selectedServiceType == 'moto' ? 2.0 : 3.0;
+    final divisor = _selectedServiceType == 'moto' ? 850.0 : 700.0;
+    return math.max(base, (meters / divisor).ceil() * step).toDouble();
+  }
+
+  double _currentFareAmount([double? distanceMeters]) {
+    return _proposedFareAmount ?? _estimateFareAmount(distanceMeters);
+  }
+
+  String _paymentMethodLabel([String? method]) {
+    return (method ?? _paymentMethod) == 'qr' ? 'QR' : 'Efectivo';
+  }
+
+  String _fareLabel([double? distanceMeters]) {
+    return 'Ofreces Bs ${_currentFareAmount(distanceMeters).round()} · ${_paymentMethodLabel()}';
+  }
+
+  void _changeFareAmount(double amount) {
+    final normalized = amount.clamp(1, 999).toDouble();
+    setState(() {
+      _proposedFareAmount = normalized;
+    });
+  }
+
+  void _adjustFareAmount(double delta, [double? distanceMeters]) {
+    _changeFareAmount(_currentFareAmount(distanceMeters) + delta);
+  }
+
+  void _selectPaymentMethod(String method) {
+    setState(() {
+      _paymentMethod = method == 'qr' ? 'qr' : 'cash';
+    });
   }
 
   void _showNearbyDriverDetails(NearbyDriver driver) {
@@ -2172,33 +2340,38 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
   }
 
   void _handleTripStatusChange(TripRequest request) {
-    if (request.status == 'accepted') {
-      setState(() {
-        _journeyDetailsExpanded = true;
-        _journeyTrackingMode = false;
-      });
-    }
-
-    final message = switch (request.status) {
-      'accepted' => 'Taxi aceptado',
-      'completed' => 'Viaje finalizado',
-      'cancelled' => 'Viaje cancelado',
-      _ => null,
-    };
-
-    if (message != null) {
-      _showFloatingNotification(
-        message,
-        tone: switch (request.status) {
-          'accepted' => NoticeTone.info,
-          'completed' => NoticeTone.success,
-          'cancelled' => NoticeTone.warning,
-          _ => NoticeTone.info,
-        },
-        showLocalNotification: true,
+    if (request.hasPendingCounterOffer) return;
+    final visual = TripStatusPresentation.fromStatus(request.status);
+    if (const {
+      'requested',
+      'searching',
+      'accepted',
+      'arriving',
+      'at_pickup',
+      'in_progress',
+      'completed',
+      'cancelled',
+    }.contains(request.status)) {
+      showTopNotice(
+        context,
+        visual.message,
+        title: visual.title,
+        icon: visual.icon,
+        tone: request.status == 'cancelled'
+            ? NoticeTone.warning
+            : request.status == 'completed'
+            ? NoticeTone.success
+            : NoticeTone.info,
+        duration: const Duration(seconds: 5),
       );
+      if (request.status != 'requested' && request.status != 'searching') {
+        LocalNotifications.show(
+          id: request.status.hashCode,
+          title: visual.title,
+          body: visual.message,
+        );
+      }
     }
-
     if (request.status == 'completed' || request.status == 'cancelled') {
       final finalPoint =
           request.status == 'completed' &&
@@ -2229,82 +2402,40 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
   }
 
   Future<void> _showTripCompletedDialogAndReset() async {
-    if (!mounted) {
-      return;
+    if (!mounted || _isEndingTripFlow) return;
+    _isEndingTripFlow = true;
+    final completedRequest = ref.read(tripProvider).request;
+    final session = ref.read(sessionProvider);
+    try {
+      final ownerRoute = ModalRoute.of(context);
+      Navigator.of(
+        context,
+      ).popUntil((route) => route == ownerRoute || route.isFirst);
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => TripCompletionDialog(
+          request: completedRequest,
+          onRate: (score, comment) async {
+            final tripId = completedRequest.activeTripId;
+            if (tripId == null || tripId.isEmpty) {
+              throw StateError('Missing trip');
+            }
+            await ref
+                .read(tripProvider.notifier)
+                .submitRating(
+                  token: session.token,
+                  tripId: tripId,
+                  score: score,
+                  comment: comment,
+                );
+          },
+        ),
+      );
+      if (mounted) await _resetTripFlowToHome();
+    } finally {
+      _isEndingTripFlow = false;
     }
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(28),
-          ),
-          titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-          contentPadding: const EdgeInsets.fromLTRB(24, 14, 24, 8),
-          actionsPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-          title: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF16A34A).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: const Icon(
-                  Icons.check_circle_rounded,
-                  color: Color(0xFF16A34A),
-                  size: 28,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Su viaje ha concluido',
-                  style: GoogleFonts.plusJakartaSans(
-                    color: AppBrand.textPrimary,
-                    fontSize: 21,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          content: const Text(
-            'Gracias por preferirnos. Le estaremos esperando para su siguiente viaje.',
-            style: TextStyle(
-              color: AppBrand.textSecondary,
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              height: 1.38,
-            ),
-          ),
-          actions: [
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () => Navigator.of(context).pop(),
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF16A34A),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                ),
-                child: const Text('De acuerdo'),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-    if (!mounted) {
-      return;
-    }
-    await _resetTripFlowToHome();
   }
 
   Future<void> _resetTripFlowToHome() async {
@@ -2321,25 +2452,21 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       _customDestinationPoint = null;
       _destinationMoveMode = false;
       _isDraggingDestinationMap = false;
-      _homeDrawerExpanded = false;
       _selectedDriverId = null;
       _journeyDetailsExpanded = false;
       _journeyTrackingMode = false;
       _journeyStartedFromTakeTaxi = false;
+      _proposedFareAmount = null;
+      _paymentMethod = 'cash';
       _movingDestinationCenter = null;
       _manualCameraCenterTarget =
           ref.read(passengerLocationProvider).position ?? _lastKnownLocation;
       _mapCenterSignal++;
       _mapFocusSignal++;
     });
-    if (_isRoutePreviewPageOpen || _isTakeTaxiPageOpen) {
-      final navigator = Navigator.of(context);
-      while (navigator.canPop()) {
-        navigator.pop();
-      }
-      _isRoutePreviewPageOpen = false;
-      _isTakeTaxiPageOpen = false;
-    }
+    _isRoutePreviewPageOpen = false;
+    _isTakeTaxiPageOpen = false;
+    widget.onBackToLauncher?.call();
   }
 
   Widget _buildTripActions(TripState tripState) {
@@ -2402,7 +2529,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     required _RoutePreviewData routePreview,
     required String destinationLabel,
   }) async {
-    if (_isRoutePreviewPageOpen || !mounted) {
+    if (_isRoutePreviewPageOpen || _isEndingTripFlow || !mounted) {
       return;
     }
     _isRoutePreviewPageOpen = true;
@@ -2427,8 +2554,13 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
           originLabel: 'Potosí · ubicación actual',
           destinationLabel: destinationLabel,
           distanceMeters: routePreview.distanceMeters,
+          proposedFareAmount: _currentFareAmount(routePreview.distanceMeters),
+          paymentMethod: _paymentMethod,
           selectedDriverId: _selectedDriverId,
           onSelectDriver: _selectDriver,
+          onFareChanged: _changeFareAmount,
+          onPaymentMethodChanged: _selectPaymentMethod,
+          onClearDestination: _clearDestinationSelection,
           onSelectTaxi: () => _selectServiceType('taxi'),
           onSelectMoto: () => _selectServiceType('moto'),
           onRequest: _requestRide,
@@ -2438,6 +2570,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       ),
     );
     _isRoutePreviewPageOpen = false;
+    if (_isEndingTripFlow) return;
     if (!mounted) {
       return;
     }
@@ -2448,7 +2581,6 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
         _editDestinationFromStatus();
         return;
       case RoutePreviewAction.clear:
-        _clearDestinationSelection();
         return;
       case RoutePreviewAction.back:
       case null:
@@ -2484,7 +2616,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     required LatLng userLocation,
     required List<PotosiMapDriverMarker> driverPoints,
   }) async {
-    if (_isTakeTaxiPageOpen || !mounted) {
+    if (_isTakeTaxiPageOpen || _isEndingTripFlow || !mounted) {
       return;
     }
     _suspendTakeTaxiAutoOpen = false;
@@ -2520,8 +2652,18 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                 _resolveDestinationPoint(),
               )?.distanceMeters ??
               350,
+          proposedFareAmount: _currentFareAmount(
+            _routePreviewData(
+              userLocation,
+              _resolveDestinationPoint(),
+            )?.distanceMeters,
+          ),
+          paymentMethod: _paymentMethod,
           selectedDriverId: _selectedDriverId,
           onSelectDriver: _selectDriver,
+          onFareChanged: _changeFareAmount,
+          onPaymentMethodChanged: _selectPaymentMethod,
+          onClearDestination: _clearDestinationSelection,
           onSelectTaxi: () => _selectServiceType('taxi'),
           onSelectMoto: () => _selectServiceType('moto'),
           onRequest: _requestRide,
@@ -2531,6 +2673,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       ),
     );
     _isTakeTaxiPageOpen = false;
+    if (_isEndingTripFlow) return;
     if (!mounted) {
       return;
     }
@@ -2560,7 +2703,6 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
         await _openNearbyDestinationSearchSheet();
         return;
       case TakeTaxiPageAction.clear:
-        _clearDestinationSelection();
         return;
       case TakeTaxiPageAction.back:
       case null:
@@ -2802,7 +2944,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
           ? '${distanceMeters.round()} m'
           : '${distanceKm.toStringAsFixed(1)} km',
       durationLabel: '$durationMinutes min',
-      fareLabel: '',
+      fareLabel: _fareLabel(distanceMeters),
       serviceLabel: _selectedServiceType == 'moto' ? 'Moto' : 'Taxi',
     );
   }
@@ -3070,6 +3212,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     final showLandingOverlay = isIdleScene;
     final showRouteReviewView =
         _rideMode == RideMode.destino &&
+        _flowState != RideFlowState.busquedaTexto &&
         !showLandingOverlay &&
         !_destinationMoveMode &&
         !isSearchScene &&
@@ -3104,7 +3247,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     final showPremiumDestinationEntry =
         showMainMapDrawer && widget.onBackToLauncher != null;
 
-    if (showRouteReviewView && !_isRoutePreviewPageOpen) {
+    if (showRouteReviewView && !_isRoutePreviewPageOpen && !_isEndingTripFlow) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) {
           return;
@@ -3121,7 +3264,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
         );
       });
     }
-    if (showTakeTaxiView && !_isTakeTaxiPageOpen) {
+    if (showTakeTaxiView && !_isTakeTaxiPageOpen && !_isEndingTripFlow) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) {
           return;
@@ -3157,8 +3300,19 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
               routeColor: mapRouteColor,
               focusBounds: focusBounds,
               focusPadding: isRideInProgress
-                  ? const EdgeInsets.fromLTRB(38, 92, 38, 180)
-                  : const EdgeInsets.fromLTRB(56, 120, 56, 220),
+                  ? EdgeInsets.fromLTRB(
+                      38,
+                      92,
+                      38,
+                      MediaQuery.sizeOf(context).height * 0.54,
+                    )
+                  : EdgeInsets.fromLTRB(
+                      38,
+                      100,
+                      38,
+                      MediaQuery.sizeOf(context).height *
+                          (hasActiveTrip ? 0.54 : 0.24),
+                    ),
               focusSignal: _mapFocusSignal,
               cameraCenterTarget: _destinationMoveMode
                   ? _movingDestinationCenter
@@ -3252,39 +3406,20 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                     Positioned(
                       left: 0,
                       right: 0,
-                      bottom: 0,
+                      bottom: 16,
                       child: MapHomeDrawer(
                         query: _destinationController.text.trim(),
                         onTapSearch: _openDestinationSearchSheetFromMap,
-                        expanded: _homeDrawerExpanded,
-                        onToggleExpanded: () {
-                          setState(() {
-                            _homeDrawerExpanded = !_homeDrawerExpanded;
-                          });
-                        },
-                        onTapSettings: _showUpcomingOptionsSheet,
                       ),
                     ),
                   if (showMainMapDrawer)
                     Positioned(
                       left: 0,
                       right: 0,
-                      bottom: 0,
+                      bottom: 16,
                       child: MapHomeDrawer(
                         query: _destinationController.text.trim(),
                         onTapSearch: _openDestinationSearchSheetFromMap,
-                        expanded: _homeDrawerExpanded,
-                        onToggleExpanded: () {
-                          setState(() {
-                            _homeDrawerExpanded = !_homeDrawerExpanded;
-                          });
-                        },
-                        onTapSettings: _showUpcomingOptionsSheet,
-                        premiumStyle: showPremiumDestinationEntry,
-                        forceExpanded: showPremiumDestinationEntry,
-                        showMoreButton: !showPremiumDestinationEntry,
-                        primaryActionLabel: 'ir',
-                        onPrimaryAction: _openDestinationSearchSheetFromMap,
                       ),
                     ),
                   if (showPremiumDestinationEntry)
@@ -3293,36 +3428,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                       left: 0,
                       right: 0,
                       child: _PremiumRequestTaxiTopBar(
-                        onBack: () {
-                          _showFloatingNotification(
-                            'Tienes un viaje activo. Usa Seguimiento o cancela el viaje si necesitas salir.',
-                            tone: NoticeTone.info,
-                          );
-                        },
-                        onProfile: () {
-                          widget.onMenuTap();
-                        },
-                        onHistory: () {
-                          _showFloatingNotification(
-                            'Historial muy pronto disponible.',
-                            tone: NoticeTone.info,
-                          );
-                        },
-                        onWallet: () {
-                          _showUpcomingOptionsSheet();
-                        },
-                        onZoomIn: () {
-                          setState(() {
-                            _mapZoomDelta = 0.6;
-                            _mapZoomSignal++;
-                          });
-                        },
-                        onZoomOut: () {
-                          setState(() {
-                            _mapZoomDelta = -0.6;
-                            _mapZoomSignal++;
-                          });
-                        },
+                        onBack: () => unawaited(_handleRideBack()),
                         onRecenter: () async {
                           await ref
                               .read(passengerLocationProvider.notifier)
@@ -3373,32 +3479,47 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                     ),
                   if (_destinationMoveMode)
                     Positioned(
-                      top: 20,
+                      top: 6,
                       left: 0,
                       right: 0,
-                      child: Center(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.96),
-                            borderRadius: BorderRadius.circular(999),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color(0x160F172A),
-                                blurRadius: 16,
-                                offset: Offset(0, 8),
+                      child: Material(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(22),
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Row(
+                            children: [
+                              IconButton(
+                                tooltip: 'Volver sin cambiar el destino',
+                                onPressed: () => unawaited(_handleRideBack()),
+                                icon: const Icon(Icons.arrow_back_rounded),
+                              ),
+                              const SizedBox(width: 8),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'Elige un punto',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppBrand.textPrimary,
+                                      ),
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      'Mueve el mapa y confirma tu destino',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppBrand.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
-                          ),
-                          child: const Text(
-                            'Deslizar para mover el mapa',
-                            style: TextStyle(
-                              color: AppBrand.textPrimary,
-                              fontWeight: FontWeight.w800,
-                            ),
                           ),
                         ),
                       ),
@@ -3410,15 +3531,6 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                         child: _MapCenterDestinationPin(
                           lifted: _isDraggingDestinationMap,
                         ),
-                      ),
-                    ),
-                  if (_destinationMoveMode)
-                    Positioned(
-                      left: 0,
-                      bottom: 132,
-                      child: _GlassIconButton(
-                        icon: Icons.arrow_back_rounded,
-                        onTap: _toggleDestinationMoveMode,
                       ),
                     ),
                   if (_destinationMoveMode)
@@ -3510,6 +3622,8 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                         },
                         onCancel:
                             const {
+                              'requested',
+                              'searching',
                               'accepted',
                               'arriving',
                               'at_pickup',
@@ -3535,6 +3649,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                       right: 0,
                       bottom: 10,
                       child: RouteReviewView(
+                        tripStatus: tripState.request.status,
                         title: hasActiveTrip ? 'Tu viaje' : 'Tu recorrido',
                         originLabel: 'Potosí · ubicación actual',
                         destinationLabel:
@@ -3543,7 +3658,9 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                             : _destinationController.text.trim(),
                         summaryLabel:
                             routeSummaryLabel ?? _compactStatusText(tripState),
-                        fareLabel: routePreview?.fareLabel ?? '',
+                        fareLabel: tripState.request.fareAmount != null
+                            ? 'Bs ${tripState.request.fareAmount!.toStringAsFixed(2)}'
+                            : routePreview?.fareLabel ?? '',
                         durationLabel:
                             routePreview?.durationLabel ??
                             (tripState.request.etaMinutes == null
@@ -3562,7 +3679,9 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                         onSelectTaxi: () => _selectServiceType('taxi'),
                         onSelectMoto: () => _selectServiceType('moto'),
                         onEdit: _editDestinationFromStatus,
-                        onClear: _clearDestinationSelection,
+                        onClear: () {
+                          unawaited(_clearDestinationSelection());
+                        },
                         primaryActionLabel: _primaryActionLabel(tripState),
                         primaryActionIcon: _primaryActionIcon(tripState),
                         onPrimaryAction: _primaryActionHandler(tripState),
@@ -5018,41 +5137,66 @@ class _GlassIconButton extends StatelessWidget {
 class _PremiumRequestTaxiTopBar extends StatelessWidget {
   const _PremiumRequestTaxiTopBar({
     required this.onBack,
-    required this.onProfile,
-    required this.onHistory,
-    required this.onWallet,
-    required this.onZoomIn,
-    required this.onZoomOut,
     required this.onRecenter,
   });
-
   final VoidCallback onBack;
-  final VoidCallback onProfile;
-  final VoidCallback onHistory;
-  final VoidCallback onWallet;
-  final VoidCallback onZoomIn;
-  final VoidCallback onZoomOut;
   final VoidCallback onRecenter;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _PremiumBlueSquareButton(icon: Icons.arrow_back_rounded, onTap: onBack),
-        const Spacer(),
-        Padding(
-          padding: const EdgeInsets.only(top: 6),
-          child: _PremiumMiniActionRow(
-            onProfile: onProfile,
-            onHistory: onHistory,
-            onWallet: onWallet,
-            onZoomIn: onZoomIn,
-            onZoomOut: onZoomOut,
-            onRecenter: onRecenter,
-          ),
+    return Material(
+      color: Colors.white,
+      elevation: 2,
+      shadowColor: const Color(0x180F172A),
+      borderRadius: BorderRadius.circular(22),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        child: Row(
+          children: [
+            IconButton(
+              tooltip: 'Volver al inicio',
+              onPressed: onBack,
+              icon: const Icon(
+                Icons.arrow_back_rounded,
+                color: AppBrand.textPrimary,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Pedir taxi',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: AppBrand.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  const Text(
+                    'Elige tu destino para comenzar',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppBrand.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              tooltip: 'Centrar mapa',
+              onPressed: onRecenter,
+              icon: const Icon(
+                Icons.my_location_rounded,
+                color: AppBrand.secondaryBlue,
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -5103,20 +5247,6 @@ class _PremiumMiniActionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final actions = <Widget>[
-      _PremiumSmallBlueIconButton(
-        icon: Icons.person_outline_rounded,
-        onTap: onProfile,
-        borderColor: const Color(0xFF2E6CFF),
-        highlighted: true,
-      ),
-      _PremiumSmallBlueIconButton(
-        icon: Icons.history_rounded,
-        onTap: onHistory,
-      ),
-      _PremiumSmallBlueIconButton(
-        icon: Icons.account_balance_wallet_outlined,
-        onTap: onWallet,
-      ),
       _PremiumSmallBlueIconButton(icon: Icons.add_rounded, onTap: onZoomIn),
       _PremiumSmallBlueIconButton(icon: Icons.remove_rounded, onTap: onZoomOut),
       _PremiumSmallBlueIconButton(
@@ -5852,118 +5982,105 @@ class _PassengerActiveTripDetailView extends StatelessWidget {
     final canCancel = onCancel != null;
     final canEdit = onEditDestination != null;
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.white.withValues(alpha: 0.94),
-            const Color(0xFFF5F7FA).withValues(alpha: 0.98),
-          ],
-        ),
-      ),
-      child: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(0, 8, 0, 18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Material(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(26),
+          clipBehavior: Clip.antiAlias,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * 0.52,
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _TripDetailIconButton(
-                    icon: Icons.arrow_back_rounded,
-                    onTap: onBack,
-                  ),
-                  const Spacer(),
-                  _TripStatusPill(
-                    label: statusText,
-                    color: statusAccent,
-                    icon: Icons.radio_button_checked_rounded,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              _TripHeroStatusCard(
-                headline: _headline,
-                supportText: _supportText,
-                status: request.status,
-                statusAccent: statusAccent,
-                etaLabel: etaLabel,
-                distanceLabel: distanceLabel,
-              ),
-              const SizedBox(height: 14),
-              _DriverAcceptedCard(
-                driverName: driverName.isEmpty
-                    ? 'Conductor RAPIGO'
-                    : driverName,
-                driverPhone: driverPhone,
-                vehicleLabel: _serviceLabel,
-                vehiclePlate: vehiclePlate,
-                vehicleColor: vehicleColor,
-                vehicleType: vehicleType,
-                vehicleIcon: _vehicleIcon,
-                statusAccent: statusAccent,
-              ),
-              const SizedBox(height: 14),
-              _TripRouteDetailCard(
-                originLabel: originLabel,
-                destinationLabel: destinationLabel,
-                summaryLabel: summaryLabel,
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: onTracking,
-                      icon: const Icon(Icons.map_rounded, size: 19),
-                      label: const Text('Seguimiento'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF111827),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        textStyle: const TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 15,
-                        ),
+                  TripStatusBanner(status: request.status),
+                  if (request.etaMinutes != null &&
+                      const {
+                        'accepted',
+                        'arriving',
+                      }.contains(request.status)) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      'Llegada estimada: ${request.etaMinutes} min',
+                      style: const TextStyle(
+                        color: AppBrand.secondaryBlue,
+                        fontWeight: FontWeight.w700,
                       ),
-                    ),
-                  ),
-                  if (canCancel) ...[
-                    const SizedBox(width: 10),
-                    _TripDetailIconButton(
-                      icon: Icons.close_rounded,
-                      onTap: onCancel!,
-                      danger: true,
                     ),
                   ],
+                  if (request.fareAmount != null) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      'Bs ${request.fareAmount!.toStringAsFixed(2)} · ${request.paymentMethod == 'qr' ? 'QR' : 'Efectivo'}',
+                      style: const TextStyle(
+                        color: AppBrand.textPrimary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                  if (driverName.isNotEmpty || vehiclePlate.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    Text(
+                      driverName.isEmpty ? 'Tu conductor' : driverName,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      [
+                        _serviceLabel,
+                        vehicleColor,
+                        vehiclePlate,
+                      ].where((part) => part.isNotEmpty).join(' · '),
+                      style: const TextStyle(
+                        color: AppBrand.textSecondary,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 14),
+                  _TripRouteDetailCard(
+                    originLabel: originLabel,
+                    destinationLabel: destinationLabel,
+                    summaryLabel: summaryLabel,
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      TextButton.icon(
+                        onPressed: onTracking,
+                        icon: const Icon(Icons.map_outlined),
+                        label: const Text('Ver recorrido'),
+                      ),
+                      if (canEdit)
+                        TextButton.icon(
+                          onPressed: onEditDestination,
+                          icon: const Icon(Icons.edit_location_alt_outlined),
+                          label: const Text('Editar destino'),
+                        ),
+                      if (canCancel)
+                        TextButton(
+                          onPressed: onCancel,
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppBrand.danger,
+                          ),
+                          child: const Text('Cancelar viaje'),
+                        ),
+                    ],
+                  ),
                 ],
               ),
-              if (canEdit) ...[
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: onEditDestination,
-                    icon: const Icon(Icons.edit_location_alt_rounded, size: 19),
-                    label: const Text('Editar destino'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppBrand.textPrimary,
-                      side: const BorderSide(color: Color(0xFFD7DEE8)),
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      textStyle: const TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                  ),
-                ),
-              ],
-            ],
+            ),
           ),
         ),
       ),

@@ -1,6 +1,9 @@
 // ignore_for_file: unused_element
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import '../../../../core/ui/top_notice.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -26,8 +29,13 @@ class RoutePreviewPage extends ConsumerStatefulWidget {
     required this.originLabel,
     required this.destinationLabel,
     required this.distanceMeters,
+    required this.proposedFareAmount,
+    required this.paymentMethod,
     required this.selectedDriverId,
     required this.onSelectDriver,
+    required this.onFareChanged,
+    required this.onPaymentMethodChanged,
+    required this.onClearDestination,
     required this.onSelectTaxi,
     required this.onSelectMoto,
     required this.onRequest,
@@ -47,13 +55,18 @@ class RoutePreviewPage extends ConsumerStatefulWidget {
   final String originLabel;
   final String destinationLabel;
   final double distanceMeters;
+  final double proposedFareAmount;
+  final String paymentMethod;
   final String? selectedDriverId;
   final ValueChanged<String> onSelectDriver;
+  final ValueChanged<double> onFareChanged;
+  final ValueChanged<String> onPaymentMethodChanged;
+  final Future<bool> Function() onClearDestination;
   final VoidCallback onSelectTaxi;
   final VoidCallback onSelectMoto;
   final Future<void> Function() onRequest;
   final Future<void> Function() onRetry;
-  final Future<void> Function() onCancel;
+  final Future<bool> Function() onCancel;
 
   @override
   ConsumerState<RoutePreviewPage> createState() => _RoutePreviewPageState();
@@ -61,6 +74,8 @@ class RoutePreviewPage extends ConsumerStatefulWidget {
 
 class _RoutePreviewPageState extends ConsumerState<RoutePreviewPage> {
   late final String _serviceType = widget.serviceType;
+  late double _proposedFareAmount = widget.proposedFareAmount;
+  late String _paymentMethod = widget.paymentMethod == 'qr' ? 'qr' : 'cash';
   bool _detailsExpanded = false;
   bool _didScheduleClose = false;
   bool _didScheduleJourney = false;
@@ -83,7 +98,23 @@ class _RoutePreviewPageState extends ConsumerState<RoutePreviewPage> {
   String get _summaryLabel => '$_durationLabel · $_distanceLabel';
 
   String get _fareLabel {
-    return '';
+    return 'Ofreces Bs ${_proposedFareAmount.round()} · ${_paymentMethod == 'qr' ? 'QR' : 'Efectivo'}';
+  }
+
+  void _changeFare(double delta) {
+    final nextFare = (_proposedFareAmount + delta).clamp(1, 999).toDouble();
+    setState(() {
+      _proposedFareAmount = nextFare;
+    });
+    widget.onFareChanged(nextFare);
+  }
+
+  void _selectPaymentMethod(String method) {
+    final normalized = method == 'qr' ? 'qr' : 'cash';
+    setState(() {
+      _paymentMethod = normalized;
+    });
+    widget.onPaymentMethodChanged(normalized);
   }
 
   String _navigationBadgeCaption(String status) {
@@ -129,11 +160,19 @@ class _RoutePreviewPageState extends ConsumerState<RoutePreviewPage> {
   }
 
   Future<void> _handleBack(String status) async {
+    if (ref.read(tripProvider).isRequestingTrip) {
+      showTopNotice(
+        context,
+        'Espera mientras se envía tu solicitud.',
+        title: 'Enviando solicitud',
+      );
+      return;
+    }
     if (_requestIsActive(status)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Cancela la solicitud para volver al mapa principal.'),
-        ),
+      showTopNotice(
+        context,
+        'Tu viaje sigue activo. Revisa los detalles o cancela la solicitud para salir.',
+        title: 'Viaje activo',
       );
       return;
     }
@@ -144,11 +183,23 @@ class _RoutePreviewPageState extends ConsumerState<RoutePreviewPage> {
   }
 
   Future<void> _handleCancel() async {
-    await widget.onCancel();
+    final cancelled = await widget.onCancel();
     if (!mounted) {
       return;
     }
-    Navigator.of(context).pop(RoutePreviewAction.back);
+    if (cancelled) {
+      Navigator.of(context).pop(RoutePreviewAction.back);
+    }
+  }
+
+  Future<void> _handleClearDestination() async {
+    final cleared = await widget.onClearDestination();
+    if (!mounted) {
+      return;
+    }
+    if (cleared) {
+      Navigator.of(context).pop(RoutePreviewAction.clear);
+    }
   }
 
   void _toggleDetails() {
@@ -199,7 +250,7 @@ class _RoutePreviewPageState extends ConsumerState<RoutePreviewPage> {
     final tripState = ref.watch(tripProvider);
     final request = tripState.request;
     final status = request.status;
-    _scheduleCloseIfFinished(status);
+    // The owning RideTab presents a single completion summary and resets the trip.
     _scheduleTransitionToJourney(status);
 
     final title = switch (status) {
@@ -227,6 +278,8 @@ class _RoutePreviewPageState extends ConsumerState<RoutePreviewPage> {
 
     final details = <String>[
       if (_requestIsActive(status)) _summaryLabel,
+      if (_requestIsActive(status) && request.fareAmount != null)
+        'Bs ${request.fareAmount!.round()} · ${request.paymentMethod == 'qr' ? 'QR' : 'Efectivo'}',
       if ((request.driverName ?? '').trim().isNotEmpty)
         request.driverName!.trim(),
       if (request.etaMinutes != null) '${request.etaMinutes} min',
@@ -265,110 +318,123 @@ class _RoutePreviewPageState extends ConsumerState<RoutePreviewPage> {
 
     final requestActive = _requestIsActive(status);
 
-    return Scaffold(
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: PotosiMapSurface(
-              viewportCacheKey: 'passenger_route_preview',
-              drivers: widget.drivers,
-              userLocation: widget.userLocation,
-              userAccuracyMeters: widget.userAccuracyMeters,
-              userHeadingDegrees: widget.userHeadingDegrees,
-              routeTarget: widget.routeTarget,
-              showRoute: widget.routeTarget != null,
-              showTargetMarker: widget.routeTarget != null,
-              routeColor: widget.routeColor,
-              focusSignal: widget.focusSignal,
-              showUtilityControls: false,
+    return PopScope<RoutePreviewAction>(
+      canPop: !requestActive && !tripState.isRequestingTrip,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _handleBack(status);
+      },
+      child: Scaffold(
+        body: Stack(
+          children: [
+            Positioned.fill(
+              child: PotosiMapSurface(
+                viewportCacheKey: 'passenger_route_preview',
+                drivers: widget.drivers,
+                userLocation: widget.userLocation,
+                userAccuracyMeters: widget.userAccuracyMeters,
+                userHeadingDegrees: widget.userHeadingDegrees,
+                routeTarget: widget.routeTarget,
+                showRoute: widget.routeTarget != null,
+                showTargetMarker: widget.routeTarget != null,
+                routeColor: widget.routeColor,
+                focusSignal: widget.focusSignal,
+                showUtilityControls: false,
+              ),
             ),
-          ),
-          Positioned.fill(
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      const Color(0xFF91BDF0).withValues(alpha: 0.24),
-                      const Color(0xFF6CA3E4).withValues(alpha: 0.08),
-                      Colors.transparent,
-                      const Color(0xFF285486).withValues(alpha: 0.12),
-                      const Color(0xFF0A2744).withValues(alpha: 0.24),
-                    ],
-                    stops: const [0, 0.16, 0.52, 0.78, 1],
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        const Color(0xFF91BDF0).withValues(alpha: 0.24),
+                        const Color(0xFF6CA3E4).withValues(alpha: 0.08),
+                        Colors.transparent,
+                        const Color(0xFF285486).withValues(alpha: 0.12),
+                        const Color(0xFF0A2744).withValues(alpha: 0.24),
+                      ],
+                      stops: const [0, 0.16, 0.52, 0.78, 1],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          Positioned.fill(
-            child: RouteReviewView(
-              title: title,
-              originLabel: widget.originLabel,
-              destinationLabel: widget.destinationLabel,
-              summaryLabel: _summaryLabel,
-              fareLabel: _fareLabel,
-              durationLabel: request.etaMinutes == null
-                  ? _durationLabel
-                  : '${request.etaMinutes} min',
-              distanceLabel: _distanceLabel,
-              serviceType: widget.serviceType,
-              onBack: () => _handleBack(status),
-              onSelectTaxi: widget.onSelectTaxi,
-              onSelectMoto: widget.onSelectMoto,
-              onEdit: () => Navigator.of(context).pop(RoutePreviewAction.edit),
-              onClear: () =>
-                  Navigator.of(context).pop(RoutePreviewAction.clear),
-              primaryActionLabel: tripState.isRequestingTrip
-                  ? (requestActive ? 'Procesando...' : 'Enviando...')
-                  : primaryActionLabel,
-              primaryActionIcon: _primaryActionIcon(
-                status,
-                isRequesting: tripState.isRequestingTrip,
+            Positioned.fill(
+              child: RouteReviewView(
+                tripStatus: status,
+                title: title,
+                originLabel: widget.originLabel,
+                destinationLabel: widget.destinationLabel,
+                summaryLabel: _summaryLabel,
+                fareLabel: _fareLabel,
+                offerAmount: _proposedFareAmount,
+                paymentMethod: _paymentMethod,
+                onDecreaseFare: () => _changeFare(-1),
+                onIncreaseFare: () => _changeFare(1),
+                onSelectPaymentMethod: _selectPaymentMethod,
+                durationLabel: request.etaMinutes == null
+                    ? _durationLabel
+                    : '${request.etaMinutes} min',
+                distanceLabel: _distanceLabel,
+                serviceType: widget.serviceType,
+                onBack: () => _handleBack(status),
+                onSelectTaxi: widget.onSelectTaxi,
+                onSelectMoto: widget.onSelectMoto,
+                onEdit: () =>
+                    Navigator.of(context).pop(RoutePreviewAction.edit),
+                onClear: () => unawaited(_handleClearDestination()),
+                primaryActionLabel: tripState.isRequestingTrip
+                    ? (requestActive ? 'Procesando...' : 'Enviando...')
+                    : primaryActionLabel,
+                primaryActionIcon: _primaryActionIcon(
+                  status,
+                  isRequesting: tripState.isRequestingTrip,
+                ),
+                onPrimaryAction: tripState.isRequestingTrip
+                    ? null
+                    : primaryAction,
+                primaryActionColor: requestActive
+                    ? statusAccent
+                    : const Color(0xFFFF4B38),
+                detailsExpanded: _detailsExpanded,
+                onToggleDetails: _toggleDetails,
+                statusText: statusText,
+                statusAccent: statusAccent,
+                statusDetails: details,
+                secondaryActions: secondaryActions,
+                navigationBadgeLabel:
+                    request.etaMinutes != null && requestActive
+                    ? '${request.etaMinutes} min'
+                    : _distanceLabel,
+                navigationBadgeCaption: _navigationBadgeCaption(status),
+                navigationBadgeIcon: _navigationBadgeIcon(status),
+                driverName: (request.driverName ?? '').trim().isEmpty
+                    ? null
+                    : request.driverName!.trim(),
+                vehicleLabel: (request.vehicleLabel ?? '').trim().isEmpty
+                    ? null
+                    : request.vehicleLabel!.trim(),
+                vehiclePlate: (request.vehiclePlate ?? '').trim().isEmpty
+                    ? null
+                    : request.vehiclePlate!.trim(),
+                vehicleDetail: (request.vehicleColor ?? '').trim().isEmpty
+                    ? null
+                    : request.vehicleColor!.trim(),
+                etaLabel: request.etaMinutes == null
+                    ? null
+                    : '${request.etaMinutes} min',
+                compactMode: const {
+                  'accepted',
+                  'arriving',
+                  'at_pickup',
+                  'in_progress',
+                }.contains(status),
               ),
-              onPrimaryAction: tripState.isRequestingTrip
-                  ? null
-                  : primaryAction,
-              primaryActionColor: requestActive
-                  ? statusAccent
-                  : const Color(0xFFFF4B38),
-              detailsExpanded: _detailsExpanded,
-              onToggleDetails: _toggleDetails,
-              statusText: statusText,
-              statusAccent: statusAccent,
-              statusDetails: details,
-              secondaryActions: secondaryActions,
-              navigationBadgeLabel: request.etaMinutes != null && requestActive
-                  ? '${request.etaMinutes} min'
-                  : _distanceLabel,
-              navigationBadgeCaption: _navigationBadgeCaption(status),
-              navigationBadgeIcon: _navigationBadgeIcon(status),
-              driverName: (request.driverName ?? '').trim().isEmpty
-                  ? null
-                  : request.driverName!.trim(),
-              vehicleLabel: (request.vehicleLabel ?? '').trim().isEmpty
-                  ? null
-                  : request.vehicleLabel!.trim(),
-              vehiclePlate: (request.vehiclePlate ?? '').trim().isEmpty
-                  ? null
-                  : request.vehiclePlate!.trim(),
-              vehicleDetail: (request.vehicleColor ?? '').trim().isEmpty
-                  ? null
-                  : request.vehicleColor!.trim(),
-              etaLabel: request.etaMinutes == null
-                  ? null
-                  : '${request.etaMinutes} min',
-              compactMode: const {
-                'accepted',
-                'arriving',
-                'at_pickup',
-                'in_progress',
-              }.contains(status),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

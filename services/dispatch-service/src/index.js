@@ -28,7 +28,8 @@ const searchSchema = z.object({
 
 const acceptSchema = z.object({
   tripId: z.string().uuid(),
-  driverId: z.string().uuid()
+  driverId: z.string().uuid(),
+  counterFare: z.number().positive().max(99999999.99).multipleOf(0.01).optional()
 });
 
 const rejectSchema = z.object({
@@ -607,6 +608,10 @@ async function bootstrap() {
       ADD COLUMN IF NOT EXISTS accepts_delivery_requests BOOLEAN NOT NULL DEFAULT FALSE
   `);
 
+  await pool.query(`ALTER TABLE trips
+    ADD COLUMN IF NOT EXISTS counter_offer_amount NUMERIC(10,2),
+    ADD COLUMN IF NOT EXISTS counter_offer_status VARCHAR(16)`);
+
   app.get("/health", async () => ({ status: "ok", service: "dispatch-service" }));
 
   app.post("/search", async (request, reply) => {
@@ -707,6 +712,7 @@ async function bootstrap() {
               ST_Y(t.destination_location::geometry) AS destination_lat,
               ST_X(t.destination_location::geometry) AS destination_lng,
               t.fare_amount,
+              t.payment_method,
               t.promotional_trip,
               u.full_name AS passenger_name,
               u.phone AS passenger_phone
@@ -790,7 +796,9 @@ async function bootstrap() {
   });
 
   app.post("/accept", async (request, reply) => {
-    const { tripId, driverId } = acceptSchema.parse(request.body);
+    const parsed = acceptSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ message: "Precio o solicitud invalida" });
+    const { tripId, driverId, counterFare } = parsed.data;
     const user = await requireOwnDriverId(request, reply, driverId);
     if (!user) return;
 
@@ -840,24 +848,27 @@ async function bootstrap() {
 
       const tripUpdate = await client.query(
         `UPDATE trips
-         SET driver_id = $1, status = 'accepted', accepted_at = NOW(), updated_at = NOW()
+         SET driver_id = $1, status = 'accepted', accepted_at = NOW(), updated_at = NOW(),
+             counter_offer_amount = $3,
+             counter_offer_status = CASE WHEN $3::numeric IS NULL THEN NULL ELSE 'pending' END
          WHERE id = $2
            AND status IN ('requested', 'searching')
+           AND ($3::numeric IS NULL OR (promotional_trip = FALSE AND $3 > fare_amount))
          RETURNING *`,
-        [driverId, tripId]
+        [driverId, tripId, counterFare ?? null]
       );
 
       if (!tripUpdate.rows.length) {
         await client.query("ROLLBACK");
-        return reply.code(409).send({ message: "Trip already taken" });
+        return reply.code(409).send({ message: counterFare == null ? "Este viaje ya no esta disponible" : "Viaje no disponible o contraoferta invalida. Debe superar la tarifa y no ser promocional." });
       }
 
       const trip = tripUpdate.rows[0];
 
       await client.query(
         `INSERT INTO trip_events (trip_id, event_type, payload)
-         VALUES ($1, 'accepted', $2::jsonb)`,
-        [tripId, JSON.stringify({ driverId })]
+         VALUES ($1, $2, $3::jsonb)`,
+        [tripId, counterFare == null ? 'accepted' : 'counter_offer_pending', JSON.stringify({ driverId, counterFare })]
       );
 
       await client.query("COMMIT");
@@ -887,14 +898,14 @@ async function bootstrap() {
         [driverId, tripId]
       );
       const etaMinutes = Math.max(2, Number(etaResult.rows[0]?.eta_minutes || 2));
-      await publish("dispatch.trip.accepted", { tripId, driverId });
-      await emitRealtime("trip:accepted", `trip:${tripId}`, {
+      await publish(counterFare == null ? "dispatch.trip.accepted" : "dispatch.trip.counter_offer", { tripId, driverId, counterFare });
+      await emitRealtime(counterFare == null ? "trip:accepted" : "trip:counter_offer", `trip:${tripId}`, {
         tripId,
         driverId,
         status: "accepted",
         etaMinutes
       });
-      await emitRealtime("driver:trip_accepted", `driver:${driverId}`, {
+      await emitRealtime(counterFare == null ? "driver:trip_accepted" : "driver:counter_offer", `driver:${driverId}`, {
         tripId,
         driverId,
         status: "accepted"

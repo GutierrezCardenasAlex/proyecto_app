@@ -9,7 +9,7 @@ import '../../../auth/data/auth_repository.dart';
 import '../../../map/data/location_controller.dart';
 import '../../data/trip_repository.dart';
 import '../../domain/trip_request.dart';
-import 'ui_kit.dart';
+import 'account_ui.dart';
 
 class ActivityTab extends ConsumerStatefulWidget {
   const ActivityTab({super.key, this.onBack});
@@ -74,48 +74,65 @@ class _ActivityTabState extends ConsumerState<ActivityTab> {
     final session = ref.watch(sessionProvider);
     final tripState = ref.watch(tripProvider);
 
-    return PageShell(
-      eyebrow: 'Historial',
-      title: 'Tus viajes',
-      leading: widget.onBack == null
-          ? null
-          : IconButton.filledTonal(
-              onPressed: widget.onBack,
-              icon: const Icon(Icons.arrow_back_rounded),
+    return AccountPageShell(
+      title: 'Mis viajes',
+      onBack: widget.onBack,
+      actions: [
+        IconButton(
+          tooltip: 'Actualizar viajes',
+          onPressed: () => unawaited(_refreshHistory()),
+          icon: const Icon(Icons.refresh_rounded),
+        ),
+      ],
+      child: RefreshIndicator(
+        onRefresh: _refreshHistory,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(24),
+          children: [
+            const AccountIntro(
+              icon: Icons.route_rounded,
+              title: 'Cada viaje, en un lugar',
+              description:
+                  'Consulta tus recorridos y los detalles de cada viaje.',
             ),
-      trailing: IconButton.filledTonal(
-        onPressed: () => unawaited(_refreshHistory()),
-        icon: const Icon(Icons.refresh_rounded),
-      ),
-      child: Column(
-        children: [
-          if (tripState.isLoading)
-            const Padding(
-              padding: EdgeInsets.only(bottom: 14),
-              child: LinearProgressIndicator(
-                minHeight: 3,
-                color: Color(0xFF0F6CBD),
-                backgroundColor: Color(0xFFEFF6FF),
+            if (tripState.isLoading)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 16),
+                child: LinearProgressIndicator(),
               ),
-            ),
-          if (tripState.history.isEmpty)
-            const EmptyCard(
-              title: 'Sin historial aun',
-              subtitle:
-                  'Tus viajes confirmados apareceran aqui cuando empieces a moverte por Potosi.',
-            )
-          else
-            ...tripState.history.map(
-              (trip) => Padding(
+            if (tripState.errorMessage != null && !tripState.isLoading)
+              Padding(
                 padding: const EdgeInsets.only(bottom: 16),
-                child: _JourneyCard(
-                  trip: trip,
-                  passengerName: session.fullName,
-                  token: session.token,
+                child: AccountStateCard(
+                  icon: Icons.cloud_off_rounded,
+                  title: 'No pudimos actualizar tus viajes',
+                  description: 'Revisa tu conexión e inténtalo de nuevo.',
+                  onRetry: () => unawaited(_refreshHistory()),
                 ),
               ),
-            ),
-        ],
+            if (tripState.history.isEmpty &&
+                !tripState.isLoading &&
+                tripState.errorMessage == null)
+              const AccountStateCard(
+                icon: Icons.local_taxi_outlined,
+                title: 'Tu historial empieza aquí',
+                description:
+                    'Tus viajes aparecerán en esta sección cuando comiences a moverte por Potosí.',
+              )
+            else
+              ...tripState.history.map(
+                (trip) => Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: _JourneyCard(
+                    trip: trip,
+                    passengerName: session.fullName,
+                    token: session.token,
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -185,6 +202,14 @@ class _JourneyCard extends ConsumerWidget {
       'arriving',
       'at_pickup',
     }.contains(trip.status);
+  }
+
+  String get _dateLabel {
+    if (trip.requestedAt.isEmpty) return 'Fecha no disponible';
+    final date = DateTime.tryParse(trip.requestedAt)?.toLocal();
+    if (date == null) return trip.requestedAt;
+    String two(int value) => value.toString().padLeft(2, '0');
+    return '${two(date.day)}/${two(date.month)}/${date.year} · ${two(date.hour)}:${two(date.minute)}';
   }
 
   String get _promoLabel => trip.status == 'completed'
@@ -371,23 +396,14 @@ class _JourneyCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final driverName = (trip.driverName ?? '').trim();
-    final driverPhone = (trip.driverPhone ?? '').trim();
     final vehicleLabel = (trip.vehicleLabel ?? '').trim();
     final vehiclePlate = (trip.vehiclePlate ?? '').trim();
-    final vehicleColor = (trip.vehicleColor ?? '').trim();
 
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: const Color(0xFFE5E7EB)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x120F172A),
-            blurRadius: 20,
-            offset: Offset(0, 10),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -396,16 +412,9 @@ class _JourneyCard extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
             decoration: BoxDecoration(
               borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(30),
+                top: Radius.circular(24),
               ),
-              gradient: LinearGradient(
-                colors: [
-                  _statusColor.withValues(alpha: 0.14),
-                  const Color(0xFFEFF6FF),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              color: const Color(0xFFF8FAFF),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -459,9 +468,7 @@ class _JourneyCard extends ConsumerWidget {
                       ],
                       const SizedBox(height: 10),
                       Text(
-                        trip.requestedAt.isEmpty
-                            ? 'Fecha no disponible'
-                            : trip.requestedAt,
+                        _dateLabel,
                         style: const TextStyle(
                           color: Color(0xFF64748B),
                           fontWeight: FontWeight.w700,
@@ -470,7 +477,7 @@ class _JourneyCard extends ConsumerWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${trip.pickupAddress} a ${trip.destinationAddress}',
+                        'Viaje en Rápigo',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
@@ -492,19 +499,10 @@ class _JourneyCard extends ConsumerWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    _HistoryBadge(
-                      icon: Icons.person_outline_rounded,
-                      label: passengerName,
-                    ),
                     if (driverName.isNotEmpty)
                       _HistoryBadge(
                         icon: Icons.badge_outlined,
                         label: driverName,
-                      ),
-                    if (driverPhone.isNotEmpty)
-                      _HistoryBadge(
-                        icon: Icons.phone_outlined,
-                        label: driverPhone,
                       ),
                     if (vehicleLabel.isNotEmpty)
                       _HistoryBadge(icon: _vehicleIcon, label: vehicleLabel),
@@ -512,11 +510,6 @@ class _JourneyCard extends ConsumerWidget {
                       _HistoryBadge(
                         icon: Icons.pin_outlined,
                         label: 'Placa $vehiclePlate',
-                      ),
-                    if (vehicleColor.isNotEmpty)
-                      _HistoryBadge(
-                        icon: Icons.palette_outlined,
-                        label: vehicleColor,
                       ),
                   ],
                 ),

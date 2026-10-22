@@ -136,6 +136,14 @@ class _DriverSocketListenerState extends ConsumerState<DriverSocketListener>
       _joinedDriverId = null;
       _scheduleSocketReconnect(driverId);
     });
+    _socket?.on('driver:counter_offer', (_) async {
+      await ref.read(offeredTripProvider.notifier).loadOffer();
+      await ref
+          .read(driverStateProvider.notifier)
+          .restoreOperationalState(force: true);
+      await ref.read(driverOffersProvider.notifier).loadOffers();
+      ref.invalidate(driverTripHistoryProvider);
+    });
     _socket?.on('driver:trip_offer', (_) {
       final currentTrip = ref.read(offeredTripProvider).value;
       if (currentTrip != null &&
@@ -174,7 +182,16 @@ class _DriverSocketListenerState extends ConsumerState<DriverSocketListener>
           tripId.isNotEmpty &&
           status.isNotEmpty &&
           currentTripId == tripId) {
+        final wasCounterOffer =
+            ref.read(offeredTripProvider).value?.hasPendingCounterOffer == true;
         ref.read(offeredTripProvider.notifier).setLocalStatus(status);
+        if (wasCounterOffer && status == 'cancelled') {
+          unawaited(
+            ref
+                .read(driverStateProvider.notifier)
+                .restoreOperationalState(force: true),
+          );
+        }
         _showDriverOverlayNotice(
           _statusMessage(status),
           tone: status == 'at_pickup' || status == 'completed'

@@ -45,6 +45,7 @@ class _DriverProfileCompletionPageState
   String? _uploadedPhotosOwnerKey;
   String? _uploadingDocumentType;
   bool _profileSubmitted = false;
+  bool _showFieldErrors = false;
 
   @override
   void initState() {
@@ -107,8 +108,10 @@ class _DriverProfileCompletionPageState
 
   String? _validatePersonalStep() {
     final email = _emailController.text.trim();
-    if (email.isNotEmpty &&
-        !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+    if (email.isEmpty) {
+      return 'Llena este campo con tu correo electronico.';
+    }
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
       return 'Ingresa un correo valido.';
     }
     return _validateRealName(_firstNameController.text, 'nombre') ??
@@ -165,6 +168,85 @@ class _DriverProfileCompletionPageState
       _licensePhoto != null &&
       _vehiclePhoto != null &&
       _uploadedPhotosOwnerKey == _currentPhotoOwnerKey;
+
+  String? _fieldError(String key) {
+    if (!_showFieldErrors) return null;
+    switch (key) {
+      case 'firstName':
+        return _validateRealName(_firstNameController.text, 'nombre') == null
+            ? null
+            : 'Llena este campo con tu nombre.';
+      case 'lastName':
+        return _validateRealName(_lastNameController.text, 'apellido') == null
+            ? null
+            : 'Llena este campo con tu apellido.';
+      case 'email':
+        final email = _emailController.text.trim();
+        if (email.isEmpty) return 'Llena este campo con tu correo electronico.';
+        return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)
+            ? null
+            : 'Ingresa un correo electronico valido.';
+      case 'address':
+        return _validateRequiredField(
+                  _addressController.text,
+                  'La direccion',
+                  min: 4,
+                ) ==
+                null
+            ? null
+            : 'Llena este campo con tu direccion.';
+      case 'license':
+        final license = _licenseController.text.trim();
+        return _validateRequiredField(license, 'La licencia', min: 4) == null &&
+                !license.toUpperCase().startsWith('TEMP-')
+            ? null
+            : 'Llena este campo con tu licencia o CI.';
+      case 'licenseCategory':
+        return _licenseCategoryController.text.trim().isEmpty
+            ? 'Selecciona la categoria.'
+            : null;
+      case 'licenseIssue':
+        return _licenseIssueController.text.trim().isEmpty
+            ? 'Selecciona la fecha de emision.'
+            : null;
+      case 'licenseExpiry':
+        return _licenseExpiryController.text.trim().isEmpty
+            ? 'Selecciona la fecha de vencimiento.'
+            : null;
+      case 'plate':
+        final plate = _plateController.text.trim();
+        return _validateRequiredField(plate, 'La placa', min: 4) == null &&
+                !RegExp(
+                  r'^POT-[0-9A-F]{4}$',
+                  caseSensitive: false,
+                ).hasMatch(plate)
+            ? null
+            : 'Llena este campo con la placa.';
+      case 'brand':
+        return _validateRequiredField(_brandController.text, 'La marca') == null
+            ? null
+            : 'Llena este campo con la marca.';
+      case 'model':
+        return _validateRequiredField(
+                  _modelController.text,
+                  'El modelo',
+                  min: 1,
+                ) ==
+                null
+            ? null
+            : 'Llena este campo con el modelo.';
+      case 'color':
+        return _validateRequiredField(_colorController.text, 'El color') == null
+            ? null
+            : 'Llena este campo con el color.';
+      case 'year':
+        final year = int.tryParse(_yearController.text.trim());
+        return year != null && year >= 1990 && year <= 2100
+            ? null
+            : 'Llena este campo con un anio valido.';
+    }
+    return null;
+  }
 
   Future<void> _pickAndUploadPhoto(String documentType) async {
     final personalError = _validatePersonalStep();
@@ -342,10 +424,14 @@ class _DriverProfileCompletionPageState
         break;
     }
     if (error != null) {
+      setState(() => _showFieldErrors = true);
       showTopNotice(context, error, tone: NoticeTone.error);
       return;
     }
-    setState(() => _step = (_step + 1).clamp(4, 9));
+    setState(() {
+      _showFieldErrors = false;
+      _step = (_step + 1).clamp(4, 9);
+    });
   }
 
   Future<void> _confirmAndSend() async {
@@ -364,6 +450,7 @@ class _DriverProfileCompletionPageState
             'Completa las fotografias antes de enviar.',
         tone: NoticeTone.error,
       );
+      setState(() => _showFieldErrors = true);
       return;
     }
     setState(() => _step = 9);
@@ -496,33 +583,34 @@ class _DriverProfileCompletionPageState
           Expanded(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Image.asset(
-                  'assets/icons/rapigo_driver_icon.png',
-                  width: 34,
-                  height: 34,
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.asset(
+                    'assets/images/rapigo_logo.jpeg',
+                    width: 128,
+                    height: 38,
+                    fit: BoxFit.cover,
+                  ),
                 ),
-                const SizedBox(width: 12),
-                Text.rich(
-                  TextSpan(
-                    children: [
-                      TextSpan(
-                        text: 'RAPIGO',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFF1746B5),
-                        ),
-                      ),
-                      TextSpan(
-                        text: ' PRO',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                          color: const Color(0xFFF6C311),
-                        ),
-                      ),
-                    ],
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF6C311),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    'PRO',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.black,
+                    ),
                   ),
                 ),
               ],
@@ -570,6 +658,8 @@ class _DriverProfileCompletionPageState
           controller: _firstNameController,
           icon: Icons.person_outline_rounded,
           hintText: 'Ingresa tu nombre',
+          errorText: _fieldError('firstName'),
+          onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 18),
         _FormField(
@@ -577,14 +667,18 @@ class _DriverProfileCompletionPageState
           controller: _lastNameController,
           icon: Icons.person_outline_rounded,
           hintText: 'Ingresa tu apellido',
+          errorText: _fieldError('lastName'),
+          onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 18),
         _FormField(
-          label: 'Correo electronico (opcional)',
+          label: 'Correo electronico',
           controller: _emailController,
           icon: Icons.email_outlined,
           hintText: 'ejemplo@gmail.com',
           keyboardType: TextInputType.emailAddress,
+          errorText: _fieldError('email'),
+          onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 18),
         _FormField(
@@ -593,12 +687,8 @@ class _DriverProfileCompletionPageState
           icon: Icons.location_on_outlined,
           hintText: 'Ingresa tu direccion',
           suffixIcon: Icons.gps_fixed_rounded,
-        ),
-        const SizedBox(height: 20),
-        const _SoftInfoCard(
-          title: 'Tu informacion esta protegida',
-          message:
-              'Usamos esta informacion unicamente para brindarte un mejor servicio y seguridad.',
+          errorText: _fieldError('address'),
+          onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 24),
         _WizardButtons(
@@ -623,10 +713,12 @@ class _DriverProfileCompletionPageState
         ),
         const SizedBox(height: 22),
         _FormField(
-          label: 'Numero de licencia',
+          label: 'Numero de licencia o CI',
           controller: _licenseController,
           icon: Icons.badge_outlined,
-          hintText: 'Ej: 12345678',
+          hintText: 'Ingresa tu licencia o CI',
+          errorText: _fieldError('license'),
+          onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 18),
         _DropdownField(
@@ -635,6 +727,7 @@ class _DriverProfileCompletionPageState
           items: const ['A', 'B', 'C', 'M'],
           icon: Icons.credit_card_outlined,
           hintText: 'Selecciona la categoria',
+          errorText: _fieldError('licenseCategory'),
           onChanged: (value) =>
               setState(() => _licenseCategoryController.text = value),
         ),
@@ -643,18 +736,14 @@ class _DriverProfileCompletionPageState
           label: 'Fecha de emision',
           controller: _licenseIssueController,
           onTap: () => _pickDate(_licenseIssueController),
+          errorText: _fieldError('licenseIssue'),
         ),
         const SizedBox(height: 18),
         _DateField(
           label: 'Fecha de vencimiento',
           controller: _licenseExpiryController,
           onTap: () => _pickDate(_licenseExpiryController),
-        ),
-        const SizedBox(height: 20),
-        const _SoftInfoCard(
-          title: 'Asegurate de ingresar datos correctos',
-          message:
-              'Estos datos seran verificados por la central antes de activar tu cuenta.',
+          errorText: _fieldError('licenseExpiry'),
         ),
         const SizedBox(height: 24),
         _WizardButtons(
@@ -715,6 +804,8 @@ class _DriverProfileCompletionPageState
           controller: _plateController,
           icon: Icons.pin_outlined,
           hintText: 'Ej: 1234ABC',
+          errorText: _fieldError('plate'),
+          onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 18),
         _FormField(
@@ -722,6 +813,8 @@ class _DriverProfileCompletionPageState
           controller: _brandController,
           icon: Icons.directions_car_outlined,
           hintText: 'Selecciona la marca',
+          errorText: _fieldError('brand'),
+          onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 18),
         _FormField(
@@ -729,6 +822,8 @@ class _DriverProfileCompletionPageState
           controller: _modelController,
           icon: Icons.directions_car_filled_outlined,
           hintText: 'Selecciona el modelo',
+          errorText: _fieldError('model'),
+          onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 18),
         _FormField(
@@ -736,6 +831,8 @@ class _DriverProfileCompletionPageState
           controller: _colorController,
           icon: Icons.palette_outlined,
           hintText: 'Selecciona el color',
+          errorText: _fieldError('color'),
+          onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 18),
         _FormField(
@@ -748,9 +845,11 @@ class _DriverProfileCompletionPageState
             FilteringTextInputFormatter.digitsOnly,
             LengthLimitingTextInputFormatter(4),
           ],
+          errorText: _fieldError('year'),
+          onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 20),
-        const _SoftInfoCard(
+        const _AlertInfoCard(
           title: 'Datos importantes',
           message:
               'Esta informacion ayudara a que los pasajeros identifiquen tu vehiculo correctamente.',
@@ -822,12 +921,6 @@ class _DriverProfileCompletionPageState
           isUploading: _uploadingDocumentType == 'vehicle_photo',
           onPick: () => _pickAndUploadPhoto('vehicle_photo'),
         ),
-        const SizedBox(height: 20),
-        const _SoftInfoCard(
-          title: 'Tu seguridad es importante',
-          message:
-              'Estas fotografias seran revisadas por nuestra central y utilizadas unicamente para verificar tu cuenta.',
-        ),
         const SizedBox(height: 24),
         _WizardButtons(
           primaryLabel: 'CONTINUAR',
@@ -857,9 +950,7 @@ class _DriverProfileCompletionPageState
           lines: [
             '${_firstNameController.text} ${_lastNameController.text}'.trim(),
             session.phone,
-            _emailController.text.isEmpty
-                ? 'Correo pendiente'
-                : _emailController.text.trim(),
+            _emailController.text.trim(),
             _addressController.text.trim(),
           ],
           onEdit: () => setState(() => _step = 4),
@@ -901,12 +992,6 @@ class _DriverProfileCompletionPageState
           ],
           onEdit: () => setState(() => _step = 7),
         ),
-        const SizedBox(height: 18),
-        const _SoftInfoCard(
-          title: 'Casi listo para empezar',
-          message:
-              'Al confirmar, tu informacion sera enviada a revision. Te notificaremos cuando tu cuenta este activa.',
-        ),
         const SizedBox(height: 24),
         _WizardButtons(
           primaryLabel: session.isLoading
@@ -941,7 +1026,7 @@ class _DriverProfileCompletionPageState
                   alignment: Alignment.center,
                   children: [
                     const Icon(
-                      Icons.shield_outlined,
+                      Icons.fact_check_outlined,
                       size: 96,
                       color: Color(0xFF1746B5),
                     ),
@@ -999,16 +1084,10 @@ class _DriverProfileCompletionPageState
           ),
         ),
         const SizedBox(height: 28),
-        const _SoftInfoCard(
-          title: 'Te notificaremos cuando tu cuenta este activa',
+        const _AlertInfoCard(
+          title: 'Revision en central',
           message:
-              'Recibiras una notificacion en la app y podras comenzar a utilizarla.',
-        ),
-        const SizedBox(height: 22),
-        const _SoftInfoCard(
-          title: 'Gracias por registrarte en Rapigo Pro',
-          message:
-              'Estamos trabajando para activarte lo antes posible. ¡Bienvenido a la comunidad!',
+              'Cuando tus datos sean aprobados, la app te avisara y podras comenzar a recibir viajes.',
         ),
         const SizedBox(height: 24),
         _WizardButtons(
@@ -1156,6 +1235,8 @@ class _FormField extends StatelessWidget {
     this.keyboardType,
     this.suffixIcon,
     this.inputFormatters,
+    this.errorText,
+    this.onChanged,
   });
 
   final String label;
@@ -1165,9 +1246,12 @@ class _FormField extends StatelessWidget {
   final TextInputType? keyboardType;
   final IconData? suffixIcon;
   final List<TextInputFormatter>? inputFormatters;
+  final String? errorText;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
+    final hasError = errorText != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1185,7 +1269,11 @@ class _FormField extends StatelessWidget {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE2E8F8)),
+            border: Border.all(
+              color: hasError
+                  ? const Color(0xFFDC2626)
+                  : const Color(0xFFE2E8F8),
+            ),
           ),
           child: Row(
             children: [
@@ -1195,6 +1283,7 @@ class _FormField extends StatelessWidget {
               Expanded(
                 child: TextField(
                   controller: controller,
+                  onChanged: onChanged,
                   keyboardType: keyboardType,
                   inputFormatters: inputFormatters,
                   cursorColor: const Color(0xFF1650D7),
@@ -1228,6 +1317,10 @@ class _FormField extends StatelessWidget {
             ],
           ),
         ),
+        if (hasError) ...[
+          const SizedBox(height: 6),
+          _InlineFieldError(errorText!),
+        ],
       ],
     );
   }
@@ -1241,6 +1334,7 @@ class _DropdownField extends StatelessWidget {
     required this.icon,
     required this.hintText,
     required this.onChanged,
+    this.errorText,
   });
 
   final String label;
@@ -1249,9 +1343,11 @@ class _DropdownField extends StatelessWidget {
   final IconData icon;
   final String hintText;
   final ValueChanged<String> onChanged;
+  final String? errorText;
 
   @override
   Widget build(BuildContext context) {
+    final hasError = errorText != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1270,7 +1366,11 @@ class _DropdownField extends StatelessWidget {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE2E8F8)),
+            border: Border.all(
+              color: hasError
+                  ? const Color(0xFFDC2626)
+                  : const Color(0xFFE2E8F8),
+            ),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
@@ -1342,6 +1442,10 @@ class _DropdownField extends StatelessWidget {
             ),
           ),
         ),
+        if (hasError) ...[
+          const SizedBox(height: 6),
+          _InlineFieldError(errorText!),
+        ],
       ],
     );
   }
@@ -1352,14 +1456,17 @@ class _DateField extends StatelessWidget {
     required this.label,
     required this.controller,
     required this.onTap,
+    this.errorText,
   });
 
   final String label;
   final TextEditingController controller;
   final VoidCallback onTap;
+  final String? errorText;
 
   @override
   Widget build(BuildContext context) {
+    final hasError = errorText != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1381,7 +1488,11 @@ class _DateField extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFE2E8F8)),
+              border: Border.all(
+                color: hasError
+                    ? const Color(0xFFDC2626)
+                    : const Color(0xFFE2E8F8),
+              ),
             ),
             child: Row(
               children: [
@@ -1416,7 +1527,29 @@ class _DateField extends StatelessWidget {
             ),
           ),
         ),
+        if (hasError) ...[
+          const SizedBox(height: 6),
+          _InlineFieldError(errorText!),
+        ],
       ],
+    );
+  }
+}
+
+class _InlineFieldError extends StatelessWidget {
+  const _InlineFieldError(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: GoogleFonts.plusJakartaSans(
+        fontSize: 11.5,
+        fontWeight: FontWeight.w800,
+        color: const Color(0xFFDC2626),
+      ),
     );
   }
 }
@@ -1670,8 +1803,8 @@ class _PhotoRequirementCard extends StatelessWidget {
   }
 }
 
-class _SoftInfoCard extends StatelessWidget {
-  const _SoftInfoCard({required this.title, required this.message});
+class _AlertInfoCard extends StatelessWidget {
+  const _AlertInfoCard({required this.title, required this.message});
 
   final String title;
   final String message;
@@ -1680,28 +1813,29 @@ class _SoftInfoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF2F6FF),
-        borderRadius: BorderRadius.circular(22),
+        color: const Color(0xFFFFF7D8),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFFFE69A)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 68,
-            height: 68,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
+            width: 42,
+            height: 42,
+            decoration: const BoxDecoration(
+              color: Color(0xFFF6C311),
+              shape: BoxShape.circle,
             ),
             child: const Icon(
-              Icons.verified_user_outlined,
-              color: Color(0xFF1650D7),
-              size: 34,
+              Icons.priority_high_rounded,
+              color: Colors.black,
+              size: 24,
             ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1709,19 +1843,19 @@ class _SoftInfoCard extends StatelessWidget {
                 Text(
                   title,
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF1746B5),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFF1D2D59),
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Text(
                   message,
                   style: GoogleFonts.plusJakartaSans(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: const Color(0xFF60709A),
-                    height: 1.4,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF5F5630),
+                    height: 1.35,
                   ),
                 ),
               ],

@@ -1,3 +1,4 @@
+import '../data/trip_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
@@ -29,6 +30,7 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
   Timer? _sessionRefreshTimer;
   DateTime? _lastBackPressAt;
   int _selectedIndex = 0;
+  Future<void> Function()? _rideBackHandler;
   bool _showRideLauncher = true;
   RideMode _pendingRideMode = RideMode.destino;
   int _rideFlowVersion = 0;
@@ -53,7 +55,38 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
     super.dispose();
   }
 
+  bool _checkingCounterOffer = false;
+
+  Future<void> _restorePendingCounterOffer() async {
+    if (!mounted || !_showRideLauncher || _checkingCounterOffer) return;
+    final session = ref.read(sessionProvider);
+    if (!session.isAuthenticated ||
+        !session.profileCompleted ||
+        session.deviceStatus != 'AUTORIZADO') {
+      return;
+    }
+    _checkingCounterOffer = true;
+    try {
+      await ref
+          .read(tripProvider.notifier)
+          .refreshCounterOffer(
+            token: session.token,
+            passengerId: session.userId,
+          );
+      if (mounted &&
+          _showRideLauncher &&
+          ref.read(tripProvider).request.hasPendingCounterOffer) {
+        _openRideFlow(RideMode.destino);
+      }
+    } catch (_) {
+      // Retry from the existing session refresh loop if the connection is down.
+    } finally {
+      _checkingCounterOffer = false;
+    }
+  }
+
   Future<void> _refreshPassengerSession() async {
+    unawaited(_restorePendingCounterOffer());
     final earnedFreeTrip = await ref
         .read(sessionProvider.notifier)
         .refreshSessionStatus();
@@ -132,6 +165,7 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
       _pendingRideMode = RideMode.destino;
       _pendingStartInMapPicker = false;
     });
+    unawaited(_restorePendingCounterOffer());
   }
 
   Future<void> _persistShellState() async {
@@ -146,8 +180,13 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
   }
 
   Future<void> _handleRootBack() async {
-    if (!_showRideLauncher) {
-      _backToRideLauncher();
+    if (!_showRideLauncher && _selectedIndex == 0) {
+      final handler = _rideBackHandler;
+      if (handler != null) {
+        await handler();
+      } else {
+        _backToRideLauncher();
+      }
       return;
     }
 
@@ -285,6 +324,13 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
               initialDestinationPoint: _pendingDestinationPoint,
               startInMapPicker: _pendingStartInMapPicker,
               onBackToLauncher: _backToRideLauncher,
+              onBackHandlerChanged: (handler, attached) {
+                if (attached) {
+                  _rideBackHandler = handler;
+                } else if (_rideBackHandler == handler) {
+                  _rideBackHandler = null;
+                }
+              },
             ),
       ActivityTab(onBack: _goHomeFromSection),
     ];

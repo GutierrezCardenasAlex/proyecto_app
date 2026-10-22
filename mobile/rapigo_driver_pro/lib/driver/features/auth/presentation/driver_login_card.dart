@@ -33,6 +33,11 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
   bool _showLoginPassword = false;
   bool _showRegisterPassword = false;
   String? _fallbackOtpCode;
+  String? _phoneInputError;
+  String? _passwordInputError;
+  String? _registerNameError;
+  String? _registerPasswordError;
+  String? _otpInputError;
 
   @override
   void dispose() {
@@ -127,13 +132,19 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
   }
 
   Future<void> _requestRegisterOtp() async {
+    setState(() {
+      _phoneInputError = null;
+      _registerNameError = null;
+    });
     final phoneError = _validatePhone();
     if (phoneError != null) {
+      setState(() => _phoneInputError = 'Llena este campo con tu numero.');
       _showInlineError(phoneError);
       return;
     }
     final nameError = _validateRealName(_registerFirstNameController.text);
     if (nameError != null) {
+      setState(() => _registerNameError = 'Llena este campo con tu nombre.');
       _showInlineError(nameError);
       return;
     }
@@ -156,13 +167,21 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
   }
 
   Future<void> _submitLogin() async {
+    setState(() {
+      _phoneInputError = null;
+      _passwordInputError = null;
+    });
     final phoneError = _validatePhone();
     if (phoneError != null) {
+      setState(() => _phoneInputError = 'Llena este campo con tu numero.');
       _showInlineError(phoneError);
       return;
     }
     if (_passwordController.text.trim().isEmpty) {
-      _showInlineError('Ingresa tu contrasena.');
+      setState(
+        () => _passwordInputError = 'Llena este campo con tu contrasena.',
+      );
+      _showInlineError('Llena este campo con tu contrasena.');
       return;
     }
 
@@ -179,12 +198,25 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
   }
 
   Future<void> _submitRegister() async {
+    setState(() {
+      _otpInputError = null;
+      _registerPasswordError = null;
+    });
     if (_otpValue.length != 6) {
-      _showInlineError('Completa el codigo de 6 digitos.');
+      setState(
+        () => _otpInputError = 'Llena este campo con el codigo completo.',
+      );
+      _showInlineError('Llena este campo con el codigo completo.');
       return;
     }
     final passwordError = _validatePassword(_registerPasswordController.text);
     if (passwordError != null) {
+      setState(
+        () => _registerPasswordError =
+            _registerPasswordController.text.trim().isEmpty
+            ? 'Llena este campo con tu contrasena.'
+            : passwordError,
+      );
       _showInlineError(passwordError);
       return;
     }
@@ -386,33 +418,34 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Image.asset(
-                          'assets/icons/rapigo_driver_icon.png',
-                          width: 44,
-                          height: 44,
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: Image.asset(
+                            'assets/images/rapigo_logo.jpeg',
+                            width: 148,
+                            height: 44,
+                            fit: BoxFit.cover,
+                          ),
                         ),
-                        const SizedBox(width: 12),
-                        Text.rich(
-                          TextSpan(
-                            children: [
-                              TextSpan(
-                                text: 'RAPIGO',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 21,
-                                  fontWeight: FontWeight.w900,
-                                  color: const Color(0xFF1746B5),
-                                ),
-                              ),
-                              TextSpan(
-                                text: ' PRO',
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 21,
-                                  fontWeight: FontWeight.w900,
-                                  color: const Color(0xFFF6BE00),
-                                ),
-                              ),
-                            ],
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF6C311),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            'PRO',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.black,
+                            ),
                           ),
                         ),
                       ],
@@ -488,7 +521,11 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
         const SizedBox(height: 18),
         _SectionLabel('Numero de celular'),
         const SizedBox(height: 10),
-        _PhoneInputField(controller: _phoneController),
+        _PhoneInputField(
+          controller: _phoneController,
+          errorText: _phoneInputError,
+          onChanged: (_) => setState(() => _phoneInputError = null),
+        ),
         const SizedBox(height: 14),
         _SectionLabel('Contrasena'),
         const SizedBox(height: 10),
@@ -499,6 +536,8 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
           suffixLabel: _showLoginPassword ? 'Ocultar' : 'Mostrar',
           onSuffixTap: () =>
               setState(() => _showLoginPassword = !_showLoginPassword),
+          errorText: _passwordInputError,
+          onChanged: (_) => setState(() => _passwordInputError = null),
         ),
         const SizedBox(height: 14),
         Row(
@@ -715,11 +754,19 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
         if (!showRegisterOtp) ...[
           _SectionLabel('Nombre real'),
           const SizedBox(height: 10),
-          _NameInputField(controller: _registerFirstNameController),
+          _NameInputField(
+            controller: _registerFirstNameController,
+            errorText: _registerNameError,
+            onChanged: (_) => setState(() => _registerNameError = null),
+          ),
           const SizedBox(height: 16),
           _SectionLabel('Numero de celular'),
           const SizedBox(height: 10),
-          _PhoneInputField(controller: _phoneController),
+          _PhoneInputField(
+            controller: _phoneController,
+            errorText: _phoneInputError,
+            onChanged: (_) => setState(() => _phoneInputError = null),
+          ),
           const SizedBox(height: 16),
           _PrimaryYellowButton(
             label: session.isLoading ? 'CONTINUANDO...' : 'CONTINUAR',
@@ -791,6 +838,10 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
               ),
             ),
           ),
+          if (_otpInputError != null) ...[
+            const SizedBox(height: 8),
+            _FieldErrorText(_otpInputError!),
+          ],
           const SizedBox(height: 10),
           if (_fallbackOtpCode != null)
             _DevelopmentTag(
@@ -808,6 +859,8 @@ class _DriverLoginCardState extends ConsumerState<DriverLoginCard> {
             suffixLabel: _showRegisterPassword ? 'Ocultar' : 'Mostrar',
             onSuffixTap: () =>
                 setState(() => _showRegisterPassword = !_showRegisterPassword),
+            errorText: _registerPasswordError,
+            onChanged: (_) => setState(() => _registerPasswordError = null),
           ),
           const SizedBox(height: 12),
           _RegisterPasswordRulesCard(controller: _registerPasswordController),
@@ -997,140 +1050,203 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-class _PhoneInputField extends StatelessWidget {
-  const _PhoneInputField({required this.controller});
+class _FieldErrorText extends StatelessWidget {
+  const _FieldErrorText(this.text);
 
-  final TextEditingController controller;
+  final String text;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 50,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E9F8)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x08123EAF),
-            blurRadius: 10,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          const SizedBox(width: 14),
-          Text(
-            '+591',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 13,
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF1D2D59),
-            ),
-          ),
-          Container(
-            width: 1,
-            height: 22,
-            margin: const EdgeInsets.symmetric(horizontal: 10),
-            color: const Color(0xFFD7DDF1),
-          ),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              keyboardType: TextInputType.phone,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-                LengthLimitingTextInputFormatter(8),
-              ],
-              cursorColor: const Color(0xFF1650D7),
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFF1D2D59),
-              ),
-              decoration: InputDecoration(
-                isCollapsed: true,
-                filled: false,
-                fillColor: Colors.transparent,
-                contentPadding: EdgeInsets.zero,
-                hintText: '7XX XXX XX',
-                hintStyle: GoogleFonts.plusJakartaSans(
-                  fontSize: 13,
-                  color: const Color(0xFFA2ACC8),
-                  fontWeight: FontWeight.w500,
-                ),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                disabledBorder: InputBorder.none,
-              ),
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.only(right: 14),
-            child: Icon(
-              Icons.phone_in_talk_outlined,
-              color: Color(0xFF1650D7),
-              size: 19,
-            ),
-          ),
-        ],
+    return Text(
+      text,
+      style: GoogleFonts.plusJakartaSans(
+        fontSize: 11.5,
+        fontWeight: FontWeight.w800,
+        color: const Color(0xFFDC2626),
       ),
     );
   }
 }
 
-class _NameInputField extends StatelessWidget {
-  const _NameInputField({required this.controller});
+class _PhoneInputField extends StatelessWidget {
+  const _PhoneInputField({
+    required this.controller,
+    this.errorText,
+    this.onChanged,
+  });
 
   final TextEditingController controller;
+  final String? errorText;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 50,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE1E8F8)),
-      ),
-      child: Row(
-        children: [
-          const SizedBox(width: 16),
-          const Icon(Icons.person_outline_rounded, color: Color(0xFF1746B5)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              textCapitalization: TextCapitalization.words,
-              cursorColor: const Color(0xFF1746B5),
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: const Color(0xFF1D2D59),
+    final hasError = errorText != null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          height: 50,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: hasError
+                  ? const Color(0xFFDC2626)
+                  : const Color(0xFFE2E9F8),
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x08123EAF),
+                blurRadius: 10,
+                offset: Offset(0, 3),
               ),
-              decoration: InputDecoration(
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                disabledBorder: InputBorder.none,
-                isCollapsed: true,
-                filled: false,
-                fillColor: Colors.transparent,
-                contentPadding: EdgeInsets.zero,
-                hintText: 'Ej. Juan',
-                hintStyle: GoogleFonts.plusJakartaSans(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF95A1BD),
+            ],
+          ),
+          child: Row(
+            children: [
+              const SizedBox(width: 14),
+              Text(
+                '+591',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF1D2D59),
                 ),
               ),
+              Container(
+                width: 1,
+                height: 22,
+                margin: const EdgeInsets.symmetric(horizontal: 10),
+                color: const Color(0xFFD7DDF1),
+              ),
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  onChanged: onChanged,
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(8),
+                  ],
+                  cursorColor: const Color(0xFF1650D7),
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF1D2D59),
+                  ),
+                  decoration: InputDecoration(
+                    isCollapsed: true,
+                    filled: false,
+                    fillColor: Colors.transparent,
+                    contentPadding: EdgeInsets.zero,
+                    hintText: 'Llena este campo con tu numero',
+                    hintStyle: GoogleFonts.plusJakartaSans(
+                      fontSize: 13,
+                      color: const Color(0xFFA2ACC8),
+                      fontWeight: FontWeight.w500,
+                    ),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                  ),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.only(right: 14),
+                child: Icon(
+                  Icons.phone_in_talk_outlined,
+                  color: Color(0xFF1650D7),
+                  size: 19,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (hasError) ...[
+          const SizedBox(height: 6),
+          _FieldErrorText(errorText!),
+        ],
+      ],
+    );
+  }
+}
+
+class _NameInputField extends StatelessWidget {
+  const _NameInputField({
+    required this.controller,
+    this.errorText,
+    this.onChanged,
+  });
+
+  final TextEditingController controller;
+  final String? errorText;
+  final ValueChanged<String>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasError = errorText != null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          height: 50,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: hasError
+                  ? const Color(0xFFDC2626)
+                  : const Color(0xFFE1E8F8),
             ),
           ),
-          const SizedBox(width: 16),
+          child: Row(
+            children: [
+              const SizedBox(width: 16),
+              const Icon(
+                Icons.person_outline_rounded,
+                color: Color(0xFF1746B5),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  onChanged: onChanged,
+                  textCapitalization: TextCapitalization.words,
+                  cursorColor: const Color(0xFF1746B5),
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF1D2D59),
+                  ),
+                  decoration: InputDecoration(
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    isCollapsed: true,
+                    filled: false,
+                    fillColor: Colors.transparent,
+                    contentPadding: EdgeInsets.zero,
+                    hintText: 'Llena este campo con tu nombre',
+                    hintStyle: GoogleFonts.plusJakartaSans(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF95A1BD),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+            ],
+          ),
+        ),
+        if (hasError) ...[
+          const SizedBox(height: 6),
+          _FieldErrorText(errorText!),
         ],
-      ),
+      ],
     );
   }
 }
@@ -1142,6 +1258,8 @@ class _PasswordInputField extends StatelessWidget {
     required this.obscureText,
     required this.suffixLabel,
     required this.onSuffixTap,
+    this.errorText,
+    this.onChanged,
   });
 
   final TextEditingController controller;
@@ -1149,98 +1267,115 @@ class _PasswordInputField extends StatelessWidget {
   final bool obscureText;
   final String suffixLabel;
   final VoidCallback onSuffixTap;
+  final String? errorText;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 50,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E9F8)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x08123EAF),
-            blurRadius: 10,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          const SizedBox(width: 14),
-          const Icon(
-            Icons.lock_outline_rounded,
-            color: Color(0xFF1650D7),
-            size: 19,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              obscureText: obscureText,
-              cursorColor: const Color(0xFF1650D7),
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFF1D2D59),
-              ),
-              decoration: InputDecoration(
-                isCollapsed: true,
-                filled: false,
-                fillColor: Colors.transparent,
-                contentPadding: EdgeInsets.zero,
-                hintText: hintText,
-                hintStyle: GoogleFonts.plusJakartaSans(
-                  fontSize: 13,
-                  color: const Color(0xFFA2ACC8),
-                  fontWeight: FontWeight.w500,
-                ),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                disabledBorder: InputBorder.none,
-              ),
+    final hasError = errorText != null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          height: 50,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: hasError
+                  ? const Color(0xFFDC2626)
+                  : const Color(0xFFE2E9F8),
             ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x08123EAF),
+                blurRadius: 10,
+                offset: Offset(0, 3),
+              ),
+            ],
           ),
-          Padding(
-            padding: const EdgeInsets.only(right: 10),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: onSuffixTap,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
+          child: Row(
+            children: [
+              const SizedBox(width: 14),
+              const Icon(
+                Icons.lock_outline_rounded,
+                color: Color(0xFF1650D7),
+                size: 19,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  onChanged: onChanged,
+                  obscureText: obscureText,
+                  cursorColor: const Color(0xFF1650D7),
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF1D2D59),
+                  ),
+                  decoration: InputDecoration(
+                    isCollapsed: true,
+                    filled: false,
+                    fillColor: Colors.transparent,
+                    contentPadding: EdgeInsets.zero,
+                    hintText: hintText,
+                    hintStyle: GoogleFonts.plusJakartaSans(
+                      fontSize: 13,
+                      color: const Color(0xFFA2ACC8),
+                      fontWeight: FontWeight.w500,
+                    ),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                  ),
                 ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF7FAFF),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: InkWell(
                   borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.remove_red_eye_outlined,
-                      color: Color(0xFF1650D7),
-                      size: 15,
+                  onTap: onSuffixTap,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      suffixLabel,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF1650D7),
-                      ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF7FAFF),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                  ],
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.remove_red_eye_outlined,
+                          color: Color(0xFF1650D7),
+                          size: 15,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          suffixLabel,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF1650D7),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
+        ),
+        if (hasError) ...[
+          const SizedBox(height: 6),
+          _FieldErrorText(errorText!),
         ],
-      ),
+      ],
     );
   }
 }

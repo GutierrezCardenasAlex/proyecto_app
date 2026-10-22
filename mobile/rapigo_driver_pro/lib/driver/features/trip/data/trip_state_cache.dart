@@ -154,6 +154,8 @@ class DriverTripStateCache {
       'destinationLat': trip.destinationLat,
       'destinationLng': trip.destinationLng,
       'fareAmount': trip.fareAmount,
+      'counterOfferAmount': trip.counterOfferAmount,
+      'counterOfferStatus': trip.counterOfferStatus,
       'requestedAt': trip.requestedAt,
       'vehicleType': trip.vehicleType,
       'vehicleLabel': trip.vehicleLabel,
@@ -164,6 +166,7 @@ class DriverTripStateCache {
       'dispatchMode': trip.dispatchMode,
       'preferredDriverId': trip.preferredDriverId,
       'offerExpiresAt': trip.offerExpiresAt,
+      'paymentMethod': trip.paymentMethod,
       'isPromotional': trip.isPromotional,
     };
   }
@@ -180,6 +183,10 @@ class DriverTripStateCache {
       destinationLat: _toNullableDouble(payload['destinationLat']),
       destinationLng: _toNullableDouble(payload['destinationLng']),
       fareAmount: _toDouble(payload['fareAmount']),
+      counterOfferAmount: double.tryParse(
+        payload['counterOfferAmount']?.toString() ?? '',
+      ),
+      counterOfferStatus: payload['counterOfferStatus']?.toString(),
       requestedAt: payload['requestedAt']?.toString(),
       vehicleType: payload['vehicleType']?.toString(),
       vehicleLabel: payload['vehicleLabel']?.toString(),
@@ -190,6 +197,9 @@ class DriverTripStateCache {
       dispatchMode: payload['dispatchMode']?.toString(),
       preferredDriverId: payload['preferredDriverId']?.toString(),
       offerExpiresAt: payload['offerExpiresAt']?.toString(),
+      paymentMethod: payload['paymentMethod']?.toString() == 'qr'
+          ? 'qr'
+          : 'cash',
       isPromotional: payload['isPromotional'] == true,
     );
   }
@@ -235,7 +245,7 @@ class DriverTripStateCache {
       status: trip.status,
       stage: stage,
       routeStage: routeStage,
-      restoreProgressPage: restoreProgressPage,
+      restoreProgressPage: restoreProgressPage && !trip.hasPendingCounterOffer,
       savedAtIso: DateTime.now().toIso8601String(),
     );
   }

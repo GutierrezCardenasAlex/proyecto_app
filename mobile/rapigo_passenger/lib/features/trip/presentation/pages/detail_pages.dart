@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/admin_center/admin_center_repository.dart';
+import '../../../../core/config/app_brand.dart';
+import '../widgets/account_ui.dart';
 import '../../../../core/map/offline_map.dart';
 import '../../../../core/ui/top_notice.dart';
 import '../../../auth/data/auth_repository.dart';
@@ -114,73 +116,85 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 }
 
-class NotificationsPage extends ConsumerWidget {
+class NotificationsPage extends ConsumerStatefulWidget {
   const NotificationsPage({super.key});
+  @override
+  ConsumerState<NotificationsPage> createState() => _NotificationsPageState();
+}
+
+class _NotificationsPageState extends ConsumerState<NotificationsPage> {
+  Future<List<AdminNotificationItem>>? _notifications;
+  String? _token;
+
+  Future<void> _reload() async {
+    final future = const AdminCenterRepository().fetchNotifications(_token!);
+    setState(() => _notifications = future);
+    try {
+      await future;
+    } catch (_) {
+      /* Rendered by FutureBuilder. */
+    }
+  }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final session = ref.watch(sessionProvider);
-    final repository = const AdminCenterRepository();
-
+  Widget build(BuildContext context) {
+    final token = ref.watch(sessionProvider).token;
+    if (_token != token) {
+      _token = token;
+      _notifications = token.isEmpty
+          ? Future.value(const <AdminNotificationItem>[])
+          : const AdminCenterRepository().fetchNotifications(token);
+    }
     return _DetailScaffold(
       title: 'Notificaciones',
-      child: FutureBuilder<List<AdminNotificationItem>>(
-        future: session.token.isEmpty
-            ? Future.value(const <AdminNotificationItem>[])
-            : repository.fetchNotifications(session.token),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.only(top: 80),
-                child: CircularProgressIndicator(),
-              ),
-            );
-          }
-
-          final items = snapshot.data ?? const <AdminNotificationItem>[];
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
-            children: [
-              const Text(
-                'BANDEJA',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.4,
-                  color: Color(0xFF0F6CBD),
+      child: RefreshIndicator(
+        onRefresh: _reload,
+        child: FutureBuilder<List<AdminNotificationItem>>(
+          future: _notifications,
+          builder: (context, snapshot) {
+            final items = snapshot.data ?? const <AdminNotificationItem>[];
+            return ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(24),
+              children: [
+                const AccountIntro(
+                  icon: Icons.notifications_none_rounded,
+                  title: 'Todo al día',
+                  description:
+                      'Los avisos de tus viajes y las novedades de Rápigo, en un solo lugar.',
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Notificaciones',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 18),
-              if (items.isEmpty)
-                const _SettingsInfoCard(
-                  title: 'Sin avisos nuevos',
-                  subtitle:
-                      'Cuando central te envie una notificacion o cambie algo importante, aparecera aqui.',
-                ),
-              ...items.map(
-                (item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
-                  child: _NotificationCard(
-                    kind: item.kind,
-                    title: item.title,
-                    message: item.message,
-                    createdAt: item.createdAt,
+                if (snapshot.connectionState == ConnectionState.waiting)
+                  const Center(child: CircularProgressIndicator())
+                else if (snapshot.hasError)
+                  AccountStateCard(
+                    icon: Icons.cloud_off_rounded,
+                    title: 'No pudimos cargar tus avisos',
+                    description: 'Revisa tu conexión e inténtalo de nuevo.',
+                    onRetry: _reload,
+                  )
+                else if (items.isEmpty)
+                  const AccountStateCard(
+                    icon: Icons.notifications_off_outlined,
+                    title: 'No tienes notificaciones',
+                    description:
+                        'Cuando recibas un aviso, lo encontrarás aquí.',
+                  )
+                else
+                  ...items.map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _NotificationCard(
+                        kind: item.kind,
+                        title: item.title,
+                        message: item.message,
+                        createdAt: item.createdAt,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -209,238 +223,103 @@ class PromotionsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
-    final safeCycleLength = session.promoCycleLength <= 0
-        ? 5
-        : session.promoCycleLength;
-    final progress = session.promoProgressCount
-        .clamp(0, safeCycleLength)
-        .toInt();
-    final hasFreeTrip = session.freeTripCredits > 0;
-    final promoEnabled = session.promoEnabled;
-    final cycleProgress = hasFreeTrip ? 0 : progress;
-    final progressValue = safeCycleLength == 0
-        ? 0.0
-        : cycleProgress / safeCycleLength;
-    final nextCycleTarget = hasFreeTrip
-        ? '0/$safeCycleLength'
-        : '$cycleProgress/$safeCycleLength';
-    final totalTrips = session.completedTripCount;
-
+    // Re-check the flag here as central can disable it while this page is open.
+    if (!session.promoEnabled) {
+      return const _DetailScaffold(
+        title: 'Promociones',
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: AccountStateCard(
+            icon: Icons.redeem_outlined,
+            title: 'No hay promociones activas',
+            description:
+                'Los beneficios volverán a aparecer cuando estén disponibles.',
+          ),
+        ),
+      );
+    }
+    final cycle = session.promoCycleLength > 0 ? session.promoCycleLength : 5;
+    final progress = session.promoProgressCount.clamp(0, cycle);
+    final credits = session.freeTripCredits;
     return _DetailScaffold(
       title: 'Promociones',
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
+        padding: const EdgeInsets.all(24),
         children: [
-          const Text(
-            'PROMOS',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.4,
-              color: Color(0xFF0F6CBD),
-            ),
+          const AccountIntro(
+            icon: Icons.redeem_rounded,
+            title: 'Viajar tiene recompensa',
+            description:
+                'Consulta tu progreso y los beneficios disponibles para tu cuenta.',
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Tu avance',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 32,
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF0F172A),
-            ),
-          ),
-          const SizedBox(height: 18),
           Container(
-            padding: const EdgeInsets.all(22),
+            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF0F6CBD), Color(0xFF38BDF8)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x220F6CBD),
-                  blurRadius: 24,
-                  offset: Offset(0, 12),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 54,
-                      height: 54,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: const Icon(
-                        Icons.card_giftcard_rounded,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            !promoEnabled
-                                ? 'Promocion pausada por central'
-                                : hasFreeTrip
-                                ? 'Ya tienes viaje gratis'
-                                : 'Te acercas a un viaje gratis',
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            !promoEnabled
-                                ? 'La promo esta desactivada por ahora. Tu historial de viajes se sigue guardando normal.'
-                                : hasFreeTrip
-                                ? 'Tu viaje gratis ya esta listo y el nuevo ciclo comenzo desde 0/$safeCycleLength.'
-                                : 'Cada $safeCycleLength viajes pagados desbloqueas 1 viaje gratis.',
-                            style: const TextStyle(
-                              color: Color(0xFFEFF6FF),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0x1AFFFFFF),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Row(
-                    children: [
-                      Text(
-                        !promoEnabled
-                            ? 'Pausada'
-                            : hasFreeTrip
-                            ? 'Gratis listo'
-                            : nextCycleTarget,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(999),
-                          child: LinearProgressIndicator(
-                            value: promoEnabled
-                                ? (hasFreeTrip ? 1 : progressValue)
-                                : 0,
-                            minHeight: 10,
-                            backgroundColor: const Color(0x33FFFFFF),
-                            valueColor: AlwaysStoppedAnimation(
-                              promoEnabled
-                                  ? Colors.white
-                                  : const Color(0xFFEFF6FF),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  !promoEnabled
-                      ? 'Cuando la central reactive la promo, tu progreso volvera a mostrarse aqui.'
-                      : hasFreeTrip
-                      ? 'Tienes ${session.freeTripCredits} viaje(s) gratis disponible(s) y tu siguiente ciclo comenzo en 0/$safeCycleLength.'
-                      : 'Te faltan ${safeCycleLength - cycleProgress} viaje(s) para ganar el proximo gratis.',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFFFFF),
+              color: AppBrand.secondaryBlue,
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Resumen de promocion',
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 18,
+                const Text(
+                  'PROMOCIÓN ACTIVA',
+                  style: TextStyle(
+                    color: AppBrand.accentYellow,
+                    fontSize: 11,
                     fontWeight: FontWeight.w800,
-                    color: const Color(0xFF0F172A),
+                    letterSpacing: 1.2,
                   ),
                 ),
-                const SizedBox(height: 12),
-                _PromoMetricRow(
-                  label: 'Viajes completados en total',
-                  value: '$totalTrips',
+                const SizedBox(height: 16),
+                Text(
+                  credits > 0
+                      ? '$credits ${credits == 1 ? 'viaje gratis' : 'viajes gratis'}'
+                      : '$progress de $cycle viajes',
+                  style: GoogleFonts.plusJakartaSans(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-                _PromoMetricRow(
-                  label: 'Avance del ciclo actual',
-                  value: nextCycleTarget,
+                const SizedBox(height: 8),
+                Text(
+                  credits > 0
+                      ? 'Tu beneficio está disponible para tu próximo viaje.'
+                      : 'Completa ${cycle - progress} viajes más para alcanzar tu beneficio.',
+                  style: const TextStyle(color: Colors.white70, height: 1.5),
                 ),
-                _PromoMetricRow(
-                  label: 'Viajes gratis disponibles',
-                  value: '${session.freeTripCredits}',
-                ),
-                _PromoMetricRow(
-                  label: 'Estado de la promo',
-                  value: promoEnabled ? 'Activa' : 'Pausada',
-                ),
-                _PromoMetricRow(
-                  label: 'Regla del beneficio',
-                  value: '$safeCycleLength viajes pagados = 1 gratis',
+                const SizedBox(height: 20),
+                LinearProgressIndicator(
+                  value: credits > 0 ? 1 : progress / cycle,
+                  minHeight: 8,
+                  borderRadius: BorderRadius.circular(99),
+                  color: AppBrand.accentYellow,
+                  backgroundColor: Colors.white24,
+                  semanticsLabel: 'Progreso de promoción',
+                  semanticsValue: credits > 0
+                      ? 'Beneficio disponible'
+                      : '$progress de $cycle',
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 14),
-          const _SettingsInfoCard(
-            title: 'Como funciona',
+          const SizedBox(height: 24),
+          _SettingsInfoCard(
+            title: 'Cómo funciona',
             subtitle:
-                'Cada 5 viajes completados desbloqueas 1 viaje gratis para usarlo en tu siguiente pedido.',
+                'Cada $cycle viajes pagados completados desbloqueas un viaje gratis. Tu historial total se conserva.',
           ),
+          const SizedBox(height: 12),
           const _SettingsInfoCard(
-            title: 'Uso del viaje premiado',
+            title: 'Un beneficio para ti',
             subtitle:
-                'El beneficio es valido solo para el cliente registrado en RAPIGO que gano la promocion. Cuando usas el viaje gratis, el ciclo vuelve a 0/5 y el conteo total sigue acumulando normal.',
+                'El viaje gratis corresponde al titular de la cuenta que obtuvo la promoción. Los acompañantes no están incluidos.',
           ),
+          const SizedBox(height: 12),
           const _SettingsInfoCard(
-            title: 'Acompanantes',
+            title: 'Te avisamos cuando esté listo',
             subtitle:
-                'La promocion no cubre acompanantes. Si viajas con otra persona, el conductor puede realizar el cobro normal correspondiente por ese pasajero adicional.',
-          ),
-          const _SettingsInfoCard(
-            title: 'Notificacion',
-            subtitle:
-                'Cuando consigas el beneficio, RAPIGO te avisara automaticamente en la app.',
+                'Recibirás un aviso en la app cuando alcances tu beneficio.',
           ),
         ],
       ),
@@ -478,80 +357,74 @@ class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return _DetailScaffold(
-      title: 'Configuraciones',
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
-        children: [
-          const Text(
-            'PREFERENCIAS',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.4,
-              color: Color(0xFF0F6CBD),
-            ),
+  Widget build(BuildContext context) => _DetailScaffold(
+    title: 'Configuración',
+    child: ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        const AccountIntro(
+          icon: Icons.tune_rounded,
+          title: 'Prepara tu próximo viaje',
+          description: 'Gestiona los mapas que utilizas en la aplicación.',
+        ),
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFFE8EBF2)),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Configuraciones',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 32,
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF0F172A),
-            ),
-          ),
-          const SizedBox(height: 18),
-          Padding(
-            padding: const EdgeInsets.only(bottom: 14),
-            child: Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFFFFF),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.map_outlined,
+                size: 36,
+                color: AppBrand.secondaryBlue,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Mapa offline',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFF0F172A),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Descarga o actualiza Potosi ciudad para seguir usando el mapa cuando la señal baje.',
-                    style: TextStyle(
-                      color: Color(0xFF64748B),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: () => showOfflineMapSheet(context),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF0F6CBD),
-                        foregroundColor: const Color(0xFFFFFFFF),
-                      ),
-                      icon: const Icon(Icons.download_for_offline_rounded),
-                      label: const Text('Abrir mapa offline'),
-                    ),
-                  ),
-                ],
+              const SizedBox(height: 20),
+              Text(
+                'Potosí sin conexión',
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 21,
+                  fontWeight: FontWeight.w800,
+                  color: AppBrand.textPrimary,
+                ),
               ),
-            ),
+              const SizedBox(height: 10),
+              const Text(
+                'Descarga el mapa de la ciudad o actualiza tu copia para consultarlo cuando la señal sea débil.',
+                style: TextStyle(color: AppBrand.textSecondary, height: 1.5),
+              ),
+              const SizedBox(height: 22),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () => showOfflineMapSheet(context),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppBrand.secondaryBlue,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  icon: const Icon(Icons.download_for_offline_outlined),
+                  label: const Text('Gestionar mapa'),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
+        ),
+        const SizedBox(height: 16),
+        const _SettingsInfoCard(
+          title: 'Antes de salir',
+          subtitle:
+              'Descarga el mapa con conexión a internet. Solicitar viajes y recibir actualizaciones requiere conexión.',
+        ),
+      ],
+    ),
+  );
 }
 
 class SupportPage extends ConsumerStatefulWidget {
@@ -565,6 +438,8 @@ class _SupportPageState extends ConsumerState<SupportPage> {
   final _messageController = TextEditingController();
   String _category = 'Falla de app';
   bool _sending = false;
+  Future<List<SupportReportItem>>? _reports;
+  String? _reportsToken;
 
   @override
   void dispose() {
@@ -576,37 +451,28 @@ class _SupportPageState extends ConsumerState<SupportPage> {
   Widget build(BuildContext context) {
     final session = ref.watch(sessionProvider);
     final repository = const AdminCenterRepository();
+    if (_reportsToken != session.token) {
+      _reportsToken = session.token;
+      _reports = session.token.isEmpty
+          ? Future.value(const <SupportReportItem>[])
+          : repository.fetchSupportReports(session.token);
+    }
 
     return _DetailScaffold(
       title: 'Soporte',
       child: FutureBuilder<List<SupportReportItem>>(
-        future: session.token.isEmpty
-            ? Future.value(const <SupportReportItem>[])
-            : repository.fetchSupportReports(session.token),
+        future: _reports,
         builder: (context, snapshot) {
           final reports = snapshot.data ?? const <SupportReportItem>[];
           return ListView(
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
+            padding: const EdgeInsets.all(24),
             children: [
-              const Text(
-                'SOPORTE',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.4,
-                  color: Color(0xFF0F6CBD),
-                ),
+              const AccountIntro(
+                icon: Icons.support_agent_rounded,
+                title: 'Estamos para ayudarte',
+                description:
+                    'Cuéntanos lo ocurrido y consulta el estado de tus reportes aquí.',
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Reporta un problema',
-                style: GoogleFonts.plusJakartaSans(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 18),
               Container(
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
@@ -619,6 +485,7 @@ class _SupportPageState extends ConsumerState<SupportPage> {
                   children: [
                     DropdownButtonFormField<String>(
                       initialValue: _category,
+                      isExpanded: true,
                       dropdownColor: const Color(0xFFFFFFFF),
                       style: const TextStyle(
                         color: Color(0xFF0F172A),
@@ -734,9 +601,13 @@ class _SupportPageState extends ConsumerState<SupportPage> {
                                     category: _category,
                                     message: _messageController.text.trim(),
                                   );
-                                  _messageController.clear();
                                   if (!context.mounted) return;
-                                  setState(() {});
+                                  _messageController.clear();
+                                  setState(() {
+                                    _reports = repository.fetchSupportReports(
+                                      session.token,
+                                    );
+                                  });
                                   showTopNotice(
                                     context,
                                     'Reporte enviado a central correctamente.',
@@ -758,6 +629,14 @@ class _SupportPageState extends ConsumerState<SupportPage> {
                                   }
                                 }
                               },
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppBrand.secondaryBlue,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size.fromHeight(50),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
                         icon: const Icon(Icons.send_rounded),
                         label: Text(
                           _sending ? 'Enviando...' : 'Enviar reporte',
@@ -777,7 +656,19 @@ class _SupportPageState extends ConsumerState<SupportPage> {
                 ),
               ),
               const SizedBox(height: 12),
-              if (reports.isEmpty)
+              if (snapshot.connectionState == ConnectionState.waiting)
+                const LinearProgressIndicator()
+              else if (snapshot.hasError)
+                AccountStateCard(
+                  icon: Icons.cloud_off_rounded,
+                  title: 'No pudimos cargar tus reportes',
+                  description:
+                      'Puedes reintentar sin perder lo que escribiste.',
+                  onRetry: () => setState(() {
+                    _reports = repository.fetchSupportReports(session.token);
+                  }),
+                )
+              else if (reports.isEmpty)
                 const _SettingsInfoCard(
                   title: 'Aún no enviaste reportes',
                   subtitle:
@@ -832,13 +723,6 @@ class _NotificationCard extends StatelessWidget {
         color: const Color(0xFFFFFFFF),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: visual.borderColor),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x22000000),
-            blurRadius: 18,
-            offset: Offset(0, 8),
-          ),
-        ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -952,7 +836,7 @@ _notificationVisual(String kind) {
         backgroundColor: const Color(0x220F6CBD),
         borderColor: const Color(0xFFE5E7EB),
         icon: Icons.notifications_active_outlined,
-        label: 'NUEVO',
+        label: 'AVISO',
       );
   }
 }
@@ -1115,69 +999,14 @@ class _SettingsInfoCard extends StatelessWidget {
   }
 }
 
-class _PromoMetricRow extends StatelessWidget {
-  const _PromoMetricRow({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: Color(0xFF64748B),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          Text(
-            value,
-            style: GoogleFonts.plusJakartaSans(
-              color: const Color(0xFF0F172A),
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _DetailScaffold extends StatelessWidget {
   const _DetailScaffold({required this.title, required this.child});
-
   final String title;
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F7),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF0F172A),
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        centerTitle: false,
-        iconTheme: const IconThemeData(color: Color(0xFF0F172A)),
-        title: Text(
-          title,
-          style: GoogleFonts.plusJakartaSans(
-            fontWeight: FontWeight.w800,
-            color: const Color(0xFF0F172A),
-          ),
-        ),
-        shape: const Border(bottom: BorderSide(color: Color(0xFFE5E7EB))),
-      ),
-      body: child,
-    );
-  }
+  Widget build(BuildContext context) =>
+      AccountPageShell(title: title, child: child);
 }
 
 class _FieldLabel extends StatelessWidget {

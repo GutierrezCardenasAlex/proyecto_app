@@ -18,9 +18,11 @@ class PassengerTripStateCache {
       return null;
     }
     return TripRequest(
-      pickupAddress: payload['pickupAddress']?.toString() ?? 'Mi ubicacion actual',
+      pickupAddress:
+          payload['pickupAddress']?.toString() ?? 'Mi ubicacion actual',
       destinationAddress:
-          payload['destinationAddress']?.toString() ?? 'Destino no esta marcado',
+          payload['destinationAddress']?.toString() ??
+          'Destino no esta marcado',
       status: payload['status']?.toString() ?? 'idle',
       activeTripId: payload['activeTripId']?.toString(),
       pickupLat: _toNullableDouble(payload['pickupLat']),
@@ -36,6 +38,12 @@ class PassengerTripStateCache {
       driverName: payload['driverName']?.toString(),
       driverPhone: payload['driverPhone']?.toString(),
       etaMinutes: _toNullableInt(payload['etaMinutes']),
+      fareAmount: _toNullableDouble(payload['fareAmount']),
+      counterOfferAmount: _toNullableDouble(payload['counterOfferAmount']),
+      counterOfferStatus: payload['counterOfferStatus']?.toString(),
+      paymentMethod: payload['paymentMethod']?.toString() == 'qr'
+          ? 'qr'
+          : 'cash',
       isPromotional: payload['isPromotional'] == true,
     );
   }
@@ -62,6 +70,10 @@ class PassengerTripStateCache {
         'driverName': request.driverName,
         'driverPhone': request.driverPhone,
         'etaMinutes': request.etaMinutes,
+        'fareAmount': request.fareAmount,
+        'counterOfferAmount': request.counterOfferAmount,
+        'counterOfferStatus': request.counterOfferStatus,
+        'paymentMethod': request.paymentMethod,
         'isPromotional': request.isPromotional,
       }),
     );

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/config/app_brand.dart';
+import 'trip_status_banner.dart';
 
 class RouteReviewActionData {
   const RouteReviewActionData({required this.label, required this.onTap});
@@ -20,6 +21,11 @@ class RouteReviewView extends StatelessWidget {
     required this.destinationLabel,
     required this.summaryLabel,
     required this.fareLabel,
+    this.offerAmount,
+    this.paymentMethod = 'cash',
+    this.onDecreaseFare,
+    this.onIncreaseFare,
+    this.onSelectPaymentMethod,
     required this.durationLabel,
     required this.distanceLabel,
     required this.serviceType,
@@ -47,6 +53,7 @@ class RouteReviewView extends StatelessWidget {
     this.vehicleDetail,
     this.etaLabel,
     this.compactMode = false,
+    this.tripStatus,
   });
 
   final String title;
@@ -54,6 +61,11 @@ class RouteReviewView extends StatelessWidget {
   final String destinationLabel;
   final String summaryLabel;
   final String fareLabel;
+  final double? offerAmount;
+  final String paymentMethod;
+  final VoidCallback? onDecreaseFare;
+  final VoidCallback? onIncreaseFare;
+  final ValueChanged<String>? onSelectPaymentMethod;
   final String durationLabel;
   final String distanceLabel;
   final String serviceType;
@@ -81,177 +93,201 @@ class RouteReviewView extends StatelessWidget {
   final String? vehicleDetail;
   final String? etaLabel;
   final bool compactMode;
+  final String? tripStatus;
 
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final panelMaxHeight = compactMode
-        ? screenHeight * 0.34
-        : screenHeight * 0.46;
-
+    final active = statusText != null;
     return SafeArea(
       child: Padding(
-        padding: EdgeInsets.fromLTRB(16, 4, 16, compactMode ? 8 : 12),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
         child: Stack(
-          fit: StackFit.expand,
           children: [
             Positioned(
               top: 0,
               left: 0,
-              child: _NavigationDistanceBadge(
-                label: navigationBadgeLabel ?? distanceLabel,
-                caption: navigationBadgeCaption ?? 'Llegada',
-                icon: navigationBadgeIcon,
-              ),
-            ),
-            Positioned(
-              top: 0,
               right: 0,
-              child: _RoundButton(
-                icon: detailsExpanded
-                    ? Icons.keyboard_arrow_down_rounded
-                    : Icons.keyboard_arrow_up_rounded,
-                onTap: onToggleDetails,
+              child: Material(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        tooltip: 'Volver',
+                        onPressed: onBack,
+                        icon: const Icon(Icons.arrow_back_rounded),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              active ? 'Tu viaje' : 'Revisa tu recorrido',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              active
+                                  ? (navigationBadgeLabel ?? summaryLabel)
+                                  : '$durationLabel · $distanceLabel · estimado',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppBrand.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
             Positioned(
               left: 0,
               right: 0,
               bottom: 0,
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.992),
-                  borderRadius: BorderRadius.circular(30),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x140F172A),
-                      blurRadius: 34,
-                      offset: Offset(0, 18),
-                    ),
-                  ],
-                ),
+              child: Material(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(26),
+                clipBehavior: Clip.antiAlias,
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
-                    maxHeight: panelMaxHeight.clamp(220.0, 420.0),
+                    maxHeight:
+                        MediaQuery.sizeOf(context).height *
+                        (detailsExpanded ? 0.58 : 0.38),
                   ),
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.fromLTRB(
-                      16,
-                      compactMode ? 10 : 13,
-                      16,
-                      compactMode ? 11 : 15,
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(18, 8, 8, 4),
+                        child: Row(
                           children: [
-                            _RoundButton(
-                              icon: Icons.arrow_back_rounded,
-                              onTap: onBack,
-                            ),
-                            const SizedBox(width: 12),
                             Expanded(
-                              child: Column(
-                                children: [
-                                  Text(
-                                    durationLabel,
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppBrand.textPrimary,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    distanceLabel,
-                                    style: GoogleFonts.plusJakartaSans(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppBrand.textSecondary,
-                                    ),
-                                  ),
-                                ],
+                              child: Text(
+                                active
+                                    ? 'Seguimiento del viaje'
+                                    : 'Destino y oferta',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
                             ),
-                            _RoundButton(
-                              icon: Icons.tune_rounded,
-                              onTap: onToggleDetails,
+                            IconButton(
+                              tooltip: detailsExpanded
+                                  ? 'Ver más mapa'
+                                  : 'Mostrar detalles',
+                              onPressed: onToggleDetails,
+                              icon: Icon(
+                                detailsExpanded
+                                    ? Icons.keyboard_arrow_down_rounded
+                                    : Icons.keyboard_arrow_up_rounded,
+                              ),
                             ),
                           ],
                         ),
-                        SizedBox(height: compactMode ? 6 : 8),
-                        _RouteProgressBar(accent: statusAccent),
-                        SizedBox(height: compactMode ? 6 : 8),
-                        if (detailsExpanded) ...[
-                          _ExpandedDetailsBlock(
-                            originLabel: originLabel,
-                            destinationLabel: destinationLabel,
-                            summaryLabel: summaryLabel,
-                            serviceType: serviceType,
-                            onSelectTaxi: onSelectTaxi,
-                            onSelectMoto: onSelectMoto,
-                            onEdit: onEdit,
-                            onClear: onClear,
-                            statusText: statusText,
-                            statusAccent: statusAccent,
-                            statusDetails: statusDetails,
-                            secondaryActions: secondaryActions,
-                            driverName: driverName,
-                            vehicleLabel: vehicleLabel,
-                            vehiclePlate: vehiclePlate,
-                            vehicleDetail: vehicleDetail,
-                            etaLabel: etaLabel,
-                          ),
-                          SizedBox(height: compactMode ? 8 : 10),
-                        ] else ...[
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              title,
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: compactMode ? 14 : 15,
-                                fontWeight: FontWeight.w800,
-                                color: AppBrand.textSecondary,
-                              ),
-                            ),
-                          ),
-                          SizedBox(height: compactMode ? 6 : 8),
-                        ],
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton(
-                            onPressed: onPrimaryAction,
-                            style: FilledButton.styleFrom(
-                              backgroundColor: primaryActionColor,
-                              foregroundColor: Colors.white,
-                              minimumSize: Size.fromHeight(
-                                compactMode ? 48 : 54,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(primaryActionIcon, size: 18),
-                                const SizedBox(width: 8),
+                      ),
+                      Flexible(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(18, 4, 18, 12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              if (active)
+                                TripStatusBanner(
+                                  status: tripStatus ?? 'searching',
+                                ),
+                              if (detailsExpanded) ...[
+                                const SizedBox(height: 10),
+                                _ExpandedDetailsBlock(
+                                  originLabel: originLabel,
+                                  destinationLabel: destinationLabel,
+                                  summaryLabel: summaryLabel,
+                                  serviceType: serviceType,
+                                  onSelectTaxi: onSelectTaxi,
+                                  onSelectMoto: onSelectMoto,
+                                  onEdit: onEdit,
+                                  onClear: onClear,
+                                  statusText: statusText,
+                                  statusAccent: statusAccent,
+                                  statusDetails: statusDetails,
+                                  secondaryActions: secondaryActions,
+                                  driverName: driverName,
+                                  vehicleLabel: vehicleLabel,
+                                  vehiclePlate: vehiclePlate,
+                                  vehicleDetail: vehicleDetail,
+                                  etaLabel: etaLabel,
+                                ),
+                              ] else if (!active) ...[
                                 Text(
-                                  primaryActionLabel,
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 16,
+                                  destinationLabel,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  fareLabel,
+                                  style: const TextStyle(
+                                    color: AppBrand.textSecondary,
                                   ),
                                 ),
                               ],
+                              if (!active &&
+                                  detailsExpanded &&
+                                  offerAmount != null &&
+                                  onDecreaseFare != null &&
+                                  onIncreaseFare != null &&
+                                  onSelectPaymentMethod != null) ...[
+                                const SizedBox(height: 16),
+                                _RouteOfferPanel(
+                                  fareAmount: offerAmount!,
+                                  paymentMethod: paymentMethod,
+                                  onDecreaseFare: onDecreaseFare!,
+                                  onIncreaseFare: onIncreaseFare!,
+                                  onSelectPaymentMethod: onSelectPaymentMethod!,
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(18, 8, 18, 16),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: onPrimaryAction,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppBrand.secondaryBlue,
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size.fromHeight(50),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 14,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            icon: Icon(primaryActionIcon, size: 20),
+                            label: Text(
+                              primaryActionLabel,
+                              textAlign: TextAlign.center,
                             ),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -338,6 +374,185 @@ class _NavigationDistanceBadge extends StatelessWidget {
             decoration: BoxDecoration(
               color: const Color(0xFFFACC15),
               borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RouteOfferPanel extends StatelessWidget {
+  const _RouteOfferPanel({
+    required this.fareAmount,
+    required this.paymentMethod,
+    required this.onDecreaseFare,
+    required this.onIncreaseFare,
+    required this.onSelectPaymentMethod,
+  });
+
+  final double fareAmount;
+  final String paymentMethod;
+  final VoidCallback onDecreaseFare;
+  final VoidCallback onIncreaseFare;
+  final ValueChanged<String> onSelectPaymentMethod;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          _OfferStepButton(icon: Icons.remove_rounded, onTap: onDecreaseFare),
+          Expanded(
+            child: Column(
+              children: [
+                Text(
+                  'Bs ${fareAmount.round()}',
+                  style: GoogleFonts.plusJakartaSans(
+                    color: AppBrand.textPrimary,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    height: 1,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _PaymentMiniButton(
+                      icon: Icons.payments_rounded,
+                      label: 'Efectivo',
+                      selected: paymentMethod != 'qr',
+                      onTap: () => onSelectPaymentMethod('cash'),
+                    ),
+                    const SizedBox(width: 8),
+                    _PaymentMiniButton(
+                      icon: Icons.qr_code_2_rounded,
+                      label: 'QR',
+                      selected: paymentMethod == 'qr',
+                      onTap: () => onSelectPaymentMethod('qr'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          _OfferStepButton(icon: Icons.add_rounded, onTap: onIncreaseFare),
+        ],
+      ),
+    );
+  }
+}
+
+class _OfferStepButton extends StatelessWidget {
+  const _OfferStepButton({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppBrand.primaryBlue,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          width: 42,
+          height: 42,
+          child: Icon(icon, color: Colors.white, size: 22),
+        ),
+      ),
+    );
+  }
+}
+
+class _PaymentMiniButton extends StatelessWidget {
+  const _PaymentMiniButton({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? const Color(0xFFFFF3C4) : Colors.white,
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: selected
+                  ? const Color(0xFFFACC15)
+                  : const Color(0xFFE2E8F0),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 15, color: AppBrand.textPrimary),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: AppBrand.textPrimary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FareSummaryPill extends StatelessWidget {
+  const _FareSummaryPill({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.local_offer_rounded, color: AppBrand.primaryBlue),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              style: GoogleFonts.plusJakartaSans(
+                color: AppBrand.textPrimary,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ],
@@ -467,29 +682,30 @@ class _ExpandedDetailsBlock extends StatelessWidget {
           value: destinationLabel,
         ),
         const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _CompactActionPill(
-              icon: serviceType == 'taxi'
-                  ? Icons.local_taxi_rounded
-                  : Icons.two_wheeler_rounded,
-              label: serviceType == 'taxi' ? 'Taxi' : 'Moto',
-              onTap: serviceType == 'taxi' ? onSelectMoto : onSelectTaxi,
-            ),
-            _CompactActionPill(
-              icon: Icons.edit_location_alt_rounded,
-              label: 'Editar',
-              onTap: onEdit,
-            ),
-            _CompactActionPill(
-              icon: Icons.close_rounded,
-              label: 'Quitar',
-              onTap: onClear,
-            ),
-          ],
-        ),
+        if (statusText == null)
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _CompactActionPill(
+                icon: serviceType == 'taxi'
+                    ? Icons.local_taxi_rounded
+                    : Icons.two_wheeler_rounded,
+                label: serviceType == 'taxi' ? 'Taxi' : 'Moto',
+                onTap: serviceType == 'taxi' ? onSelectMoto : onSelectTaxi,
+              ),
+              _CompactActionPill(
+                icon: Icons.edit_location_alt_rounded,
+                label: 'Editar',
+                onTap: onEdit,
+              ),
+              _CompactActionPill(
+                icon: Icons.close_rounded,
+                label: 'Quitar',
+                onTap: onClear,
+              ),
+            ],
+          ),
         if (hasDriverInfo ||
             statusText != null ||
             statusDetails.isNotEmpty) ...[

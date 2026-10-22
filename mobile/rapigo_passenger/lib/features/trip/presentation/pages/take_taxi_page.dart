@@ -7,11 +7,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart' hide Path;
 
 import '../../../auth/data/auth_repository.dart';
+import '../../../../core/ui/top_notice.dart';
 import '../../../map/data/location_controller.dart';
 import '../../../map/presentation/potosi_map.dart';
 import '../../data/trip_repository.dart';
 import '../../domain/trip_request.dart';
 import '../widgets/route_review_view.dart';
+import '../widgets/trip_status_banner.dart';
 
 enum TakeTaxiPageAction { back, edit, clear, journey }
 
@@ -30,8 +32,13 @@ class TakeTaxiPage extends ConsumerStatefulWidget {
     required this.originLabel,
     required this.destinationLabel,
     required this.distanceMeters,
+    required this.proposedFareAmount,
+    required this.paymentMethod,
     required this.selectedDriverId,
     required this.onSelectDriver,
+    required this.onFareChanged,
+    required this.onPaymentMethodChanged,
+    required this.onClearDestination,
     required this.onSelectTaxi,
     required this.onSelectMoto,
     required this.onRequest,
@@ -51,13 +58,18 @@ class TakeTaxiPage extends ConsumerStatefulWidget {
   final String originLabel;
   final String destinationLabel;
   final double distanceMeters;
+  final double proposedFareAmount;
+  final String paymentMethod;
   final String? selectedDriverId;
   final ValueChanged<String> onSelectDriver;
+  final ValueChanged<double> onFareChanged;
+  final ValueChanged<String> onPaymentMethodChanged;
+  final Future<bool> Function() onClearDestination;
   final VoidCallback onSelectTaxi;
   final VoidCallback onSelectMoto;
   final Future<void> Function() onRequest;
   final Future<void> Function() onRetry;
-  final Future<void> Function() onCancel;
+  final Future<bool> Function() onCancel;
 
   @override
   ConsumerState<TakeTaxiPage> createState() => _TakeTaxiPageState();
@@ -65,10 +77,18 @@ class TakeTaxiPage extends ConsumerStatefulWidget {
 
 class _TakeTaxiPageState extends ConsumerState<TakeTaxiPage> {
   late String _serviceType = widget.serviceType;
+  late String? _chosenDriverId = widget.selectedDriverId;
+
+  void _chooseDriver(String id) {
+    if (!mounted) return;
+    setState(() => _chosenDriverId = id);
+    widget.onSelectDriver(id);
+  }
+
+  late double _proposedFareAmount = widget.proposedFareAmount;
+  late String _paymentMethod = widget.paymentMethod == 'qr' ? 'qr' : 'cash';
   bool _detailsExpanded = false;
-  bool _didScheduleClose = false;
   bool _takeTaxiDrawerExpanded = true;
-  String? _ratingPromptedTripId;
   Timer? _nearbyRefreshTimer;
   int _mapCenterSignal = 0;
 
@@ -83,10 +103,9 @@ class _TakeTaxiPageState extends ConsumerState<TakeTaxiPage> {
       final firstDriver = _filteredDrivers.isEmpty
           ? null
           : _filteredDrivers.first;
-      if ((widget.selectedDriverId == null ||
-              widget.selectedDriverId!.isEmpty) &&
+      if ((_chosenDriverId == null || _chosenDriverId!.isEmpty) &&
           firstDriver != null) {
-        widget.onSelectDriver(firstDriver.driverId);
+        _chooseDriver(firstDriver.driverId);
       }
     });
   }
@@ -134,6 +153,24 @@ class _TakeTaxiPageState extends ConsumerState<TakeTaxiPage> {
 
   String get _summaryLabel => '$_durationLabel · $_distanceLabel';
 
+  String get _paymentMethodLabel => _paymentMethod == 'qr' ? 'QR' : 'Efectivo';
+
+  void _changeFare(double delta) {
+    final nextFare = (_proposedFareAmount + delta).clamp(1, 999).toDouble();
+    setState(() {
+      _proposedFareAmount = nextFare;
+    });
+    widget.onFareChanged(nextFare);
+  }
+
+  void _selectPaymentMethod(String method) {
+    final normalized = method == 'qr' ? 'qr' : 'cash';
+    setState(() {
+      _paymentMethod = normalized;
+    });
+    widget.onPaymentMethodChanged(normalized);
+  }
+
   List<NearbyDriver> get _liveNearbyDrivers {
     final liveNearbyDrivers = ref.read(tripProvider).nearbyDrivers;
     if (liveNearbyDrivers.isNotEmpty) {
@@ -173,7 +210,7 @@ class _TakeTaxiPageState extends ConsumerState<TakeTaxiPage> {
   }
 
   String? get _highlightedDriverId {
-    final selectedId = widget.selectedDriverId;
+    final selectedId = _chosenDriverId;
     if (selectedId != null && selectedId.isNotEmpty) {
       return selectedId;
     }
@@ -181,7 +218,7 @@ class _TakeTaxiPageState extends ConsumerState<TakeTaxiPage> {
   }
 
   NearbyDriver? get _selectedDriver {
-    final selectedId = widget.selectedDriverId;
+    final selectedId = _chosenDriverId;
     if (selectedId == null || selectedId.isEmpty) {
       return _filteredDrivers.isEmpty ? null : _filteredDrivers.first;
     }
@@ -194,7 +231,7 @@ class _TakeTaxiPageState extends ConsumerState<TakeTaxiPage> {
   }
 
   int get _selectedDriverIndex {
-    final selectedId = widget.selectedDriverId;
+    final selectedId = _chosenDriverId;
     if (selectedId == null || selectedId.isEmpty) {
       return 0;
     }
@@ -208,7 +245,7 @@ class _TakeTaxiPageState extends ConsumerState<TakeTaxiPage> {
     if (index < 0 || index >= _filteredDrivers.length) {
       return;
     }
-    widget.onSelectDriver(_filteredDrivers[index].driverId);
+    _chooseDriver(_filteredDrivers[index].driverId);
   }
 
   void _startNearbyRefreshLoop() {
@@ -267,11 +304,19 @@ class _TakeTaxiPageState extends ConsumerState<TakeTaxiPage> {
   }
 
   Future<void> _handleBack(String status) async {
+    if (ref.read(tripProvider).isRequestingTrip) {
+      showTopNotice(
+        context,
+        'Espera mientras se envía tu solicitud.',
+        title: 'Enviando solicitud',
+      );
+      return;
+    }
     if (_requestIsActive(status)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Cancela la solicitud para volver al mapa principal.'),
-        ),
+      showTopNotice(
+        context,
+        'Tu viaje sigue activo. Revisa los detalles o cancela la solicitud para salir.',
+        title: 'Viaje activo',
       );
       return;
     }
@@ -282,11 +327,23 @@ class _TakeTaxiPageState extends ConsumerState<TakeTaxiPage> {
   }
 
   Future<void> _handleCancel() async {
-    await widget.onCancel();
+    final cancelled = await widget.onCancel();
     if (!mounted) {
       return;
     }
-    Navigator.of(context).pop(TakeTaxiPageAction.back);
+    if (cancelled) {
+      Navigator.of(context).pop(TakeTaxiPageAction.back);
+    }
+  }
+
+  Future<void> _handleClearDestination() async {
+    final cleared = await widget.onClearDestination();
+    if (!mounted) {
+      return;
+    }
+    if (cleared) {
+      Navigator.of(context).pop(TakeTaxiPageAction.clear);
+    }
   }
 
   void _toggleDetails() {
@@ -295,142 +352,8 @@ class _TakeTaxiPageState extends ConsumerState<TakeTaxiPage> {
     });
   }
 
-  void _scheduleCloseIfFinished(String status) {
-    if (_didScheduleClose || !mounted) {
-      return;
-    }
-    if (status == 'completed') {
-      final tripId = ref.read(tripProvider).request.activeTripId;
-      if (tripId == null || tripId.isEmpty) {
-        _didScheduleClose = true;
-        _closeFinishedTrip();
-        return;
-      }
-      if (_ratingPromptedTripId == tripId) {
-        return;
-      }
-      _didScheduleClose = true;
-      _ratingPromptedTripId = tripId;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) {
-          return;
-        }
-        unawaited(_showPassengerRatingDialogAndClose(tripId));
-      });
-      return;
-    }
-    if (status != 'cancelled') {
-      return;
-    }
-    _didScheduleClose = true;
-    _closeFinishedTrip();
-  }
-
-  void _closeFinishedTrip() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-      Navigator.of(context).pop(TakeTaxiPageAction.back);
-    });
-  }
-
-  Future<void> _showPassengerRatingDialogAndClose(String tripId) async {
-    int selectedScore = 5;
-    final commentController = TextEditingController();
-    try {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) {
-          return StatefulBuilder(
-            builder: (context, setDialogState) {
-              return AlertDialog(
-                title: const Text('Califica al conductor'),
-                content: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Wrap(
-                        spacing: 4,
-                        children: List<Widget>.generate(5, (index) {
-                          final value = index + 1;
-                          return IconButton(
-                            onPressed: () =>
-                                setDialogState(() => selectedScore = value),
-                            icon: Icon(
-                              value <= selectedScore
-                                  ? Icons.star
-                                  : Icons.star_border_rounded,
-                              color: const Color(0xFFFACC15),
-                            ),
-                          );
-                        }),
-                      ),
-                      TextField(
-                        controller: commentController,
-                        maxLines: 3,
-                        decoration: const InputDecoration(
-                          hintText: 'Comentario opcional',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(false),
-                    child: const Text('Luego'),
-                  ),
-                  FilledButton(
-                    onPressed: () => Navigator.of(context).pop(true),
-                    child: const Text('Enviar'),
-                  ),
-                ],
-              );
-            },
-          );
-        },
-      );
-
-      if (confirmed != true) {
-        if (mounted) {
-          Navigator.of(context).pop(TakeTaxiPageAction.back);
-        }
-        return;
-      }
-
-      final session = ref.read(sessionProvider);
-      await ref
-          .read(tripProvider.notifier)
-          .submitRating(
-            token: session.token,
-            tripId: tripId,
-            score: selectedScore,
-            comment: commentController.text,
-          );
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gracias por calificar al conductor.')),
-      );
-      Navigator.of(context).pop(TakeTaxiPageAction.back);
-    } catch (error) {
-      _didScheduleClose = false;
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo concluir la calificacion: $error')),
-      );
-    } finally {
-      commentController.dispose();
-    }
-  }
-
   void _showDriverDetails(NearbyDriver driver) {
-    widget.onSelectDriver(driver.driverId);
+    _chooseDriver(driver.driverId);
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -611,7 +534,7 @@ class _TakeTaxiPageState extends ConsumerState<TakeTaxiPage> {
             driver: drivers[index],
             selected: drivers[index].driverId == _highlightedDriverId,
             onTap: () {
-              widget.onSelectDriver(drivers[index].driverId);
+              _chooseDriver(drivers[index].driverId);
               _showDriverDetails(drivers[index]);
             },
           ),
@@ -632,7 +555,7 @@ class _TakeTaxiPageState extends ConsumerState<TakeTaxiPage> {
             drivers: drivers,
             selectedDriverId: _highlightedDriverId,
             onSelectDriver: (driver) {
-              widget.onSelectDriver(driver.driverId);
+              _chooseDriver(driver.driverId);
               Navigator.of(context).pop();
             },
             onShowMap: () {
@@ -651,7 +574,7 @@ class _TakeTaxiPageState extends ConsumerState<TakeTaxiPage> {
     ref.watch(tripProvider.select((state) => state.nearbyDrivers));
     final request = tripState.request;
     final status = request.status;
-    _scheduleCloseIfFinished(status);
+    // The owning RideTab presents a single completion summary and resets the trip.
     final activeMapDrivers = _liveNearbyDrivers.isNotEmpty
         ? _liveNearbyDrivers
               .map(
@@ -690,6 +613,8 @@ class _TakeTaxiPageState extends ConsumerState<TakeTaxiPage> {
 
     final details = <String>[
       if (_requestIsActive(status)) _summaryLabel,
+      if (_requestIsActive(status))
+        'Bs ${(request.fareAmount ?? _proposedFareAmount).toStringAsFixed(2)} · ${request.paymentMethod == 'qr' ? 'QR' : 'Efectivo'}',
       if ((request.driverName ?? '').trim().isNotEmpty)
         request.driverName!.trim(),
       if (request.etaMinutes != null) '${request.etaMinutes} min',
@@ -736,175 +661,197 @@ class _TakeTaxiPageState extends ConsumerState<TakeTaxiPage> {
     final liveHeadingDegrees =
         ref.watch(passengerLocationProvider).headingDegrees ??
         widget.userHeadingDegrees;
+    final driverPoint = request.driverLat != null && request.driverLng != null
+        ? LatLng(request.driverLat!, request.driverLng!)
+        : null;
+    final pickupPoint = request.pickupLat != null && request.pickupLng != null
+        ? LatLng(request.pickupLat!, request.pickupLng!)
+        : liveUserLocation;
+    final destinationPoint =
+        request.destinationLat != null && request.destinationLng != null
+        ? LatLng(request.destinationLat!, request.destinationLng!)
+        : widget.routeTarget;
+    final visibleTarget = requestActive
+        ? (status == 'in_progress' ? destinationPoint : pickupPoint)
+        : widget.routeTarget;
     final nearbyCount = _filteredDrivers.length;
-    final screenSize = MediaQuery.sizeOf(context);
     final screenPadding = MediaQuery.paddingOf(context);
-    final isTinyHeight = screenSize.height < 430;
-    final isCompactHeight = screenSize.height < 560;
-    final isNarrowWidth = screenSize.width < 380;
-    final topControlsOffset = isTinyHeight
-        ? 10.0
-        : (isCompactHeight ? 20.0 : 38.0);
-    final topBannerOffset = isTinyHeight
-        ? 14.0
-        : (isCompactHeight ? 24.0 : 42.0);
-    final horizontalInset = isNarrowWidth ? 12.0 : (isTinyHeight ? 16.0 : 30.0);
-    final bottomInset = isTinyHeight ? 10.0 : (isCompactHeight ? 16.0 : 28.0);
-    final floatingSize = (isNarrowWidth || isTinyHeight) ? 42.0 : 50.0;
-    final bannerHorizontalInset = isNarrowWidth
-        ? 104.0
-        : (isTinyHeight ? 88.0 : 110.0);
-
-    return Scaffold(
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: PotosiMapSurface(
-              viewportCacheKey: 'passenger_take_taxi',
-              drivers: activeMapDrivers,
-              userLocation: liveUserLocation,
-              userAccuracyMeters: liveAccuracyMeters,
-              userHeadingDegrees: liveHeadingDegrees,
-              userMarkerAccentColor: const Color(0xFFFACC15),
-              userMarkerHaloColor: const Color(0xFFFACC15),
-              userMarkerBorderColor: const Color(0xFFFFF2A8),
-              routeTarget: widget.routeTarget,
-              showRoute: widget.routeTarget != null,
-              showTargetMarker: widget.routeTarget != null,
-              routeColor: widget.routeColor,
-              focusSignal: widget.focusSignal,
-              cameraCenterTarget: liveUserLocation,
-              cameraCenterSignal: _mapCenterSignal,
-              showUtilityControls: false,
+    const horizontalInset = 16.0;
+    const bottomInset = 12.0;
+    return PopScope<TakeTaxiPageAction>(
+      canPop: !requestActive && !tripState.isRequestingTrip,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _handleBack(status);
+      },
+      child: Scaffold(
+        body: Stack(
+          children: [
+            Positioned.fill(
+              child: PotosiMapSurface(
+                viewportCacheKey: 'passenger_take_taxi',
+                drivers: activeMapDrivers,
+                userLocation: liveUserLocation,
+                userAccuracyMeters: liveAccuracyMeters,
+                userHeadingDegrees: liveHeadingDegrees,
+                userMarkerAccentColor: const Color(0xFFFACC15),
+                userMarkerHaloColor: const Color(0xFFFACC15),
+                userMarkerBorderColor: const Color(0xFFFFF2A8),
+                routeStart: requestActive ? driverPoint : null,
+                routeTarget: visibleTarget,
+                showRoute:
+                    visibleTarget != null &&
+                    (!requestActive || driverPoint != null),
+                showTargetMarker: visibleTarget != null,
+                routeColor: widget.routeColor,
+                focusSignal: widget.focusSignal,
+                cameraCenterTarget: liveUserLocation,
+                cameraCenterSignal: _mapCenterSignal,
+                showUtilityControls: false,
+              ),
             ),
-          ),
-          Positioned.fill(
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      const Color(0xFF8FBDF2).withValues(alpha: 0.18),
-                      const Color(0xFF6EA7E8).withValues(alpha: 0.07),
-                      Colors.transparent,
-                      const Color(0xFF0D2B4B).withValues(alpha: 0.12),
-                      const Color(0xFF08203A).withValues(alpha: 0.20),
+            Positioned(
+              left: 16,
+              right: 16,
+              top: screenPadding.top + 12,
+              child: Material(
+                color: Colors.white,
+                elevation: 2,
+                shadowColor: const Color(0x180F172A),
+                borderRadius: BorderRadius.circular(22),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 8,
+                  ),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        tooltip: 'Volver',
+                        onPressed: () => _handleBack(status),
+                        icon: const Icon(Icons.arrow_back_rounded),
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              title,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF0F172A),
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              requestActive
+                                  ? (statusText ?? 'Tu viaje')
+                                  : '$nearbyCount vehículos cerca de ti',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF475569),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Centrar mapa',
+                        onPressed: () => setState(() => _mapCenterSignal++),
+                        icon: const Icon(
+                          Icons.my_location_rounded,
+                          color: Color(0xFF1D4ED8),
+                        ),
+                      ),
                     ],
-                    stops: const [0, 0.16, 0.48, 0.78, 1],
                   ),
                 ),
               ),
             ),
-          ),
-          Positioned(
-            left: isNarrowWidth ? 14 : (isTinyHeight ? 18 : 26),
-            top: screenPadding.top + topControlsOffset,
-            child: _FloatingCircleButton(
-              icon: Icons.arrow_back_rounded,
-              onTap: () => _handleBack(status),
-              backgroundColor: Colors.white.withValues(alpha: 0.98),
-              iconColor: const Color(0xFF0F172A),
-              borderColor: Colors.transparent,
-              iconSize: (isNarrowWidth || isTinyHeight) ? 21 : 24,
-              size: floatingSize,
-            ),
-          ),
-          Positioned(
-            right: isNarrowWidth ? 14 : (isTinyHeight ? 18 : 26),
-            top: screenPadding.top + topControlsOffset,
-            child: _FloatingCircleButton(
-              icon: Icons.explore_rounded,
-              onTap: () => setState(() => _mapCenterSignal++),
-              backgroundColor: const Color(0xFF2257E8),
-              iconColor: Colors.white,
-              borderColor: const Color(0xFFE8F0FF),
-              iconSize: (isNarrowWidth || isTinyHeight) ? 19 : 21,
-              size: floatingSize,
-            ),
-          ),
-          if (!isTinyHeight)
             Positioned(
-              left: bannerHorizontalInset,
-              right: bannerHorizontalInset,
-              top: screenPadding.top + topBannerOffset,
-              child: _NearbyTaxiHeroBanner(
-                nearbyCount: nearbyCount,
-                onTap: _openNearestTaxiPicker,
+              left: horizontalInset,
+              right: horizontalInset,
+              bottom: bottomInset,
+              child: SafeArea(
+                top: false,
+                child: requestActive
+                    ? _ActiveTripStatusCard(
+                        tripStatus: status,
+                        title: title,
+                        statusText: statusText ?? 'Esperando taxi',
+                        statusAccent: statusAccent,
+                        summaryLabel: _summaryLabel,
+                        details: details,
+                        driverName: (request.driverName ?? '').trim(),
+                        vehicleLabel:
+                            request.vehicleLabel ??
+                            selectedDriver?.vehicleLabel ??
+                            '',
+                        vehicleDetail: [
+                          if ((request.vehicleColor ?? '').trim().isNotEmpty)
+                            request.vehicleColor!.trim(),
+                          if ((request.vehiclePlate ?? '').trim().isNotEmpty)
+                            request.vehiclePlate!.trim(),
+                        ].join(' · '),
+                        etaLabel: request.etaMinutes == null
+                            ? null
+                            : '${request.etaMinutes} min',
+                        primaryActionLabel: tripState.isRequestingTrip
+                            ? 'Procesando...'
+                            : primaryActionLabel,
+                        onPrimaryAction: tripState.isRequestingTrip
+                            ? null
+                            : primaryAction,
+                        secondaryActions: secondaryActions,
+                        detailsExpanded: _detailsExpanded,
+                        onToggleDetails: _toggleDetails,
+                      )
+                    : _TakeTaxiCleanSheet(
+                        nearbyCount: nearbyCount,
+                        nearbyDrivers: _filteredDrivers,
+                        selectedDriverId: _highlightedDriverId,
+                        expanded: _takeTaxiDrawerExpanded,
+                        destinationReady: destinationReady,
+                        destinationLabel: widget.destinationLabel,
+                        fareAmount: _proposedFareAmount,
+                        paymentMethodLabel: _paymentMethodLabel,
+                        paymentMethod: _paymentMethod,
+                        isRequesting: tripState.isRequestingTrip,
+                        primaryActionLabel: destinationReady
+                            ? primaryActionLabel
+                            : 'Elegir destino',
+                        onPrimary: tripState.isRequestingTrip
+                            ? null
+                            : (destinationReady
+                                  ? primaryAction
+                                  : () async => Navigator.of(
+                                      context,
+                                    ).pop(TakeTaxiPageAction.edit)),
+                        onChooseDestination: () =>
+                            Navigator.of(context).pop(TakeTaxiPageAction.edit),
+                        onClearDestination: destinationReady
+                            ? () => unawaited(_handleClearDestination())
+                            : null,
+                        onDecreaseFare: () => _changeFare(-1),
+                        onIncreaseFare: () => _changeFare(1),
+                        onSelectPaymentMethod: _selectPaymentMethod,
+                        onShowNearby: () => setState(() => _mapCenterSignal++),
+                        onRefresh: _refreshNearbyDrivers,
+                        onToggleExpanded: () {
+                          setState(() {
+                            _takeTaxiDrawerExpanded = !_takeTaxiDrawerExpanded;
+                          });
+                        },
+                        onSelectDriver: (driver) {
+                          _chooseDriver(driver.driverId);
+                        },
+                      ),
               ),
             ),
-          Positioned(
-            left: horizontalInset,
-            right: horizontalInset,
-            bottom: bottomInset,
-            child: SafeArea(
-              top: false,
-              child: requestActive
-                  ? _ActiveTripStatusCard(
-                      title: title,
-                      statusText: statusText ?? 'Esperando taxi',
-                      statusAccent: statusAccent,
-                      summaryLabel: _summaryLabel,
-                      details: details,
-                      driverName: (request.driverName ?? '').trim(),
-                      vehicleLabel:
-                          request.vehicleLabel ??
-                          selectedDriver?.vehicleLabel ??
-                          '',
-                      vehicleDetail: [
-                        if ((request.vehicleColor ?? '').trim().isNotEmpty)
-                          request.vehicleColor!.trim(),
-                        if ((request.vehiclePlate ?? '').trim().isNotEmpty)
-                          request.vehiclePlate!.trim(),
-                      ].join(' · '),
-                      etaLabel: request.etaMinutes == null
-                          ? null
-                          : '${request.etaMinutes} min',
-                      primaryActionLabel: tripState.isRequestingTrip
-                          ? 'Procesando...'
-                          : primaryActionLabel,
-                      onPrimaryAction: tripState.isRequestingTrip
-                          ? null
-                          : primaryAction,
-                      secondaryActions: secondaryActions,
-                      detailsExpanded: _detailsExpanded,
-                      onToggleDetails: _toggleDetails,
-                    )
-                  : _TakeTaxiCleanSheet(
-                      nearbyCount: nearbyCount,
-                      nearbyDrivers: _filteredDrivers,
-                      selectedDriverId: _highlightedDriverId,
-                      expanded: _takeTaxiDrawerExpanded,
-                      destinationReady: destinationReady,
-                      destinationLabel: widget.destinationLabel,
-                      isRequesting: tripState.isRequestingTrip,
-                      primaryActionLabel: destinationReady
-                          ? primaryActionLabel
-                          : 'Elegir destino',
-                      onPrimary: tripState.isRequestingTrip
-                          ? null
-                          : (destinationReady
-                                ? primaryAction
-                                : () async => Navigator.of(
-                                    context,
-                                  ).pop(TakeTaxiPageAction.edit)),
-                      onChooseDestination: () =>
-                          Navigator.of(context).pop(TakeTaxiPageAction.edit),
-                      onShowNearby: () => setState(() => _mapCenterSignal++),
-                      onRefresh: _refreshNearbyDrivers,
-                      onToggleExpanded: () {
-                        setState(() {
-                          _takeTaxiDrawerExpanded = !_takeTaxiDrawerExpanded;
-                        });
-                      },
-                      onSelectDriver: (driver) {
-                        widget.onSelectDriver(driver.driverId);
-                      },
-                    ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1087,10 +1034,7 @@ class _NearbyTaxiMapBadge extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: const Color(0xFFFACC15),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: const Color(0xFF0F172A),
-                      width: 1.4,
-                    ),
+                    border: Border.all(color: Color(0xFF0F172A), width: 1.4),
                     boxShadow: const [
                       BoxShadow(
                         color: Color(0x330F172A),
@@ -1136,10 +1080,17 @@ class _TakeTaxiCleanSheet extends StatelessWidget {
     required this.expanded,
     required this.destinationReady,
     required this.destinationLabel,
+    required this.fareAmount,
+    required this.paymentMethodLabel,
+    required this.paymentMethod,
     required this.isRequesting,
     required this.primaryActionLabel,
     required this.onPrimary,
     required this.onChooseDestination,
+    required this.onClearDestination,
+    required this.onDecreaseFare,
+    required this.onIncreaseFare,
+    required this.onSelectPaymentMethod,
     required this.onShowNearby,
     required this.onRefresh,
     required this.onToggleExpanded,
@@ -1152,10 +1103,17 @@ class _TakeTaxiCleanSheet extends StatelessWidget {
   final bool expanded;
   final bool destinationReady;
   final String destinationLabel;
+  final double fareAmount;
+  final String paymentMethodLabel;
+  final String paymentMethod;
   final bool isRequesting;
   final String primaryActionLabel;
   final Future<void> Function()? onPrimary;
   final VoidCallback onChooseDestination;
+  final VoidCallback? onClearDestination;
+  final VoidCallback onDecreaseFare;
+  final VoidCallback onIncreaseFare;
+  final ValueChanged<String> onSelectPaymentMethod;
   final VoidCallback onShowNearby;
   final VoidCallback onRefresh;
   final VoidCallback onToggleExpanded;
@@ -1163,300 +1121,412 @@ class _TakeTaxiCleanSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final destinationText = destinationReady
-        ? destinationLabel
-        : 'Busca la dirección o selecciona en el mapa.';
-    final screenHeight = MediaQuery.sizeOf(context).height;
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final isTinyHeight = screenHeight < 430;
-    final isNarrowWidth = screenWidth < 380;
-    final maxSheetHeight = (screenHeight * (isTinyHeight ? 0.42 : 0.48)).clamp(
-      isTinyHeight ? 148.0 : 230.0,
-      isTinyHeight ? 190.0 : 430.0,
-    );
-    final driverListHeight = (screenHeight * 0.14).clamp(
-      isTinyHeight ? 0.0 : 84.0,
-      isTinyHeight ? 0.0 : 144.0,
-    );
-    final showDriverList =
-        !isTinyHeight && !isNarrowWidth && nearbyDrivers.isNotEmpty;
-    final showDestinationTile = !isTinyHeight || !destinationReady;
-    final showNearbyTile = !isTinyHeight && !isNarrowWidth;
+    final height = MediaQuery.sizeOf(context).height;
+    final canRequest =
+        !isRequesting &&
+        onPrimary != null &&
+        (!destinationReady || nearbyDrivers.isNotEmpty);
     return Material(
-      color: const Color(0xFF041E38).withValues(alpha: 0.98),
-      borderRadius: BorderRadius.circular(26),
-      elevation: 24,
-      shadowColor: const Color(0x66020B18),
+      color: Colors.white,
+      elevation: 6,
+      shadowColor: const Color(0x220F172A),
+      borderRadius: BorderRadius.circular(28),
+      clipBehavior: Clip.antiAlias,
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxHeight: expanded ? maxSheetHeight : (isTinyHeight ? 104 : 132),
+          maxHeight: height * (height < 500 ? 0.55 : 0.62),
         ),
-        child: SingleChildScrollView(
-          physics: const ClampingScrollPhysics(),
-          padding: EdgeInsets.fromLTRB(
-            isTinyHeight || isNarrowWidth ? 12 : 22,
-            isTinyHeight ? 8 : 12,
-            isTinyHeight || isNarrowWidth ? 12 : 22,
-            expanded ? (isTinyHeight ? 12 : 22) : (isTinyHeight ? 10 : 16),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              GestureDetector(
-                onTap: onToggleExpanded,
-                child: Container(
-                  width: 54,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFACC15),
-                    borderRadius: BorderRadius.circular(999),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 8, 8),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Prepara tu viaje',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Actualizar vehículos',
+                    onPressed: onRefresh,
+                    icon: const Icon(
+                      Icons.refresh_rounded,
+                      color: Color(0xFF1D4ED8),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: expanded ? 'Ver más mapa' : 'Mostrar detalles',
+                    onPressed: onToggleExpanded,
+                    icon: Icon(
+                      expanded
+                          ? Icons.keyboard_arrow_down_rounded
+                          : Icons.keyboard_arrow_up_rounded,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (expanded)
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const _TakeTaxiStepLabel(
+                        number: '1',
+                        title: 'Elige tu vehículo',
+                      ),
+                      const SizedBox(height: 12),
+                      if (nearbyDrivers.isEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF5F6FA),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Text(
+                            'No hay vehículos disponibles por ahora. Puedes actualizar la búsqueda.',
+                            style: TextStyle(
+                              color: Color(0xFF475569),
+                              height: 1.5,
+                            ),
+                          ),
+                        )
+                      else
+                        ...nearbyDrivers.map(
+                          (driver) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: _TakeTaxiDriverChoiceTile(
+                              driver: driver,
+                              selected: driver.driverId == selectedDriverId,
+                              compact: true,
+                              onTap: () => onSelectDriver(driver),
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 16),
+                      const _TakeTaxiStepLabel(
+                        number: '2',
+                        title: 'Indica tu destino',
+                      ),
+                      const SizedBox(height: 12),
+                      Material(
+                        color: const Color(0xFFF5F6FA),
+                        borderRadius: BorderRadius.circular(16),
+                        child: InkWell(
+                          onTap: onChooseDestination,
+                          borderRadius: BorderRadius.circular(16),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.location_on_outlined,
+                                  color: Color(0xFF1D4ED8),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    destinationReady
+                                        ? destinationLabel
+                                        : '¿A dónde quieres ir?',
+                                    style: const TextStyle(
+                                      color: Color(0xFF0F172A),
+                                      fontWeight: FontWeight.w600,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Icon(
+                                  Icons.chevron_right_rounded,
+                                  color: Color(0xFF475569),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (onClearDestination != null)
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: onClearDestination,
+                            child: const Text('Quitar destino'),
+                          ),
+                        ),
+                      const SizedBox(height: 20),
+                      const _TakeTaxiStepLabel(
+                        number: '3',
+                        title: 'Oferta y forma de pago',
+                      ),
+                      const SizedBox(height: 12),
+                      _FareAndPaymentPanel(
+                        fareAmount: fareAmount,
+                        paymentMethod: paymentMethod,
+                        paymentMethodLabel: paymentMethodLabel,
+                        onDecreaseFare: onDecreaseFare,
+                        onIncreaseFare: onIncreaseFare,
+                        onSelectPaymentMethod: onSelectPaymentMethod,
+                      ),
+                    ],
                   ),
                 ),
               ),
-              SizedBox(height: isTinyHeight ? 8 : 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Tomar taxi',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            height: 1,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          destinationReady
-                              ? 'Destino elegido'
-                              : 'Destino pendiente',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Color(0xFFC7D7EA),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: canRequest ? () => onPrimary!() : null,
+                  icon: Icon(
+                    destinationReady
+                        ? Icons.local_taxi_rounded
+                        : Icons.search_rounded,
                   ),
-                  _TakeTaxiSheetCircleButton(
-                    icon: Icons.tune_rounded,
-                    onTap: onRefresh,
-                  ),
-                  SizedBox(width: isTinyHeight || isNarrowWidth ? 6 : 10),
-                  _TakeTaxiSheetCircleButton(
-                    icon: Icons.my_location_rounded,
-                    onTap: onShowNearby,
-                  ),
-                  SizedBox(width: isTinyHeight || isNarrowWidth ? 6 : 10),
-                  _TakeTaxiSheetCircleButton(
-                    icon: expanded
-                        ? Icons.keyboard_arrow_down_rounded
-                        : Icons.keyboard_arrow_up_rounded,
-                    onTap: onToggleExpanded,
-                  ),
-                ],
-              ),
-              if (expanded) ...[
-                SizedBox(height: isTinyHeight ? 10 : 18),
-                if (showNearbyTile)
-                  _TakeTaxiInfoTile(
-                    icon: Icons.local_taxi_rounded,
-                    iconColor: const Color(0xFFDCFCE7),
-                    iconBackground: const Color(0xFF0F6848),
-                    borderColor: const Color(0xFF22C55E),
-                    title: 'Taxis cerca de ti',
-                    subtitle: '$nearbyCount disponibles',
-                    trailing: 'Ver mapa',
-                    onTap: onShowNearby,
-                    filledTrailing: true,
-                  ),
-                if (showDriverList) ...[
-                  const SizedBox(height: 10),
-                  ConstrainedBox(
-                    constraints: BoxConstraints(maxHeight: driverListHeight),
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      padding: EdgeInsets.zero,
-                      itemCount: nearbyDrivers.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 8),
-                      itemBuilder: (context, index) {
-                        final driver = nearbyDrivers[index];
-                        return _TakeTaxiDriverChoiceTile(
-                          driver: driver,
-                          selected: driver.driverId == selectedDriverId,
-                          compact: true,
-                          onTap: () => onSelectDriver(driver),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-                if (showDestinationTile) ...[
-                  SizedBox(height: isTinyHeight ? 8 : 12),
-                  _TakeTaxiInfoTile(
-                    icon: Icons.my_location_rounded,
-                    iconColor: Colors.white,
-                    iconBackground: const Color(0xFF1D4ED8),
-                    borderColor: const Color(0xFF2563EB),
-                    title: destinationReady
-                        ? 'Destino elegido'
-                        : 'Paso 2 · Elige tu destino',
-                    subtitle: destinationText,
-                    trailing: null,
-                    onTap: onChooseDestination,
-                  ),
-                ],
-                SizedBox(height: isTinyHeight ? 10 : 16),
-                FilledButton.icon(
-                  onPressed: isRequesting || onPrimary == null
-                      ? null
-                      : () => onPrimary!(),
-                  icon: const Icon(Icons.location_on_outlined, size: 19),
                   label: Text(
-                    isRequesting ? 'Enviando...' : primaryActionLabel,
+                    isRequesting
+                        ? 'Enviando solicitud…'
+                        : destinationReady && nearbyDrivers.isEmpty
+                        ? 'Sin vehículos disponibles'
+                        : primaryActionLabel,
                   ),
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF2557FF),
-                    disabledBackgroundColor: const Color(0xFF31528F),
+                    backgroundColor: const Color(0xFF1D4ED8),
                     foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(
-                      vertical: isTinyHeight ? 11 : 15,
-                    ),
-                    textStyle: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                    ),
-                    side: const BorderSide(
-                      color: Color(0xFFFACC15),
-                      width: 1.5,
+                    minimumSize: const Size.fromHeight(52),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 14,
                     ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                   ),
                 ),
-              ],
-            ],
-          ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _TakeTaxiInfoTile extends StatelessWidget {
-  const _TakeTaxiInfoTile({
-    required this.icon,
-    required this.iconColor,
-    required this.iconBackground,
-    required this.borderColor,
-    required this.title,
-    required this.subtitle,
-    required this.trailing,
-    required this.onTap,
-    this.filledTrailing = false,
+class _TakeTaxiStepLabel extends StatelessWidget {
+  const _TakeTaxiStepLabel({required this.number, required this.title});
+  final String number;
+  final String title;
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      CircleAvatar(
+        radius: 13,
+        backgroundColor: const Color(0xFFE8EEFF),
+        child: Text(
+          number,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF1D4ED8),
+          ),
+        ),
+      ),
+      const SizedBox(width: 10),
+      Expanded(
+        child: Text(
+          title,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF0F172A),
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+class _FareAndPaymentPanel extends StatelessWidget {
+  const _FareAndPaymentPanel({
+    required this.fareAmount,
+    required this.paymentMethod,
+    required this.paymentMethodLabel,
+    required this.onDecreaseFare,
+    required this.onIncreaseFare,
+    required this.onSelectPaymentMethod,
   });
 
-  final IconData icon;
-  final Color iconColor;
-  final Color iconBackground;
-  final Color borderColor;
-  final String title;
-  final String subtitle;
-  final String? trailing;
-  final VoidCallback onTap;
-  final bool filledTrailing;
+  final double fareAmount;
+  final String paymentMethod;
+  final String paymentMethodLabel;
+  final VoidCallback onDecreaseFare;
+  final VoidCallback onIncreaseFare;
+  final ValueChanged<String> onSelectPaymentMethod;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(24),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(24),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(13),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: borderColor, width: 1.4),
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F6FA),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE8EBF2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Tu oferta',
+            style: TextStyle(
+              color: Color(0xFF475569),
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+            ),
           ),
-          child: Row(
+          const SizedBox(height: 10),
+          Row(
             children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: iconBackground,
-                ),
-                child: Icon(icon, color: iconColor, size: 24),
+              _FareStepperButton(
+                icon: Icons.remove_rounded,
+                onTap: onDecreaseFare,
               ),
-              const SizedBox(width: 12),
               Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      'Bs ${fareAmount.round()}',
+                      textAlign: TextAlign.center,
                       style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
+                        color: Color(0xFF0F172A),
+                        fontSize: 30,
                         fontWeight: FontWeight.w900,
+                        height: 1,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 5),
                     Text(
-                      subtitle,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                      paymentMethodLabel,
                       style: const TextStyle(
-                        color: Color(0xFFD7E4F3),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF475569),
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
                   ],
                 ),
               ),
-              if (trailing != null) ...[
-                const SizedBox(width: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 11,
-                  ),
-                  decoration: BoxDecoration(
-                    color: filledTrailing
-                        ? const Color(0xFF0F6F50)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    trailing!,
-                    style: const TextStyle(
-                      color: Color(0xFFDCFCE7),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                    ),
+              _FareStepperButton(
+                icon: Icons.add_rounded,
+                onTap: onIncreaseFare,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _PaymentChoiceButton(
+                  icon: Icons.payments_rounded,
+                  label: 'Efectivo',
+                  selected: paymentMethod != 'qr',
+                  onTap: () => onSelectPaymentMethod('cash'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _PaymentChoiceButton(
+                  icon: Icons.qr_code_2_rounded,
+                  label: 'QR',
+                  selected: paymentMethod == 'qr',
+                  onTap: () => onSelectPaymentMethod('qr'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FareStepperButton extends StatelessWidget {
+  const _FareStepperButton({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xFFFACC15),
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          width: 44,
+          height: 44,
+          child: Icon(icon, color: const Color(0xFF08203A), size: 24),
+        ),
+      ),
+    );
+  }
+}
+
+class _PaymentChoiceButton extends StatelessWidget {
+  const _PaymentChoiceButton({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? const Color(0xFFFACC15) : const Color(0xFFE8EEFF),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: selected
+                    ? const Color(0xFF08203A)
+                    : const Color(0xFF1D4ED8),
+              ),
+              const SizedBox(width: 7),
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: selected
+                        ? const Color(0xFF08203A)
+                        : const Color(0xFF1D4ED8),
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
-              ] else
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: Colors.white,
-                  size: 28,
-                ),
+              ),
             ],
           ),
         ),
@@ -1489,18 +1559,13 @@ class _TakeTaxiDriverChoiceTile extends StatelessWidget {
         : '${(driver.distanceMeters / 1000).toStringAsFixed(1)} km';
     final timeLabel = '${driver.etaMinutes} min';
     return Material(
-      color: selected
-          ? const Color(0xFF123D36).withValues(alpha: 0.96)
-          : const Color(0xFF082A4D).withValues(alpha: 0.76),
+      color: selected ? const Color(0xFFE8EEFF) : Colors.white,
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: onTap,
         child: Container(
-          constraints: BoxConstraints(
-            minHeight: compact ? 72 : 104,
-            maxHeight: compact ? 78 : 124,
-          ),
+          constraints: BoxConstraints(minHeight: compact ? 72 : 104),
           padding: EdgeInsets.symmetric(
             horizontal: compact ? 10 : 12,
             vertical: compact ? 8 : 10,
@@ -1509,8 +1574,8 @@ class _TakeTaxiDriverChoiceTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
               color: selected
-                  ? const Color(0xFF22C55E)
-                  : const Color(0xFF1E4A78),
+                  ? const Color(0xFF1D4ED8)
+                  : const Color(0xFFE8EBF2),
               width: selected ? 1.4 : 1,
             ),
           ),
@@ -1533,12 +1598,12 @@ class _TakeTaxiDriverChoiceTile extends StatelessWidget {
                   children: [
                     Text(
                       driver.vehicleLabel.trim().isEmpty
-                          ? 'Taxi cercano'
+                          ? (isMoto ? 'Moto cercana' : 'Taxi cercano')
                           : driver.vehicleLabel.trim(),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Colors.white,
+                        color: Color(0xFF0F172A),
                         fontSize: compact ? 13 : 14,
                         fontWeight: FontWeight.w900,
                       ),
@@ -1569,7 +1634,7 @@ class _TakeTaxiDriverChoiceTile extends StatelessWidget {
               Icon(
                 selected ? Icons.check_circle_rounded : Icons.circle_outlined,
                 color: selected
-                    ? const Color(0xFF22C55E)
+                    ? const Color(0xFF1D4ED8)
                     : const Color(0xFF8AA4C4),
                 size: 24,
               ),
@@ -2823,6 +2888,7 @@ class _PrimaryRequestBar extends StatelessWidget {
 
 class _ActiveTripStatusCard extends StatelessWidget {
   const _ActiveTripStatusCard({
+    required this.tripStatus,
     required this.title,
     required this.statusText,
     required this.statusAccent,
@@ -2839,6 +2905,7 @@ class _ActiveTripStatusCard extends StatelessWidget {
     required this.onToggleDetails,
   });
 
+  final String tripStatus;
   final String title;
   final String statusText;
   final Color statusAccent;
@@ -2856,164 +2923,152 @@ class _ActiveTripStatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF102B4A),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFF1D4ED8)),
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.62,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+      child: SingleChildScrollView(
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFFE8EBF2)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              IconButton(
-                onPressed: onToggleDetails,
-                icon: Icon(
-                  detailsExpanded
-                      ? Icons.keyboard_arrow_down_rounded
-                      : Icons.keyboard_arrow_up_rounded,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: statusAccent,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  statusText,
-                  style: TextStyle(
-                    color: statusAccent,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            summaryLabel,
-            style: const TextStyle(
-              fontWeight: FontWeight.w700,
-              color: Color(0xFFD7E4F3),
-            ),
-          ),
-          if (detailsExpanded) ...[
-            const SizedBox(height: 12),
-            if (driverName.trim().isNotEmpty)
-              _DriverDetailRow(
-                icon: Icons.person_rounded,
-                label: 'Conductor',
-                value: driverName,
-              ),
-            if (vehicleLabel.trim().isNotEmpty) ...[
-              const SizedBox(height: 8),
-              _DriverDetailRow(
-                icon: Icons.directions_car_filled_rounded,
-                label: 'Vehículo',
-                value: vehicleDetail.trim().isEmpty
-                    ? vehicleLabel
-                    : '$vehicleLabel · $vehicleDetail',
-              ),
-            ],
-            if (etaLabel != null) ...[
-              const SizedBox(height: 8),
-              _DriverDetailRow(
-                icon: Icons.schedule_rounded,
-                label: 'Llegada',
-                value: etaLabel!,
-              ),
-            ],
-            if (details.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: details
-                    .map(
-                      (detail) => Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0E223A),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          detail,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFFD7E4F3),
-                          ),
-                        ),
-                      ),
-                    )
-                    .toList(),
-              ),
-            ],
-          ],
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: onPrimaryAction,
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF1D4ED8),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                side: const BorderSide(color: Color(0xFFFACC15), width: 1.5),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-              ),
-              child: Text(primaryActionLabel),
-            ),
-          ),
-          if (secondaryActions.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 14,
-              runSpacing: 8,
-              children: secondaryActions
-                  .map(
-                    (action) => GestureDetector(
-                      onTap: action.onTap,
-                      child: Text(
-                        action.label,
-                        style: const TextStyle(
-                          color: Color(0xFFFACC15),
-                          fontWeight: FontWeight.w800,
-                        ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
                       ),
                     ),
-                  )
-                  .toList(),
-            ),
-          ],
-        ],
+                  ),
+                  IconButton(
+                    onPressed: onToggleDetails,
+                    icon: Icon(
+                      detailsExpanded
+                          ? Icons.keyboard_arrow_down_rounded
+                          : Icons.keyboard_arrow_up_rounded,
+                    ),
+                  ),
+                ],
+              ),
+              TripStatusBanner(status: tripStatus),
+              const SizedBox(height: 12),
+              Text(
+                summaryLabel,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF475569),
+                ),
+              ),
+              if (detailsExpanded) ...[
+                const SizedBox(height: 12),
+                if (driverName.trim().isNotEmpty)
+                  _DriverDetailRow(
+                    icon: Icons.person_rounded,
+                    label: 'Conductor',
+                    value: driverName,
+                  ),
+                if (vehicleLabel.trim().isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  _DriverDetailRow(
+                    icon: Icons.directions_car_filled_rounded,
+                    label: 'Vehículo',
+                    value: vehicleDetail.trim().isEmpty
+                        ? vehicleLabel
+                        : '$vehicleLabel · $vehicleDetail',
+                  ),
+                ],
+                if (etaLabel != null) ...[
+                  const SizedBox(height: 8),
+                  _DriverDetailRow(
+                    icon: Icons.schedule_rounded,
+                    label: 'Llegada',
+                    value: etaLabel!,
+                  ),
+                ],
+                if (details.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: details
+                        .map(
+                          (detail) => Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF5F6FA),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              detail,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF475569),
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ],
+              ],
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: onPrimaryAction,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF1D4ED8),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    side: const BorderSide(
+                      color: Color(0xFF1D4ED8),
+                      width: 1.5,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                  child: Text(primaryActionLabel),
+                ),
+              ),
+              if (secondaryActions.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 14,
+                  runSpacing: 8,
+                  children: secondaryActions
+                      .map(
+                        (action) => GestureDetector(
+                          onTap: action.onTap,
+                          child: Text(
+                            action.label,
+                            style: const TextStyle(
+                              color: Color(0xFF1D4ED8),
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -3067,69 +3122,18 @@ class _DriverDetailRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 20, color: const Color(0xFFFACC15)),
+        Icon(icon, size: 20, color: const Color(0xFF1D4ED8)),
         const SizedBox(width: 10),
         Expanded(
           child: Text(
             '$label: $value',
             style: const TextStyle(
-              color: Colors.white,
+              color: Color(0xFF0F172A),
               fontWeight: FontWeight.w700,
             ),
           ),
         ),
       ],
-    );
-  }
-}
-
-class _FloatingCircleButton extends StatelessWidget {
-  const _FloatingCircleButton({
-    required this.icon,
-    required this.onTap,
-    this.backgroundColor,
-    this.iconColor,
-    this.borderColor,
-    this.iconSize,
-    this.size = 60,
-  });
-
-  final IconData icon;
-  final VoidCallback onTap;
-  final Color? backgroundColor;
-  final Color? iconColor;
-  final Color? borderColor;
-  final double? iconSize;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: backgroundColor ?? Colors.white.withValues(alpha: 0.95),
-      shape: const CircleBorder(),
-      elevation: 12,
-      shadowColor: const Color(0x220F172A),
-      child: Container(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: borderColor == null
-              ? null
-              : Border.all(color: borderColor!, width: 2),
-        ),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onTap,
-          child: SizedBox(
-            width: size,
-            height: size,
-            child: Icon(
-              icon,
-              color: iconColor ?? const Color(0xFF111827),
-              size: iconSize ?? 26,
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

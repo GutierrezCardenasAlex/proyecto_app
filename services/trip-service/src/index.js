@@ -1,3 +1,4 @@
+const { registerCounterOfferRoutes } = require("./counter-offers");
 const Fastify = require("fastify");
 const cors = require("@fastify/cors");
 const crypto = require("crypto");
@@ -26,6 +27,7 @@ const tripSchema = z.object({
   estimatedDistanceMeters: z.number().int().positive(),
   estimatedDurationSeconds: z.number().int().positive(),
   fareAmount: z.number().positive(),
+  paymentMethod: z.enum(["cash", "qr"]).default("cash"),
   dispatchMode: z.enum(["broadcast", "nearby"]).default("broadcast"),
   preferredDriverId: z.string().uuid().optional()
 });
@@ -210,6 +212,9 @@ async function requireTripAccess(request, reply, tripId, { forStatus = null } = 
 }
 
 async function ensureSchema() {
+  await pool.query(`ALTER TABLE trips
+    ADD COLUMN IF NOT EXISTS counter_offer_amount NUMERIC(10,2),
+    ADD COLUMN IF NOT EXISTS counter_offer_status VARCHAR(16)`);
   await pool.query(`
     DO $$
     BEGIN
@@ -231,7 +236,8 @@ async function ensureSchema() {
   await pool.query(`
     ALTER TABLE trips
       ADD COLUMN IF NOT EXISTS dispatch_mode VARCHAR(16) NOT NULL DEFAULT 'broadcast',
-      ADD COLUMN IF NOT EXISTS preferred_driver_id UUID REFERENCES drivers(id)
+      ADD COLUMN IF NOT EXISTS preferred_driver_id UUID REFERENCES drivers(id),
+      ADD COLUMN IF NOT EXISTS payment_method VARCHAR(16) NOT NULL DEFAULT 'cash'
   `);
   await pool.query(`
     ALTER TABLE trips
@@ -295,6 +301,7 @@ function mapTrip(row) {
     driver_lat: row.driver_lat == null ? null : Number(row.driver_lat),
     driver_lng: row.driver_lng == null ? null : Number(row.driver_lng),
     fare_amount: row.fare_amount == null ? null : Number(row.fare_amount),
+    payment_method: row.payment_method || "cash",
     eta_minutes: row.eta_minutes == null ? null : Number(row.eta_minutes)
   };
 }
@@ -302,6 +309,7 @@ function mapTrip(row) {
 async function bootstrap() {
   await app.register(cors, { origin: true, credentials: true });
   await ensureSchema();
+  registerCounterOfferRoutes(app, { pool, redis, requireTripAccess, emitRealtime, publish });
 
   app.get("/health", async () => ({ status: "ok", service: "trip-service" }));
 
@@ -325,7 +333,7 @@ async function bootstrap() {
     try {
       await client.query("BEGIN");
       const existingTripResult = await client.query(
-        `SELECT id, status, promotional_trip, fare_amount
+        `SELECT id, status, promotional_trip, fare_amount, payment_method
          FROM trips
          WHERE passenger_id = $1
            AND status IN ('requested', 'searching', 'accepted', 'arriving', 'at_pickup', 'in_progress')
@@ -352,6 +360,7 @@ async function bootstrap() {
                  estimated_distance_meters = $10,
                  estimated_duration_seconds = $11,
                  fare_amount = $12,
+                 payment_method = $13,
                  updated_at = NOW()
              WHERE id = $1
              RETURNING *`,
@@ -367,7 +376,8 @@ async function bootstrap() {
               input.destinationLat ?? null,
               input.estimatedDistanceMeters,
               input.estimatedDurationSeconds,
-              existingTrip.promotional_trip === true ? existingTrip.fare_amount : input.fareAmount
+              existingTrip.promotional_trip === true ? existingTrip.fare_amount : input.fareAmount,
+              input.paymentMethod
             ]
           );
           trip = refreshedExistingTrip.rows[0];
@@ -418,6 +428,7 @@ async function bootstrap() {
            estimated_distance_meters,
            estimated_duration_seconds,
            fare_amount,
+           payment_method,
            promotional_trip,
            dispatch_mode,
            preferred_driver_id,
@@ -429,7 +440,7 @@ async function bootstrap() {
              WHEN $6::double precision IS NULL OR $7::double precision IS NULL THEN NULL
              ELSE ST_SetSRID(ST_MakePoint($6, $7), 4326)::geography
            END,
-          $8, $9, $10, $11, $12, $13, 'requested'
+           $8, $9, $10, $11, $12, $13, $14, 'requested'
          )
          RETURNING *`,
           [
@@ -443,6 +454,7 @@ async function bootstrap() {
             input.estimatedDistanceMeters,
             input.estimatedDurationSeconds,
             effectiveFare,
+            input.paymentMethod,
             rewardApplied,
             input.dispatchMode,
             input.preferredDriverId ?? null
@@ -494,7 +506,8 @@ async function bootstrap() {
               v.plate AS vehicle_plate,
               du.full_name AS driver_name,
               du.phone AS driver_phone,
-              t.promotional_trip
+              t.promotional_trip,
+              t.payment_method
        FROM trips t
        LEFT JOIN vehicles v ON v.driver_id = t.driver_id
        LEFT JOIN drivers d ON d.id = t.driver_id
@@ -525,7 +538,8 @@ async function bootstrap() {
               v.plate AS vehicle_plate,
               pu.full_name AS passenger_name,
               pu.phone AS passenger_phone,
-              t.promotional_trip
+              t.promotional_trip,
+              t.payment_method
        FROM trips t
        LEFT JOIN vehicles v ON v.driver_id = t.driver_id
        LEFT JOIN users pu ON pu.id = t.passenger_id
@@ -565,6 +579,7 @@ async function bootstrap() {
               ll.driver_lat,
               ll.driver_lng,
               t.promotional_trip,
+              t.payment_method,
               CASE
                 WHEN ll.location IS NULL THEN NULL
                 ELSE GREATEST(
@@ -605,7 +620,8 @@ async function bootstrap() {
               v.plate AS vehicle_plate,
               pu.full_name AS passenger_name,
               pu.phone AS passenger_phone,
-              t.promotional_trip
+              t.promotional_trip,
+              t.payment_method
        FROM trips t
        LEFT JOIN users pu ON pu.id = t.passenger_id
        LEFT JOIN vehicles v ON v.driver_id = t.driver_id
@@ -672,13 +688,19 @@ async function bootstrap() {
       cancelled: "cancelled_at"
     }[status];
 
-    const query = timestampField
-      ? `UPDATE trips SET status = $2, ${timestampField} = NOW(), updated_at = NOW() WHERE id = $1 RETURNING *`
-      : `UPDATE trips SET status = $2, updated_at = NOW() WHERE id = $1 RETURNING *`;
+    const query = `UPDATE trips SET status = $2,
+      ${timestampField ? `${timestampField} = NOW(),` : ''}
+      updated_at = NOW(),
+      counter_offer_status = CASE
+        WHEN $2 = 'cancelled' AND counter_offer_status = 'pending' THEN 'rejected'
+        ELSE counter_offer_status END
+      WHERE id = $1 AND status NOT IN ('cancelled', 'completed')
+        AND ($2 = 'cancelled' OR counter_offer_status IS DISTINCT FROM 'pending')
+      RETURNING *`;
 
     const result = await pool.query(query, [tripId, status]);
     if (!result.rows.length) {
-      return reply.code(404).send({ message: "Trip not found" });
+      return reply.code(409).send({ message: "El viaje finalizo o espera la respuesta del pasajero a la contraoferta" });
     }
 
     const trip = result.rows[0];
@@ -696,8 +718,8 @@ async function bootstrap() {
       await pool.query(
         `UPDATE drivers
          SET status = 'available', is_available = TRUE, current_trip_id = NULL, updated_at = NOW()
-         WHERE id = $1`,
-        [trip.driver_id]
+         WHERE id = $1 AND current_trip_id = $2`,
+        [trip.driver_id, tripId]
       );
     }
 

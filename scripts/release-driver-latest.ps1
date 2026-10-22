@@ -1,6 +1,6 @@
 param(
   [string]$RemoteUser = "root",
-  [string]$RemoteHost = "rapigo.cybernovatech.space",
+  [string]$RemoteHost = "ssh.cybernovatech.space",
   [int]$RemotePort = 22,
   [string]$RemoteProjectPath = "/root/app/proyecto_app"
 )
@@ -8,8 +8,8 @@ param(
 $ErrorActionPreference = "Stop"
 
 # Edita solo estos dos valores para tu siguiente release.
-$DriverBuildName = "1.0.11"
-$DriverBuildNumber = "11"
+$DriverBuildName = "1.0.13"
+$DriverBuildNumber = "13"
 
 & "$PSScriptRoot\release-driver.ps1" `
   -RemoteUser $RemoteUser `
