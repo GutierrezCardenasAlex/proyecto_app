@@ -195,3 +195,16 @@ CREATE INDEX IF NOT EXISTS idx_trips_pickup_geo
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_user_devices_user_identifier
   ON user_devices (user_id, device_identifier);
+
+CREATE TABLE IF NOT EXISTS trip_driver_offers (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  trip_id UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+  driver_id UUID NOT NULL REFERENCES drivers(id),
+  amount NUMERIC(10,2) NOT NULL CHECK (amount >= 0),
+  trip_revision TIMESTAMPTZ NOT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending','accepted','ignored','unavailable')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (trip_id, driver_id)
+);

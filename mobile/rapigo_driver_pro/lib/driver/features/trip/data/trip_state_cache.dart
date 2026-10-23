@@ -154,6 +154,8 @@ class DriverTripStateCache {
       'destinationLat': trip.destinationLat,
       'destinationLng': trip.destinationLng,
       'fareAmount': trip.fareAmount,
+      'myOfferAmount': trip.myOfferAmount,
+      'myOfferStatus': trip.myOfferStatus,
       'counterOfferAmount': trip.counterOfferAmount,
       'counterOfferStatus': trip.counterOfferStatus,
       'requestedAt': trip.requestedAt,
@@ -183,6 +185,8 @@ class DriverTripStateCache {
       destinationLat: _toNullableDouble(payload['destinationLat']),
       destinationLng: _toNullableDouble(payload['destinationLng']),
       fareAmount: _toDouble(payload['fareAmount']),
+      myOfferAmount: _toNullableDouble(payload['myOfferAmount']),
+      myOfferStatus: payload['myOfferStatus']?.toString(),
       counterOfferAmount: double.tryParse(
         payload['counterOfferAmount']?.toString() ?? '',
       ),

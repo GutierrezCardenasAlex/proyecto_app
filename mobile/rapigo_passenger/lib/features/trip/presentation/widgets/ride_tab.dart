@@ -1,3 +1,4 @@
+import 'passenger_driver_offers_dialog.dart';
 import 'passenger_counter_offer_dialog.dart';
 // ignore_for_file: unused_element, unused_local_variable, unused_element_parameter
 
@@ -154,7 +155,9 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       });
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && ref.read(tripProvider).request.hasPendingCounterOffer) {
+      if (mounted &&
+          (ref.read(tripProvider).request.hasPendingCounterOffer ||
+              ref.read(tripProvider).request.hasDriverOffers)) {
         _showCounterOffer();
       }
     });
@@ -162,6 +165,15 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       previous,
       next,
     ) {
+      if (next.request.hasDriverOffers &&
+          previous?.request.offers
+                  .map((o) => '${o.id}:${o.amount}')
+                  .join(',') !=
+              next.request.offers.map((o) => '${o.id}:${o.amount}').join(',')) {
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _showCounterOffer(),
+        );
+      }
       if (next.request.hasPendingCounterOffer) {
         if (previous?.request.hasPendingCounterOffer != true) {
           LocalNotifications.show(
@@ -436,10 +448,21 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
 
   void _startRefreshLoop() {
     _refreshTimer?.cancel();
-    _refreshTimer = Timer.periodic(
-      const Duration(seconds: 15),
-      (_) => unawaited(_syncDashboard()),
-    );
+    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (ref.read(tripProvider).request.isAwaitingDriver) {
+        final session = ref.read(sessionProvider);
+        unawaited(
+          ref
+              .read(tripProvider.notifier)
+              .refreshCounterOffer(
+                token: session.token,
+                passengerId: session.userId,
+              )
+              .catchError((_) {}),
+        );
+      }
+      unawaited(_syncDashboard());
+    });
   }
 
   void _stopRefreshLoop() {
@@ -506,6 +529,31 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
       builder: (dialogContext) => Consumer(
         builder: (context, ref, _) {
           final request = ref.watch(tripProvider).request;
+          if (request.isAwaitingDriver) {
+            return PassengerDriverOffersDialog(
+              offers: request.offers,
+              onRespond: (offer, accept) async {
+                final session = ref.read(sessionProvider);
+                try {
+                  await ref
+                      .read(tripProvider.notifier)
+                      .respondDriverOffer(
+                        token: session.token,
+                        tripId: request.activeTripId!,
+                        offer: offer,
+                        accept: accept,
+                      );
+                } finally {
+                  await ref
+                      .read(tripProvider.notifier)
+                      .refreshCounterOffer(
+                        token: session.token,
+                        passengerId: session.userId,
+                      );
+                }
+              },
+            );
+          }
           if (!request.hasPendingCounterOffer) {
             if (!closing) {
               closing = true;
@@ -561,6 +609,19 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
         _joinTripRoom(tripId);
       }
       _scheduleDashboardSync();
+    });
+    _socket?.on('trip:offers_changed', (_) async {
+      final session = ref.read(sessionProvider);
+      try {
+        await ref
+            .read(tripProvider.notifier)
+            .refreshCounterOffer(
+              token: session.token,
+              passengerId: session.userId,
+            );
+      } catch (_) {
+        _scheduleDashboardSync();
+      }
     });
     _socket?.on('trip:counter_offer', (_) async {
       final session = ref.read(sessionProvider);
@@ -1349,7 +1410,9 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
           destinationAddress: resolvedDestination,
           dispatchMode: _rideMode == RideMode.destino ? 'broadcast' : 'nearby',
           destinationLocation: resolvedDestinationPoint,
-          preferredDriverId: selectedDriverId,
+          preferredDriverId: _rideMode == RideMode.destino
+              ? null
+              : selectedDriverId,
           fareAmount: _currentFareAmount(distanceMeters),
           paymentMethod: _paymentMethod,
         );
@@ -2629,6 +2692,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     final result = await Navigator.of(context).push<TakeTaxiPageAction>(
       MaterialPageRoute(
         builder: (context) => TakeTaxiPage(
+          onViewOffers: _showCounterOffer,
           drivers: driverPoints,
           nearbyDrivers: _requestableDrivers(
             ref.read(tripProvider).nearbyDrivers,
@@ -3826,6 +3890,17 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                   }
                 }
               },
+            ),
+          ),
+        if (tripState.request.isAwaitingDriver)
+          Positioned(
+            top: MediaQuery.paddingOf(context).top + 12,
+            left: 64,
+            right: 64,
+            child: FilledButton.icon(
+              onPressed: _showCounterOffer,
+              icon: const Icon(Icons.price_change_outlined),
+              label: Text('Ver ofertas (${tripState.request.offers.length})'),
             ),
           ),
       ],

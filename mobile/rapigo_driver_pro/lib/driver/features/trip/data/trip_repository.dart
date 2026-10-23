@@ -68,6 +68,8 @@ class DriverTripRepository {
       destinationLat: _toNullableDouble(item['destination_lat']),
       destinationLng: _toNullableDouble(item['destination_lng']),
       fareAmount: _toDouble(item['fare_amount']),
+      myOfferAmount: _toNullableDouble(item['my_offer_amount']),
+      myOfferStatus: item['my_offer_status']?.toString(),
       counterOfferAmount: double.tryParse(
         item['counter_offer_amount']?.toString() ?? '',
       ),
@@ -196,12 +198,10 @@ class DriverTripRepository {
     }
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    final proposal = payload['proposal'] as Map<String, dynamic>;
     return trip.copyWith(
-      status: payload['status']?.toString() ?? 'accepted',
-      counterOfferAmount: double.tryParse(
-        payload['counter_offer_amount']?.toString() ?? '',
-      ),
-      counterOfferStatus: payload['counter_offer_status']?.toString(),
+      myOfferAmount: _toNullableDouble(proposal['amount']),
+      myOfferStatus: proposal['status']?.toString(),
     );
   }
 
@@ -286,6 +286,8 @@ class DriverTripRepository {
       destinationLat: _toNullableDouble(item['destination_lat']),
       destinationLng: _toNullableDouble(item['destination_lng']),
       fareAmount: _toDouble(item['fare_amount']),
+      myOfferAmount: _toNullableDouble(item['my_offer_amount']),
+      myOfferStatus: item['my_offer_status']?.toString(),
       counterOfferAmount: double.tryParse(
         item['counter_offer_amount']?.toString() ?? '',
       ),
@@ -437,28 +439,16 @@ class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
   Future<void> sendCounterOffer(DriverTrip trip, double amount) async {
     final session = ref.read(driverSessionProvider);
     if (session.token.isEmpty || session.driverId.isEmpty) {
-      throw Exception('Inicia sesión para enviar una contraoferta');
+      throw Exception('Inicia sesión para enviar una oferta');
     }
-    try {
-      final reserved = await _repository.accept(
-        token: session.token,
-        driverId: session.driverId,
-        trip: trip,
-        counterFare: amount,
-      );
-      state = AsyncData(reserved);
-      await _persistTrip();
-      ref.read(driverOffersProvider.notifier).removeOfferLocally(trip.id);
-      ref.invalidate(driverTripHistoryProvider);
-    } catch (_) {
-      // Recover a reservation if the response was lost after the server committed.
-      await loadOffer();
-      if (state.value?.id == trip.id &&
-          state.value?.hasPendingCounterOffer == true) {
-        return;
-      }
-      rethrow;
-    }
+    await _repository.accept(
+      token: session.token,
+      driverId: session.driverId,
+      trip: trip,
+      counterFare: amount,
+    );
+    await ref.read(driverOffersProvider.notifier).loadOffers();
+    await loadOffer();
   }
 
   Future<void> updateTripStatus(String status) async {

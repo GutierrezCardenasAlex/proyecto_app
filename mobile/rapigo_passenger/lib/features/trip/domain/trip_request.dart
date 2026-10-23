@@ -1,3 +1,5 @@
+import 'driver_offer.dart';
+
 class TripRequest {
   const TripRequest({
     required this.pickupAddress,
@@ -22,6 +24,7 @@ class TripRequest {
     this.isPromotional = false,
     this.counterOfferAmount,
     this.counterOfferStatus,
+    this.offers = const [],
   });
 
   final String pickupAddress;
@@ -46,6 +49,10 @@ class TripRequest {
   final bool isPromotional;
   final double? counterOfferAmount;
   final String? counterOfferStatus;
+  final List<DriverOffer> offers;
+  bool get isAwaitingDriver =>
+      const {'requested', 'searching'}.contains(status);
+  bool get hasDriverOffers => isAwaitingDriver && offers.isNotEmpty;
 
   bool get hasPendingCounterOffer =>
       status == 'accepted' && counterOfferStatus == 'pending';
@@ -73,6 +80,7 @@ class TripRequest {
     bool? isPromotional,
     double? counterOfferAmount,
     String? counterOfferStatus,
+    List<DriverOffer>? offers,
     bool clearTripId = false,
   }) {
     return TripRequest(
@@ -98,6 +106,7 @@ class TripRequest {
       isPromotional: isPromotional ?? this.isPromotional,
       counterOfferAmount: counterOfferAmount ?? this.counterOfferAmount,
       counterOfferStatus: counterOfferStatus ?? this.counterOfferStatus,
+      offers: clearTripId ? const [] : offers ?? this.offers,
     );
   }
 }

@@ -1,3 +1,4 @@
+const { registerDriverProposals, withdrawDriverProposal } = require("./driver-proposals");
 const Fastify = require("fastify");
 const cors = require("@fastify/cors");
 const axios = require("axios");
@@ -29,7 +30,7 @@ const searchSchema = z.object({
 const acceptSchema = z.object({
   tripId: z.string().uuid(),
   driverId: z.string().uuid(),
-  counterFare: z.number().positive().max(99999999.99).multipleOf(0.01).optional()
+  counterFare: z.number().min(0).max(99999999.99).multipleOf(0.01).optional()
 });
 
 const rejectSchema = z.object({
@@ -612,6 +613,19 @@ async function bootstrap() {
     ADD COLUMN IF NOT EXISTS counter_offer_amount NUMERIC(10,2),
     ADD COLUMN IF NOT EXISTS counter_offer_status VARCHAR(16)`);
 
+  await pool.query(`CREATE TABLE IF NOT EXISTS trip_driver_offers (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  trip_id UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+  driver_id UUID NOT NULL REFERENCES drivers(id),
+  amount NUMERIC(10,2) NOT NULL CHECK (amount >= 0),
+  trip_revision TIMESTAMPTZ NOT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending','accepted','ignored','unavailable')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (trip_id, driver_id)
+);`);
+
   app.get("/health", async () => ({ status: "ok", service: "dispatch-service" }));
 
   app.post("/search", async (request, reply) => {
@@ -620,9 +634,10 @@ async function bootstrap() {
     }
 
     const { tripId, pickupLat, pickupLng, dispatchMode, preferredDriverId } = searchSchema.parse(request.body);
-    const initialStage = preferredDriverId ? "directed" : "nearby";
-    const initialRadiusMeters = preferredDriverId ? null : NEARBY_STAGE_RADIUS_METERS;
-    const initialLimit = preferredDriverId ? 1 : NEARBY_STAGE_LIMIT;
+    const directedDriverId = dispatchMode === "broadcast" ? null : preferredDriverId;
+    const initialStage = directedDriverId ? "directed" : "broadcast";
+    const initialRadiusMeters = null;
+    const initialLimit = directedDriverId ? 1 : null;
     const runId = crypto.randomUUID();
     await clearTripOffers(tripId);
     await redis.set(`trip:${tripId}:dispatch_run`, runId, "EX", OFFER_TTL_SECONDS);
@@ -636,7 +651,7 @@ async function bootstrap() {
     const candidates = await findCandidateDrivers({
       pickupLat,
       pickupLng,
-      preferredDriverId: preferredDriverId ?? null,
+      preferredDriverId: directedDriverId ?? null,
       radiusMeters: initialRadiusMeters,
       limit: initialLimit
     });
@@ -650,33 +665,8 @@ async function bootstrap() {
       candidates: candidates.length
     });
 
-    let fallbackInMs = 0;
-    if (preferredDriverId) {
-      await offerTripToCandidates(tripId, candidates, initialStage);
-      if (candidates.length) {
-        fallbackInMs = DIRECTED_STAGE_TIMEOUT_MS;
-        await scheduleDirectedFallback({ tripId, pickupLat, pickupLng, runId });
-      }
-    } else {
-      const sequentialDispatch = await startSequentialNearbyDispatch({
-        tripId,
-        pickupLat,
-        pickupLng,
-        candidates,
-        runId
-      });
-      fallbackInMs = sequentialDispatch.fallbackInMs;
-    }
-
-    if (preferredDriverId && !candidates.length) {
-      await expandTripOffersToBroadcast({
-        tripId,
-        pickupLat,
-        pickupLng,
-        reason: "preferred_driver_unavailable",
-        runId
-      });
-    }
+    const fallbackInMs = 0;
+    await offerTripToCandidates(tripId, candidates, initialStage);
 
     return {
       tripId,
@@ -691,13 +681,7 @@ async function bootstrap() {
     const user = await requireOwnDriverId(request, reply, driverId);
     if (!user) return;
 
-    const directTripIds = await redis.smembers(`driver:${driverId}:offers`);
-    const broadcastTripIds = await findVisibleBroadcastTripIds(driverId);
-    const tripIds = [...new Set([...directTripIds, ...broadcastTripIds])];
-
-    if (!tripIds.length) {
-      return { offers: [] };
-    }
+    if (!(await isCandidateStillAvailable(driverId))) return { offers: [] };
 
     const result = await pool.query(
       `SELECT t.id,
@@ -712,25 +696,28 @@ async function bootstrap() {
               ST_Y(t.destination_location::geometry) AS destination_lat,
               ST_X(t.destination_location::geometry) AS destination_lng,
               t.fare_amount,
+              proposal.amount AS my_offer_amount,
+              CASE WHEN proposal.status = 'pending' AND proposal.trip_revision <> t.updated_at
+                THEN 'outdated' ELSE proposal.status END AS my_offer_status,
               t.payment_method,
               t.promotional_trip,
               u.full_name AS passenger_name,
               u.phone AS passenger_phone
        FROM trips t
        LEFT JOIN users u ON u.id = t.passenger_id
-       WHERE t.id = ANY($1::uuid[])
+       LEFT JOIN trip_driver_offers proposal ON proposal.trip_id = t.id AND proposal.driver_id = $1
+       WHERE (t.dispatch_mode = 'broadcast' OR t.preferred_driver_id IS NULL OR t.preferred_driver_id = $1)
          AND t.status IN ('requested', 'searching')
        ORDER BY t.requested_at DESC`,
-      [tripIds]
+      [driverId]
     );
 
-    const offers = await Promise.all(
-      result.rows.map(async (row) => ({
-        ...row,
-        offer_expires_at: await redis.hget(`driver:${driverId}:offer_expires_at`, row.id)
-      }))
-    );
-
+    const offers = [];
+    for (const row of result.rows) {
+      if (!await redis.sismember(`trip:${row.id}:rejected_drivers`, driverId)) {
+        offers.push({ ...row, offer_expires_at: null });
+      }
+    }
     return { offers };
   });
 
@@ -795,139 +782,17 @@ async function bootstrap() {
     };
   });
 
-  app.post("/accept", async (request, reply) => {
-    const parsed = acceptSchema.safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send({ message: "Precio o solicitud invalida" });
-    const { tripId, driverId, counterFare } = parsed.data;
-    const user = await requireOwnDriverId(request, reply, driverId);
-    if (!user) return;
-
-    const wasOffered = await redis.sismember(`driver:${driverId}:offers`, tripId);
-    const canAcceptOpenBroadcast = !wasOffered && await canAcceptBroadcastOffer(tripId, driverId);
-    if (!wasOffered && !canAcceptOpenBroadcast) {
-      return reply.code(403).send({ message: "Este viaje no fue ofertado a tu conductor" });
-    }
-    if (canAcceptOpenBroadcast) {
-      await redis.sadd(`driver:${driverId}:offers`, tripId);
-      await redis.expire(`driver:${driverId}:offers`, OFFER_TTL_SECONDS);
-      await redis.sadd(`trip:${tripId}:offered_drivers`, driverId);
-      await redis.expire(`trip:${tripId}:offered_drivers`, OFFER_TTL_SECONDS);
-    }
-
-    const lockKey = `trip:${tripId}:accept_lock`;
-    const lockValue = await redis.set(lockKey, driverId, "NX", "EX", 15);
-
-    if (lockValue !== "OK") {
-      return reply.code(409).send({ message: "Trip is already being processed" });
-    }
-
-    const client = await pool.connect();
-    try {
-      await client.query("BEGIN");
-      const driverUpdate = await client.query(
-        `UPDATE drivers
-         SET status = 'busy', is_available = FALSE, current_trip_id = $2, updated_at = NOW()
-         WHERE id = $1
-           AND status = 'available'
-           AND is_available = TRUE
-           AND current_trip_id IS NULL
-           AND NOT EXISTS (
-             SELECT 1
-             FROM trips active_trip
-             WHERE active_trip.driver_id = drivers.id
-               AND active_trip.status IN ('accepted', 'arriving', 'at_pickup', 'in_progress')
-           )
-         RETURNING id`,
-        [driverId, tripId]
-      );
-
-      if (!driverUpdate.rows.length) {
-        await client.query("ROLLBACK");
-        return reply.code(409).send({ message: "El conductor ya no esta libre para aceptar este viaje" });
-      }
-
-      const tripUpdate = await client.query(
-        `UPDATE trips
-         SET driver_id = $1, status = 'accepted', accepted_at = NOW(), updated_at = NOW(),
-             counter_offer_amount = $3,
-             counter_offer_status = CASE WHEN $3::numeric IS NULL THEN NULL ELSE 'pending' END
-         WHERE id = $2
-           AND status IN ('requested', 'searching')
-           AND ($3::numeric IS NULL OR (promotional_trip = FALSE AND $3 > fare_amount))
-         RETURNING *`,
-        [driverId, tripId, counterFare ?? null]
-      );
-
-      if (!tripUpdate.rows.length) {
-        await client.query("ROLLBACK");
-        return reply.code(409).send({ message: counterFare == null ? "Este viaje ya no esta disponible" : "Viaje no disponible o contraoferta invalida. Debe superar la tarifa y no ser promocional." });
-      }
-
-      const trip = tripUpdate.rows[0];
-
-      await client.query(
-        `INSERT INTO trip_events (trip_id, event_type, payload)
-         VALUES ($1, $2, $3::jsonb)`,
-        [tripId, counterFare == null ? 'accepted' : 'counter_offer_pending', JSON.stringify({ driverId, counterFare })]
-      );
-
-      await client.query("COMMIT");
-      await notifyTripUnavailable(tripId, driverId);
-      await clearTripOffers(tripId);
-      const etaResult = await pool.query(
-        `WITH latest_location AS (
-           SELECT DISTINCT ON (dl.driver_id)
-             dl.driver_id,
-             dl.location
-           FROM driver_locations dl
-           WHERE dl.driver_id = $1
-           ORDER BY dl.driver_id, dl.recorded_at DESC
-         )
-         SELECT COALESCE(
-           ROUND(
-             ST_Distance(
-               ll.location,
-               t.pickup_location
-             ) / 350.0
-           )::int,
-           2
-         ) AS eta_minutes
-         FROM trips t
-         LEFT JOIN latest_location ll ON ll.driver_id = $1
-         WHERE t.id = $2`,
-        [driverId, tripId]
-      );
-      const etaMinutes = Math.max(2, Number(etaResult.rows[0]?.eta_minutes || 2));
-      await publish(counterFare == null ? "dispatch.trip.accepted" : "dispatch.trip.counter_offer", { tripId, driverId, counterFare });
-      await emitRealtime(counterFare == null ? "trip:accepted" : "trip:counter_offer", `trip:${tripId}`, {
-        tripId,
-        driverId,
-        status: "accepted",
-        etaMinutes
-      });
-      await emitRealtime(counterFare == null ? "driver:trip_accepted" : "driver:counter_offer", `driver:${driverId}`, {
-        tripId,
-        driverId,
-        status: "accepted"
-      });
-      reply.send({
-        ...trip,
-        eta_minutes: etaMinutes
-      });
-    } catch (error) {
-      await client.query("ROLLBACK");
-      throw error;
-    } finally {
-      client.release();
-      await redis.del(lockKey);
-    }
-  });
+  registerDriverProposals(app, { pool, requireOwnDriverId, emitRealtime, schema: acceptSchema });
 
   app.post("/reject", async (request, reply) => {
     const { tripId, driverId } = rejectSchema.parse(request.body);
     const user = await requireOwnDriverId(request, reply, driverId);
     if (!user) return;
 
+    if (!await withdrawDriverProposal(pool, driverId, tripId)) {
+      return reply.code(409).send({ message: 'La solicitud ya fue atendida o cancelada. Actualiza tus viajes.' });
+    }
+    await emitRealtime('trip:offers_changed', `trip:${tripId}`, { tripId });
     const currentDriverId = await redis.get(`trip:${tripId}:active_offer_driver`);
     const dispatchStage = await redis.get(`trip:${tripId}:dispatch_stage`);
     const runId = await redis.get(`trip:${tripId}:dispatch_run`);

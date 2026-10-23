@@ -60,19 +60,19 @@ void main() {
           ),
         ),
       );
-      await tester.enterText(find.byType(TextField), '9');
-      await tester.tap(find.text('Enviar contraoferta'));
+      await tester.enterText(find.byType(TextField), '0');
+      await tester.tap(find.text('Enviar oferta'));
       await tester.pump();
       expect(sent, isEmpty);
       await tester.enterText(find.byType(TextField), '15,50');
-      await tester.tap(find.text('Enviar contraoferta'));
+      await tester.tap(find.text('Enviar oferta'));
       await tester.pump();
       await tester.tap(find.text('Enviando…'));
       expect(sent, [15.5]);
       completer.completeError(Exception('Sin conexión'));
       await tester.pumpAndSettle();
       expect(find.text('Sin conexión'), findsOneWidget);
-      expect(find.text('Enviar contraoferta'), findsOneWidget);
+      expect(find.text('Enviar oferta'), findsOneWidget);
     },
   );
 

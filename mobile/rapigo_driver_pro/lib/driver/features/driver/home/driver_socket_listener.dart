@@ -136,6 +136,10 @@ class _DriverSocketListenerState extends ConsumerState<DriverSocketListener>
       _joinedDriverId = null;
       _scheduleSocketReconnect(driverId);
     });
+    _socket?.on('driver:offers_changed', (_) async {
+      await ref.read(driverOffersProvider.notifier).loadOffers();
+      await ref.read(offeredTripProvider.notifier).loadOffer();
+    });
     _socket?.on('driver:counter_offer', (_) async {
       await ref.read(offeredTripProvider.notifier).loadOffer();
       await ref

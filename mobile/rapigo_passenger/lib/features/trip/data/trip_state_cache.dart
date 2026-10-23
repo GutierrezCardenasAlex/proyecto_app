@@ -1,3 +1,4 @@
+import '../domain/driver_offer.dart';
 import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
@@ -18,6 +19,10 @@ class PassengerTripStateCache {
       return null;
     }
     return TripRequest(
+      offers: (payload['offers'] as List? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(DriverOffer.fromJson)
+          .toList(),
       pickupAddress:
           payload['pickupAddress']?.toString() ?? 'Mi ubicacion actual',
       destinationAddress:
@@ -56,6 +61,7 @@ class PassengerTripStateCache {
         'pickupAddress': request.pickupAddress,
         'destinationAddress': request.destinationAddress,
         'status': request.status,
+        'offers': request.offers.map((offer) => offer.toJson()).toList(),
         'activeTripId': request.activeTripId,
         'pickupLat': request.pickupLat,
         'pickupLng': request.pickupLng,

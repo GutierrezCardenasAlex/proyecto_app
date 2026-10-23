@@ -44,6 +44,7 @@ class TakeTaxiPage extends ConsumerStatefulWidget {
     required this.onRequest,
     required this.onRetry,
     required this.onCancel,
+    required this.onViewOffers,
   });
 
   final List<PotosiMapDriverMarker> drivers;
@@ -70,6 +71,7 @@ class TakeTaxiPage extends ConsumerStatefulWidget {
   final Future<void> Function() onRequest;
   final Future<void> Function() onRetry;
   final Future<bool> Function() onCancel;
+  final Future<void> Function() onViewOffers;
 
   @override
   ConsumerState<TakeTaxiPage> createState() => _TakeTaxiPageState();
@@ -635,14 +637,14 @@ class _TakeTaxiPageState extends ConsumerState<TakeTaxiPage> {
     ];
 
     final primaryActionLabel = switch (status) {
-      'requested' || 'searching' => 'Volver a solicitar',
+      'requested' || 'searching' => 'Ver ofertas (${request.offers.length})',
       'accepted' || 'arriving' || 'at_pickup' => 'Cancelar viaje',
       'in_progress' => 'Viaje en curso',
       _ => 'Solicitar taxi',
     };
 
     final primaryAction = switch (status) {
-      'requested' || 'searching' => widget.onRetry,
+      'requested' || 'searching' => widget.onViewOffers,
       'accepted' || 'arriving' || 'at_pickup' => _handleCancel,
       'in_progress' => null,
       _ => _handleRequestAndContinue,

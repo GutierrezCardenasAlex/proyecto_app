@@ -1,3 +1,4 @@
+import '../domain/driver_offer.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
@@ -26,6 +27,10 @@ class TripRepository {
 
   TripRequest _mapTripRequest(Map<String, dynamic> payload) {
     return TripRequest(
+      offers: (payload['offers'] as List? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(DriverOffer.fromJson)
+          .toList(),
       pickupAddress:
           payload['pickup_address']?.toString() ?? 'Mi ubicacion actual',
       destinationAddress:
@@ -304,6 +309,26 @@ class TripRepository {
     );
   }
 
+  Future<TripRequest> respondDriverOffer({
+    required String token,
+    required String tripId,
+    required DriverOffer offer,
+    required bool accept,
+  }) async {
+    final response = await http.post(
+      Uri.parse(
+        '${AppConfig.apiBaseUrl}/trips/$tripId/offers/${offer.id}/response',
+      ),
+      headers: _headers(token),
+      body: jsonEncode({'accept': accept, 'expectedAmount': offer.amount}),
+    );
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    if (response.statusCode >= 400) {
+      throw Exception(payload['message'] ?? 'No se pudo responder');
+    }
+    return _mapTripRequest(payload['trip'] as Map<String, dynamic>);
+  }
+
   Future<TripRequest> respondCounterOffer({
     required String token,
     required String tripId,
@@ -524,10 +549,12 @@ class TripController extends Notifier<TripState> {
     if (request != null) {
       state = state.copyWith(request: request, clearError: true);
       await _persistRequest();
-    } else if (state.request.hasPendingCounterOffer) {
+    } else if (state.request.hasPendingCounterOffer ||
+        state.request.isAwaitingDriver) {
       state = state.copyWith(
         request: state.request.copyWith(
           status: 'cancelled',
+          offers: const [],
           counterOfferStatus: 'rejected',
         ),
         clearError: true,
@@ -651,6 +678,37 @@ class TripController extends Notifier<TripState> {
     }
     updated.sort((a, b) => a.distanceMeters.compareTo(b.distanceMeters));
     state = state.copyWith(nearbyDrivers: updated, clearError: true);
+  }
+
+  Future<void> respondDriverOffer({
+    required String token,
+    required String tripId,
+    required DriverOffer offer,
+    required bool accept,
+  }) async {
+    final request = await _repository.respondDriverOffer(
+      token: token,
+      tripId: tripId,
+      offer: offer,
+      accept: accept,
+    );
+    if (state.request.activeTripId != tripId) return;
+    state = state.copyWith(
+      request: state.request.copyWith(
+        status: request.status,
+        fareAmount: request.fareAmount,
+        driverName: accept ? offer.driverName : null,
+        vehiclePlate: accept ? offer.plate : null,
+        vehicleLabel: accept ? offer.vehicle : null,
+        offers: accept
+            ? const []
+            : state.request.offers
+                  .where((item) => item.id != offer.id)
+                  .toList(),
+      ),
+      clearError: true,
+    );
+    await _persistRequest();
   }
 
   Future<void> respondCounterOffer({

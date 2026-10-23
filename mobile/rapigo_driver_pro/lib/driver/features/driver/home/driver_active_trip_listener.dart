@@ -30,7 +30,9 @@ class _DriverActiveTripListenerState
 
   void _handleTrip(DriverTrip? trip) {
     final previewTripId = ref.read(driverOfferPreviewTripIdProvider);
-    if (previewTripId != null && trip?.id == previewTripId) {
+    if (previewTripId != null &&
+        trip?.id == previewTripId &&
+        const {'requested', 'searching'}.contains(trip?.status)) {
       return;
     }
     if (!_shouldOpenTripFlow(trip)) {

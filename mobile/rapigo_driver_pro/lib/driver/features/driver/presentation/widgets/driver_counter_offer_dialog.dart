@@ -31,12 +31,11 @@ class _DriverCounterOfferDialogState extends State<DriverCounterOfferDialog> {
     final amount = double.tryParse(raw);
     if (amount == null ||
         !amount.isFinite ||
-        amount <= widget.originalFare ||
+        amount <= 0 ||
         amount > 99999999.99 ||
         !RegExp(r'^\d+(\.\d{1,2})?$').hasMatch(raw)) {
       setState(
-        () => _error =
-            'Ingresa un precio mayor a Bs ${widget.originalFare.toStringAsFixed(2)}, con hasta 2 decimales.',
+        () => _error = 'Ingresa un precio mayor a cero, con hasta 2 decimales.',
       );
       return;
     }
@@ -63,14 +62,14 @@ class _DriverCounterOfferDialogState extends State<DriverCounterOfferDialog> {
     return PopScope(
       canPop: !_sending,
       child: AlertDialog(
-        title: const Text('Proponer otro precio'),
+        title: const Text('Enviar una oferta'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'El pasajero ofrece Bs ${widget.originalFare.toStringAsFixed(2)}. Si acepta tu precio, podrás ir a recogerlo. Si rechaza, el viaje se cancela.',
+                'El pasajero propone Bs ${widget.originalFare.toStringAsFixed(2)}. Enviar tu precio no reserva el viaje. Si el pasajero te elige, podrás ir a recogerlo.',
               ),
               const SizedBox(height: 18),
               TextField(
@@ -82,7 +81,7 @@ class _DriverCounterOfferDialogState extends State<DriverCounterOfferDialog> {
                 ),
                 onSubmitted: (_) => _submit(),
                 decoration: InputDecoration(
-                  labelText: 'Tu contraoferta',
+                  labelText: 'Tu oferta',
                   prefixText: 'Bs ',
                   border: const OutlineInputBorder(),
                   errorText: _error,
@@ -99,7 +98,7 @@ class _DriverCounterOfferDialogState extends State<DriverCounterOfferDialog> {
           ),
           FilledButton(
             onPressed: _sending ? null : _submit,
-            child: Text(_sending ? 'Enviando…' : 'Enviar contraoferta'),
+            child: Text(_sending ? 'Enviando…' : 'Enviar oferta'),
           ),
         ],
       ),

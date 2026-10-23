@@ -1,3 +1,4 @@
+const { registerDriverOfferRoutes, loadPassengerOffers } = require("./driver-offers");
 const { registerCounterOfferRoutes } = require("./counter-offers");
 const Fastify = require("fastify");
 const cors = require("@fastify/cors");
@@ -309,6 +310,19 @@ function mapTrip(row) {
 async function bootstrap() {
   await app.register(cors, { origin: true, credentials: true });
   await ensureSchema();
+  await pool.query(`CREATE TABLE IF NOT EXISTS trip_driver_offers (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  trip_id UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+  driver_id UUID NOT NULL REFERENCES drivers(id),
+  amount NUMERIC(10,2) NOT NULL CHECK (amount >= 0),
+  trip_revision TIMESTAMPTZ NOT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending','accepted','ignored','unavailable')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (trip_id, driver_id)
+);`);
+  registerDriverOfferRoutes(app, { pool, requireTripAccess, emitRealtime, redis, publish });
   registerCounterOfferRoutes(app, { pool, redis, requireTripAccess, emitRealtime, publish });
 
   app.get("/health", async () => ({ status: "ok", service: "trip-service" }));
@@ -552,8 +566,13 @@ async function bootstrap() {
     return result.rows.map(mapTrip);
   });
 
-  app.get("/active/passenger/:passengerId", async (request) => {
+  app.get("/active/passenger/:passengerId", async (request, reply) => {
     const { passengerId } = request.params;
+    const user = await requireUserToken(request, reply);
+    if (!user) return;
+    if (user.role !== 'passenger' || user.sub !== passengerId) {
+      return reply.code(403).send({ message: 'No puedes consultar las ofertas de otro pasajero' });
+    }
     const result = await pool.query(
       `WITH latest_location AS (
          SELECT DISTINCT ON (dl.driver_id)
@@ -599,7 +618,9 @@ async function bootstrap() {
       [passengerId]
     );
 
-    return mapTrip(result.rows[0]) ?? null;
+    const trip = mapTrip(result.rows[0]);
+    if (!trip) return null;
+    return { ...trip, offers: await loadPassengerOffers(pool, trip.id) };
   });
 
   app.get("/active/driver/:driverId", async (request, reply) => {

@@ -1,28 +1,27 @@
-# Contraofertas y menú del conductor
+# Solicitudes y ofertas de varios conductores
 
-El conductor puede proponer un precio mayor al original desde una solicitud entrante no promocional. El servidor reserva el viaje y al conductor con el estado existente `accepted` y `counter_offer_status = pending`. La tarifa original se conserva hasta que el pasajero responda. Los clientes muestran la espera y el servidor impide avanzar a recogida, inicio o finalización durante esa espera.
+En **Pedir taxi**, la solicitud se difunde inmediatamente a los conductores disponibles. La lista del conductor se consulta desde PostgreSQL y no desaparece porque caduque una notificación Redis. El conductor entra a Solicitudes, revisa recogida, destino, precio y ruta, y envía una oferta. Revisar o enviar un precio no asigna el viaje ni ocupa al conductor.
 
-- Aceptar: guarda `counter_offer_amount` como `fare_amount` y pasa a `arriving`.
-- Rechazar: cancela el viaje y libera al conductor dentro de la misma transacción.
-- El conductor también puede cancelar mientras espera. No se acepta una respuesta posterior a la cancelación.
-- Una contraoferta pendiente se recupera desde el servidor y la caché local al reabrir las apps. No tiene vencimiento automático: requiere respuesta o cancelación.
+El pasajero compara las ofertas con precio, nombre, calificación, vehículo y placa. **Ignorar** descarta solo esa oferta; no cancela la solicitud. **Elegir conductor** asigna el viaje y la tarifa dentro de una transacción, pasa a `arriving` y abre el flujo de recogida del conductor elegido. Las ofertas competidoras quedan fuera de disponibilidad. Un conductor no puede quedar asignado a dos viajes.
 
-API: `POST /dispatch/accept` admite el campo opcional `counterFare`. `POST /trips/:tripId/counter-offer/response` recibe `{ "accept": true }` o `{ "accept": false }` y exige la identidad del pasajero propietario. Se notifican ambos clientes mediante `trip:counter_offer` y `driver:counter_offer`; también existe recuperación por consultas periódicas.
+En **Tomar taxi**, si se eligió un conductor en el mapa, ese conductor puede enviar su oferta y el pasajero puede elegirla o ignorarla. Sin un conductor específico, la solicitud está abierta. El botón **Ver ofertas** permite volver a la lista mientras se espera.
 
-## Puesta en funcionamiento
+Cada conductor mantiene una oferta por solicitud. Puede actualizar el precio pendiente, pero no reenviar una oferta que el pasajero ya ignoró. El servidor verifica el precio que el pasajero vio y la versión exacta del recorrido; un cambio de ruta invalida las ofertas anteriores hasta que se reenvíen. Las promociones conservan su tarifa. Las ofertas no tienen un vencimiento ficticio de 20 segundos.
 
-Actualizar y reiniciar `trip-service` y `dispatch-service` antes de distribuir las dos apps actualizadas. Los servicios añaden las columnas de forma idempotente al arrancar; el esquema para instalaciones nuevas también las incluye. Esta modificación no despliega servicios ni instala APK en teléfonos.
+## API y despliegue
+
+- `POST /dispatch/accept`: recibe `tripId`, `driverId` y `counterFare` opcional. Ahora devuelve `{ proposal }` y solo envía una oferta.
+- `GET /trips/:tripId/offers`: ofertas vigentes para el pasajero propietario.
+- `POST /trips/:tripId/offers/:offerId/response`: `{ accept, expectedAmount }`; el importe observado es obligatorio para elegir.
+- La consulta del viaje activo del pasajero incluye `offers` para recuperación al reconectar y reiniciar.
+- Eventos: `trip:offers_changed`, `driver:offers_changed`, y los eventos de estado/asignación existentes al confirmar.
+
+Los servicios crean `trip_driver_offers` al arrancar. El esquema de instalaciones nuevas incluye la misma tabla. Actualizar **trip-service, dispatch-service y ambas apps juntos**, porque cambió el contrato de `/dispatch/accept`. No se desplegaron servicios ni se instalaron APK durante esta modificación. El flujo anterior de contraoferta única permanece disponible únicamente para terminar solicitudes antiguas que ya estuvieran reservadas.
 
 ## Verificación
 
-Pruebas automatizadas:
+- `flutter test --no-pub` y `flutter analyze --no-pub` en cada app.
+- `node --test services/trip-service/test/counter-offers.test.js` conserva la compatibilidad anterior.
+- `OFFER_TEST_DATABASE_URL` debe apuntar exclusivamente a PostgreSQL de pruebas. Con esa variable, ejecutar `node --test services/trip-service/test/driver-offers.integration.test.js`. La prueba crea y elimina un esquema propio y usa las transacciones reales, sin arrancar los servicios productivos.
 
-- `node --test services/trip-service/test/counter-offers.test.js`
-- `flutter test --no-pub` dentro de cada app.
-- `flutter analyze --no-pub` dentro de cada app.
-
-Las pruebas del servidor usan dependencias simuladas; no reemplazan una prueba con PostgreSQL, Redis, WebSocket y ambos teléfonos conectados.
-
-Comprobar en un entorno de prueba: ofrecer Bs 10, proponer Bs 15, aceptar y confirmar que ambos muestran Bs 15 y pueden seguir el viaje; repetir rechazando y verificar que se cancela y el conductor queda libre. Probar dos conductores sobre la misma solicitud, cancelación simultánea con una respuesta, pérdida de conexión y reapertura de ambas apps durante la espera.
-
-El inicio del conductor muestra la calle abajo y un FAB a la derecha con centro del conductor, vista del vehículo/mapa y solicitudes. La calle se consulta de nuevo cuando cambia la ubicación al menos 22 metros.
+Se verifican ofertas simultáneas sin reserva, selección de un único conductor, rechazo de una doble asignación entre viajes, ignorar sin cancelar, cambios de tarifa/recorrido, solicitudes canceladas y el modo dirigido de Tomar taxi. Redis y WebSocket se simulan en esa prueba; queda pendiente comprobar el recorrido completo con ambas apps en teléfonos conectados al backend actualizado.

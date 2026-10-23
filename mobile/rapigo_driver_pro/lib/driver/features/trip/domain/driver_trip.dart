@@ -23,6 +23,8 @@ class DriverTrip {
     this.isPromotional = false,
     this.counterOfferAmount,
     this.counterOfferStatus,
+    this.myOfferAmount,
+    this.myOfferStatus,
   });
 
   final String id;
@@ -48,6 +50,8 @@ class DriverTrip {
   final bool isPromotional;
   final double? counterOfferAmount;
   final String? counterOfferStatus;
+  final double? myOfferAmount;
+  final String? myOfferStatus;
 
   bool get hasPendingCounterOffer =>
       status == 'accepted' && counterOfferStatus == 'pending';
@@ -84,6 +88,8 @@ class DriverTrip {
     bool? isPromotional,
     double? counterOfferAmount,
     String? counterOfferStatus,
+    double? myOfferAmount,
+    String? myOfferStatus,
   }) {
     return DriverTrip(
       id: id ?? this.id,
@@ -109,6 +115,8 @@ class DriverTrip {
       isPromotional: isPromotional ?? this.isPromotional,
       counterOfferAmount: counterOfferAmount ?? this.counterOfferAmount,
       counterOfferStatus: counterOfferStatus ?? this.counterOfferStatus,
+      myOfferAmount: myOfferAmount ?? this.myOfferAmount,
+      myOfferStatus: myOfferStatus ?? this.myOfferStatus,
     );
   }
 }

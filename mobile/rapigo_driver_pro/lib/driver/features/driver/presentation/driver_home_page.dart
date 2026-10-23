@@ -472,16 +472,8 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
     _counterOfferRefresh = Timer.periodic(const Duration(seconds: 5), (
       _,
     ) async {
-      if (ref.read(offeredTripProvider).value?.hasPendingCounterOffer == true) {
-        await ref.read(offeredTripProvider.notifier).loadOffer();
-        if (mounted &&
-            ref.read(offeredTripProvider).value?.hasPendingCounterOffer !=
-                true) {
-          await ref
-              .read(driverStateProvider.notifier)
-              .restoreOperationalState(force: true);
-        }
-      }
+      await ref.read(offeredTripProvider.notifier).loadOffer();
+      if (mounted) await ref.read(driverOffersProvider.notifier).loadOffers();
     });
     unawaited(_restoreMapViewPreferences());
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -693,8 +685,14 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
           hasLiveTrip: _hasLiveTripStatus(trip),
           offersAsync: offersAsync,
           pendingOffers: pendingOffers,
-          onViewDetails: _showIncomingTripDetail,
-          onAccept: _handleDriverPrimaryAction,
+          onViewDetails: (offer) {
+            Navigator.of(context).pop();
+            _showIncomingTripDetail(offer);
+          },
+          onAccept: (offer) {
+            Navigator.of(context).pop();
+            if (offer != null) _showIncomingTripDetail(offer);
+          },
           onReject: (offer) async {
             await _rejectOfferForCurrentDriver(offer);
           },
@@ -963,6 +961,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
   }
 
   void _showIncomingTripDetail(DriverTrip trip) {
+    ref.read(driverOfferPreviewTripIdProvider.notifier).setTrip(trip.id);
     setState(() {
       _selectedIncomingOfferId = trip.id;
       _mapFocusSignal++;
@@ -1047,6 +1046,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
   }
 
   Future<void> _openOfferRoutePreview(DriverTrip trip) async {
+    ref.read(driverOfferPreviewTripIdProvider.notifier).setTrip(trip.id);
     setState(() {
       _selectedIncomingOfferId = trip.id;
       _mapFocusSignal++;
@@ -1555,11 +1555,6 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
     final offers = offersAsync.value ?? const <DriverTrip>[];
     final previewTripId = ref.watch(driverOfferPreviewTripIdProvider);
     final shouldResumeHome = ref.watch(driverHomeResumeOverlayProvider);
-    final isPreviewingRoute =
-        previewTripId != null &&
-        trip != null &&
-        trip.id == previewTripId &&
-        trip.status == 'accepted';
     final pendingOffers = <DriverTrip>[
       if (_hasPendingOffer(trip)) trip!,
       ...offers.where(
@@ -1571,12 +1566,13 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
     final selectedIncomingOffer = pendingOffers
         .where((offer) => offer.id == _selectedIncomingOfferId)
         .firstOrNull;
-    final incomingOverlayTrip =
-        (isPreviewingRoute || trip?.hasPendingCounterOffer == true)
+    final incomingOverlayTrip = trip?.hasPendingCounterOffer == true
         ? trip
-        : (selectedIncomingOffer ??
-              (pendingOffers.isNotEmpty ? pendingOffers.first : null));
-    final mapTrip = incomingOverlayTrip ?? trip;
+        : selectedIncomingOffer;
+    final isPreviewingRoute =
+        incomingOverlayTrip != null && previewTripId == incomingOverlayTrip.id;
+    final mapTrip =
+        incomingOverlayTrip ?? (_hasLiveTripStatus(trip) ? trip : null);
     final mapTripStatus =
         incomingOverlayTrip != null && _hasPendingOffer(incomingOverlayTrip)
         ? 'accepted'
@@ -1868,6 +1864,11 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
           _DriverIncomingRequestOverlay(
             trip: incomingOverlayTrip,
             isPreviewingRoute: isPreviewingRoute,
+            onClose: () {
+              setState(() => _selectedIncomingOfferId = null);
+              ref.read(driverOfferPreviewTripIdProvider.notifier).setTrip(null);
+              _openAvailableTripsPage(trip: trip, offersAsync: offersAsync);
+            },
           ),
         if (_showResumeOverlay)
           Positioned.fill(
@@ -2408,7 +2409,7 @@ class _DriverHomeOfferCard extends StatelessWidget {
             pending
                 ? 'Esperando al pasajero'
                 : isPreviewingRoute
-                ? 'Confirma tu viaje'
+                ? 'Revisa la ruta y ofrece'
                 : 'Un nuevo viaje para ti',
             style: const TextStyle(
               color: Colors.white,
@@ -2421,8 +2422,8 @@ class _DriverHomeOfferCard extends StatelessWidget {
             pending
                 ? 'Propusiste Bs ${trip.counterOfferAmount?.toStringAsFixed(2)}. El viaje continúa solo si el pasajero acepta.'
                 : isPreviewingRoute
-                ? 'Revisa el recorrido y confirma para ir a recoger al pasajero.'
-                : 'Reserva el recorrido para revisarlo antes de confirmar.',
+                ? 'El pasajero elegirá entre las ofertas que reciba.'
+                : 'Revisa la recogida y el destino antes de enviar tu oferta.',
             style: const TextStyle(
               color: Color(0xFFADBBD0),
               fontSize: 13,
@@ -2431,6 +2432,18 @@ class _DriverHomeOfferCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           _DriverOfferFarePanel(trip: trip),
+          if (trip.myOfferStatus != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(
+                trip.myOfferStatus == 'pending'
+                    ? 'Tu oferta: Bs ${trip.myOfferAmount?.toStringAsFixed(2)} · Esperando respuesta'
+                    : trip.myOfferStatus == 'ignored'
+                    ? 'El pasajero ignoró tu oferta.'
+                    : 'Revisa el recorrido y vuelve a enviar tu oferta.',
+                style: const TextStyle(color: Color(0xFFFFC400)),
+              ),
+            ),
           const SizedBox(height: 16),
           DriverRequestRoute(
             pickup: trip.passengerPickup,
@@ -2468,7 +2481,9 @@ class _DriverHomeOfferCard extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 16),
-          if (!pending && !isPreviewingRoute && !trip.isPromotional) ...[
+          if (!pending &&
+              !trip.isPromotional &&
+              trip.myOfferStatus != 'ignored') ...[
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
@@ -2521,7 +2536,9 @@ class _DriverHomeOfferCard extends StatelessWidget {
                 Expanded(
                   flex: 3,
                   child: FilledButton(
-                    onPressed: onPrimaryAction,
+                    onPressed: trip.myOfferStatus == 'ignored'
+                        ? null
+                        : onPrimaryAction,
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFFFFC400),
                       foregroundColor: const Color(0xFF0D1828),
@@ -2539,7 +2556,7 @@ class _DriverHomeOfferCard extends StatelessWidget {
                       ),
                     ),
                     child: Text(
-                      isPreviewingRoute ? 'Confirmar viaje' : 'Ver recorrido',
+                      'Ofrecer Bs ${trip.fareAmount.toStringAsFixed(2)}',
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -2748,31 +2765,18 @@ class _DriverRequestPassengerBlock extends StatelessWidget {
   }
 }
 
-String? _visibleOfferExpiresAt(DriverTrip trip) {
-  final rawExpiresAt = trip.offerExpiresAt?.trim();
-  if (rawExpiresAt != null && rawExpiresAt.isNotEmpty) {
-    return rawExpiresAt;
-  }
-  if (!const {'requested', 'searching'}.contains(trip.status)) {
-    return null;
-  }
-  final requestedAt = DateTime.tryParse(trip.requestedAt ?? '')?.toLocal();
-  final fallbackBase = requestedAt ?? DateTime.now();
-  final fallbackExpiresAt = fallbackBase.add(const Duration(seconds: 20));
-  if (!fallbackExpiresAt.isAfter(DateTime.now())) {
-    return DateTime.now().add(const Duration(seconds: 20)).toIso8601String();
-  }
-  return fallbackExpiresAt.toIso8601String();
-}
+String? _visibleOfferExpiresAt(DriverTrip trip) => trip.offerExpiresAt;
 
 class _DriverIncomingRequestOverlay extends ConsumerWidget {
   const _DriverIncomingRequestOverlay({
     required this.trip,
     required this.isPreviewingRoute,
+    required this.onClose,
   });
 
   final DriverTrip trip;
   final bool isPreviewingRoute;
+  final VoidCallback onClose;
 
   double _distanceMeters({
     required double startLat,
@@ -2864,6 +2868,15 @@ class _DriverIncomingRequestOverlay extends ConsumerWidget {
                   runSpacing: 8,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
+                    TextButton.icon(
+                      onPressed: onClose,
+                      style: TextButton.styleFrom(
+                        backgroundColor: const Color(0xFF0D1828),
+                        foregroundColor: Colors.white,
+                      ),
+                      icon: const Icon(Icons.arrow_back),
+                      label: const Text('Volver a solicitudes'),
+                    ),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -3002,62 +3015,18 @@ class _DriverIncomingRequestOverlay extends ConsumerWidget {
                             }
                           },
                           onPrimaryAction: () async {
-                            if (isPreviewingRoute) {
-                              ref
-                                  .read(
-                                    driverOfferPreviewTripIdProvider.notifier,
-                                  )
-                                  .setTrip(null);
-                              try {
-                                await ref
-                                    .read(offeredTripProvider.notifier)
-                                    .updateTripStatus('arriving');
-                                if (context.mounted) {
-                                  showTopNotice(
-                                    context,
-                                    'Viaje aceptado. Dirigete al punto de recogida.',
-                                    tone: NoticeTone.success,
-                                  );
-                                }
-                              } catch (error) {
-                                if (context.mounted) {
-                                  showTopNotice(
-                                    context,
-                                    error.toString().replaceFirst(
-                                      'Exception: ',
-                                      '',
-                                    ),
-                                    tone: NoticeTone.error,
-                                  );
-                                }
-                              }
-                              return;
-                            }
                             try {
                               await ref
                                   .read(offeredTripProvider.notifier)
-                                  .acceptTrip(trip);
-                              ref
-                                  .read(driverOffersProvider.notifier)
-                                  .removeOfferLocally(trip.id);
-                              ref
-                                  .read(
-                                    driverOfferPreviewTripIdProvider.notifier,
-                                  )
-                                  .setTrip(trip.id);
+                                  .sendCounterOffer(trip, trip.fareAmount);
                               if (context.mounted) {
                                 showTopNotice(
                                   context,
-                                  'Recorrido bloqueado para ti. Revisa la ruta y luego acepta.',
-                                  tone: NoticeTone.info,
+                                  'Oferta enviada. Espera que el pasajero te elija.',
+                                  tone: NoticeTone.success,
                                 );
                               }
                             } catch (error) {
-                              ref
-                                  .read(
-                                    driverOfferPreviewTripIdProvider.notifier,
-                                  )
-                                  .setTrip(null);
                               if (context.mounted) {
                                 showTopNotice(
                                   context,
@@ -3195,7 +3164,7 @@ class _DriverPreviewRouteBadge extends StatelessWidget {
   }
 }
 
-class _DriverAvailableTripsPage extends StatelessWidget {
+class _DriverAvailableTripsPage extends ConsumerWidget {
   const _DriverAvailableTripsPage({
     required this.hasLiveTrip,
     required this.offersAsync,
@@ -3215,14 +3184,16 @@ class _DriverAvailableTripsPage extends StatelessWidget {
   final VoidCallback onExpired;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final offersAsync = ref.watch(driverOffersProvider);
+    final pendingOffers = offersAsync.value ?? const <DriverTrip>[];
     return Scaffold(
       backgroundColor: const Color(0xFF07111F),
       appBar: AppBar(
         backgroundColor: const Color(0xFF07111F),
         foregroundColor: Colors.white,
         title: Text(
-          'Viajes disponibles',
+          'Solicitudes · Pedir taxi',
           style: GoogleFonts.plusJakartaSans(
             fontWeight: FontWeight.w800,
             color: Colors.white,
@@ -3556,6 +3527,16 @@ class _DriverAvailableTripCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
+          _InfoTile(
+            label: 'Precio',
+            value: 'Bs ${trip.fareAmount.toStringAsFixed(2)}',
+          ),
+          if (trip.myOfferStatus != null)
+            _InfoTile(
+              label: 'Tu oferta',
+              value:
+                  'Bs ${trip.myOfferAmount?.toStringAsFixed(2)} · ${trip.myOfferStatus == 'pending' ? 'Enviada' : 'Ignorada'}',
+            ),
           _InfoTile(label: 'Recojo', value: trip.passengerPickup),
           _InfoTile(label: 'Destino', value: trip.destination),
           if (trip.passengerPhone?.trim().isNotEmpty ?? false)
@@ -3612,7 +3593,7 @@ class _DriverAvailableTripCard extends StatelessWidget {
                     ),
                   ),
                   child: const Text(
-                    'Aceptar',
+                    'Ver ruta',
                     style: TextStyle(fontWeight: FontWeight.w800),
                   ),
                 ),

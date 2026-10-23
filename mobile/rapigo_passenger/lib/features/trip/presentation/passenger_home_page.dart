@@ -75,7 +75,8 @@ class _PassengerHomePageState extends ConsumerState<PassengerHomePage> {
           );
       if (mounted &&
           _showRideLauncher &&
-          ref.read(tripProvider).request.hasPendingCounterOffer) {
+          (ref.read(tripProvider).request.hasPendingCounterOffer ||
+              ref.read(tripProvider).request.hasDriverOffers)) {
         _openRideFlow(RideMode.destino);
       }
     } catch (_) {
