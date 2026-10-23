@@ -14,7 +14,8 @@ Se retiraron el cronómetro, el filtro de ofertas vencidas de la app y el despac
 
 ## API y despliegue
 
-- `POST /dispatch/accept`: recibe `tripId`, `driverId` y `counterFare` opcional. Ahora devuelve `{ proposal }` y solo envía una oferta.
+- `POST /dispatch/proposals`: recibe `tripId`, `driverId` y `counterFare` opcional. Devuelve `{ proposal }` con estado `pending` y solo envía una oferta. La app valida esa respuesta antes de indicar éxito.
+- `/dispatch/accept` queda como alias para clientes anteriores contra el servidor actualizado. La nueva app nunca utiliza esa ruta ni recurre a ella si `/proposals` no existe: en servidores antiguos podía asignar el viaje inmediatamente. Una respuesta 404/405 pide actualizar el servidor, sin intentar aceptar el viaje.
 - `GET /trips/:tripId/offers`: ofertas vigentes para el pasajero propietario.
 - `POST /trips/:tripId/offers/:offerId/response`: `{ accept, expectedAmount }`; el importe observado es obligatorio para elegir.
 - La consulta del viaje activo del pasajero incluye `offers` para recuperación al reconectar y reiniciar.

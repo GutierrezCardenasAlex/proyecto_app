@@ -43,7 +43,8 @@ test('driver offer marketplace with real PostgreSQL transactions', {
   const source = fs.readFileSync(path.resolve(__dirname, '../../../infra/postgres/schema.sql'), 'utf8');
   const offersDdl = source.match(/CREATE TABLE IF NOT EXISTS trip_driver_offers \([\s\S]*?\);/)[0];
   await pool.query(offersDdl);
-  const emitRealtime = async () => {};
+  const emitted = [];
+  const emitRealtime = async (event, room, data) => { emitted.push({ event, room, data }); };
   registerDriverProposals(app, { pool, emitRealtime,
     schema: z.object({ tripId: z.string().uuid(), driverId: z.string().uuid(),
       counterFare: z.number().min(0).max(99999999.99).multipleOf(0.01).optional() }),
@@ -63,6 +64,7 @@ test('driver offer marketplace with real PostgreSQL transactions', {
   });
   await app.ready();
   async function fixture() {
+    emitted.length = 0;
     await pool.query('TRUNCATE users, drivers, vehicles, trips, trip_events, trip_driver_offers CASCADE');
     const passenger = crypto.randomUUID(), driver1 = crypto.randomUUID(), driver2 = crypto.randomUUID();
     const trip1 = crypto.randomUUID(), trip2 = crypto.randomUUID();
@@ -73,7 +75,7 @@ test('driver offer marketplace with real PostgreSQL transactions', {
     for (const id of [trip1, trip2]) await pool.query('INSERT INTO trips(id,passenger_id) VALUES ($1,$2)', [id, passenger]);
     return { passenger, driver1, driver2, trip1, trip2 };
   }
-  const bid = (driverId, tripId, amount) => app.inject({ method: 'POST', url: '/accept',
+  const bid = (driverId, tripId, amount) => app.inject({ method: 'POST', url: '/proposals',
     headers: { 'x-driver-id': driverId }, payload: { driverId, tripId, counterFare: amount } });
   const decide = (f, tripId, offer, accept = true, amount = Number(offer.amount)) => app.inject({
     method: 'POST', url: `/${tripId}/offers/${offer.id}/response`,
@@ -88,6 +90,8 @@ test('driver offer marketplace with real PostgreSQL transactions', {
       assert.equal(response.statusCode, 200);
       const offer = response.json().proposal;
       assert.equal(Number(offer.amount), 10);
+      assert.equal(emitted.some(e => e.event === 'driver:trip_accepted'), false);
+      assert.ok(emitted.some(e => e.event === 'trip:offers_changed'));
       assert.equal((await decide(f, f.trip1, offer)).statusCode, 200);
       const trip = (await pool.query('SELECT * FROM trips WHERE id=$1', [f.trip1])).rows[0];
       assert.equal(Number(trip.fare_amount), 10);
@@ -104,6 +108,8 @@ test('driver offer marketplace with real PostgreSQL transactions', {
       assert.equal(Number(list.json().offers[0].amount), 15);
       const pending = (await pool.query('SELECT * FROM trips WHERE id=$1', [f.trip1])).rows[0];
       assert.equal(pending.driver_id, null);
+      assert.equal(pending.status, 'searching');
+      assert.equal(emitted.some(e => e.event === 'driver:trip_accepted'), false);
       assert.equal(Number(pending.fare_amount), 10);
       assert.equal((await decide(f, f.trip1, offer)).statusCode, 200);
       assert.equal(Number((await pool.query('SELECT fare_amount FROM trips WHERE id=$1', [f.trip1])).rows[0].fare_amount), 15);

@@ -1,5 +1,5 @@
 function registerDriverProposals(app, { pool, requireOwnDriverId, emitRealtime, schema }) {
-  app.post('/accept', async (request, reply) => {
+  const sendProposal = async (request, reply) => {
     const parsed = schema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ message: 'Precio o solicitud inválida' });
     const { tripId, driverId, counterFare } = parsed.data;
@@ -55,7 +55,10 @@ function registerDriverProposals(app, { pool, requireOwnDriverId, emitRealtime, 
     await emitRealtime('trip:offers_changed', `trip:${tripId}`, { tripId });
     await emitRealtime('driver:offers_changed', `driver:${driverId}`, { tripId });
     return { proposal };
-  });
+  };
+  // New clients must never call the legacy assignment endpoint on an old server.
+  app.post('/proposals', sendProposal);
+  app.post('/accept', sendProposal);
 }
 async function withdrawDriverProposal(pool, driverId, tripId) {
   const client = await pool.connect();

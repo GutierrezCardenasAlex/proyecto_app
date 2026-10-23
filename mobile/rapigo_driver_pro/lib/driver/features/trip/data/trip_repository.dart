@@ -35,7 +35,9 @@ final driverTripHistoryProvider = FutureProvider<List<DriverTrip>>((ref) async {
 });
 
 class DriverTripRepository {
-  const DriverTripRepository();
+  const DriverTripRepository({http.Client? client}) : _client = client;
+
+  final http.Client? _client;
 
   Future<DriverTrip?> fetchActiveTrip({
     required String token,
@@ -175,14 +177,14 @@ class DriverTripRepository {
         .toList(growable: false);
   }
 
-  Future<DriverTrip> accept({
+  Future<DriverTrip> sendProposal({
     required String token,
     required String driverId,
     required DriverTrip trip,
     double? counterFare,
   }) async {
-    final response = await http.post(
-      Uri.parse('${AppConfig.apiBaseUrl}/dispatch/accept'),
+    final response = await (_client?.post ?? http.post)(
+      Uri.parse('${AppConfig.apiBaseUrl}/dispatch/proposals'),
       headers: _headers(token),
       body: jsonEncode({
         'tripId': trip.id,
@@ -191,16 +193,41 @@ class DriverTripRepository {
       }),
     );
 
+    if (response.statusCode == 404 || response.statusCode == 405) {
+      throw Exception(
+        'El servidor todavía no admite propuestas. Debe actualizarse antes de enviar ofertas. No se aceptó el viaje.',
+      );
+    }
     if (response.statusCode >= 400) {
-      throw Exception(_errorMessage(response, 'No se pudo aceptar el viaje'));
+      throw Exception(_errorMessage(response, 'No se pudo enviar la oferta'));
     }
 
-    final payload = jsonDecode(response.body) as Map<String, dynamic>;
-    final proposal = payload['proposal'] as Map<String, dynamic>;
-    return trip.copyWith(
-      myOfferAmount: _toNullableDouble(proposal['amount']),
-      myOfferStatus: proposal['status']?.toString(),
-    );
+    dynamic payload;
+    try {
+      payload = jsonDecode(response.body);
+    } on FormatException {
+      throw Exception(
+        'El servidor no confirmó la oferta. Actualiza las solicitudes antes de volver a enviarla.',
+      );
+    }
+    final proposal = payload is Map<String, dynamic>
+        ? payload['proposal']
+        : null;
+    final amount = proposal is Map<String, dynamic>
+        ? _toNullableDouble(proposal['amount'])
+        : null;
+    if (proposal is! Map<String, dynamic> ||
+        proposal['trip_id'] != trip.id ||
+        proposal['driver_id'] != driverId ||
+        proposal['status'] != 'pending' ||
+        amount == null ||
+        !amount.isFinite ||
+        amount < 0) {
+      throw Exception(
+        'El servidor no confirmó una oferta pendiente. Actualiza las solicitudes y verifica la versión del servidor.',
+      );
+    }
+    return trip.copyWith(myOfferAmount: amount, myOfferStatus: 'pending');
   }
 
   Future<void> reject({
@@ -396,38 +423,12 @@ class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
     }
   }
 
-  Future<void> acceptTrip([DriverTrip? trip]) async {
-    final session = ref.read(driverSessionProvider);
-    final current = trip ?? state.value;
-    if (current == null || session.driverId.isEmpty || session.token.isEmpty) {
-      return;
-    }
-
-    try {
-      final acceptedTrip = await _repository.accept(
-        token: session.token,
-        driverId: session.driverId,
-        trip: current,
-      );
-      state = AsyncData(acceptedTrip);
-      await _persistTrip();
-    } catch (error) {
-      await clearTrip();
-      await ref.read(driverOffersProvider.notifier).loadOffers();
-      ref.invalidate(driverTripHistoryProvider);
-      throw Exception(_friendlyAcceptError(error));
-    } finally {
-      ref.invalidate(driverTripHistoryProvider);
-      ref.invalidate(driverOffersProvider);
-    }
-  }
-
   Future<void> sendCounterOffer(DriverTrip trip, [double? amount]) async {
     final session = ref.read(driverSessionProvider);
     if (session.token.isEmpty || session.driverId.isEmpty) {
       throw Exception('Inicia sesión para enviar una oferta');
     }
-    await _repository.accept(
+    await _repository.sendProposal(
       token: session.token,
       driverId: session.driverId,
       trip: trip,
@@ -584,28 +585,6 @@ class DriverOffersController extends Notifier<AsyncValue<List<DriverTrip>>> {
     state = const AsyncData([]);
     await _persistOffers();
   }
-}
-
-String _friendlyAcceptError(Object error) {
-  final raw = error.toString();
-  final normalized = raw.toLowerCase();
-  if (normalized.contains('no fue ofertado') ||
-      normalized.contains('solicitud ya no esta disponible')) {
-    return 'La oferta vencio y paso al siguiente conductor disponible.';
-  }
-  if (normalized.contains('conductor ya no esta libre')) {
-    return 'Tu estado cambio a ocupado. Vuelve a ponerte disponible para recibir solicitudes.';
-  }
-  if (normalized.contains('being processed')) {
-    return 'Estamos confirmando esta solicitud. Intenta otra vez en un momento.';
-  }
-  if (raw.contains('409')) {
-    return 'Este viaje ya fue aceptado por otro conductor.';
-  }
-  if (raw.contains('403')) {
-    return 'Esta solicitud ya no esta disponible para tu conductor.';
-  }
-  return 'No se pudo aceptar el viaje. Intenta con otra solicitud.';
 }
 
 String _friendlyTripStatusError(Object error) {
