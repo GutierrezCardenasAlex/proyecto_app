@@ -1,3 +1,4 @@
+const { statusUpdateQuery } = require("./status-update");
 const { registerDriverOfferRoutes, loadPassengerOffers } = require("./driver-offers");
 const { registerCounterOfferRoutes } = require("./counter-offers");
 const Fastify = require("fastify");
@@ -701,23 +702,7 @@ async function bootstrap() {
         });
       }
     }
-    const timestampField = {
-      arriving: null,
-      at_pickup: null,
-      in_progress: "started_at",
-      completed: "completed_at",
-      cancelled: "cancelled_at"
-    }[status];
-
-    const query = `UPDATE trips SET status = $2,
-      ${timestampField ? `${timestampField} = NOW(),` : ''}
-      updated_at = NOW(),
-      counter_offer_status = CASE
-        WHEN $2 = 'cancelled' AND counter_offer_status = 'pending' THEN 'rejected'
-        ELSE counter_offer_status END
-      WHERE id = $1 AND status NOT IN ('cancelled', 'completed')
-        AND ($2 = 'cancelled' OR counter_offer_status IS DISTINCT FROM 'pending')
-      RETURNING *`;
+    const query = statusUpdateQuery(status);
 
     const result = await pool.query(query, [tripId, status]);
     if (!result.rows.length) {
