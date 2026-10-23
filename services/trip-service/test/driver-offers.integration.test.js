@@ -79,6 +79,37 @@ test('driver offer marketplace with real PostgreSQL transactions', {
     method: 'POST', url: `/${tripId}/offers/${offer.id}/response`,
     headers: { 'x-passenger-id': f.passenger }, payload: { accept, expectedAmount: amount } });
 
+  for (const mode of ['broadcast', 'nearby']) {
+    await t.test(`${mode}: accepting without a new price preserves Bs 10`, async () => {
+      const f = await fixture();
+      await pool.query('UPDATE trips SET dispatch_mode=$2, preferred_driver_id=$3 WHERE id=$1',
+        [f.trip1, mode, mode === 'nearby' ? f.driver1 : null]);
+      const response = await bid(f.driver1, f.trip1);
+      assert.equal(response.statusCode, 200);
+      const offer = response.json().proposal;
+      assert.equal(Number(offer.amount), 10);
+      assert.equal((await decide(f, f.trip1, offer)).statusCode, 200);
+      const trip = (await pool.query('SELECT * FROM trips WHERE id=$1', [f.trip1])).rows[0];
+      assert.equal(Number(trip.fare_amount), 10);
+      assert.equal(trip.driver_id, f.driver1);
+    });
+
+    await t.test(`${mode}: Bs 15 stays pending until the passenger accepts`, async () => {
+      const f = await fixture();
+      await pool.query('UPDATE trips SET dispatch_mode=$2, preferred_driver_id=$3 WHERE id=$1',
+        [f.trip1, mode, mode === 'nearby' ? f.driver1 : null]);
+      const offer = (await bid(f.driver1, f.trip1, 15)).json().proposal;
+      await pool.query("UPDATE trip_driver_offers SET created_at=NOW()-INTERVAL '1 hour' WHERE id=$1", [offer.id]);
+      const list = await app.inject({ url: `/${f.trip1}/offers`, headers: { 'x-passenger-id': f.passenger } });
+      assert.equal(Number(list.json().offers[0].amount), 15);
+      const pending = (await pool.query('SELECT * FROM trips WHERE id=$1', [f.trip1])).rows[0];
+      assert.equal(pending.driver_id, null);
+      assert.equal(Number(pending.fare_amount), 10);
+      assert.equal((await decide(f, f.trip1, offer)).statusCode, 200);
+      assert.equal(Number((await pool.query('SELECT fare_amount FROM trips WHERE id=$1', [f.trip1])).rows[0].fare_amount), 15);
+    });
+  }
+
   await t.test('multiple drivers bid without reservation; ignoring preserves the request', async () => {
     const f = await fixture();
     const a = (await bid(f.driver1, f.trip1, 15)).json().proposal;

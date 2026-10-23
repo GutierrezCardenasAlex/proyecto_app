@@ -124,7 +124,6 @@ class DriverTripRepository {
 
     final mappedOffers = offers
         .map((item) => _mapTrip(item, fallbackStatus: 'requested'))
-        .where((offer) => !_isExpiredOffer(offer))
         .toList(growable: false);
     if (mappedOffers.isEmpty) {
       return null;
@@ -150,7 +149,6 @@ class DriverTripRepository {
     final offers = (payload['offers'] as List<dynamic>? ?? const [])
         .whereType<Map<String, dynamic>>()
         .map((item) => _mapTrip(item, fallbackStatus: 'requested'))
-        .where((offer) => !_isExpiredOffer(offer))
         .toList(growable: false);
     return offers;
   }
@@ -257,18 +255,6 @@ class DriverTripRepository {
       // Use the stable fallback when the backend does not send JSON.
     }
     return '$fallback (${response.statusCode})';
-  }
-
-  static bool _isExpiredOffer(DriverTrip offer) {
-    final rawExpiresAt = offer.offerExpiresAt?.trim();
-    if (rawExpiresAt == null || rawExpiresAt.isEmpty) {
-      return false;
-    }
-    final expiresAt = DateTime.tryParse(rawExpiresAt)?.toLocal();
-    if (expiresAt == null) {
-      return false;
-    }
-    return !expiresAt.isAfter(DateTime.now());
   }
 
   static DriverTrip _mapTrip(
@@ -436,7 +422,7 @@ class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
     }
   }
 
-  Future<void> sendCounterOffer(DriverTrip trip, double amount) async {
+  Future<void> sendCounterOffer(DriverTrip trip, [double? amount]) async {
     final session = ref.read(driverSessionProvider);
     if (session.token.isEmpty || session.driverId.isEmpty) {
       throw Exception('Inicia sesión para enviar una oferta');

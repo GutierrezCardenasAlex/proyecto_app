@@ -13,11 +13,6 @@ const port = Number(process.env.PORT || 3004);
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const redis = new Redis(process.env.REDIS_URL);
 const OFFER_TTL_SECONDS = Number(process.env.DISPATCH_OFFER_TTL_SECONDS || 600);
-const NEARBY_STAGE_RADIUS_METERS = Number(process.env.DISPATCH_NEARBY_STAGE_RADIUS_METERS || 100);
-const NEARBY_STAGE_LIMIT = Number(process.env.DISPATCH_NEARBY_STAGE_LIMIT || 8);
-const OFFER_RESPONSE_TIMEOUT_MS = Number(process.env.DISPATCH_OFFER_RESPONSE_TIMEOUT_MS || 20000);
-const DIRECTED_STAGE_TIMEOUT_MS = Number(process.env.DISPATCH_DIRECTED_STAGE_TIMEOUT_MS || 25000);
-const BROADCAST_STAGE_LIMIT = Number(process.env.DISPATCH_BROADCAST_STAGE_LIMIT || 1000);
 
 const searchSchema = z.object({
   tripId: z.string().uuid(),
@@ -165,25 +160,12 @@ async function clearTripOffers(tripId) {
   );
 }
 
-async function notifyTripUnavailable(tripId, acceptedDriverId) {
-  const offeredDriverIds = await redis.smembers(`trip:${tripId}:offered_drivers`);
-  for (const offeredDriverId of offeredDriverIds) {
-    if (offeredDriverId === acceptedDriverId) {
-      continue;
-    }
-    await emitRealtime("driver:trip_unavailable", `driver:${offeredDriverId}`, {
-      tripId,
-      reason: "accepted"
-    });
-  }
-}
-
 async function findCandidateDrivers({
   pickupLat,
   pickupLng,
   preferredDriverId = null,
   radiusMeters = null,
-  limit = BROADCAST_STAGE_LIMIT,
+  limit = null,
   excludeDriverIds = []
 }) {
   const result = await pool.query(
@@ -207,13 +189,12 @@ async function findCandidateDrivers({
               ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
             ) AS distance_meters
      FROM drivers d
-     INNER JOIN latest_locations ll ON ll.driver_id = d.id
+     LEFT JOIN latest_locations ll ON ll.driver_id = d.id
      LEFT JOIN vehicles v ON v.driver_id = d.id
      WHERE d.is_available = TRUE
        AND d.status = 'available'
        AND d.current_trip_id IS NULL
        AND d.accepts_transport_requests = TRUE
-       AND ll.recorded_at >= NOW() - INTERVAL '5 minutes'
        AND ($3::uuid IS NULL OR d.id = $3)
        AND NOT (d.id = ANY($4::uuid[]))
        AND NOT EXISTS (
@@ -266,90 +247,6 @@ async function offerTripToCandidates(tripId, candidates, stage) {
   }
 }
 
-async function offerTripToCandidate({ tripId, candidate, stage, offerToken = null, offerExpiresAt = null }) {
-  const payload = {
-    ...buildOfferPayload(tripId, candidate, stage),
-    offerToken,
-    offerExpiresAt
-  };
-  await redis.sadd(`driver:${candidate.driver_id}:offers`, tripId);
-  await redis.expire(`driver:${candidate.driver_id}:offers`, OFFER_TTL_SECONDS);
-  if (offerExpiresAt) {
-    await redis.hset(`driver:${candidate.driver_id}:offer_expires_at`, tripId, offerExpiresAt);
-    await redis.expire(`driver:${candidate.driver_id}:offer_expires_at`, OFFER_TTL_SECONDS);
-  } else {
-    await redis.hdel(`driver:${candidate.driver_id}:offer_expires_at`, tripId);
-  }
-  await redis.sadd(`trip:${tripId}:offered_drivers`, candidate.driver_id);
-  await redis.expire(`trip:${tripId}:offered_drivers`, OFFER_TTL_SECONDS);
-  await publish("dispatch.trip.offer", payload);
-  await emitRealtime("driver:trip_offer", `driver:${candidate.driver_id}`, payload);
-}
-
-async function removeActiveOffer({ tripId, driverId, reason }) {
-  if (!driverId) {
-    return;
-  }
-  await redis.srem(`driver:${driverId}:offers`, tripId);
-  await redis.hdel(`driver:${driverId}:offer_expires_at`, tripId);
-  await emitRealtime("driver:trip_unavailable", `driver:${driverId}`, {
-    tripId,
-    reason
-  });
-}
-
-async function expandTripOffersToBroadcast({ tripId, pickupLat, pickupLng, reason, runId = null }) {
-  if (runId) {
-    const currentRunId = await redis.get(`trip:${tripId}:dispatch_run`);
-    if (currentRunId !== runId) {
-      return { expanded: false, candidates: [] };
-    }
-  }
-
-  const tripResult = await pool.query(
-    "SELECT status FROM trips WHERE id = $1 AND status IN ('requested', 'searching') LIMIT 1",
-    [tripId]
-  );
-  if (!tripResult.rows.length) {
-    return { expanded: false, candidates: [] };
-  }
-
-  const offeredDriverIds = await redis.smembers(`trip:${tripId}:offered_drivers`);
-  const activeDriverId = await redis.get(`trip:${tripId}:active_offer_driver`);
-  await removeActiveOffer({ tripId, driverId: activeDriverId, reason });
-  await redis.del(`trip:${tripId}:active_offer_driver`, `trip:${tripId}:active_offer_token`, `trip:${tripId}:nearby_queue`);
-  const candidates = await findCandidateDrivers({
-    pickupLat,
-    pickupLng,
-    limit: BROADCAST_STAGE_LIMIT,
-    excludeDriverIds: offeredDriverIds
-  });
-
-  await redis.set(`trip:${tripId}:dispatch_stage`, "broadcast");
-  await redis.set(`trip:${tripId}:candidate_count`, String(offeredDriverIds.length + candidates.length), "EX", OFFER_TTL_SECONDS);
-  await offerTripToCandidates(tripId, candidates, "broadcast");
-  await publish("dispatch.search.expanded", {
-    tripId,
-    reason,
-    previousCandidates: offeredDriverIds.length,
-    candidates: candidates.length
-  });
-
-  return { expanded: true, candidates };
-}
-
-function candidateToQueueValue(candidate) {
-  return JSON.stringify(candidate);
-}
-
-function queueValueToCandidate(value) {
-  try {
-    return JSON.parse(value);
-  } catch (_) {
-    return null;
-  }
-}
-
 async function isCandidateStillAvailable(driverId) {
   const result = await pool.query(
     `SELECT d.id
@@ -369,235 +266,6 @@ async function isCandidateStillAvailable(driverId) {
     [driverId]
   );
   return result.rows.length > 0;
-}
-
-async function scanBroadcastTripIds() {
-  const stream = redis.scanStream({
-    match: "trip:*:dispatch_stage",
-    count: 100
-  });
-  const tripIds = [];
-
-  for await (const keys of stream) {
-    if (!keys.length) {
-      continue;
-    }
-    const stages = await redis.mget(keys);
-    keys.forEach((key, index) => {
-      if (stages[index] !== "broadcast") {
-        return;
-      }
-      const match = key.match(/^trip:([^:]+):dispatch_stage$/);
-      if (match?.[1]) {
-        tripIds.push(match[1]);
-      }
-    });
-  }
-
-  return tripIds;
-}
-
-async function findVisibleBroadcastTripIds(driverId) {
-  if (!(await isCandidateStillAvailable(driverId))) {
-    return [];
-  }
-
-  const broadcastTripIds = await scanBroadcastTripIds();
-  if (!broadcastTripIds.length) {
-    return [];
-  }
-
-  const visibleTripIds = [];
-  for (const tripId of broadcastTripIds) {
-    const rejected = await redis.sismember(`trip:${tripId}:rejected_drivers`, driverId);
-    if (!rejected) {
-      visibleTripIds.push(tripId);
-    }
-  }
-
-  return visibleTripIds;
-}
-
-async function canAcceptBroadcastOffer(tripId, driverId) {
-  const stage = await redis.get(`trip:${tripId}:dispatch_stage`);
-  if (stage !== "broadcast") {
-    return false;
-  }
-  const rejected = await redis.sismember(`trip:${tripId}:rejected_drivers`, driverId);
-  if (rejected) {
-    return false;
-  }
-  return isCandidateStillAvailable(driverId);
-}
-
-async function loadTripDispatchContext(tripId) {
-  const result = await pool.query(
-    `SELECT status,
-            ST_Y(pickup_location::geometry) AS pickup_lat,
-            ST_X(pickup_location::geometry) AS pickup_lng
-     FROM trips
-     WHERE id = $1
-       AND status IN ('requested', 'searching')
-     LIMIT 1`,
-    [tripId]
-  );
-  if (!result.rows.length) {
-    return null;
-  }
-  return {
-    status: result.rows[0].status,
-    pickupLat: Number(result.rows[0].pickup_lat),
-    pickupLng: Number(result.rows[0].pickup_lng)
-  };
-}
-
-async function advanceSequentialOffer({ tripId, pickupLat = null, pickupLng = null, reason, runId = null, previousDriverId = null }) {
-  if (runId) {
-    const currentRunId = await redis.get(`trip:${tripId}:dispatch_run`);
-    if (currentRunId !== runId) {
-      return { advanced: false, stage: "stale_run", candidate: null };
-    }
-  }
-
-  const context = pickupLat == null || pickupLng == null ? await loadTripDispatchContext(tripId) : null;
-  const resolvedPickupLat = pickupLat ?? context?.pickupLat;
-  const resolvedPickupLng = pickupLng ?? context?.pickupLng;
-  if (resolvedPickupLat == null || resolvedPickupLng == null) {
-    return { advanced: false, stage: "inactive", candidate: null };
-  }
-
-  const tripResult = context
-    ? { rows: [{ status: context.status }] }
-    : await pool.query(
-        "SELECT status FROM trips WHERE id = $1 AND status IN ('requested', 'searching') LIMIT 1",
-        [tripId]
-      );
-  if (!tripResult.rows.length) {
-    return { advanced: false, stage: "inactive", candidate: null };
-  }
-
-  const activeDriverId = previousDriverId ?? await redis.get(`trip:${tripId}:active_offer_driver`);
-  await removeActiveOffer({ tripId, driverId: activeDriverId, reason });
-  await redis.del(`trip:${tripId}:active_offer_driver`, `trip:${tripId}:active_offer_token`);
-
-  const queueKey = `trip:${tripId}:nearby_queue`;
-  let candidate = null;
-  while (!candidate) {
-    const rawCandidate = await redis.lpop(queueKey);
-    if (!rawCandidate) {
-      await expandTripOffersToBroadcast({
-        tripId,
-        pickupLat: resolvedPickupLat,
-        pickupLng: resolvedPickupLng,
-        reason,
-        runId
-      });
-      return { advanced: true, stage: "broadcast", candidate: null };
-    }
-    candidate = queueValueToCandidate(rawCandidate);
-    if (candidate && !(await isCandidateStillAvailable(candidate.driver_id))) {
-      candidate = null;
-    }
-  }
-
-  const offerToken = crypto.randomUUID();
-  const offerExpiresAt = new Date(Date.now() + OFFER_RESPONSE_TIMEOUT_MS).toISOString();
-  await redis.set(`trip:${tripId}:active_offer_driver`, candidate.driver_id, "EX", OFFER_TTL_SECONDS);
-  await redis.set(`trip:${tripId}:active_offer_token`, offerToken, "EX", OFFER_TTL_SECONDS);
-  await redis.set(`trip:${tripId}:dispatch_stage`, "nearby", "EX", OFFER_TTL_SECONDS);
-  await offerTripToCandidate({ tripId, candidate, stage: "nearby", offerToken, offerExpiresAt });
-  scheduleSequentialOfferTimeout({
-    tripId,
-    pickupLat: resolvedPickupLat,
-    pickupLng: resolvedPickupLng,
-    runId,
-    driverId: candidate.driver_id,
-    offerToken
-  });
-  await publish("dispatch.offer.advanced", {
-    tripId,
-    reason,
-    driverId: candidate.driver_id
-  });
-  return { advanced: true, stage: "nearby", candidate };
-}
-
-function scheduleSequentialOfferTimeout({ tripId, pickupLat, pickupLng, runId, driverId, offerToken }) {
-  setTimeout(() => {
-    (async () => {
-      const currentRunId = await redis.get(`trip:${tripId}:dispatch_run`);
-      const currentDriverId = await redis.get(`trip:${tripId}:active_offer_driver`);
-      const currentOfferToken = await redis.get(`trip:${tripId}:active_offer_token`);
-      if (currentRunId !== runId || currentDriverId !== driverId || currentOfferToken !== offerToken) {
-        return;
-      }
-      await advanceSequentialOffer({
-        tripId,
-        pickupLat,
-        pickupLng,
-        reason: "nearby_timeout",
-        runId,
-        previousDriverId: driverId
-      });
-    })().catch((error) => {
-      app.log.error({ err: error, tripId }, "failed to advance sequential dispatch offer");
-    });
-  }, OFFER_RESPONSE_TIMEOUT_MS);
-}
-
-async function startSequentialNearbyDispatch({ tripId, pickupLat, pickupLng, candidates, runId }) {
-  const queueKey = `trip:${tripId}:nearby_queue`;
-  if (candidates.length) {
-    await redis.rpush(queueKey, ...candidates.map(candidateToQueueValue));
-    await redis.expire(queueKey, OFFER_TTL_SECONDS);
-  }
-  if (!candidates.length) {
-    await expandTripOffersToBroadcast({
-      tripId,
-      pickupLat,
-      pickupLng,
-      reason: "no_nearby_candidates",
-      runId
-    });
-    return { firstCandidate: null, fallbackInMs: 0 };
-  }
-
-  const advanced = await advanceSequentialOffer({
-    tripId,
-    pickupLat,
-    pickupLng,
-    reason: "nearby_started",
-    runId,
-  });
-  return {
-    firstCandidate: advanced.candidate,
-    fallbackInMs: advanced.stage === "nearby" ? OFFER_RESPONSE_TIMEOUT_MS : 0
-  };
-}
-
-async function scheduleDirectedFallback({ tripId, pickupLat, pickupLng, runId }) {
-  const timerValue = await redis.set(
-    `trip:${tripId}:broadcast_timer`,
-    "scheduled",
-    "NX",
-    "PX",
-    DIRECTED_STAGE_TIMEOUT_MS + 10000
-  );
-  if (timerValue !== "OK") {
-    return;
-  }
-
-  setTimeout(() => {
-    expandTripOffersToBroadcast({
-      tripId,
-      pickupLat,
-      pickupLng,
-      reason: "directed_timeout",
-      runId
-    }).catch((error) => {
-      app.log.error({ err: error, tripId }, "failed to expand dispatch offers");
-    });
-  }, DIRECTED_STAGE_TIMEOUT_MS);
 }
 
 async function bootstrap() {
@@ -793,9 +461,6 @@ async function bootstrap() {
       return reply.code(409).send({ message: 'La solicitud ya fue atendida o cancelada. Actualiza tus viajes.' });
     }
     await emitRealtime('trip:offers_changed', `trip:${tripId}`, { tripId });
-    const currentDriverId = await redis.get(`trip:${tripId}:active_offer_driver`);
-    const dispatchStage = await redis.get(`trip:${tripId}:dispatch_stage`);
-    const runId = await redis.get(`trip:${tripId}:dispatch_run`);
     await redis.srem(`driver:${driverId}:offers`, tripId);
     await redis.hdel(`driver:${driverId}:offer_expires_at`, tripId);
     await redis.sadd(`trip:${tripId}:rejected_drivers`, driverId);
@@ -803,16 +468,6 @@ async function bootstrap() {
       tripId,
       driverId
     });
-
-    if (dispatchStage === "nearby" && currentDriverId === driverId) {
-      await advanceSequentialOffer({
-        tripId,
-        reason: "driver_rejected",
-        runId,
-        previousDriverId: driverId
-      });
-    }
-
     reply.send({ ok: true });
   });
 

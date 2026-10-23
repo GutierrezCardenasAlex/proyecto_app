@@ -8,6 +8,10 @@ En **Tomar taxi**, si se eligió un conductor en el mapa, ese conductor puede en
 
 Cada conductor mantiene una oferta por solicitud. Puede actualizar el precio pendiente, pero no reenviar una oferta que el pasajero ya ignoró. El servidor verifica el precio que el pasajero vio y la versión exacta del recorrido; un cambio de ruta invalida las ofertas anteriores hasta que se reenvíen. Las promociones conservan su tarifa. Las ofertas no tienen un vencimiento ficticio de 20 segundos.
 
+El botón **Aceptar Bs 10.00** del conductor envía la propuesta sin otro precio: el servidor conserva la tarifa del pasajero. **Enviar una oferta** permite proponer, por ejemplo, Bs 15; el pasajero recibe ese precio y elige o ignora al conductor. Ambos casos esperan la elección del pasajero y funcionan en Pedir taxi y Tomar taxi.
+
+Se retiraron el cronómetro, el filtro de ofertas vencidas de la app y el despacho secuencial con temporizador. La notificación inicial de Pedir taxi incluye a todos los conductores disponibles que aceptan transporte, aunque todavía no tengan una ubicación GPS reciente. La ubicación reciente sigue siendo necesaria para mostrar vehículos en el mapa. Las solicitudes permanecen consultables mientras estén abiertas, incluso después de vencer la caché de notificaciones.
+
 ## API y despliegue
 
 - `POST /dispatch/accept`: recibe `tripId`, `driverId` y `counterFare` opcional. Ahora devuelve `{ proposal }` y solo envía una oferta.
