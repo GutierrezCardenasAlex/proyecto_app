@@ -52,9 +52,25 @@ class _DriverActiveTripListenerState
         _tripFlowRouteOpen = false;
         return;
       }
+      final acknowledged = await DriverTripStateCache()
+          .hasAcknowledgedAcceptance(trip.id);
+      if (!mounted) return;
+      final current = ref.read(offeredTripProvider).value;
+      if (current?.id != trip.id || !_shouldOpenTripFlow(current)) {
+        _tripFlowRouteOpen = false;
+        _lastOpenedTripId = null;
+        return;
+      }
+      final acceptedOriginalFare = await DriverTripStateCache()
+          .acceptedOriginalFare(current!.id, current.fareAmount);
+      if (!mounted) return;
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (context) => DriverProgressPage(
+            acceptedOriginalFare: acceptedOriginalFare,
+            showAcceptance:
+                !acknowledged &&
+                const {'accepted', 'arriving'}.contains(current.status),
             onClosed: () {
               _tripFlowRouteOpen = false;
             },

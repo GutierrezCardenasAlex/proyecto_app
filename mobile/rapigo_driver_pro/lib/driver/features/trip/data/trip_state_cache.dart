@@ -23,6 +23,28 @@ class DriverTripFlowMetadata {
 }
 
 class DriverTripStateCache {
+  Future<void> rememberRequestedFare(String tripId, double amount) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('driver_requested_fare_$tripId', amount);
+  }
+
+  Future<bool> acceptedOriginalFare(String tripId, double agreedFare) async {
+    final prefs = await SharedPreferences.getInstance();
+    final original = prefs.getDouble('driver_requested_fare_$tripId');
+    return original != null &&
+        (original * 100).round() == (agreedFare * 100).round();
+  }
+
+  Future<bool> hasAcknowledgedAcceptance(String tripId) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('driver_last_acknowledged_acceptance') == tripId;
+  }
+
+  Future<void> acknowledgeAcceptance(String tripId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('driver_last_acknowledged_acceptance', tripId);
+  }
+
   static const _activeTripKey = 'rapigo_driver_active_trip_v1';
   static const _offersKey = 'rapigo_driver_offers_v1';
   static const _previewTripIdKey = 'rapigo_driver_preview_trip_id_v1';

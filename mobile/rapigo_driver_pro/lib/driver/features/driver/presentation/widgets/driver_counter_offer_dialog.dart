@@ -45,7 +45,15 @@ class _DriverCounterOfferDialogState extends State<DriverCounterOfferDialog> {
     });
     try {
       await widget.onSubmit(amount);
-      if (mounted) Navigator.of(context).pop();
+      if (mounted) {
+        final route = ModalRoute.of(context);
+        // Acceptance may already have opened the trip screen above this dialog.
+        if (route != null && !route.isCurrent) {
+          Navigator.of(context).removeRoute(route, true);
+        } else {
+          Navigator.of(context).pop(true);
+        }
+      }
     } catch (error) {
       if (mounted) {
         setState(
@@ -69,7 +77,7 @@ class _DriverCounterOfferDialogState extends State<DriverCounterOfferDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'El pasajero propone Bs ${widget.originalFare.toStringAsFixed(2)}. Enviar tu precio no reserva el viaje. Si el pasajero te elige, podrás ir a recogerlo.',
+                'El pasajero propone Bs ${widget.originalFare.toStringAsFixed(2)}. Un precio distinto necesita aprobación del pasajero. Si mantienes su precio, el viaje se acepta directamente.',
               ),
               const SizedBox(height: 18),
               TextField(

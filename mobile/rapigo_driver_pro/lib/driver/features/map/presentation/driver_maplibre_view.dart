@@ -1832,9 +1832,9 @@ class _DriverMapLibreViewState extends ConsumerState<DriverMapLibreView>
               northeast: ml.LatLng(bounds.north, bounds.east),
             ),
             left: 54,
-            top: 118,
+            top: math.min(150.0, MediaQuery.sizeOf(context).height * 0.25),
             right: 54,
-            bottom: 360,
+            bottom: math.min(240.0, MediaQuery.sizeOf(context).height * 0.4),
           ),
         );
         _lastAnimatedCameraTarget = ll.LatLng(

@@ -19,10 +19,11 @@ void main() {
     fareAmount: 10,
   );
 
-  for (final price in <double?>[null, 15]) {
+  for (final price in <double?>[null, 10, 15]) {
     test(
-      'proposal at $price never calls acceptance or changes trip status',
+      'original price confirms immediately; a different price stays pending: $price',
       () async {
+        final direct = price == null || price == 10;
         final requests = <http.Request>[];
         final repository = DriverTripRepository(
           client: MockClient((request) async {
@@ -30,12 +31,21 @@ void main() {
             final body = jsonDecode(request.body) as Map<String, dynamic>;
             expect(body.containsKey('counterFare'), price != null);
             expect(body['counterFare'], price);
+            expect(body['expectedFare'], 10);
             return http.Response(
               jsonEncode({
+                'accepted': direct,
+                if (direct)
+                  'trip': {
+                    'id': 'trip',
+                    'driver_id': 'driver',
+                    'status': 'arriving',
+                    'fare_amount': '10.00',
+                  },
                 'proposal': {
                   'trip_id': 'trip',
                   'driver_id': 'driver',
-                  'status': 'pending',
+                  'status': direct ? 'accepted' : 'pending',
                   'amount': (price ?? 10).toStringAsFixed(2),
                 },
               }),
@@ -50,10 +60,10 @@ void main() {
           counterFare: price,
         );
         expect(requests.single.url.path, '/api/dispatch/proposals');
-        expect(result.status, 'searching');
+        expect(result.status, direct ? 'arriving' : 'searching');
         expect(result.fareAmount, 10);
         expect(result.myOfferAmount, price ?? 10);
-        expect(result.myOfferStatus, 'pending');
+        expect(result.myOfferStatus, direct ? 'accepted' : 'pending');
       },
     );
   }
@@ -93,6 +103,24 @@ void main() {
       },
     );
   }
+
+  test('an old backend cannot silently leave direct acceptance pending', () async {
+    final repository = DriverTripRepository(client: MockClient((_) async => http.Response(jsonEncode({
+      'proposal': {'trip_id': 'trip', 'driver_id': 'driver', 'status': 'pending', 'amount': 10},
+    }), 200)));
+    await expectLater(repository.sendProposal(token: 'token', driverId: 'driver', trip: trip),
+      throwsA(isA<Exception>().having((e) => e.toString(), 'message', contains('aceptación directa'))));
+  });
+
+  test('a counteroffer cannot be treated as an immediate assignment', () async {
+    final repository = DriverTripRepository(client: MockClient((_) async => http.Response(jsonEncode({
+      'accepted': true,
+      'proposal': {'trip_id': 'trip', 'driver_id': 'driver', 'status': 'accepted', 'amount': 15},
+      'trip': {'id': 'trip', 'driver_id': 'driver', 'status': 'arriving', 'fare_amount': 15},
+    }), 200)));
+    await expectLater(repository.sendProposal(token: 'token', driverId: 'driver', trip: trip, counterFare: 15),
+      throwsA(isA<Exception>().having((e) => e.toString(), 'message', contains('no confirmó correctamente'))));
+  });
 
   for (final status in [404, 405]) {
     test(

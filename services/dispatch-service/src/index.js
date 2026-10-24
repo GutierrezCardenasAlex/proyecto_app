@@ -25,6 +25,7 @@ const searchSchema = z.object({
 const acceptSchema = z.object({
   tripId: z.string().uuid(),
   driverId: z.string().uuid(),
+  expectedFare: z.number().min(0).max(99999999.99).optional(),
   counterFare: z.number().min(0).max(99999999.99).multipleOf(0.01).optional()
 });
 
@@ -450,7 +451,7 @@ async function bootstrap() {
     };
   });
 
-  registerDriverProposals(app, { pool, requireOwnDriverId, emitRealtime, schema: acceptSchema });
+  registerDriverProposals(app, { pool, requireOwnDriverId, emitRealtime, redis, publish, schema: acceptSchema });
 
   app.post("/reject", async (request, reply) => {
     const { tripId, driverId } = rejectSchema.parse(request.body);

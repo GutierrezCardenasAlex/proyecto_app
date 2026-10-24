@@ -1,11 +1,13 @@
-function registerDriverProposals(app, { pool, requireOwnDriverId, emitRealtime, schema }) {
+function registerDriverProposals(app, { pool, requireOwnDriverId, emitRealtime, schema, redis, publish }) {
   const sendProposal = async (request, reply) => {
     const parsed = schema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ message: 'Precio o solicitud inválida' });
-    const { tripId, driverId, counterFare } = parsed.data;
+    const { tripId, driverId, counterFare, expectedFare } = parsed.data;
     if (!await requireOwnDriverId(request, reply, driverId)) return;
     const client = await pool.connect();
     let proposal;
+    let assignedTrip = null;
+    let affected = [];
     try {
       await client.query('BEGIN');
       // All offer writes and selections lock driver then trip, in that order.
@@ -28,6 +30,11 @@ function registerDriverProposals(app, { pool, requireOwnDriverId, emitRealtime, 
         return reply.code(409).send({ message: 'La solicitud ya no está disponible para ti' });
       }
       const amount = counterFare ?? Number(trip.fare_amount);
+      const direct = amount === Number(trip.fare_amount);
+      if (direct && expectedFare != null && expectedFare !== Number(trip.fare_amount)) {
+        await client.query('ROLLBACK');
+        return reply.code(409).send({ message: 'El precio del pasajero cambió. Revisa la solicitud antes de aceptar.' });
+      }
       if (!Number.isFinite(amount) || amount < 0 || amount > 99999999.99 ||
           (!trip.promotional_trip && amount <= 0) ||
           (trip.promotional_trip && amount !== Number(trip.fare_amount))) {
@@ -44,17 +51,44 @@ function registerDriverProposals(app, { pool, requireOwnDriverId, emitRealtime, 
         await client.query('ROLLBACK');
         return reply.code(409).send({ message: 'El pasajero ya respondió tu oferta' });
       }
+      if (direct) {
+        // The driver already locked above accepts the passenger's own price.
+        await client.query(`UPDATE drivers SET status = 'busy', is_available = FALSE,
+          current_trip_id = $2, updated_at = NOW() WHERE id = $1`, [driverId, tripId]);
+        const assigned = await client.query(`UPDATE trips SET driver_id = $2,
+          status = 'arriving', accepted_at = NOW(), updated_at = NOW()
+          WHERE id = $1 RETURNING *`, [tripId, driverId]);
+        assignedTrip = assigned.rows[0];
+        const closed = await client.query(`UPDATE trip_driver_offers SET
+          status = CASE WHEN id = $1 THEN 'accepted' ELSE 'unavailable' END, updated_at = NOW()
+          WHERE status = 'pending' AND (trip_id = $2 OR driver_id = $3)
+          RETURNING trip_id, driver_id`, [proposal.id, tripId, driverId]);
+        affected = closed.rows;
+        proposal = { ...proposal, status: 'accepted' };
+      }
       await client.query(`INSERT INTO trip_events (trip_id, event_type, payload)
-        VALUES ($1, 'driver_offer_sent', $2::jsonb)`, [tripId, JSON.stringify({ driverId, amount })]);
+        VALUES ($1, $2, $3::jsonb)`, [tripId, direct ? 'driver_direct_accept' : 'driver_offer_sent', JSON.stringify({ driverId, amount })]);
       await client.query('COMMIT');
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
     } finally { client.release(); }
-    // Sending a proposal never reserves the driver or assigns the trip.
-    await emitRealtime('trip:offers_changed', `trip:${tripId}`, { tripId });
-    await emitRealtime('driver:offers_changed', `driver:${driverId}`, { tripId });
-    return { proposal };
+    // Notification failures must not undo a committed assignment or ask for a retry.
+    try {
+      for (const id of new Set([tripId, ...affected.map(row => row.trip_id)])) {
+        await emitRealtime('trip:offers_changed', `trip:${id}`, { tripId: id });
+      }
+      for (const id of new Set([driverId, ...affected.map(row => row.driver_id)])) {
+        await emitRealtime('driver:offers_changed', `driver:${id}`, { tripId });
+      }
+      if (assignedTrip) {
+        await emitRealtime('trip:status_changed', `trip:${tripId}`, { tripId, driverId, status: assignedTrip.status });
+        await emitRealtime('driver:trip_accepted', `driver:${driverId}`, { tripId, status: assignedTrip.status });
+        if (redis) await redis.set(`trip:${tripId}:status`, assignedTrip.status, 'EX', 3600);
+        if (publish) await publish('dispatch.trip.accepted', { tripId, driverId });
+      }
+    } catch (error) { app.log.warn({ err: error, tripId }, 'offer saved; notification failed'); }
+    return { proposal, accepted: assignedTrip != null, ...(assignedTrip ? { trip: assignedTrip } : {}) };
   };
   // New clients must never call the legacy assignment endpoint on an old server.
   app.post('/proposals', sendProposal);

@@ -35,6 +35,7 @@ import '../../map/presentation/driver_map_surface.dart';
 import '../data/driver_repository.dart';
 import 'driver_initial_bootstrap.dart';
 import '../presentation/widgets/driver_home_design.dart';
+import '../presentation/widgets/driver_request_preview.dart';
 import '../presentation/widgets/driver_home_fab.dart';
 import '../presentation/widgets/driver_counter_offer_dialog.dart';
 import 'driver_offer_preview_provider.dart';

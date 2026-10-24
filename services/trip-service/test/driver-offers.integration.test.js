@@ -47,7 +47,7 @@ test('driver offer marketplace with real PostgreSQL transactions', {
   const emitRealtime = async (event, room, data) => { emitted.push({ event, room, data }); };
   registerDriverProposals(app, { pool, emitRealtime,
     schema: z.object({ tripId: z.string().uuid(), driverId: z.string().uuid(),
-      counterFare: z.number().min(0).max(99999999.99).multipleOf(0.01).optional() }),
+      expectedFare: z.number().min(0).optional(), counterFare: z.number().min(0).max(99999999.99).multipleOf(0.01).optional() }),
     requireOwnDriverId: async (req, reply, id) => {
       if (req.headers['x-driver-id'] !== id) { reply.code(403).send({}); return null; }
       return { sub: id };
@@ -90,9 +90,11 @@ test('driver offer marketplace with real PostgreSQL transactions', {
       assert.equal(response.statusCode, 200);
       const offer = response.json().proposal;
       assert.equal(Number(offer.amount), 10);
-      assert.equal(emitted.some(e => e.event === 'driver:trip_accepted'), false);
-      assert.ok(emitted.some(e => e.event === 'trip:offers_changed'));
-      assert.equal((await decide(f, f.trip1, offer)).statusCode, 200);
+      assert.equal(response.json().accepted, true);
+      assert.equal(offer.status, 'accepted');
+      assert.equal(emitted.some(e => e.event === 'driver:trip_accepted'), true);
+      assert.ok(emitted.some(e => e.event === 'trip:status_changed'));
+      assert.equal((await decide(f, f.trip1, offer)).statusCode, 409);
       const trip = (await pool.query('SELECT * FROM trips WHERE id=$1', [f.trip1])).rows[0];
       assert.equal(Number(trip.fare_amount), 10);
       assert.equal(trip.driver_id, f.driver1);
@@ -115,6 +117,38 @@ test('driver offer marketplace with real PostgreSQL transactions', {
       assert.equal(Number((await pool.query('SELECT fare_amount FROM trips WHERE id=$1', [f.trip1])).rows[0].fare_amount), 15);
     });
   }
+
+  await t.test('two direct acceptances assign one driver only', async () => {
+    const f = await fixture();
+    const responses = await Promise.all([bid(f.driver1, f.trip1), bid(f.driver2, f.trip1)]);
+    assert.deepEqual(responses.map(r => r.statusCode).sort(), [200, 409]);
+    assert.equal((await pool.query("SELECT COUNT(*)::int AS n FROM drivers WHERE status='busy'")).rows[0].n, 1);
+  });
+
+  await t.test('direct acceptance races safely with passenger choice of another counteroffer', async () => {
+    const f = await fixture();
+    const offer = (await bid(f.driver1, f.trip1, 15)).json().proposal;
+    const responses = await Promise.all([decide(f, f.trip1, offer), bid(f.driver2, f.trip1)]);
+    assert.deepEqual(responses.map(r => r.statusCode).sort(), [200, 409]);
+    assert.equal((await pool.query("SELECT COUNT(*)::int AS n FROM drivers WHERE status='busy'")).rows[0].n, 1);
+  });
+
+  await t.test('same price is direct and closes this drivers other pending offers', async () => {
+    const f = await fixture();
+    const other = (await bid(f.driver1, f.trip2, 15)).json().proposal;
+    const accepted = await bid(f.driver1, f.trip1, 10);
+    assert.equal(accepted.json().accepted, true);
+    assert.equal((await decide(f, f.trip2, other)).statusCode, 409);
+    assert.equal((await bid(f.driver1, f.trip2)).statusCode, 409);
+  });
+
+  await t.test('changed passenger fare cannot be directly accepted unseen', async () => {
+    const f = await fixture();
+    const result = await app.inject({ method: 'POST', url: '/proposals', headers: { 'x-driver-id': f.driver1 },
+      payload: { tripId: f.trip1, driverId: f.driver1, expectedFare: 9 } });
+    assert.equal(result.statusCode, 409);
+    assert.equal((await pool.query('SELECT driver_id FROM trips WHERE id=$1', [f.trip1])).rows[0].driver_id, null);
+  });
 
   await t.test('multiple drivers bid without reservation; ignoring preserves the request', async () => {
     const f = await fixture();

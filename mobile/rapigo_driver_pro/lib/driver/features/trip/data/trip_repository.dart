@@ -183,15 +183,22 @@ class DriverTripRepository {
     required DriverTrip trip,
     double? counterFare,
   }) async {
-    final response = await (_client?.post ?? http.post)(
-      Uri.parse('${AppConfig.apiBaseUrl}/dispatch/proposals'),
-      headers: _headers(token),
-      body: jsonEncode({
-        'tripId': trip.id,
-        'driverId': driverId,
-        'counterFare': ?counterFare,
-      }),
-    );
+    final response =
+        await (_client?.post ?? http.post)(
+          Uri.parse('${AppConfig.apiBaseUrl}/dispatch/proposals'),
+          headers: _headers(token),
+          body: jsonEncode({
+            'tripId': trip.id,
+            'driverId': driverId,
+            'counterFare': ?counterFare,
+            'expectedFare': trip.fareAmount,
+          }),
+        ).timeout(
+          const Duration(seconds: 20),
+          onTimeout: () => throw Exception(
+            'No llegó la confirmación del viaje. Revisa tus viajes activos antes de volver a aceptar.',
+          ),
+        );
 
     if (response.statusCode == 404 || response.statusCode == 405) {
       throw Exception(
@@ -216,6 +223,30 @@ class DriverTripRepository {
     final amount = proposal is Map<String, dynamic>
         ? _toNullableDouble(proposal['amount'])
         : null;
+    if (payload is Map<String, dynamic> && payload['accepted'] == true) {
+      final assigned = payload['trip'];
+      final direct = counterFare == null || counterFare == trip.fareAmount;
+      if (!direct ||
+          assigned is! Map<String, dynamic> ||
+          assigned['id'] != trip.id ||
+          assigned['driver_id'] != driverId ||
+          assigned['status'] != 'arriving' ||
+          _toNullableDouble(assigned['fare_amount']) != trip.fareAmount ||
+          proposal is! Map<String, dynamic> ||
+          proposal['status'] != 'accepted' ||
+          proposal['trip_id'] != trip.id ||
+          proposal['driver_id'] != driverId ||
+          amount != trip.fareAmount) {
+        throw Exception(
+          'El servidor no confirmó correctamente la aceptación del viaje. Actualiza las solicitudes.',
+        );
+      }
+      return trip.copyWith(
+        status: 'arriving',
+        myOfferAmount: amount,
+        myOfferStatus: 'accepted',
+      );
+    }
     if (proposal is! Map<String, dynamic> ||
         proposal['trip_id'] != trip.id ||
         proposal['driver_id'] != driverId ||
@@ -225,6 +256,11 @@ class DriverTripRepository {
         amount < 0) {
       throw Exception(
         'El servidor no confirmó una oferta pendiente. Actualiza las solicitudes y verifica la versión del servidor.',
+      );
+    }
+    if (counterFare == null || counterFare == trip.fareAmount) {
+      throw Exception(
+        'El servidor aún usa la aprobación del pasajero para aceptar el precio original. Actualiza el backend para habilitar la aceptación directa.',
       );
     }
     return trip.copyWith(myOfferAmount: amount, myOfferStatus: 'pending');
@@ -428,12 +464,19 @@ class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
     if (session.token.isEmpty || session.driverId.isEmpty) {
       throw Exception('Inicia sesión para enviar una oferta');
     }
-    await _repository.sendProposal(
+    // Keep the passenger's original price before any realtime acceptance arrives.
+    // The confirmation compares it with the server's final agreed fare.
+    await _cache.rememberRequestedFare(trip.id, trip.fareAmount);
+    final response = await _repository.sendProposal(
       token: session.token,
       driverId: session.driverId,
       trip: trip,
       counterFare: amount,
     );
+    if (response.myOfferStatus == 'accepted') {
+      state = AsyncData(response);
+      await _persistTrip();
+    }
     await ref.read(driverOffersProvider.notifier).loadOffers();
     await loadOffer();
   }

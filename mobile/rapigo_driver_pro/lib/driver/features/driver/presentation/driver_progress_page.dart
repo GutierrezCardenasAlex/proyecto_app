@@ -17,10 +17,20 @@ import '../home/driver_offer_preview_provider.dart';
 import '../navigation/navigation_service.dart' as trip_navigation;
 import '../../map/presentation/driver_map_surface.dart';
 import '../../trip/data/trip_repository.dart';
+import '../../trip/data/trip_state_cache.dart';
+import 'widgets/driver_journey_design.dart';
 import '../../trip/domain/driver_trip.dart';
 
 class DriverProgressPage extends ConsumerStatefulWidget {
-  const DriverProgressPage({super.key, required this.onClosed});
+  const DriverProgressPage({
+    super.key,
+    required this.onClosed,
+    this.showAcceptance = false,
+    this.acceptedOriginalFare = false,
+  });
+
+  final bool showAcceptance;
+  final bool acceptedOriginalFare;
 
   final VoidCallback onClosed;
 
@@ -31,6 +41,9 @@ class DriverProgressPage extends ConsumerStatefulWidget {
 class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
   static const _detailsExpandedPrefix = 'rapigo_driver_progress_details_v1_';
   bool _detailsExpanded = false;
+  late bool _showAcceptance;
+  bool _acknowledging = false;
+  bool _updatingStatus = false;
   bool _didNotifyClosed = false;
   bool _isClosingToHome = false;
   bool _homePopScheduled = false;
@@ -50,6 +63,7 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
   @override
   void initState() {
     super.initState();
+    _showAcceptance = widget.showAcceptance;
     unawaited(_restoreNavigationPreference());
   }
 
@@ -655,11 +669,13 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
   }
 
   Future<void> _handlePrimaryAction(DriverTrip trip) async {
+    if (_updatingStatus) return;
     if (trip.status == 'completed') {
       await _closeSummaryAndReturnHome();
       return;
     }
 
+    setState(() => _updatingStatus = true);
     try {
       if (trip.status == 'accepted') {
         final openedNavigation = await _openNavigationForTrip(trip);
@@ -719,6 +735,8 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
           tone: NoticeTone.error,
         );
       }
+    } finally {
+      if (mounted) setState(() => _updatingStatus = false);
     }
   }
 
@@ -880,6 +898,33 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
       );
     }
 
+    if (_showAcceptance &&
+        const {'accepted', 'arriving'}.contains(trip.status)) {
+      return DriverAcceptedView(
+        trip: trip,
+        acceptedOriginalFare: widget.acceptedOriginalFare,
+        busy: _acknowledging,
+        onContinue: () async {
+          if (_acknowledging) return;
+          setState(() => _acknowledging = true);
+          try {
+            await DriverTripStateCache().acknowledgeAcceptance(trip.id);
+            if (mounted) setState(() => _showAcceptance = false);
+          } catch (_) {
+            if (context.mounted) {
+              showTopNotice(
+                context,
+                'No se pudo guardar la confirmación. Intenta nuevamente.',
+                tone: NoticeTone.error,
+              );
+            }
+          } finally {
+            if (mounted) setState(() => _acknowledging = false);
+          }
+        },
+      );
+    }
+
     final routeColor =
         trip.status == 'in_progress' || trip.status == 'completed'
         ? const Color(0xFF0EA5E9)
@@ -896,7 +941,9 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
     final destinationDistance =
         trip.destinationLat != null && trip.destinationLng != null
         ? _distanceMeters(
-            LatLng(trip.pickupLat, trip.pickupLng),
+            trip.status == 'in_progress'
+                ? LatLng(driverLat, driverLng)
+                : LatLng(trip.pickupLat, trip.pickupLng),
             LatLng(trip.destinationLat!, trip.destinationLng!),
           )
         : 0.0;
@@ -981,7 +1028,7 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
                     _DriverTripFlowPanel(
                       trip: trip,
                       driverPoint: LatLng(driverLat, driverLng),
-                      onPrimary: tripAsync.isLoading
+                      onPrimary: (_updatingStatus || tripAsync.isLoading)
                           ? null
                           : () => _handlePrimaryAction(trip),
                       onSecondary: _canCancelTrip(trip)
@@ -1058,7 +1105,7 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
       },
       child: Scaffold(
         backgroundColor: const Color(0xFF040B17),
-        body: Stack(
+        body: DriverJourneyCanvas(
           children: [
             Positioned.fill(
               child: showInternalNavigationMap
@@ -1203,33 +1250,36 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
                   ),
                 ),
               ),
-            SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-                child: Column(
-                  children: [
-                    _DriverNavigationHeader(
-                      distanceLabel: navigationDistanceLabel,
-                      title: navigationTitle,
-                      subtitle: navigationSubtitle,
-                      pickupStage: isPickupStage,
-                    ),
-                    const Spacer(),
-                  ],
+            Positioned(
+              top: 0,
+              left: 12,
+              right: 12,
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: DriverJourneyHeader(
+                    trip: trip,
+                    distanceLabel: navigationDistanceLabel,
+                    title: navigationTitle,
+                    subtitle: navigationSubtitle,
+                    pickupStage: isPickupStage,
+                  ),
                 ),
               ),
             ),
-            if (showCompactPanel) ...[
+            if (showCompactPanel && !showDetailsModal) ...[
               Positioned(
                 left: 20,
                 right: 20,
                 bottom: 16,
                 child: SafeArea(
                   top: false,
-                  child: _DriverNavigationCompactDrawer(
+                  child: DriverJourneyPanel(
                     key: ValueKey('compact-${trip.status}'),
                     trip: trip,
-                    statusLabel: available ? 'Conectado' : 'Desconectado',
+                    onCall: () => _callPassenger(trip),
+                    onChat: () => _openPassengerWhatsApp(trip),
                     etaLabel: navigationEtaLabel,
                     distanceLabel: navigationDistanceLabel,
                     detailsExpanded: showDetailsModal,
@@ -1240,7 +1290,8 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
                       unawaited(_persistDetailsExpanded(trip.id, nextValue));
                     },
                     onPrimary:
-                        (tripAsync.isLoading ||
+                        (_updatingStatus ||
+                            tripAsync.isLoading ||
                             (showInternalNavigationMap && _isPreparingRoute))
                         ? null
                         : () => _handlePrimaryAction(trip),
@@ -1251,9 +1302,9 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
             Positioned(
               left: 20,
               right: 20,
-              bottom: showSummaryOnly || !showInternalNavigationMap ? 16 : 132,
+              top: 12,
+              bottom: 12,
               child: SafeArea(
-                top: false,
                 child: IgnorePointer(
                   ignoring: !showDetailsModal,
                   child: AnimatedSlide(
@@ -1265,66 +1316,86 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
                     child: AnimatedOpacity(
                       duration: const Duration(milliseconds: 220),
                       opacity: showDetailsModal ? 1 : 0,
-                      child: _DriverTripFlowPanel(
-                        trip: trip,
-                        driverPoint: LatLng(driverLat, driverLng),
-                        onPrimary: tripAsync.isLoading
-                            ? null
-                            : () => _handlePrimaryAction(trip),
-                        onSecondary: _canCancelTrip(trip)
-                            ? () => _cancelTrip(trip)
-                            : null,
-                        onCall: () => _callPassenger(trip),
-                        onChat: () => _openPassengerWhatsApp(trip),
-                        onMore: () => _openPassengerActions(trip),
-                        pickupDistanceLabel: _formatDistance(pickupDistance),
-                        pickupEtaLabel: _formatEtaFromMeters(pickupDistance),
-                        destinationDistanceLabel:
-                            trip.destinationLat != null &&
-                                trip.destinationLng != null
-                            ? _formatDistance(destinationDistance)
-                            : '--',
-                        destinationEtaLabel:
-                            trip.destinationLat != null &&
-                                trip.destinationLng != null
-                            ? _formatEtaFromMeters(destinationDistance)
-                            : '--',
-                        totalDistanceLabel:
-                            trip.destinationLat != null &&
-                                trip.destinationLng != null
-                            ? _formatDistance(
-                                _distanceMeters(
-                                  LatLng(trip.pickupLat, trip.pickupLng),
-                                  LatLng(
-                                    trip.destinationLat!,
-                                    trip.destinationLng!,
-                                  ),
-                                ),
-                              )
-                            : '--',
-                        totalDurationLabel: _formatTripDuration(trip),
-                        pickupTitle: _primaryAddress(trip.passengerPickup),
-                        pickupSubtitle: _secondaryAddress(trip.passengerPickup),
-                        destinationTitle: _primaryAddress(trip.destination),
-                        destinationSubtitle: _secondaryAddress(
-                          trip.destination,
+                      child: Material(
+                        color: const Color(0xFF0D1828),
+                        borderRadius: BorderRadius.circular(24),
+                        clipBehavior: Clip.antiAlias,
+                        child: SizedBox.expand(
+                          child: SingleChildScrollView(
+                            child: _DriverTripFlowPanel(
+                              trip: trip,
+                              driverPoint: LatLng(driverLat, driverLng),
+                              onPrimary:
+                                  (_updatingStatus || tripAsync.isLoading)
+                                  ? null
+                                  : () => _handlePrimaryAction(trip),
+                              onSecondary: _canCancelTrip(trip)
+                                  ? () => _cancelTrip(trip)
+                                  : null,
+                              onCall: () => _callPassenger(trip),
+                              onChat: () => _openPassengerWhatsApp(trip),
+                              onMore: () => _openPassengerActions(trip),
+                              pickupDistanceLabel: _formatDistance(
+                                pickupDistance,
+                              ),
+                              pickupEtaLabel: _formatEtaFromMeters(
+                                pickupDistance,
+                              ),
+                              destinationDistanceLabel:
+                                  trip.destinationLat != null &&
+                                      trip.destinationLng != null
+                                  ? _formatDistance(destinationDistance)
+                                  : '--',
+                              destinationEtaLabel:
+                                  trip.destinationLat != null &&
+                                      trip.destinationLng != null
+                                  ? _formatEtaFromMeters(destinationDistance)
+                                  : '--',
+                              totalDistanceLabel:
+                                  trip.destinationLat != null &&
+                                      trip.destinationLng != null
+                                  ? _formatDistance(
+                                      _distanceMeters(
+                                        LatLng(trip.pickupLat, trip.pickupLng),
+                                        LatLng(
+                                          trip.destinationLat!,
+                                          trip.destinationLng!,
+                                        ),
+                                      ),
+                                    )
+                                  : '--',
+                              totalDurationLabel: _formatTripDuration(trip),
+                              pickupTitle: _primaryAddress(
+                                trip.passengerPickup,
+                              ),
+                              pickupSubtitle: _secondaryAddress(
+                                trip.passengerPickup,
+                              ),
+                              destinationTitle: _primaryAddress(
+                                trip.destination,
+                              ),
+                              destinationSubtitle: _secondaryAddress(
+                                trip.destination,
+                              ),
+                              pickupClockLabel: _formatClock(
+                                _parseTripDate(trip.requestedAt),
+                              ),
+                              onCloseSummary: trip.status == 'completed'
+                                  ? _closeSummaryAndReturnHome
+                                  : null,
+                              onCollapse:
+                                  trip.status == 'completed' ||
+                                      !showInternalNavigationMap
+                                  ? null
+                                  : () {
+                                      setState(() => _detailsExpanded = false);
+                                      unawaited(
+                                        _persistDetailsExpanded(trip.id, false),
+                                      );
+                                    },
+                            ),
+                          ),
                         ),
-                        pickupClockLabel: _formatClock(
-                          _parseTripDate(trip.requestedAt),
-                        ),
-                        onCloseSummary: trip.status == 'completed'
-                            ? _closeSummaryAndReturnHome
-                            : null,
-                        onCollapse:
-                            trip.status == 'completed' ||
-                                !showInternalNavigationMap
-                            ? null
-                            : () {
-                                setState(() => _detailsExpanded = false);
-                                unawaited(
-                                  _persistDetailsExpanded(trip.id, false),
-                                );
-                              },
                       ),
                     ),
                   ),
@@ -1589,265 +1660,6 @@ class _ExternalNavigationStreetLine extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _DriverNavigationHeader extends StatelessWidget {
-  const _DriverNavigationHeader({
-    required this.distanceLabel,
-    required this.title,
-    required this.subtitle,
-    required this.pickupStage,
-  });
-
-  final String distanceLabel;
-  final String title;
-  final String subtitle;
-  final bool pickupStage;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.rapigoPalette;
-    final textTheme = Theme.of(context).textTheme;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
-      decoration: BoxDecoration(
-        color: palette.surfacePrimary.withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: palette.outlineSoft),
-        boxShadow: [
-          BoxShadow(
-            color: palette.shadowSoft,
-            blurRadius: 22,
-            offset: Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Icon(
-              pickupStage ? Icons.turn_left_rounded : Icons.flag_circle_rounded,
-              color: Colors.white,
-              size: 54,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  distanceLabel,
-                  style: textTheme.headlineSmall?.copyWith(
-                    color: palette.textPrimary,
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                    height: 1,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.titleLarge?.copyWith(
-                    color: palette.accentBlueSoft,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
-                    height: 1.08,
-                  ),
-                ),
-                if (subtitle.trim().isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: palette.textSecondary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DriverNavigationCompactDrawer extends StatelessWidget {
-  const _DriverNavigationCompactDrawer({
-    super.key,
-    required this.trip,
-    required this.statusLabel,
-    required this.etaLabel,
-    required this.distanceLabel,
-    required this.detailsExpanded,
-    required this.onNavigate,
-    required this.onExpand,
-    required this.onPrimary,
-  });
-
-  final DriverTrip trip;
-  final String statusLabel;
-  final String etaLabel;
-  final String distanceLabel;
-  final bool detailsExpanded;
-  final VoidCallback onNavigate;
-  final VoidCallback onExpand;
-  final VoidCallback? onPrimary;
-
-  bool get _isAccepted => trip.status == 'accepted';
-  bool get _isArriving => trip.status == 'arriving';
-  bool get _isAtPickup => trip.status == 'at_pickup';
-  bool get _isInProgress => trip.status == 'in_progress';
-
-  String get _primaryLabel {
-    if (_isAccepted) return 'IR AHORA';
-    if (_isArriving) return 'CONFIRMAR LLEGADA';
-    if (_isAtPickup) return 'INICIAR VIAJE';
-    if (_isInProgress) return 'FINALIZAR VIAJE';
-    return 'CONTINUAR';
-  }
-
-  Color get _primaryColor {
-    if (_isAtPickup || _isInProgress) return const Color(0xFF22C55E);
-    return const Color(0xFF38BDF8);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.rapigoPalette;
-    final metrics = context.rapigoMetrics;
-    final textTheme = Theme.of(context).textTheme;
-    return Material(
-      color: palette.surfacePrimary.withValues(alpha: 0.96),
-      borderRadius: BorderRadius.circular(metrics.radiusLarge),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(metrics.radiusLarge),
-          border: Border.all(color: palette.outlineSoft),
-          boxShadow: [
-            BoxShadow(
-              color: palette.shadowSoft,
-              blurRadius: 26,
-              offset: Offset(0, 14),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 64,
-              height: 6,
-              decoration: BoxDecoration(
-                color: palette.textMuted.withValues(alpha: 0.72),
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                _CompactRoundButton(
-                  icon: detailsExpanded
-                      ? Icons.close_rounded
-                      : Icons.menu_rounded,
-                  onTap: onExpand,
-                ),
-                Expanded(
-                  child: Column(
-                    children: [
-                      Text(
-                        etaLabel,
-                        style: textTheme.headlineSmall?.copyWith(
-                          color: palette.textPrimary,
-                          fontSize: 28,
-                          fontWeight: FontWeight.w900,
-                          height: 1,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '$distanceLabel • $statusLabel',
-                        style: textTheme.bodyLarge?.copyWith(
-                          color: palette.textSecondary,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                _CompactRoundButton(
-                  icon: Icons.navigation_rounded,
-                  onTap: onNavigate,
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: onPrimary,
-                style: FilledButton.styleFrom(
-                  backgroundColor: _primaryColor,
-                  foregroundColor: _isAccepted || _isArriving
-                      ? const Color(0xFF031018)
-                      : Colors.white,
-                  minimumSize: const Size.fromHeight(58),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
-                child: Text(
-                  _primaryLabel,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 17,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CompactRoundButton extends StatelessWidget {
-  const _CompactRoundButton({required this.icon, this.onTap});
-
-  final IconData icon;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.rapigoPalette;
-    return Material(
-      color: palette.surfaceSecondary,
-      borderRadius: BorderRadius.circular(24),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(24),
-        onTap: onTap,
-        child: SizedBox(
-          width: 58,
-          height: 58,
-          child: Icon(icon, color: palette.textPrimary, size: 28),
-        ),
-      ),
     );
   }
 }
