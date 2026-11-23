@@ -56,6 +56,7 @@ class AppUpdateService {
   }
 
   Future<AppUpdateManifest?> fetchLatestManifest() async {
+    if (const bool.fromEnvironment('PLAY_STORE')) return null;
     for (final uri in _manifestCandidates()) {
       try {
         final response = await _client
@@ -142,6 +143,9 @@ class AppUpdateService {
     required String packageName,
     void Function(double progress)? onProgress,
   }) async {
+    if (const bool.fromEnvironment('PLAY_STORE')) {
+      throw StateError('Las actualizaciones de esta edición se gestionan con Google Play.');
+    }
     final request = http.Request('GET', Uri.parse(manifest.apkUrl));
     final response = await _client.send(request);
     if (response.statusCode != 200) {

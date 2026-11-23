@@ -1,0 +1,13 @@
+{
+  "SERVER_SCHEME": "https",
+  "SERVER_HOST": "",
+  "GATEWAY_PORT": "443",
+  "WEBSOCKET_SCHEME": "wss",
+  "WEBSOCKET_PORT": "443",
+  "ROUTING_SCHEME": "https",
+  "ROUTING_HOST": "",
+  "ROUTING_PORT": "443",
+  "ROUTING_PATH": "/route/v1/driving",
+  "PRIVACY_POLICY_URL": "",
+  "ACCOUNT_DELETION_URL": ""
+}

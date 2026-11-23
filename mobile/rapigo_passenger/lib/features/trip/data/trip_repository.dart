@@ -211,7 +211,7 @@ class TripRepository {
         distanceMeters: distanceMeters,
         rating: _toDouble(
           dispatchDriver['rating'] ?? live['rating'],
-          fallback: 5,
+          fallback: 0,
         ),
         etaMinutes:
             (dispatchDriver['eta_minutes'] as num?)?.toInt() ??

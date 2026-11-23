@@ -168,8 +168,11 @@ class _DriverShellState extends ConsumerState<DriverShell> {
               }
             },
             child: Scaffold(
-              backgroundColor: const Color(0xFF08111F),
-              extendBody: true,
+              backgroundColor: context.rapigoPalette.backgroundBase,
+              bottomNavigationBar: DriverBottomNav(
+                currentIndex: _selectedIndex,
+                onTap: _openTab,
+              ),
               body: Stack(
                 children: [
                   IndexedStack(index: _selectedIndex, children: pages),

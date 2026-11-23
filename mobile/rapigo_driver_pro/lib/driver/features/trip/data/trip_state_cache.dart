@@ -181,6 +181,7 @@ class DriverTripStateCache {
       'counterOfferAmount': trip.counterOfferAmount,
       'counterOfferStatus': trip.counterOfferStatus,
       'requestedAt': trip.requestedAt,
+      'completedAt': trip.completedAt,
       'vehicleType': trip.vehicleType,
       'vehicleLabel': trip.vehicleLabel,
       'vehiclePlate': trip.vehiclePlate,
@@ -214,6 +215,7 @@ class DriverTripStateCache {
       ),
       counterOfferStatus: payload['counterOfferStatus']?.toString(),
       requestedAt: payload['requestedAt']?.toString(),
+      completedAt: payload['completedAt']?.toString(),
       vehicleType: payload['vehicleType']?.toString(),
       vehicleLabel: payload['vehicleLabel']?.toString(),
       vehiclePlate: payload['vehiclePlate']?.toString(),
@@ -261,6 +263,7 @@ class DriverTripStateCache {
       _ => 'offer',
     };
     final restoreProgressPage = const {
+      'completed',
       'accepted',
       'arriving',
       'at_pickup',

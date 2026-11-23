@@ -1,3 +1,4 @@
+const { registerSubscriptions } = require('./subscriptions');
 const Fastify = require("fastify");
 const cors = require("@fastify/cors");
 const jwt = require("@fastify/jwt");
@@ -394,6 +395,7 @@ async function bootstrap() {
   });
   await app.register(jwt, { secret: process.env.JWT_SECRET || "super-secret" });
   await ensureAdminSchema();
+  await registerSubscriptions(app, { pool, ensureAdmin, ensureUser });
 
   app.get("/health", async () => ({ status: "ok", service: "admin-service" }));
 

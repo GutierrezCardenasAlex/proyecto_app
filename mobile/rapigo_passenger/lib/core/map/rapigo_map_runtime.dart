@@ -102,7 +102,7 @@ final potosiCityPack = RapigoOfflineCityPack(
 RapigoMapEngine _resolveEngine() {
   const raw = String.fromEnvironment(
     'RAPIGO_MAP_ENGINE',
-    defaultValue: 'maplibre',
+    defaultValue: 'raster',
   );
   switch (raw.trim().toLowerCase()) {
     case 'maplibre':

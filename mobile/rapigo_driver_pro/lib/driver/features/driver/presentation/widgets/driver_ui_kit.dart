@@ -31,7 +31,7 @@ class DriverPageShell extends StatelessWidget {
           metrics.pagePadding,
           metrics.sectionGap,
           metrics.pagePadding,
-          metrics.pagePadding + 96,
+          metrics.pagePadding + 24,
         ),
         children: [
           Row(
@@ -99,23 +99,8 @@ class DriverEmptyCard extends StatelessWidget {
     return Container(
       padding: EdgeInsets.all(metrics.pagePadding),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            palette.surfacePrimary,
-            palette.surfaceSecondary,
-          ],
-        ),
+        color: palette.surfacePrimary,
         borderRadius: BorderRadius.circular(metrics.radiusLarge),
-        border: Border.all(color: palette.outlineStrong),
-        boxShadow: [
-          BoxShadow(
-            color: palette.shadowSoft,
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -166,7 +151,7 @@ class DriverMenuTile extends StatelessWidget {
       color: palette.surfacePrimary,
       borderRadius: BorderRadius.circular(metrics.radiusLarge),
       shadowColor: palette.shadowSoft,
-      elevation: 1,
+      elevation: 0,
       child: InkWell(
         borderRadius: BorderRadius.circular(metrics.radiusLarge),
         onTap: onTap,
@@ -175,12 +160,11 @@ class DriverMenuTile extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: 52,
-                height: 52,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
                   color: palette.accentBlue.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(metrics.radiusSmall),
-                  border: Border.all(color: palette.accentBlue.withValues(alpha: 0.28)),
                 ),
                 child: Icon(icon, color: palette.accentYellow),
               ),

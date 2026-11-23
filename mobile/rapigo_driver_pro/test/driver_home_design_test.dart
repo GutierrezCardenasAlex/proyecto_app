@@ -3,6 +3,34 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:rapigo_driver_pro/driver/features/driver/presentation/widgets/driver_home_design.dart';
 
 void main() {
+  testWidgets('reconnection is legible and updating blocks duplicate toggles', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    var toggles = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.linear(1.5)),
+            child: DriverHomeHeader(
+              available: true,
+              updating: true,
+              statusLabel: 'Reconectando con la central',
+              onMenuTap: () {},
+              onAvailabilityTap: () => toggles++,
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.text('Reconectando con la central'));
+    expect(toggles, 0);
+  });
   testWidgets('availability and menu remain usable on a narrow screen', (
     tester,
   ) async {

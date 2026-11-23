@@ -1,3 +1,4 @@
+import '../../../../core/privacy/privacy_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -113,6 +114,12 @@ class ProfileHubPage extends ConsumerWidget {
                         title: 'Configuración',
                         subtitle: 'Preferencias de la aplicación',
                         onTap: () => _openPage(context, const SettingsPage()),
+                      ),
+                      _AccountMenuTile(
+                        icon: Icons.privacy_tip_outlined,
+                        title: 'Privacidad y cuenta',
+                        subtitle: 'Tus datos y solicitud de eliminación',
+                        onTap: () => _openPage(context, PrivacyPage(token: session.token, onOpenSupport: () => _openPage(context, const SupportPage()))),
                       ),
                       _AccountMenuTile(
                         icon: Icons.support_agent_rounded,

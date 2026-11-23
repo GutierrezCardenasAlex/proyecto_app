@@ -28,7 +28,7 @@ const realNameSchema = z
   .min(2)
   .refine(isRealPersonName, "Ingresa un nombre real, no generico.");
 const smsProvider = (process.env.SMS_PROVIDER || "").toLowerCase();
-const exposeOtpInResponse = String(process.env.AUTH_EXPOSE_OTP || "true").toLowerCase() === "true";
+const exposeOtpInResponse = process.env.NODE_ENV !== "production" && String(process.env.AUTH_EXPOSE_OTP || "false").toLowerCase() === "true";
 const defaultAdminPhone = process.env.ADMIN_DEFAULT_PHONE || "+59170000001";
 const defaultAdminUsername = (process.env.ADMIN_DEFAULT_USERNAME || "centralrapigo").trim().toLowerCase();
 const defaultAdminPasswordHash =
@@ -162,7 +162,7 @@ async function sendOtpSms({ phone, otp, contextLabel }) {
   const body = new URLSearchParams({
     To: phone,
     From: from,
-    Body: `Taxi Ya: tu codigo de verificacion es ${otp}. No lo compartas con nadie.`,
+    Body: `RAPIGO: tu codigo de verificacion es ${otp}. No lo compartas con nadie.`,
   });
 
   const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
@@ -472,6 +472,15 @@ function roleLabel(role) {
 }
 
 async function bootstrap() {
+  if (process.env.NODE_ENV === "production") {
+    const required = ["JWT_SECRET", "ADMIN_DEFAULT_PASSWORD_HASH", "SUPERADMIN_ACCESS_KEY", "MONITOR_PASSWORD",
+      "SMS_TWILIO_ACCOUNT_SID", "SMS_TWILIO_AUTH_TOKEN", "SMS_TWILIO_FROM"];
+    if (required.some((name) => !process.env[name]) || smsProvider !== "twilio" ||
+        process.env.JWT_SECRET === "super-secret" || process.env.SUPERADMIN_ACCESS_KEY === "superAdmin" ||
+        process.env.MONITOR_PASSWORD === "Monitoreo2026") {
+      throw new Error("Production requires private authentication secrets and a configured SMS provider.");
+    }
+  }
   await app.register(cors, {
     origin: true,
     credentials: true,

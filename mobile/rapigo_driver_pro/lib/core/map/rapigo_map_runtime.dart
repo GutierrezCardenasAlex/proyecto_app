@@ -4,14 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config/app_config.dart';
 
-enum RapigoMapEngine {
-  flutterMapRaster,
-  mapLibreVector,
-}
+enum RapigoMapEngine { flutterMapRaster, mapLibreVector }
 
-enum RapigoMapThemeMode {
-  lightProfessional,
-}
+enum RapigoMapThemeMode { lightProfessional }
 
 @immutable
 class RapigoMapStyleManifest {
@@ -104,26 +99,14 @@ final potosiCityPack = RapigoOfflineCityPack(
   mbtilesAssetPath: 'assets/maps/potosi.mbtiles',
 );
 
-RapigoMapEngine _resolveEngine() {
-  const raw = String.fromEnvironment('RAPIGO_MAP_ENGINE', defaultValue: 'maplibre');
-  switch (raw.trim().toLowerCase()) {
-    case 'maplibre':
-    case 'maplibre_gl':
-    case 'vector':
-      return RapigoMapEngine.mapLibreVector;
-    default:
-      return RapigoMapEngine.flutterMapRaster;
-  }
-}
-
 final rapigoMapRuntimeProvider = Provider<RapigoMapRuntimeConfig>((ref) {
   return RapigoMapRuntimeConfig(
-    engine: _resolveEngine(),
+    engine: RapigoMapEngine.flutterMapRaster,
     themeMode: RapigoMapThemeMode.lightProfessional,
     style: rapigoLightStyle,
     cityPack: potosiCityPack,
     enableRotationSmoothing: true,
     enableGlowMarkers: true,
-    enableFutureVectorBridge: true,
+    enableFutureVectorBridge: false,
   );
 });

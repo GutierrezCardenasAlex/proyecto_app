@@ -32,12 +32,11 @@ class AppConfig {
   );
   static const mapTilesUrlTemplate = String.fromEnvironment(
     'MAP_TILES_URL_TEMPLATE',
-    defaultValue:
-        'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
+    defaultValue: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
   );
   static const mapTilesAttribution = String.fromEnvironment(
     'MAP_TILES_ATTRIBUTION',
-    defaultValue: '© OpenStreetMap contributors © CARTO Voyager',
+    defaultValue: '© OpenStreetMap contributors',
   );
   static const mapOfflineTilesUrlTemplate = String.fromEnvironment(
     'MAP_OFFLINE_TILES_URL_TEMPLATE',

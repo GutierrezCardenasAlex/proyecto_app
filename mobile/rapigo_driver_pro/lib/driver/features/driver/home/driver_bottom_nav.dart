@@ -12,90 +12,54 @@ class DriverBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const items = [
-      (Icons.home_rounded, 'Inicio'),
-      (Icons.bar_chart_rounded, 'Estad.'),
-      (Icons.local_taxi_rounded, 'Viajes'),
-      (Icons.inventory_2_rounded, 'Pedidos'),
-      (Icons.person_rounded, 'Perfil'),
-    ];
-
-    return SafeArea(
-      top: false,
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 8),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF081120), Color(0xFF020617)],
-          ),
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: const Color(0xFF1A3A66)),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF0F6CBD).withValues(alpha: 0.18),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Row(
-          children: List.generate(items.length, (index) {
-            final item = items[index];
-            final selected = index == currentIndex;
-            return Expanded(
-              child: InkWell(
-                borderRadius: BorderRadius.circular(22),
-                onTap: () => onTap(index),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        curve: Curves.easeOut,
-                        padding: const EdgeInsets.all(7),
-                        decoration: BoxDecoration(
-                          color: selected
-                              ? const Color(0x22FACC15)
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: selected
-                                ? const Color(0x66FACC15)
-                                : Colors.transparent,
-                          ),
-                        ),
-                        child: Icon(
-                          item.$1,
-                          color: selected
-                              ? const Color(0xFFFACC15)
-                              : const Color(0xFFE2E8F0),
-                          size: 21,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        item.$2,
-                        style: GoogleFonts.plusJakartaSans(
-                          color: selected
-                              ? const Color(0xFFFACC15)
-                              : const Color(0xFFDCE6F2),
-                          fontSize: 10.5,
-                          fontWeight: selected
-                              ? FontWeight.w800
-                              : FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+    final palette = context.rapigoPalette;
+    // Keep the existing shell indices and persisted navigation destinations.
+    const destinations = [0, 2, 3, 4];
+    final selected = destinations.indexOf(currentIndex);
+    return Material(
+      color: palette.backgroundBase,
+      child: SafeArea(
+        top: false,
+        child: NavigationBarTheme(
+          data: NavigationBarTheme.of(context).copyWith(
+            iconTheme: WidgetStateProperty.resolveWith(
+              (states) => IconThemeData(
+                color: states.contains(WidgetState.selected)
+                    ? palette.accentYellow
+                    : palette.textMuted,
+                size: 24,
               ),
-            );
-          }),
+            ),
+          ),
+          child: NavigationBar(
+            height: 72,
+            backgroundColor: palette.backgroundBase,
+            indicatorColor: palette.accentYellow.withValues(alpha: 0.12),
+            selectedIndex: selected < 0 ? 3 : selected,
+            onDestinationSelected: (index) => onTap(destinations[index]),
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.explore_outlined),
+                selectedIcon: Icon(Icons.explore),
+                label: 'Inicio',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.route_outlined),
+                selectedIcon: Icon(Icons.route),
+                label: 'Viajes',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.inventory_2_outlined),
+                selectedIcon: Icon(Icons.inventory_2),
+                label: 'Pedidos',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.person_outline),
+                selectedIcon: Icon(Icons.person),
+                label: 'Perfil',
+              ),
+            ],
+          ),
         ),
       ),
     );

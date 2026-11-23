@@ -96,7 +96,7 @@ function registerDriverOfferRoutes(app, { pool, requireTripAccess, emitRealtime,
   });
 }
 async function loadPassengerOffers(pool, tripId) {
-    const result = await pool.query(`SELECT o.*, u.full_name AS driver_name, d.rating,
+    const result = await pool.query(`SELECT o.*, u.full_name AS driver_name, (SELECT ROUND(AVG(r.score)::numeric, 2) FROM trip_ratings r WHERE r.to_driver_id = d.id) AS rating,
         v.vehicle_type, v.brand, v.model, v.plate, v.color
       FROM trip_driver_offers o
       JOIN trips t ON t.id = o.trip_id

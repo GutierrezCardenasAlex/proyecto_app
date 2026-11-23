@@ -1189,6 +1189,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      showDragHandle: true,
       builder: (context) {
         return SafeArea(
           top: false,
@@ -1209,8 +1210,8 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Container(
-                          width: 76,
-                          height: 76,
+                          width: 56,
+                          height: 56,
                           decoration: BoxDecoration(
                             color: const Color(0xFFF1F5F9),
                             borderRadius: BorderRadius.circular(24),
@@ -1230,7 +1231,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                                 Text(
                                   'Hola, $firstName',
                                   style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 30,
+                                    fontSize: 23,
                                     fontWeight: FontWeight.w800,
                                     color: const Color(0xFF0F172A),
                                   ),
@@ -1260,7 +1261,8 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                         ),
                         IconButton(
                           onPressed: () => Navigator.of(context).pop(),
-                          icon: const Icon(Icons.close_rounded, size: 34),
+                          tooltip: 'Cerrar menú',
+                          icon: const Icon(Icons.close_rounded, size: 24),
                           color: const Color(0xFF4B5563),
                         ),
                       ],
@@ -1274,7 +1276,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Navegador',
+                              'Tu actividad',
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w800,
@@ -1288,7 +1290,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                               children: [
                                 _HomeNavigatorCard(
                                   icon: Icons.bar_chart_rounded,
-                                  label: 'Estadistica',
+                                  label: 'Estadísticas',
                                   accent: const Color(0xFF1D4ED8),
                                   onTap: () {
                                     Navigator.of(context).pop();
@@ -1351,7 +1353,7 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                             ),
                             _HomeQuickActionTile(
                               icon: Icons.settings_outlined,
-                              label: 'Ajustes',
+                              label: 'Configuraciones',
                               onTap: () {
                                 Navigator.of(context).pop();
                                 Navigator.of(this.context).push(
@@ -1705,25 +1707,6 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
             ),
           ),
         ),
-        Positioned.fill(
-          child: IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    const Color(0xFFFFFFFF).withValues(alpha: 0.10),
-                    Colors.transparent,
-                    Colors.transparent,
-                    const Color(0xFFFFFFFF).withValues(alpha: 0.12),
-                  ],
-                  stops: const [0, 0.20, 0.62, 1],
-                ),
-              ),
-            ),
-          ),
-        ),
         if (incomingOverlayTrip == null)
           SafeArea(
             child: Padding(
@@ -1741,6 +1724,16 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                     top: 0,
                     child: DriverHomeHeader(
                       available: available,
+                      updating: ref.watch(driverStateProvider).isUpdatingAvailability,
+                      statusLabel: ref.watch(driverStateProvider).isUpdatingAvailability
+                          ? 'Actualizando…'
+                          : !ref.watch(driverConnectionProvider)
+                          ? 'Reconectando con la central'
+                          : trip != null && const {'accepted', 'arriving', 'at_pickup', 'in_progress'}.contains(trip.status)
+                          ? 'En viaje'
+                          : available && ref.watch(driverStateProvider).errorMessage != null
+                          ? 'Revisa ubicación o conexión'
+                          : null,
                       onMenuTap: () => _openHomeQuickSheet(
                         available: available,
                         fullName: session.fullName,
@@ -1748,6 +1741,8 @@ class _DriverDashboardState extends ConsumerState<_DriverDashboard>
                         offersAsync: offersAsync,
                       ),
                       onAvailabilityTap: () async {
+                        if (!available && !await LocationConsent.request(context, driver: true)) return;
+                        if (!mounted) return;
                         await ref
                             .read(driverStateProvider.notifier)
                             .toggleAvailability(!available);
@@ -1938,24 +1933,25 @@ class _HomeQuickActionTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
-        color: Colors.transparent,
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(18),
         child: InkWell(
           borderRadius: BorderRadius.circular(22),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
             child: Row(
               children: [
                 SizedBox(
                   width: 44,
-                  child: Icon(icon, size: 30, color: const Color(0xFF111111)),
+                  child: Icon(icon, size: 24, color: const Color(0xFF334155)),
                 ),
-                const SizedBox(width: 18),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     label,
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: 18,
+                      fontSize: 15,
                       fontWeight: FontWeight.w700,
                       color: const Color(0xFF111111),
                     ),
@@ -1986,7 +1982,7 @@ class _HomeNavigatorCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: (MediaQuery.sizeOf(context).width - 60) / 2,
+      width: double.infinity,
       child: Material(
         color: Colors.transparent,
         child: InkWell(

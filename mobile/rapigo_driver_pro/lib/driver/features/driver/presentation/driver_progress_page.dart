@@ -19,6 +19,7 @@ import '../../map/presentation/driver_map_surface.dart';
 import '../../trip/data/trip_repository.dart';
 import '../../trip/data/trip_state_cache.dart';
 import 'widgets/driver_journey_design.dart';
+import 'widgets/driver_trip_details.dart';
 import '../../trip/domain/driver_trip.dart';
 
 class DriverProgressPage extends ConsumerStatefulWidget {
@@ -745,6 +746,7 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
   }
 
   Future<void> _closeSummaryAndReturnHome() async {
+    if (_isClosingToHome) return;
     final tripId = ref.read(offeredTripProvider).value?.id;
     if (mounted) {
       setState(() {
@@ -774,14 +776,7 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
     await ref.read(driverOffersProvider.notifier).clearOffers();
     await ref.read(offeredTripProvider.notifier).clearTrip();
     _refreshHomeStateAfterClose();
-    await Future<void>.delayed(const Duration(seconds: 3));
-    if (!mounted || _homePopScheduled) {
-      return;
-    }
-    setState(() {
-      _closingMessage = 'Viaje completado correctamente';
-      _showHomeReturnButton = true;
-    });
+    await _returnToHome();
   }
 
   @override
@@ -922,6 +917,21 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
             if (mounted) setState(() => _acknowledging = false);
           }
         },
+      );
+    }
+
+    if (trip.status == 'completed' ||
+        (_detailsExpanded && !showInternalNavigationMap)) {
+      return DriverTripDetailsView(
+        trip: trip,
+        vehicleType: session.vehicleType,
+        completed: trip.status == 'completed',
+        onClose: trip.status == 'completed'
+            ? _closeSummaryAndReturnHome
+            : () {
+                setState(() => _detailsExpanded = false);
+                unawaited(_persistDetailsExpanded(trip.id, false));
+              },
       );
     }
 
@@ -1299,109 +1309,17 @@ class _DriverProgressPageState extends ConsumerState<DriverProgressPage> {
                 ),
               ),
             ],
-            Positioned(
-              left: 20,
-              right: 20,
-              top: 12,
-              bottom: 12,
-              child: SafeArea(
-                child: IgnorePointer(
-                  ignoring: !showDetailsModal,
-                  child: AnimatedSlide(
-                    duration: const Duration(milliseconds: 260),
-                    curve: Curves.easeOutCubic,
-                    offset: showDetailsModal
-                        ? Offset.zero
-                        : Offset(0, showSummaryOnly ? 0.18 : 0.12),
-                    child: AnimatedOpacity(
-                      duration: const Duration(milliseconds: 220),
-                      opacity: showDetailsModal ? 1 : 0,
-                      child: Material(
-                        color: const Color(0xFF0D1828),
-                        borderRadius: BorderRadius.circular(24),
-                        clipBehavior: Clip.antiAlias,
-                        child: SizedBox.expand(
-                          child: SingleChildScrollView(
-                            child: _DriverTripFlowPanel(
-                              trip: trip,
-                              driverPoint: LatLng(driverLat, driverLng),
-                              onPrimary:
-                                  (_updatingStatus || tripAsync.isLoading)
-                                  ? null
-                                  : () => _handlePrimaryAction(trip),
-                              onSecondary: _canCancelTrip(trip)
-                                  ? () => _cancelTrip(trip)
-                                  : null,
-                              onCall: () => _callPassenger(trip),
-                              onChat: () => _openPassengerWhatsApp(trip),
-                              onMore: () => _openPassengerActions(trip),
-                              pickupDistanceLabel: _formatDistance(
-                                pickupDistance,
-                              ),
-                              pickupEtaLabel: _formatEtaFromMeters(
-                                pickupDistance,
-                              ),
-                              destinationDistanceLabel:
-                                  trip.destinationLat != null &&
-                                      trip.destinationLng != null
-                                  ? _formatDistance(destinationDistance)
-                                  : '--',
-                              destinationEtaLabel:
-                                  trip.destinationLat != null &&
-                                      trip.destinationLng != null
-                                  ? _formatEtaFromMeters(destinationDistance)
-                                  : '--',
-                              totalDistanceLabel:
-                                  trip.destinationLat != null &&
-                                      trip.destinationLng != null
-                                  ? _formatDistance(
-                                      _distanceMeters(
-                                        LatLng(trip.pickupLat, trip.pickupLng),
-                                        LatLng(
-                                          trip.destinationLat!,
-                                          trip.destinationLng!,
-                                        ),
-                                      ),
-                                    )
-                                  : '--',
-                              totalDurationLabel: _formatTripDuration(trip),
-                              pickupTitle: _primaryAddress(
-                                trip.passengerPickup,
-                              ),
-                              pickupSubtitle: _secondaryAddress(
-                                trip.passengerPickup,
-                              ),
-                              destinationTitle: _primaryAddress(
-                                trip.destination,
-                              ),
-                              destinationSubtitle: _secondaryAddress(
-                                trip.destination,
-                              ),
-                              pickupClockLabel: _formatClock(
-                                _parseTripDate(trip.requestedAt),
-                              ),
-                              onCloseSummary: trip.status == 'completed'
-                                  ? _closeSummaryAndReturnHome
-                                  : null,
-                              onCollapse:
-                                  trip.status == 'completed' ||
-                                      !showInternalNavigationMap
-                                  ? null
-                                  : () {
-                                      setState(() => _detailsExpanded = false);
-                                      unawaited(
-                                        _persistDetailsExpanded(trip.id, false),
-                                      );
-                                    },
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+            if (_detailsExpanded)
+              Positioned.fill(
+                child: DriverTripDetailsView(
+                  trip: trip,
+                  vehicleType: session.vehicleType,
+                  onClose: () {
+                    setState(() => _detailsExpanded = false);
+                    unawaited(_persistDetailsExpanded(trip.id, false));
+                  },
                 ),
               ),
-            ),
           ],
         ),
       ),
@@ -1685,7 +1603,6 @@ class _DriverTripFlowPanel extends StatelessWidget {
     required this.destinationSubtitle,
     this.pickupClockLabel,
     this.onCloseSummary,
-    this.onCollapse,
   });
 
   final DriverTrip trip;
@@ -1707,7 +1624,6 @@ class _DriverTripFlowPanel extends StatelessWidget {
   final String destinationSubtitle;
   final String? pickupClockLabel;
   final VoidCallback? onCloseSummary;
-  final VoidCallback? onCollapse;
 
   bool get _isRequest => const {'requested', 'searching'}.contains(trip.status);
   bool get _isAccepted => trip.status == 'accepted';
@@ -2019,26 +1935,6 @@ class _DriverTripFlowPanel extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (onCollapse != null && !_isCompleted) ...[
-                  Material(
-                    color: palette.surfaceSecondary,
-                    shape: const CircleBorder(),
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
-                      onTap: onCollapse,
-                      child: const SizedBox(
-                        width: 54,
-                        height: 54,
-                        child: Icon(
-                          Icons.close_rounded,
-                          color: Colors.white,
-                          size: 26,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                ],
                 if (_isRequest)
                   Container(
                     width: 64,

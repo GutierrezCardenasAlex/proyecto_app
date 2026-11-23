@@ -1,3 +1,4 @@
+import SubscriptionPanel from '../../components/dashboard/SubscriptionPanel'
 import Button from '../../components/common/Button'
 import Card from '../../components/cards/Card'
 import StatCard from '../../components/dashboard/StatCard'
@@ -33,6 +34,7 @@ export default function SettingsPage() {
         <StatCard label="Ultima sincronizacion" value={central.lastUpdatedAt || 'Sin dato'} detail="Reloj operativo del panel" icon="🕒" tone="neutral" />
       </section>
 
+      <SubscriptionPanel />
       <section className="settings-page-grid">
         <Card title="Perfil institucional" subtitle="Datos visibles de la central y estado actual de la sesion." className="saas-panel-dark">
           <div className="settings-stack">

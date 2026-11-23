@@ -179,7 +179,7 @@ async function findCandidateDrivers({
        ORDER BY dl.driver_id, dl.recorded_at DESC
      )
      SELECT d.id AS driver_id,
-            d.rating,
+            (SELECT ROUND(AVG(r.score)::numeric, 2) FROM trip_ratings r WHERE r.to_driver_id = d.id) AS rating,
             v.vehicle_type,
             v.brand,
             v.model,
@@ -407,7 +407,7 @@ async function bootstrap() {
          ORDER BY dl.driver_id, dl.recorded_at DESC
        )
        SELECT d.id AS driver_id,
-              d.rating,
+              (SELECT ROUND(AVG(r.score)::numeric, 2) FROM trip_ratings r WHERE r.to_driver_id = d.id) AS rating,
               v.vehicle_type,
               v.brand,
               v.model,

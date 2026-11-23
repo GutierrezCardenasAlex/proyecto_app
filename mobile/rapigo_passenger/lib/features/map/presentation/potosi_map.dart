@@ -2536,6 +2536,11 @@ class _PotosiMapState extends ConsumerState<PotosiMap>
                 ),
               ],
             ),
+            RichAttributionWidget(
+              attributions: [
+                TextSourceAttribution(AppConfig.effectiveOfflineTilesAttribution),
+              ],
+            ),
           ],
         ),
         Positioned.fill(

@@ -1,9 +1,9 @@
+import '../../../../core/privacy/location_consent.dart';
 import 'passenger_driver_offers_dialog.dart';
 import 'passenger_counter_offer_dialog.dart';
 // ignore_for_file: unused_element, unused_local_variable, unused_element_parameter
 
 import 'dart:async';
-import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -67,8 +67,6 @@ enum RideFlowState { reposo, busquedaTexto, seleccionManual, rutaConfirmacion }
 class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
   static const String _lastPassengerLatKey = 'rapigo_passenger_last_lat';
   static const String _lastPassengerLngKey = 'rapigo_passenger_last_lng';
-  static const String _backgroundNoticeSeenKey =
-      'rapigo_passenger_background_notice_seen';
   static const String _rideUiStateKey = 'rapigo_passenger_ride_ui_state_v1';
   static const String _customDestinationLabel = 'Destino marcado en mapa';
   final TextEditingController _destinationController = TextEditingController();
@@ -258,7 +256,6 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
     _isPreparingExperience = true;
     try {
       await _ensureCriticalPermissions();
-      await _maybeShowBackgroundServiceNotice();
       await LocalNotifications.ensureInitialized();
       await _restoreLastKnownLocation();
       await ref.read(passengerLocationProvider.notifier).loadCurrentLocation();
@@ -281,133 +278,11 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
   }
 
   Future<void> _ensureCriticalPermissions() async {
-    while (mounted) {
-      final notificationStatus = await Permission.notification.request();
-      final locationStatus = await Permission.locationWhenInUse.request();
-      PermissionStatus backgroundLocationStatus = PermissionStatus.granted;
-      if (Platform.isAndroid &&
-          (locationStatus.isGranted || locationStatus.isLimited)) {
-        backgroundLocationStatus = await Permission.locationAlways.request();
-      }
-      final notificationsReady =
-          notificationStatus.isGranted || notificationStatus.isLimited;
-      final locationReady =
-          (locationStatus.isGranted || locationStatus.isLimited) &&
-          (backgroundLocationStatus.isGranted ||
-              backgroundLocationStatus.isLimited);
-      if (notificationsReady && locationReady) {
-        return;
-      }
-      await _showPermissionsRequiredDialog(
-        notificationsReady: notificationsReady,
-        locationReady: locationReady,
-      );
-    }
-  }
-
-  Future<void> _showPermissionsRequiredDialog({
-    required bool notificationsReady,
-    required bool locationReady,
-  }) {
-    return showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF17181B),
-          title: const Text(
-            'Activa los permisos',
-            style: TextStyle(
-              color: Color(0xFFFFF4EC),
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'RAPIGO necesita estos permisos completos para entrar con todo listo y evitar fallos despues.',
-                style: TextStyle(color: Color(0xFFFFD8BF)),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                '${locationReady ? '✓' : '•'} Ubicacion siempre activa',
-                style: TextStyle(
-                  color: locationReady
-                      ? const Color(0xFF86EFAC)
-                      : const Color(0xFFFFF4EC),
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '${notificationsReady ? '✓' : '•'} Notificaciones activas',
-                style: TextStyle(
-                  color: notificationsReady
-                      ? const Color(0xFF86EFAC)
-                      : const Color(0xFFFFF4EC),
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () async {
-                await openAppSettings();
-              },
-              child: const Text('Configuracion'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(),
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFF97316),
-                foregroundColor: const Color(0xFF0F0F10),
-              ),
-              child: const Text('Reintentar'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _maybeShowBackgroundServiceNotice() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool(_backgroundNoticeSeenKey) == true || !mounted) {
-      return;
-    }
-    await showDialog<void>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF17181B),
-          title: const Text(
-            'RAPIGO seguira activo',
-            style: TextStyle(
-              color: Color(0xFFFFF4EC),
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          content: const Text(
-            'Veras una notificacion fija mientras RAPIGO use ubicacion en segundo plano. Es normal: sirve para que el mapa, las alertas y el seguimiento del viaje sigan funcionando aunque bloquees el celular.',
-            style: TextStyle(color: Color(0xFFFFD8BF), height: 1.5),
-          ),
-          actions: [
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(),
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFF97316),
-                foregroundColor: const Color(0xFF0F0F10),
-              ),
-              child: const Text('Entendido'),
-            ),
-          ],
-        );
-      },
-    );
-    await prefs.setBool(_backgroundNoticeSeenKey, true);
+    if (!mounted) return;
+    await LocationConsent.request(context, driver: false);
+    if (!mounted) return;
+    // Notifications are optional; refusal must never trap the user in a loop.
+    await Permission.notification.request();
   }
 
   @override
@@ -727,7 +602,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
               lat: lat,
               lng: lng,
               distanceMeters: distanceMeters,
-              rating: current?.rating ?? 5,
+              rating: current?.rating ?? 0,
               etaMinutes:
                   current?.etaMinutes ??
                   (distanceMeters / 350).round().clamp(2, 60),
@@ -2041,7 +1916,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
                           ),
                           _TripInfoRow(
                             label: 'Calificacion',
-                            value: driver.rating.toStringAsFixed(1),
+                            value: driver.ratingLabel,
                           ),
                         ],
                       ),
@@ -3925,7 +3800,7 @@ class _RideTabState extends ConsumerState<RideTab> with WidgetsBindingObserver {
               : driver.vehicleLabel,
           subtitle: driver.vehicleDetail,
           eta: '${driver.etaMinutes} min',
-          rating: driver.rating.toStringAsFixed(1),
+          rating: driver.ratingLabel,
           distance: '${(driver.distanceMeters / 1000).toStringAsFixed(1)} km',
           icon: _vehicleIcon(driver.vehicleType),
           highlighted: isSelected,

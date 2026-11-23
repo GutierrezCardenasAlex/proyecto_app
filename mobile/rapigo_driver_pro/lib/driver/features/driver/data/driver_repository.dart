@@ -26,6 +26,16 @@ final driverStateProvider =
       DriverStateController.new,
     );
 
+final driverConnectionProvider = NotifierProvider<DriverConnection, bool>(
+  DriverConnection.new,
+);
+
+class DriverConnection extends Notifier<bool> {
+  @override
+  bool build() => false;
+  void setConnected(bool connected) => state = connected;
+}
+
 class DriverRepository {
   const DriverRepository();
 
@@ -124,10 +134,11 @@ class DriverRepository {
       throw Exception('Activa el GPS para operar como conductor.');
     }
 
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('driver_location_consent_v2') != true) {
+      throw Exception('Autoriza el uso de ubicación para conectarte.');
     }
+    final permission = await Geolocator.checkPermission();
 
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
@@ -307,7 +318,8 @@ class DriverRepository {
         intervalDuration: const Duration(seconds: 1),
         foregroundNotificationConfig: const ForegroundNotificationConfig(
           notificationTitle: 'RAPIGO - PRO',
-          notificationText: 'Buscando Pasajeros Cercanos......',
+          notificationText:
+              'Ubicación activa para solicitudes y seguimiento del viaje',
           enableWakeLock: true,
           setOngoing: true,
         ),
@@ -346,6 +358,19 @@ class DriverStateController extends Notifier<DriverState> {
       _compassSubscription?.cancel();
       _availabilityHeartbeatTimer?.cancel();
     });
+    ref.listen(driverSessionProvider, (previous, next) {
+      if (!next.loggedIn) {
+        unawaited(_positionSubscription?.cancel());
+        _positionSubscription = null;
+        _stopAvailabilityHeartbeat();
+        state = state.copyWith(available: false, backendStatus: 'offline');
+      }
+    });
+    ref.listen(offeredTripProvider, (previous, next) {
+      if (previous?.value?.status != next.value?.status) {
+        Future<void>.microtask(_syncTrackingForOperation);
+      }
+    });
     Future<void>.microtask(_bootstrapLocalLocation);
     return const DriverState(
       available: false,
@@ -380,7 +405,7 @@ class DriverStateController extends Notifier<DriverState> {
     }
 
     try {
-      await _startTrackedLocationUpdates();
+      if (_needsTracking) await _startTrackedLocationUpdates();
     } catch (_) {
       // Keep shell visible even if tracking cannot start immediately.
     }
@@ -468,7 +493,7 @@ class DriverStateController extends Notifier<DriverState> {
         await _startTrackedLocationUpdates();
         _startAvailabilityHeartbeat();
       } else {
-        await _startTrackedLocationUpdates();
+        await _syncTrackingForOperation();
         _stopAvailabilityHeartbeat();
       }
 
@@ -545,7 +570,7 @@ class DriverStateController extends Notifier<DriverState> {
         await _startTrackedLocationUpdates();
         _startAvailabilityHeartbeat();
       } else {
-        await _startTrackedLocationUpdates();
+        await _syncTrackingForOperation();
         _stopAvailabilityHeartbeat();
       }
     } catch (error) {
@@ -604,9 +629,38 @@ class DriverStateController extends Notifier<DriverState> {
     );
   }
 
+  bool get _needsTracking {
+    if (!ref.read(driverSessionProvider).loggedIn) return false;
+    final trip = ref.read(offeredTripProvider).value;
+    return state.available ||
+        (trip != null &&
+            const {
+              'accepted',
+              'arriving',
+              'at_pickup',
+              'in_progress',
+            }.contains(trip.status));
+  }
+
+  Future<void> _syncTrackingForOperation() async {
+    if (!ref.mounted) return;
+    if (_needsTracking) {
+      try {
+        await _startTrackedLocationUpdates();
+      } catch (_) {
+        /* Await user permission. */
+      }
+    } else {
+      await _positionSubscription?.cancel();
+      _positionSubscription = null;
+    }
+  }
+
   Future<void> _startTrackedLocationUpdates() async {
     await _repository.ensureLocationReady();
+    if (!ref.mounted || !_needsTracking) return;
     await _positionSubscription?.cancel();
+    if (!ref.mounted || !_needsTracking) return;
     _positionSubscription = _repository.watchPositionStream().listen(
       (position) {
         unawaited(_handleTrackedPosition(position));
@@ -634,7 +688,7 @@ class DriverStateController extends Notifier<DriverState> {
 
   Future<void> _sendAvailabilityHeartbeat() async {
     final session = ref.read(driverSessionProvider);
-    if (!session.loggedIn || session.token.isEmpty || !state.available) {
+    if (!session.loggedIn || session.token.isEmpty || !_needsTracking) {
       return;
     }
     try {
@@ -662,7 +716,7 @@ class DriverStateController extends Notifier<DriverState> {
     _isSendingTrackedLocation = true;
     try {
       final session = ref.read(driverSessionProvider);
-      if (!session.loggedIn || session.token.isEmpty || !state.available) {
+      if (!session.loggedIn || session.token.isEmpty || !_needsTracking) {
         return;
       }
       final trip = ref.read(offeredTripProvider).value;

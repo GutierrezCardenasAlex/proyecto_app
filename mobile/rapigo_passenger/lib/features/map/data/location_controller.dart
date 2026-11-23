@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/widgets.dart';
 
 import 'package:flutter_compass/flutter_compass.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +9,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/config/potosi_geo.dart';
+import '../../auth/data/auth_repository.dart';
 
 final passengerLocationProvider =
     NotifierProvider<PassengerLocationController, PassengerLocationState>(
@@ -47,7 +49,9 @@ class PassengerLocationState {
   }
 }
 
-class PassengerLocationController extends Notifier<PassengerLocationState> {
+class PassengerLocationController extends Notifier<PassengerLocationState>
+    with WidgetsBindingObserver {
+  bool _foreground = true;
   static const _cacheLatKey = 'passenger_location_cache_lat';
   static const _cacheLngKey = 'passenger_location_cache_lng';
   static const _cacheAccuracyKey = 'passenger_location_cache_accuracy';
@@ -59,9 +63,17 @@ class PassengerLocationController extends Notifier<PassengerLocationState> {
 
   @override
   PassengerLocationState build() {
+    WidgetsBinding.instance.addObserver(this);
     ref.onDispose(() {
+      WidgetsBinding.instance.removeObserver(this);
       _positionSubscription?.cancel();
       _compassSubscription?.cancel();
+    });
+    ref.listen(sessionProvider, (previous, next) {
+      if (!next.isAuthenticated) {
+        unawaited(_positionSubscription?.cancel());
+        _positionSubscription = null;
+      }
     });
     Future<void>.microtask(_bootstrapLocation);
     return const PassengerLocationState(
@@ -79,7 +91,19 @@ class PassengerLocationController extends Notifier<PassengerLocationState> {
     await loadCurrentLocation();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
+    if (_foreground) {
+      unawaited(loadCurrentLocation());
+    } else {
+      unawaited(_positionSubscription?.cancel());
+      _positionSubscription = null;
+    }
+  }
+
   Future<void> loadCurrentLocation() async {
+    if (!_foreground || !ref.read(sessionProvider).isAuthenticated) return;
     state = state.copyWith(isLoading: true, clearError: true);
 
     try {
@@ -117,7 +141,7 @@ class PassengerLocationController extends Notifier<PassengerLocationState> {
         if (state.position == null) {
           state = state.copyWith(
             isLoading: false,
-            errorMessage: 'No se pudo seguir tu ubicacion en segundo plano.',
+            errorMessage: 'No se pudo actualizar tu ubicación.',
           );
         }
       }
@@ -158,10 +182,7 @@ class PassengerLocationController extends Notifier<PassengerLocationState> {
       throw Exception('Activa el GPS para mostrar autos cercanos.');
     }
 
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
+    final permission = await Geolocator.checkPermission();
 
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
@@ -170,6 +191,8 @@ class PassengerLocationController extends Notifier<PassengerLocationState> {
   }
 
   Future<void> _startTracking() async {
+    await _ensureLocationReady();
+    if (!_foreground || !ref.read(sessionProvider).isAuthenticated) return;
     await _positionSubscription?.cancel();
     _positionSubscription =
         Geolocator.getPositionStream(
@@ -179,7 +202,7 @@ class PassengerLocationController extends Notifier<PassengerLocationState> {
           onError: (_) {
             state = state.copyWith(
               isLoading: false,
-              errorMessage: 'No se pudo seguir tu ubicacion en segundo plano.',
+              errorMessage: 'No se pudo actualizar tu ubicación.',
             );
           },
         );
@@ -258,20 +281,15 @@ class PassengerLocationController extends Notifier<PassengerLocationState> {
         accuracy: LocationAccuracy.bestForNavigation,
         distanceFilter: 3,
         intervalDuration: const Duration(seconds: 2),
-        foregroundNotificationConfig: const ForegroundNotificationConfig(
-          notificationTitle: 'RAPIGO',
-          notificationText: 'Escuchamos tus necesidades....',
-          enableWakeLock: true,
-          setOngoing: true,
-        ),
       );
     }
     if (Platform.isIOS || Platform.isMacOS) {
       return AppleSettings(
         accuracy: LocationAccuracy.bestForNavigation,
         distanceFilter: 3,
-        pauseLocationUpdatesAutomatically: false,
-        showBackgroundLocationIndicator: true,
+        pauseLocationUpdatesAutomatically: true,
+        showBackgroundLocationIndicator: false,
+        allowBackgroundLocationUpdates: false,
       );
     }
     return const LocationSettings(
@@ -281,6 +299,7 @@ class PassengerLocationController extends Notifier<PassengerLocationState> {
   }
 
   void _applyPosition(Position position) {
+    if (!_foreground || !ref.read(sessionProvider).isAuthenticated) return;
     unawaited(_cacheLocation(position));
     final smoothedPoint = _smoothedPosition(position);
 

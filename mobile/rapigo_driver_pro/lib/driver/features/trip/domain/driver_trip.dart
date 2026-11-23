@@ -10,6 +10,7 @@ class DriverTrip {
     required this.destinationLng,
     required this.fareAmount,
     this.requestedAt,
+    this.completedAt,
     this.vehicleType,
     this.vehicleLabel,
     this.vehiclePlate,
@@ -37,6 +38,7 @@ class DriverTrip {
   final double? destinationLng;
   final double fareAmount;
   final String? requestedAt;
+  final String? completedAt;
   final String? vehicleType;
   final String? vehicleLabel;
   final String? vehiclePlate;
@@ -75,6 +77,7 @@ class DriverTrip {
     double? destinationLng,
     double? fareAmount,
     String? requestedAt,
+    String? completedAt,
     String? vehicleType,
     String? vehicleLabel,
     String? vehiclePlate,
@@ -102,6 +105,7 @@ class DriverTrip {
       destinationLng: destinationLng ?? this.destinationLng,
       fareAmount: fareAmount ?? this.fareAmount,
       requestedAt: requestedAt ?? this.requestedAt,
+      completedAt: completedAt ?? this.completedAt,
       vehicleType: vehicleType ?? this.vehicleType,
       vehicleLabel: vehicleLabel ?? this.vehicleLabel,
       vehiclePlate: vehiclePlate ?? this.vehiclePlate,

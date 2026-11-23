@@ -1,5 +1,45 @@
 # RAPIGO offline maps
 
+## Configuracion actual de conductor y pasajero
+
+Conductor usa **flutter_map con OpenStreetMap raster**. MapLibre Native se
+retiró de sus dependencias. El mapa conserva el movimiento suave y los límites
+de Potosí. Las teselas vistas se guardan automáticamente en la caché persistente
+`potosi_online_map_v3`, que se reutiliza al cerrar y abrir la app. No se borra la
+caché existente al actualizar. No se descarga toda la ciudad desde OSM público.
+Sin conexión solo estarán disponibles las zonas y niveles de zoom ya cargados.
+Las rutas guardadas se conservan; calcular rutas nuevas puede requerir internet.
+
+Pasajero usa por defecto el servidor propio configurado en docker-compose:
+`https://rapigo.cybernovatech.space/tiles/styles/rapigo-navigation/512/{z}/{x}/{y}.png`.
+CARTO ya no es el proveedor predeterminado. El motor predeterminado es raster,
+que muestra las mismas teselas almacenadas por flutter_map_tile_caching.
+En pasajero, MapLibre sigue siendo opcional con `RAPIGO_MAP_ENGINE=maplibre`.
+Las siguientes opciones de teselas raster corresponden a fuentes propias configuradas para pasajero o conductor.
+
+- El paquete completo se registra solamente cuando todas las teselas se guardaron
+  o ya estaban en cache. La identidad incluye URL, limites, zoom y dimension.
+- Al reiniciar se reutiliza el paquete completo. Una descarga parcial se reanuda
+  omitiendo las teselas existentes; solo hay un intento automatico por sesion.
+- El boton «Completar mapa» reintenta las faltantes sin borrar lo descargado.
+- Las teselas de la fuente offline propia no caducan automaticamente. Para una
+  nueva edicion del mapa, usar una URL versionada en la configuracion de compilacion.
+- Actualizar la app conserva la cache; desinstalarla o borrar sus datos la elimina.
+- Los registros antiguos no certificaban un paquete completo: la primera apertura
+  puede verificarlo nuevamente, sin volver a bajar las teselas de la misma URL.
+
+La primera descarga requiere que el servidor propio este disponible. Durante la
+revision local su puerto HTTPS rechazo la conexion; no se pudo validar una
+primera descarga real. No se incluye un archivo MBTiles en el APK: la referencia
+`assets/maps/potosi.mbtiles` del manifiesto no es un importador de mapas.
+
+Para usar otra fuente autorizada para descarga offline, establecer
+`MAP_OFFLINE_TILES_URL_TEMPLATE` y `MAP_OFFLINE_TILES_ATTRIBUTION` al compilar.
+Si solo se necesita navegacion online gratuita, se puede establecer
+`MAP_TILES_URL_TEMPLATE=https://tile.openstreetmap.org/{z}/{x}/{y}.png` sin fuente
+offline: guarda las zonas consultadas y deshabilita la descarga masiva.
+
+
 ## Opcion 1: URL configurable rapida
 
 La app ya acepta dos modos:
@@ -7,12 +47,12 @@ La app ya acepta dos modos:
 - `MAP_TILES_URL_TEMPLATE`: mapa online normal
 - `MAP_OFFLINE_TILES_URL_TEMPLATE`: fuente dedicada para cache/descarga offline
 
-Si no configuras la segunda, la app sigue funcionando con OpenStreetMap sin bloquear nada.
+Si no configuras la segunda, la app usa la fuente principal (por defecto el servidor propio). OpenStreetMap publico solo se usa si se configura explicitamente.
 
 Ejemplo manual:
 
 ```powershell
-cd "C:\Users\maylex\Documents\New project\app_potosi\mobile\taxiya_app"
+cd "C:\Users\maylex\Documents\New project\app_potosi\mobile\rapigo_passenger"
 flutter run --dart-define=MAP_OFFLINE_TILES_URL_TEMPLATE=http://10.0.2.2:8082/styles/basic-preview/{z}/{x}/{y}.png --dart-define=MAP_OFFLINE_TILES_ATTRIBUTION="Local tiles"
 ```
 

@@ -8,9 +8,7 @@ import '../config/app_config.dart';
 import '../../features/maps/services/route_cache_manager.dart';
 
 final routeServiceProvider = Provider<RouteService>((ref) {
-  return RouteService(
-    cacheManager: RouteCacheManager(),
-  );
+  return RouteService(cacheManager: RouteCacheManager());
 });
 
 class RoutePathBundle {
@@ -32,13 +30,13 @@ class RoutePathBundle {
 }
 
 class RouteService {
-  RouteService({
-    RouteCacheManager? cacheManager,
-  }) : _cacheManager = cacheManager ?? RouteCacheManager();
+  RouteService({RouteCacheManager? cacheManager})
+    : _cacheManager = cacheManager ?? RouteCacheManager();
 
   static const Distance _distance = Distance();
 
-  static final Map<String, RoutePathBundle> _cache = <String, RoutePathBundle>{};
+  static final Map<String, RoutePathBundle> _cache =
+      <String, RoutePathBundle>{};
   final RouteCacheManager _cacheManager;
 
   Future<List<LatLng>> fetchRoute({
@@ -94,10 +92,7 @@ class RouteService {
       if (!allowDirectFallback) {
         throw Exception('Routing offline fallback preserved');
       }
-      return _directBundle(
-        start: start,
-        end: end,
-      );
+      return _directBundle(start: start, end: end);
     }
 
     try {
@@ -109,7 +104,10 @@ class RouteService {
         '?overview=full&geometries=geojson&alternatives=true&steps=false&continue_straight=false',
       );
 
-      final response = await http.get(uri, headers: const {'Accept': 'application/json'});
+      final response = await http.get(
+        uri,
+        headers: const {'Accept': 'application/json'},
+      );
       if (response.statusCode >= 400) {
         throw Exception('No se pudo cargar la ruta (${response.statusCode})');
       }
@@ -120,16 +118,16 @@ class RouteService {
         if (!allowDirectFallback) {
           throw Exception('Routing returned no routes');
         }
-        return _directBundle(
-          start: start,
-          end: end,
-        );
+        return _directBundle(start: start, end: end);
       }
 
       final decodedRoutes = routes
           .whereType<Map<String, dynamic>>()
           .take(3)
-          .map((route) => _decodeRouteGeometry(route, exactStart: start, exactEnd: end))
+          .map(
+            (route) =>
+                _decodeRouteGeometry(route, exactStart: start, exactEnd: end),
+          )
           .where((points) => points.length >= 2)
           .toList(growable: false);
 
@@ -137,16 +135,15 @@ class RouteService {
         if (!allowDirectFallback) {
           throw Exception('Routing returned invalid geometry');
         }
-        return _directBundle(
-          start: start,
-          end: end,
-        );
+        return _directBundle(start: start, end: end);
       }
 
       final firstRoute = routes.first as Map<String, dynamic>;
       final bundle = RoutePathBundle(
         primary: decodedRoutes.first,
-        alternatives: decodedRoutes.length > 1 ? decodedRoutes.sublist(1) : const <List<LatLng>>[],
+        alternatives: decodedRoutes.length > 1
+            ? decodedRoutes.sublist(1)
+            : const <List<LatLng>>[],
         start: start,
         end: end,
         distanceMeters: firstRoute['distance'] is num
@@ -206,25 +203,14 @@ class RouteService {
         .whereType<List<dynamic>>()
         .where((item) => item.length >= 2)
         .map(
-          (item) => LatLng(
-            (item[1] as num).toDouble(),
-            (item[0] as num).toDouble(),
-          ),
+          (item) =>
+              LatLng((item[1] as num).toDouble(), (item[0] as num).toDouble()),
         )
         .toList(growable: true);
     if (points.length < 2) {
-      return <LatLng>[exactStart, exactEnd];
+      return const [];
     }
-    if (pointDistance(points.first, exactStart) > 3) {
-      points.insert(0, exactStart);
-    } else {
-      points[0] = exactStart;
-    }
-    if (pointDistance(points.last, exactEnd) > 3) {
-      points.add(exactEnd);
-    } else {
-      points[points.length - 1] = exactEnd;
-    }
+    // Keep the routing engine's road geometry; GPS endpoints can be in buildings.
     return points;
   }
 
@@ -237,7 +223,9 @@ class RouteService {
       final uri = Uri.parse(
         '$snapBase/${point.longitude},${point.latitude}?number=1',
       );
-      final response = await http.get(uri, headers: const {'Accept': 'application/json'});
+      final response = await http
+          .get(uri, headers: const {'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 4));
       if (response.statusCode >= 400) {
         return point;
       }
@@ -246,7 +234,9 @@ class RouteService {
       if (waypoints.isEmpty) {
         return point;
       }
-      final location = (waypoints.first as Map<String, dynamic>)['location'] as List<dynamic>?;
+      final location =
+          (waypoints.first as Map<String, dynamic>)['location']
+              as List<dynamic>?;
       if (location == null || location.length < 2) {
         return point;
       }
@@ -278,7 +268,8 @@ class RouteService {
       if (start == null || end == null) {
         return null;
       }
-      final alternativesRaw = payload['alternatives'] as List<dynamic>? ?? const [];
+      final alternativesRaw =
+          payload['alternatives'] as List<dynamic>? ?? const [];
       final alternatives = alternativesRaw
           .whereType<List<dynamic>>()
           .map(_pointsFromJson)
@@ -302,7 +293,9 @@ class RouteService {
       'start': _latLngToJson(bundle.start),
       'end': _latLngToJson(bundle.end),
       'primary': _pointsToJson(bundle.primary),
-      'alternatives': bundle.alternatives.map(_pointsToJson).toList(growable: false),
+      'alternatives': bundle.alternatives
+          .map(_pointsToJson)
+          .toList(growable: false),
       'distanceMeters': bundle.distanceMeters,
       'durationSeconds': bundle.durationSeconds,
     });
@@ -340,17 +333,17 @@ class RouteService {
   }
 
   String? _nearestUrlBase() {
-    final base = AppConfig.mapRoutingUrlBase.trim().replaceAll(RegExp(r'/$'), '');
+    final base = AppConfig.mapRoutingUrlBase.trim().replaceAll(
+      RegExp(r'/$'),
+      '',
+    );
     if (base.contains('/route/v1/')) {
       return base.replaceFirst('/route/v1/', '/nearest/v1/');
     }
     return null;
   }
 
-  double distanceToRoute({
-    required LatLng point,
-    required List<LatLng> route,
-  }) {
+  double distanceToRoute({required LatLng point, required List<LatLng> route}) {
     if (route.isEmpty) {
       return double.infinity;
     }

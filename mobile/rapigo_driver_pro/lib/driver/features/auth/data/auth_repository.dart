@@ -48,6 +48,15 @@ class DriverUploadedDocument {
   }
 }
 
+final driverProfileDetailsProvider =
+    FutureProvider.autoDispose<DriverProfileDetails?>((ref) {
+      final session = ref.watch(driverSessionProvider);
+      if (session.token.isEmpty || session.userId.isEmpty) return null;
+      return ref
+          .watch(authRepositoryProvider)
+          .fetchDriverProfile(token: session.token, userId: session.userId);
+    });
+
 class DriverAuthResult {
   const DriverAuthResult({
     required this.userId,
@@ -107,6 +116,9 @@ class DriverProfileDetails {
     required this.model,
     required this.color,
     required this.year,
+    this.driverPhoto,
+    this.licensePhoto,
+    this.vehiclePhoto,
   });
 
   final String licenseNumber;
@@ -122,6 +134,60 @@ class DriverProfileDetails {
   final String model;
   final String color;
   final int? year;
+  final DriverUploadedDocument? driverPhoto;
+  final DriverUploadedDocument? licensePhoto;
+  final DriverUploadedDocument? vehiclePhoto;
+
+  factory DriverProfileDetails.fromJson(Map<String, dynamic> payload) {
+    final vehicle = payload['vehicle'] as Map<String, dynamic>? ?? const {};
+    DriverUploadedDocument? photo(Map<String, dynamic> source, String prefix) {
+      final url = source['${prefix}_url']?.toString() ?? '';
+      final publicId = source['${prefix}_public_id']?.toString() ?? '';
+      final folder = payload['documents_folder']?.toString() ?? '';
+      if (url.isEmpty || publicId.isEmpty || folder.isEmpty) return null;
+      return DriverUploadedDocument(
+        url: url,
+        publicId: publicId,
+        folder: folder,
+      );
+    }
+
+    return DriverProfileDetails(
+      driverPhoto: photo(payload, 'driver_photo'),
+      licensePhoto: photo(payload, 'license_photo'),
+      vehiclePhoto: photo(vehicle, 'vehicle_photo'),
+      licenseNumber:
+          payload['license_number']?.toString() ??
+          payload['licenseNumber']?.toString() ??
+          '',
+      licenseCategory:
+          payload['license_category']?.toString() ??
+          payload['licenseCategory']?.toString() ??
+          '',
+      licenseIssueDate:
+          payload['license_issue_date']?.toString() ??
+          payload['licenseIssueDate']?.toString() ??
+          '',
+      licenseExpiryDate:
+          payload['license_expiry_date']?.toString() ??
+          payload['licenseExpiryDate']?.toString() ??
+          '',
+      vehicleType:
+          vehicle['vehicle_type']?.toString() ??
+          vehicle['type']?.toString() ??
+          'taxi',
+      deliveryEnabled:
+          payload['accepts_delivery_requests'] == true ||
+          payload['acceptsDeliveryRequests'] == true,
+      driverId: payload['id']?.toString() ?? '',
+      accessStatus: payload['access_status']?.toString() ?? 'AUTORIZADO',
+      plate: vehicle['plate']?.toString() ?? '',
+      brand: vehicle['brand']?.toString() ?? '',
+      model: vehicle['model']?.toString() ?? '',
+      color: vehicle['color']?.toString() ?? '',
+      year: int.tryParse(vehicle['year']?.toString() ?? ''),
+    );
+  }
 }
 
 class DriverSessionStatusResult {
@@ -184,41 +250,7 @@ class DriverAuthRepository {
       fallbackMessage: 'No se pudo cargar el perfil del conductor',
     );
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
-    final vehicle = payload['vehicle'] as Map<String, dynamic>? ?? const {};
-    return DriverProfileDetails(
-      licenseNumber:
-          payload['license_number']?.toString() ??
-          payload['licenseNumber']?.toString() ??
-          '',
-      licenseCategory:
-          payload['license_category']?.toString() ??
-          payload['licenseCategory']?.toString() ??
-          '',
-      licenseIssueDate:
-          payload['license_issue_date']?.toString() ??
-          payload['licenseIssueDate']?.toString() ??
-          '',
-      licenseExpiryDate:
-          payload['license_expiry_date']?.toString() ??
-          payload['licenseExpiryDate']?.toString() ??
-          '',
-      vehicleType:
-          vehicle['vehicle_type']?.toString() ??
-          vehicle['type']?.toString() ??
-          'taxi',
-      deliveryEnabled:
-          payload['accepts_delivery_requests'] == true ||
-          payload['acceptsDeliveryRequests'] == true,
-      driverId: payload['id']?.toString() ?? '',
-      accessStatus: payload['access_status']?.toString() ?? 'AUTORIZADO',
-      plate: vehicle['plate']?.toString() ?? '',
-      brand: vehicle['brand']?.toString() ?? '',
-      model: vehicle['model']?.toString() ?? '',
-      color: vehicle['color']?.toString() ?? '',
-      year: vehicle['year'] is num
-          ? (vehicle['year'] as num).toInt()
-          : int.tryParse(vehicle['year']?.toString() ?? ''),
-    );
+    return DriverProfileDetails.fromJson(payload);
   }
 
   Future<DriverOtpRequestResult> requestRegistrationOtp(
@@ -390,16 +422,17 @@ class DriverAuthRepository {
 
     final signature =
         jsonDecode(signatureResponse.body) as Map<String, dynamic>;
-    final request = http.MultipartRequest(
-      'POST',
-      Uri.parse(signature['uploadUrl']?.toString() ?? ''),
-    )
-      ..fields['api_key'] = signature['apiKey']?.toString() ?? ''
-      ..fields['timestamp'] = signature['timestamp']?.toString() ?? ''
-      ..fields['folder'] = signature['folder']?.toString() ?? ''
-      ..fields['public_id'] = signature['publicId']?.toString() ?? ''
-      ..fields['signature'] = signature['signature']?.toString() ?? ''
-      ..files.add(await http.MultipartFile.fromPath('file', file.path));
+    final request =
+        http.MultipartRequest(
+            'POST',
+            Uri.parse(signature['uploadUrl']?.toString() ?? ''),
+          )
+          ..fields['api_key'] = signature['apiKey']?.toString() ?? ''
+          ..fields['timestamp'] = signature['timestamp']?.toString() ?? ''
+          ..fields['folder'] = signature['folder']?.toString() ?? ''
+          ..fields['public_id'] = signature['publicId']?.toString() ?? ''
+          ..fields['signature'] = signature['signature']?.toString() ?? ''
+          ..files.add(await http.MultipartFile.fromPath('file', file.path));
 
     http.StreamedResponse streamedResponse;
     try {
@@ -421,7 +454,8 @@ class DriverAuthRepository {
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
     return DriverUploadedDocument(
-      url: payload['secure_url']?.toString() ?? payload['url']?.toString() ?? '',
+      url:
+          payload['secure_url']?.toString() ?? payload['url']?.toString() ?? '',
       publicId: payload['public_id']?.toString() ?? '',
       folder: signature['folder']?.toString() ?? '',
     );
@@ -450,9 +484,8 @@ class DriverAuthRepository {
     DriverUploadedDocument? licensePhoto,
     DriverUploadedDocument? vehiclePhoto,
   }) async {
-    final documents = driverPhoto != null &&
-            licensePhoto != null &&
-            vehiclePhoto != null
+    final documents =
+        driverPhoto != null && licensePhoto != null && vehiclePhoto != null
         ? {
             'driverPhoto': driverPhoto.toJson(),
             'licensePhoto': licensePhoto.toJson(),
@@ -471,7 +504,7 @@ class DriverAuthRepository {
         'brand': brand,
         'model': model,
         'color': color,
-        'year': year,
+        'year': ?year,
       },
     };
     if (documents != null) {

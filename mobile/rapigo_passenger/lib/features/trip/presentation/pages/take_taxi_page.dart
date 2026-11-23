@@ -437,7 +437,7 @@ class _TakeTaxiPageState extends ConsumerState<TakeTaxiPage> {
                               ),
                               _DetailPill(
                                 icon: Icons.star_rounded,
-                                label: driver.rating.toStringAsFixed(1),
+                                label: driver.ratingLabel,
                               ),
                             ],
                           ),

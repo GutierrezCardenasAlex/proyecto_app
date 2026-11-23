@@ -39,6 +39,7 @@ test('driver offer marketplace with real PostgreSQL transactions', {
       preferred_driver_id uuid, fare_amount numeric(10,2) DEFAULT 10, promotional_trip boolean DEFAULT false,
       accepted_at timestamptz, updated_at timestamptz DEFAULT NOW());
     CREATE TABLE trip_events (trip_id uuid, event_type text, payload jsonb);
+    CREATE TABLE trip_ratings (to_driver_id uuid REFERENCES drivers(id) ON DELETE CASCADE, score integer);
   `);
   const source = fs.readFileSync(path.resolve(__dirname, '../../../infra/postgres/schema.sql'), 'utf8');
   const offersDdl = source.match(/CREATE TABLE IF NOT EXISTS trip_driver_offers \([\s\S]*?\);/)[0];
@@ -108,6 +109,7 @@ test('driver offer marketplace with real PostgreSQL transactions', {
       await pool.query("UPDATE trip_driver_offers SET created_at=NOW()-INTERVAL '1 hour' WHERE id=$1", [offer.id]);
       const list = await app.inject({ url: `/${f.trip1}/offers`, headers: { 'x-passenger-id': f.passenger } });
       assert.equal(Number(list.json().offers[0].amount), 15);
+      assert.equal(list.json().offers[0].rating, null);
       const pending = (await pool.query('SELECT * FROM trips WHERE id=$1', [f.trip1])).rows[0];
       assert.equal(pending.driver_id, null);
       assert.equal(pending.status, 'searching');

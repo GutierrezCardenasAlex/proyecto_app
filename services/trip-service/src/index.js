@@ -862,6 +862,8 @@ async function bootstrap() {
     reply.send(trip);
   });
 
+  await pool.query('CREATE INDEX IF NOT EXISTS trip_ratings_driver_idx ON trip_ratings(to_driver_id)');
+
   app.post("/:tripId/rating", async (request, reply) => {
     const { tripId } = request.params;
     const { fromRole, score, comment } = ratingSchema.parse(request.body);

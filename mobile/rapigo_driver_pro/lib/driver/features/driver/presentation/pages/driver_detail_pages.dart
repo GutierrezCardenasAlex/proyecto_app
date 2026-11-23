@@ -1,7 +1,12 @@
+import 'driver_subscription_page.dart';
+import '../../../../../core/privacy/privacy_page.dart';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart' hide Path;
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -13,11 +18,13 @@ import '../../../../../core/update/app_update_service.dart';
 import '../../../../../shared/theme/rapigo_theme.dart';
 import '../../../auth/data/auth_repository.dart';
 import '../../data/driver_repository.dart';
+import '../../data/driver_statistics.dart';
 import '../../navigation/navigation_service.dart' as trip_navigation;
 import '../../../../core/notifications/local_notifications.dart';
 import '../../../trip/data/trip_repository.dart';
 import '../../../trip/domain/driver_trip.dart';
 import '../widgets/driver_ui_kit.dart';
+import '../widgets/driver_profile_photo_card.dart';
 
 class DriverProfilePage extends ConsumerWidget {
   const DriverProfilePage({super.key});
@@ -39,216 +46,293 @@ class DriverProfilePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = context.rapigoPalette;
-    final metrics = context.rapigoMetrics;
-    final textTheme = Theme.of(context).textTheme;
     final session = ref.watch(driverSessionProvider);
-    final displayName = session.firstName.trim().isNotEmpty
-        ? session.firstName.trim()
-        : (session.fullName.trim().isNotEmpty
-              ? session.fullName.trim().split(' ').first
-              : 'alex');
-    final vehicleSummary = session.vehicleType.trim().isNotEmpty
-        ? session.vehicleType.trim()
-        : '';
-
+    final profileAsync = ref.watch(driverProfileDetailsProvider);
+    final profile = profileAsync.asData?.value;
+    final photo = profile?.driverPhoto;
+    final name = session.fullName.trim().isEmpty
+        ? 'Conductor'
+        : session.fullName.trim();
+    final photoCount = [
+      profile?.driverPhoto,
+      profile?.licensePhoto,
+      profile?.vehiclePhoto,
+    ].where((photo) => photo != null).length;
     return _DetailScaffold(
-      title: 'Perfil',
-      child: Scaffold(
-        backgroundColor: palette.backgroundBase,
-        body: SafeArea(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(
-              metrics.pagePadding,
-              metrics.sectionGap,
-              metrics.pagePadding,
-              metrics.pagePadding + 8,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '¡Hola, $displayName!',
-                            style: textTheme.headlineMedium?.copyWith(
-                              fontSize: 34,
-                              fontWeight: FontWeight.w900,
-                              color: palette.textPrimary,
-                              height: 1.05,
-                            ),
-                          ),
-                          SizedBox(height: metrics.itemGap * 0.55),
-                          Row(
-                            children: [
-                              Text(
-                                'Conductor verificado',
-                                style: textTheme.titleMedium?.copyWith(
-                                  color: palette.textSecondary,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              SizedBox(width: metrics.itemGap * 0.5),
-                              Container(
-                                width: 26,
-                                height: 26,
-                                decoration: BoxDecoration(
+      title: 'Mi perfil',
+      child: SafeArea(
+        top: false,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 32),
+          children: [
+            Container(
+              padding: const EdgeInsets.all(22),
+              decoration: BoxDecoration(
+                color: palette.surfacePrimary,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: Container(
+                          width: 80,
+                          height: 80,
+                          color: palette.surfaceSecondary,
+                          child: photo == null
+                              ? Icon(
+                                  Icons.person_outline_rounded,
+                                  size: 40,
                                   color: palette.accentYellow,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.verified_rounded,
-                                  size: 18,
-                                  color: Color(0xFF111827),
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (vehicleSummary.isNotEmpty) ...[
-                            SizedBox(height: metrics.itemGap * 0.8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 10,
-                              ),
-                              decoration: BoxDecoration(
-                                color: palette.surfacePrimary,
-                                borderRadius: BorderRadius.circular(
-                                  metrics.radiusSmall,
-                                ),
-                                border: Border.all(
-                                  color: palette.outlineStrong,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.directions_car_filled_rounded,
-                                    size: 18,
+                                )
+                              : Image.network(
+                                  photo.url,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, error, stack) => Icon(
+                                    Icons.person_outline_rounded,
+                                    size: 40,
                                     color: palette.accentYellow,
                                   ),
-                                  SizedBox(width: metrics.itemGap * 0.5),
-                                  Flexible(
-                                    child: Text(
-                                      vehicleSummary,
-                                      style: textTheme.bodyMedium?.copyWith(
-                                        color: palette.textPrimary,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 13,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
+                                ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'RAPIGO CONDUCTOR',
+                              style: TextStyle(
+                                color: palette.accentYellow,
+                                fontSize: 10,
+                                letterSpacing: 1.4,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              name,
+                              style: GoogleFonts.plusJakartaSans(
+                                color: palette.textPrimary,
+                                fontSize: 23,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              session.phone,
+                              style: TextStyle(
+                                color: palette.textSecondary,
+                                fontSize: 13,
                               ),
                             ),
                           ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Container(
-                      width: 82,
-                      height: 82,
-                      decoration: BoxDecoration(
-                        color: palette.surfacePrimary,
-                        borderRadius: BorderRadius.circular(28),
-                        border: Border.all(color: palette.outlineStrong),
-                      ),
-                      child: Icon(
-                        Icons.person_outline_rounded,
-                        size: 40,
-                        color: palette.textPrimary,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: metrics.sectionGap),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF11151D),
-                    borderRadius: BorderRadius.circular(28),
-                    border: Border.all(color: const Color(0xFF262D37)),
-                  ),
-                  child: Column(
-                    children: [
-                      _DriverProfileMenuTile(
-                        icon: Icons.edit_outlined,
-                        title: 'Editar perfil',
-                        onTap: () =>
-                            _openPage(context, const DriverEditProfilePage()),
-                      ),
-                      _DriverProfileDivider(),
-                      _DriverProfileMenuTile(
-                        icon: Icons.bar_chart_rounded,
-                        title: 'Estadistica',
-                        onTap: () =>
-                            _openPage(context, const DriverStatisticsPage()),
-                      ),
-                      _DriverProfileDivider(),
-                      _DriverProfileMenuTile(
-                        icon: Icons.notifications_none_rounded,
-                        title: 'Notificaciones',
-                        onTap: () =>
-                            _openPage(context, const DriverNotificationsPage()),
-                      ),
-                      _DriverProfileDivider(),
-                      _DriverProfileMenuTile(
-                        icon: Icons.settings_outlined,
-                        title: 'Configuraciones',
-                        onTap: () =>
-                            _openPage(context, const DriverSettingsPage()),
-                      ),
-                      _DriverProfileDivider(),
-                      _DriverProfileMenuTile(
-                        icon: Icons.support_agent_rounded,
-                        title: 'Soporte',
-                        onTap: () =>
-                            _openPage(context, const DriverSupportPage()),
+                        ),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: FilledButton.icon(
-                    onPressed: () => _handleLogout(context, ref),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFFFACC15),
-                      foregroundColor: const Color(0xFF111827),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
+                  const SizedBox(height: 20),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      Chip(
+                        avatar: const Icon(
+                          Icons.verified_user_outlined,
+                          size: 17,
+                        ),
+                        label: Text(
+                          session.accessStatus == 'AUTORIZADO'
+                              ? 'Cuenta autorizada'
+                              : 'Estado: ${session.accessStatus}',
+                        ),
                       ),
-                    ),
-                    icon: const Icon(Icons.logout_rounded, size: 20),
-                    label: const Text(
-                      'Cerrar sesión',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w900,
+                      Chip(
+                        avatar: Icon(
+                          session.vehicleType == 'moto'
+                              ? Icons.two_wheeler
+                              : Icons.local_taxi_outlined,
+                          size: 17,
+                        ),
+                        label: Text(
+                          profile?.plate.isNotEmpty == true
+                              ? profile!.plate
+                              : session.vehicleType == 'moto'
+                              ? 'Moto'
+                              : 'Taxi',
+                        ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () =>
+                          _openPage(context, const DriverEditProfilePage()),
+                      icon: const Icon(Icons.edit_outlined, size: 20),
+                      label: const Text('Editar perfil'),
                     ),
                   ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            _DriverTodaySummary(),
+            const SizedBox(height: 18),
+            _EditSection(
+              title: 'Documentación',
+              children: [
+                Text(
+                  'Conductor, licencia y vehículo',
+                  style: TextStyle(color: palette.textSecondary, fontSize: 13),
+                ),
+                const SizedBox(height: 12),
+                if (profileAsync.isLoading)
+                  const LinearProgressIndicator()
+                else if (profileAsync.hasError)
+                  Text(
+                    'No pudimos cargar tus fotos. Intenta nuevamente.',
+                    style: TextStyle(color: palette.textSecondary),
+                  )
+                else
+                  Text(
+                    '$photoCount de 3 fotos guardadas',
+                    style: TextStyle(
+                      color: photoCount == 3
+                          ? palette.accentGreen
+                          : palette.accentYellow,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                if (profile != null) ...[
+                  _ReadinessRow(label: 'Foto del conductor', ready: profile.driverPhoto != null),
+                  _ReadinessRow(label: 'Licencia de conducir', ready: profile.licensePhoto != null),
+                  _ReadinessRow(label: 'Foto del vehículo', ready: profile.vehiclePhoto != null),
+                  const SizedBox(height: 8),
+                  Text('Estos estados indican archivos cargados. La autorización de la cuenta la confirma la central.', style: TextStyle(color: palette.textMuted, fontSize: 12)),
+                ],
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _openPage(
+                      context,
+                      const DriverEditProfilePage(photosFirst: true),
+                    ),
+                    icon: const Icon(Icons.add_photo_alternate_outlined),
+                    label: const Text('Subir o cambiar fotos'),
+                  ),
+                ),
+                if (profileAsync.hasError)
+                  TextButton.icon(
+                    onPressed: () =>
+                        ref.invalidate(driverProfileDetailsProvider),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Reintentar'),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            _EditSection(
+              title: 'Mi cuenta',
+              children: [
+                _DriverProfileMenuTile(
+                  icon: Icons.workspace_premium_outlined,
+                  title: 'Mi suscripción',
+                  onTap: () => _openPage(context, DriverSubscriptionPage(token: session.token)),
+                ),
+                const _DriverProfileDivider(),
+                _DriverProfileMenuTile(
+                  icon: Icons.bar_chart_rounded,
+                  title: 'Estadísticas',
+                  onTap: () => _openPage(context, const DriverStatisticsPage()),
+                ),
+                const _DriverProfileDivider(),
+                _DriverProfileMenuTile(
+                  icon: Icons.notifications_none_rounded,
+                  title: 'Notificaciones',
+                  onTap: () =>
+                      _openPage(context, const DriverNotificationsPage()),
+                ),
+                const _DriverProfileDivider(),
+                _DriverProfileMenuTile(
+                  icon: Icons.settings_outlined,
+                  title: 'Configuraciones',
+                  onTap: () => _openPage(context, const DriverSettingsPage()),
+                ),
+                const _DriverProfileDivider(),
+                _DriverProfileMenuTile(
+                  icon: Icons.privacy_tip_outlined,
+                  title: 'Privacidad y cuenta',
+                  onTap: () => _openPage(context, PrivacyPage(token: session.token, onOpenSupport: () => _openPage(context, const DriverSupportPage()))),
+                ),
+                const _DriverProfileDivider(),
+                _DriverProfileMenuTile(
+                  icon: Icons.support_agent_rounded,
+                  title: 'Soporte',
+                  onTap: () => _openPage(context, const DriverSupportPage()),
                 ),
               ],
             ),
-          ),
+            const SizedBox(height: 20),
+            OutlinedButton.icon(
+              onPressed: () => _handleLogout(context, ref),
+              icon: const Icon(Icons.logout_rounded, size: 20),
+              label: const Text('Cerrar sesión'),
+            ),
+          ],
         ),
       ),
     );
+  }
+}
+
+class _ReadinessRow extends StatelessWidget {
+  const _ReadinessRow({required this.label, required this.ready});
+  final String label;
+  final bool ready;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 6),
+    child: Row(children: [
+      Icon(ready ? Icons.check_circle_outline : Icons.radio_button_unchecked, size: 20, color: ready ? context.rapigoPalette.accentGreen : context.rapigoPalette.textMuted),
+      const SizedBox(width: 10),
+      Expanded(child: Text(label)),
+      Text(ready ? 'Cargado' : 'Pendiente', style: Theme.of(context).textTheme.bodySmall),
+    ]),
+  );
+}
+
+class _DriverTodaySummary extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final history = ref.watch(driverStatisticsProvider('Dia'));
+    return _EditSection(title: 'Hoy', children: [
+      history.when(
+        loading: () => const LinearProgressIndicator(),
+        error: (_, stack) => TextButton.icon(
+          onPressed: () => ref.invalidate(driverStatisticsProvider('Dia')),
+          icon: const Icon(Icons.refresh), label: const Text('Reintentar resumen'),
+        ),
+        data: (summary) {
+          final completed = summary.completed;
+          return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Bs ${summary.revenue.toStringAsFixed(2)}', style: Theme.of(context).textTheme.headlineLarge),
+            const SizedBox(height: 6),
+            Text('$completed viajes completados'),
+            const SizedBox(height: 6),
+            Text('Importes registrados; confirma el cobro de cada viaje.', style: Theme.of(context).textTheme.bodySmall),
+          ]);
+        },
+      ),
+    ]);
   }
 }
 
@@ -412,7 +496,9 @@ class _DriverAppInfoPageState extends State<DriverAppInfoPage> {
 }
 
 class DriverEditProfilePage extends ConsumerStatefulWidget {
-  const DriverEditProfilePage({super.key});
+  const DriverEditProfilePage({super.key, this.photosFirst = false});
+
+  final bool photosFirst;
 
   @override
   ConsumerState<DriverEditProfilePage> createState() =>
@@ -432,6 +518,12 @@ class _DriverEditProfilePageState extends ConsumerState<DriverEditProfilePage> {
   final _colorController = TextEditingController();
   final _yearController = TextEditingController();
   Future<DriverProfileDetails?>? _profileFuture;
+  final _photosKey = GlobalKey();
+  final _imagePicker = ImagePicker();
+  final _photos = <String, DriverUploadedDocument?>{};
+  final _changedPhotos = <String>{};
+  DriverProfileDetails? _originalProfile;
+  String? _uploadingPhoto;
   String _vehicleType = 'taxi';
   bool _saving = false;
   bool _loaded = false;
@@ -476,6 +568,12 @@ class _DriverEditProfilePageState extends ConsumerState<DriverEditProfilePage> {
     if (!_loaded && mounted) {
       setState(() {
         _loaded = true;
+        _originalProfile = profile;
+        _photos.addAll({
+          'driver_photo': profile.driverPhoto,
+          'license_photo': profile.licensePhoto,
+          'vehicle_photo': profile.vehiclePhoto,
+        });
         _licenseController.text = profile.licenseNumber;
         _vehicleType = profile.vehicleType.trim().isEmpty
             ? _vehicleType
@@ -545,8 +643,138 @@ class _DriverEditProfilePageState extends ConsumerState<DriverEditProfilePage> {
     return null;
   }
 
+  Future<void> _pickPhoto(String type) async {
+    if (_saving || _uploadingPhoto != null) return;
+    // Lock selection as well as upload to prevent overlapping picker requests.
+    setState(() => _uploadingPhoto = type);
+    try {
+      final source = await showModalBottomSheet<ImageSource>(
+        context: context,
+        showDragHandle: true,
+        builder: (context) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt_outlined),
+                title: const Text('Tomar foto'),
+                onTap: () => Navigator.pop(context, ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: const Text('Elegir de galería'),
+                onTap: () => Navigator.pop(context, ImageSource.gallery),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      );
+      if (source == null || !mounted) return;
+      final picked = await _imagePicker.pickImage(
+        source: source,
+        imageQuality: 82,
+        maxWidth: 1800,
+      );
+      if (picked == null || !mounted) return;
+      final document = await ref
+          .read(driverSessionProvider.notifier)
+          .uploadDriverDocument(
+            firstName: _firstNameController.text.trim(),
+            lastName: _lastNameController.text.trim(),
+            documentType: type,
+            file: File(picked.path),
+          );
+      if (!mounted) return;
+      setState(() {
+        _photos[type] = document;
+        _changedPhotos.add(type);
+      });
+      showTopNotice(
+        context,
+        'Foto lista. Toca Guardar cambios para actualizar tu perfil.',
+        tone: NoticeTone.success,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      showTopNotice(
+        context,
+        'No se pudo subir la foto. Revisa la conexión y los permisos e intenta de nuevo. Tu foto anterior se conserva.',
+        tone: NoticeTone.error,
+      );
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = null);
+    }
+  }
+
+  Widget _photoSection() => _EditSection(
+    key: _photosKey,
+    title: 'Fotos del registro',
+    children: [
+      const Text(
+        'Tus fotos guardadas se conservan. Puedes cambiar solo la que necesites.',
+        style: TextStyle(color: Color(0xFFB8C0CC), height: 1.5, fontSize: 13),
+      ),
+      const SizedBox(height: 16),
+      for (final photo in const [
+        (
+          'driver_photo',
+          'Foto del conductor',
+          'Tu rostro visible y con buena iluminación.',
+          Icons.person_outline_rounded,
+        ),
+        (
+          'license_photo',
+          'Foto de la licencia',
+          'Documento completo y datos legibles.',
+          Icons.badge_outlined,
+        ),
+        (
+          'vehicle_photo',
+          'Foto del vehículo',
+          'Muestra el vehículo y su placa con claridad.',
+          Icons.directions_car_outlined,
+        ),
+      ])
+        DriverProfilePhotoCard(
+          title: photo.$2,
+          description: photo.$3,
+          icon: photo.$4,
+          url: _photos[photo.$1]?.url,
+          uploading: _uploadingPhoto == photo.$1,
+          changed: _changedPhotos.contains(photo.$1),
+          onPick: _saving || _uploadingPhoto != null
+              ? null
+              : () => _pickPhoto(photo.$1),
+        ),
+    ],
+  );
+
   Future<void> _save() async {
-    if (_saving || !_formKey.currentState!.validate()) {
+    if (_saving ||
+        _uploadingPhoto != null ||
+        !_loaded ||
+        !_formKey.currentState!.validate()) {
+      return;
+    }
+    final missing = [
+      'driver_photo',
+      'license_photo',
+      'vehicle_photo',
+    ].where((type) => _photos[type] == null).toList();
+    if (missing.isNotEmpty) {
+      showTopNotice(
+        context,
+        'Completa las fotos que faltan en Fotos del registro.',
+        tone: NoticeTone.error,
+      );
+      final photosContext = _photosKey.currentContext;
+      if (photosContext != null) {
+        Scrollable.ensureVisible(
+          photosContext,
+          duration: const Duration(milliseconds: 300),
+        );
+      }
       return;
     }
     setState(() => _saving = true);
@@ -558,9 +786,12 @@ class _DriverEditProfilePageState extends ConsumerState<DriverEditProfilePage> {
           email: _emailController.text.trim(),
           address: _addressController.text.trim(),
           licenseNumber: _licenseController.text.trim(),
-          licenseCategory: '',
-          licenseIssueDate: '',
-          licenseExpiryDate: '',
+          licenseCategory: _originalProfile?.licenseCategory ?? '',
+          licenseIssueDate: _originalProfile?.licenseIssueDate ?? '',
+          licenseExpiryDate: _originalProfile?.licenseExpiryDate ?? '',
+          driverPhoto: _photos['driver_photo'],
+          licensePhoto: _photos['license_photo'],
+          vehiclePhoto: _photos['vehicle_photo'],
           vehicleType: _vehicleType,
           plate: _plateController.text.trim().toUpperCase(),
           brand: _brandController.text.trim(),
@@ -586,6 +817,7 @@ class _DriverEditProfilePageState extends ConsumerState<DriverEditProfilePage> {
       'Perfil actualizado correctamente.',
       tone: NoticeTone.success,
     );
+    ref.invalidate(driverProfileDetailsProvider);
     Navigator.of(context).pop();
   }
 
@@ -606,6 +838,32 @@ class _DriverEditProfilePageState extends ConsumerState<DriverEditProfilePage> {
                 child: CircularProgressIndicator(color: Color(0xFFFACC15)),
               );
             }
+            if (snapshot.hasError || snapshot.data == null) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.cloud_off_outlined, size: 40),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'No se pudo cargar tu perfil y tus fotos.',
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      OutlinedButton.icon(
+                        onPressed: () => setState(
+                          () => _profileFuture = _loadDriverProfile(),
+                        ),
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Reintentar'),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
             return SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
               child: Form(
@@ -613,6 +871,64 @@ class _DriverEditProfilePageState extends ConsumerState<DriverEditProfilePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: palette.surfaceSecondary,
+                        borderRadius: BorderRadius.circular(22),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.manage_accounts_outlined,
+                            color: palette.accentYellow,
+                            size: 30,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Mantén tu perfil al día',
+                            style: TextStyle(
+                              color: palette.textPrimary,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Actualiza tus datos y las fotos de tu registro. Al terminar, guarda los cambios.',
+                            style: TextStyle(
+                              color: palette.textSecondary,
+                              height: 1.5,
+                            ),
+                          ),
+                          if (!widget.photosFirst) ...[
+                            const SizedBox(height: 14),
+                            OutlinedButton.icon(
+                              onPressed: () {
+                                final target = _photosKey.currentContext;
+                                if (target != null) {
+                                  Scrollable.ensureVisible(
+                                    target,
+                                    duration: const Duration(milliseconds: 300),
+                                  );
+                                }
+                              },
+                              icon: const Icon(
+                                Icons.add_photo_alternate_outlined,
+                              ),
+                              label: const Text('Subir o cambiar fotos'),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    if (widget.photosFirst) ...[
+                      _photoSection(),
+                      const SizedBox(height: 18),
+                    ],
                     _EditSection(
                       title: 'Datos personales',
                       children: [
@@ -637,12 +953,12 @@ class _DriverEditProfilePageState extends ConsumerState<DriverEditProfilePage> {
                         ),
                         _EditField(
                           controller: _addressController,
-                          label: 'Direccion',
+                          label: 'Dirección',
                           icon: Icons.location_on_outlined,
                           validator: (value) =>
-                              _required(value, 'Direccion', min: 4),
+                              _required(value, 'Dirección', min: 4),
                         ),
-                        _ReadOnlyInfo(label: 'Telefono', value: session.phone),
+                        _ReadOnlyInfo(label: 'Teléfono', value: session.phone),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -651,7 +967,7 @@ class _DriverEditProfilePageState extends ConsumerState<DriverEditProfilePage> {
                       children: [
                         _EditField(
                           controller: _licenseController,
-                          label: 'Numero de licencia',
+                          label: 'Número de licencia',
                           icon: Icons.credit_card_rounded,
                           validator: _licenseValidator,
                         ),
@@ -659,7 +975,7 @@ class _DriverEditProfilePageState extends ConsumerState<DriverEditProfilePage> {
                     ),
                     const SizedBox(height: 16),
                     _EditSection(
-                      title: 'Vehiculo',
+                      title: 'Vehículo',
                       children: [
                         SegmentedButton<String>(
                           segments: const [
@@ -708,7 +1024,7 @@ class _DriverEditProfilePageState extends ConsumerState<DriverEditProfilePage> {
                         ),
                         _EditField(
                           controller: _yearController,
-                          label: 'Anio',
+                          label: 'Año',
                           icon: Icons.calendar_month_outlined,
                           keyboardType: TextInputType.number,
                           validator: (value) {
@@ -718,19 +1034,25 @@ class _DriverEditProfilePageState extends ConsumerState<DriverEditProfilePage> {
                             }
                             final year = int.tryParse(text);
                             if (year == null || year < 1990 || year > 2100) {
-                              return 'Anio invalido.';
+                              return 'Año invalido.';
                             }
                             return null;
                           },
                         ),
                       ],
                     ),
+                    if (!widget.photosFirst) ...[
+                      const SizedBox(height: 18),
+                      _photoSection(),
+                    ],
                     const SizedBox(height: 22),
                     SizedBox(
                       width: double.infinity,
                       height: 58,
                       child: FilledButton.icon(
-                        onPressed: _saving ? null : _save,
+                        onPressed: _saving || _uploadingPhoto != null
+                            ? null
+                            : _save,
                         icon: _saving
                             ? const SizedBox(
                                 width: 18,
@@ -757,7 +1079,7 @@ class _DriverEditProfilePageState extends ConsumerState<DriverEditProfilePage> {
 }
 
 class _EditSection extends StatelessWidget {
-  const _EditSection({required this.title, required this.children});
+  const _EditSection({super.key, required this.title, required this.children});
 
   final String title;
   final List<Widget> children;
@@ -1060,12 +1382,11 @@ class _DriverProfileMenuTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
-              width: 46,
-              height: 46,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
                 color: palette.surfaceSecondary,
-                borderRadius: BorderRadius.circular(15),
-                border: Border.all(color: palette.outlineStrong),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: palette.accentYellow, size: 22),
             ),
@@ -1079,7 +1400,7 @@ class _DriverProfileMenuTile extends StatelessWidget {
                     style: textTheme.titleLarge?.copyWith(
                       color: palette.textPrimary,
                       fontSize: 15,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
@@ -1090,8 +1411,8 @@ class _DriverProfileMenuTile extends StatelessWidget {
               padding: EdgeInsets.zero,
               child: Icon(
                 Icons.chevron_right_rounded,
-                color: palette.textPrimary,
-                size: 24,
+                color: palette.textMuted,
+                size: 22,
               ),
             ),
           ],
@@ -1102,6 +1423,8 @@ class _DriverProfileMenuTile extends StatelessWidget {
 }
 
 class _DriverProfileDivider extends StatelessWidget {
+  const _DriverProfileDivider();
+
   @override
   Widget build(BuildContext context) {
     return Divider(
@@ -1287,222 +1610,105 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
     final palette = context.rapigoPalette;
     return _DetailScaffold(
       title: 'Configuraciones',
-      child: DriverPageShell(
-        eyebrow: 'Preferencias',
-        title: 'Configuraciones',
-        child: Column(
+      child: SafeArea(
+        top: false,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 32),
           children: [
             Container(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(22),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
+                gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [palette.surfacePrimary, palette.surfaceSecondary],
+                  colors: [Color(0xFF20334E), Color(0xFF101C2E)],
                 ),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: palette.outlineStrong),
+                borderRadius: BorderRadius.circular(26),
+                border: Border.all(color: palette.outlineSoft),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const Icon(
+                    Icons.tune_rounded,
+                    color: Color(0xFFFFC400),
+                    size: 30,
+                  ),
+                  const SizedBox(height: 18),
                   Text(
-                    'Mapa offline',
+                    'Tu app, a tu manera',
                     style: GoogleFonts.plusJakartaSans(
-                      fontSize: 16,
+                      color: palette.textPrimary,
+                      fontSize: 25,
                       fontWeight: FontWeight.w800,
-                      color: Colors.white,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Descarga o actualiza Potosi ciudad para mantener el mapa listo aun con señal baja.',
+                  const SizedBox(height: 8),
+                  Text(
+                    'Prepara cada viaje con las preferencias que van contigo.',
                     style: TextStyle(
-                      color: Color(0xFFDCE6F2),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: () => showOfflineMapSheet(context),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(42),
-                        textStyle: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      icon: const Icon(
-                        Icons.download_for_offline_rounded,
-                        size: 18,
-                      ),
-                      label: const Text('Abrir mapa offline'),
+                      color: palette.textSecondary,
+                      fontSize: 14,
+                      height: 1.5,
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [palette.surfacePrimary, palette.surfaceSecondary],
+            const _SettingsSectionLabel('NAVEGACIÓN'),
+            _SettingsCard(
+              icon: Icons.map_outlined,
+              title: 'Mapa offline',
+              subtitle: 'Ten Potosí a mano, incluso con poca señal.',
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () => showOfflineMapSheet(context),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  icon: const Icon(
+                    Icons.download_for_offline_outlined,
+                    size: 20,
+                  ),
+                  label: const Text('Gestionar mapa offline'),
                 ),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: palette.outlineStrong),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color:
-                          (_requestSoundEnabled
-                                  ? palette.accentGreen
-                                  : palette.surfaceMuted)
-                              .withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: _requestSoundEnabled
-                            ? palette.accentGreen.withValues(alpha: 0.45)
-                            : palette.outlineSoft,
-                      ),
-                    ),
-                    child: Icon(
-                      _requestSoundEnabled
-                          ? Icons.volume_up_rounded
-                          : Icons.volume_off_rounded,
-                      color: _requestSoundEnabled
-                          ? palette.accentGreen
-                          : palette.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Sonido de solicitudes',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Alerta sonora cuando llega una solicitud de viaje.',
-                          style: TextStyle(
-                            color: Color(0xFFDCE6F2),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Switch.adaptive(
-                    value: _requestSoundEnabled,
-                    onChanged: _loadingRequestSound
-                        ? null
-                        : (value) => _setRequestSoundPreference(value),
-                  ),
-                ],
               ),
             ),
             const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [palette.surfacePrimary, palette.surfaceSecondary],
-                ),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: palette.outlineStrong),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: palette.accentBlue.withValues(alpha: 0.16),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: palette.accentBlue.withValues(alpha: 0.36),
-                          ),
-                        ),
-                        child: Icon(
-                          Icons.navigation_rounded,
-                          color: palette.accentBlue,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
-                            Text(
-                              'Aplicacion de navegacion',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Elige que app abrir al presionar Navegar.',
-                              style: TextStyle(
-                                color: Color(0xFFDCE6F2),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
+            _SettingsCard(
+              icon: Icons.navigation_outlined,
+              title: 'Aplicación de navegación',
+              subtitle: 'Elige la app que se abrirá al tocar Navegar.',
+              child:
                   DropdownButtonFormField<trip_navigation.NavigationPreference>(
                     initialValue: _navigationPreference,
+                    isExpanded: true,
                     dropdownColor: palette.surfacePrimary,
-                    iconEnabledColor: palette.textPrimary,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    icon: Icon(
+                      Icons.expand_more_rounded,
+                      color: palette.textSecondary,
+                    ),
+                    style: TextStyle(
+                      color: palette.textPrimary,
                       fontSize: 14,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                     ),
                     decoration: InputDecoration(
-                      filled: true,
-                      fillColor: const Color(0xFF0B1627),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 14,
-                        vertical: 12,
+                        vertical: 14,
                       ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide(color: palette.outlineSoft),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide(color: palette.accentBlue),
+                      fillColor: palette.backgroundBase,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
                       ),
                     ),
                     items: trip_navigation.NavigationPreference.values.map((
@@ -1523,11 +1729,12 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                           available
                               ? preference.label
                               : '${preference.label} no instalado',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: available
-                                ? Colors.white
-                                : const Color(0xFF64748B),
-                            fontWeight: FontWeight.w800,
+                                ? palette.textPrimary
+                                : palette.textMuted,
                           ),
                         ),
                       );
@@ -1540,79 +1747,81 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
                             }
                           },
                   ),
-                ],
+            ),
+            const _SettingsSectionLabel('SOLICITUDES Y SERVICIOS'),
+            _SettingsCard(
+              icon: Icons.notifications_active_outlined,
+              title: 'Sonido de solicitudes',
+              subtitle: 'Escucha una alerta al recibir un nuevo viaje.',
+              child: _SettingsSwitchRow(
+                label: _requestSoundEnabled
+                    ? 'Sonido activado'
+                    : 'Sonido desactivado',
+                value: _requestSoundEnabled,
+                busy: _loadingRequestSound,
+                onChanged: _setRequestSoundPreference,
               ),
             ),
             const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [palette.surfacePrimary, palette.surfaceSecondary],
-                ),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: palette.outlineStrong),
-              ),
+            _SettingsCard(
+              icon: Icons.local_taxi_outlined,
+              title: 'Tus servicios',
+              subtitle: 'Administra los tipos de solicitudes que recibes.',
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Servicios',
-                    style: GoogleFonts.plusJakartaSans(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
                   Row(
                     children: [
-                      const Expanded(
-                        child: _DriverServiceOptionButton(
-                          icon: Icons.local_taxi_rounded,
-                          title: 'Taxi o moto',
-                          subtitle: 'Activo',
-                          active: true,
-                        ),
+                      Icon(
+                        Icons.check_circle_rounded,
+                        color: palette.accentGreen,
+                        size: 20,
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: _DriverServiceOptionButton(
-                          icon: Icons.delivery_dining_rounded,
-                          title: 'Delivery',
-                          subtitle: _deliveryEnabled
-                              ? 'Extra activo'
-                              : 'Servicio extra',
-                          active: _deliveryEnabled,
-                          trailing: _loadingServices || _savingServices
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Color(0xFF60A5FA),
-                                  ),
-                                )
-                              : Switch.adaptive(
-                                  value: _deliveryEnabled,
-                                  onChanged: _setDeliveryEnabled,
-                                ),
-                          onTap: _loadingServices || _savingServices
-                              ? null
-                              : () => _setDeliveryEnabled(!_deliveryEnabled),
+                        child: Text(
+                          'Taxi o moto',
+                          style: TextStyle(
+                            color: palette.textPrimary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        'Activo',
+                        style: TextStyle(
+                          color: palette.accentGreen,
+                          fontSize: 12,
                         ),
                       ),
                     ],
                   ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Divider(height: 1, color: palette.outlineSoft),
+                  ),
+                  _SettingsSwitchRow(
+                    label: 'Delivery',
+                    value: _deliveryEnabled,
+                    busy: _loadingServices || _savingServices,
+                    onChanged: _setDeliveryEnabled,
+                  ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Recibe también solicitudes de entregas.',
+                      style: TextStyle(
+                        color: palette.textMuted,
+                        fontSize: 12,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 14),
+            const _SettingsSectionLabel('CUENTA Y APLICACIÓN'),
             const _DriverProtectedSessionCard(),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
             _DriverAboutSettingsCard(
               onOpenInfo: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
@@ -1625,6 +1834,143 @@ class _DriverSettingsPageState extends ConsumerState<DriverSettingsPage> {
       ),
     );
   }
+}
+
+class _SettingsSectionLabel extends StatelessWidget {
+  const _SettingsSectionLabel(this.label);
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(4, 26, 4, 12),
+    child: Text(
+      label,
+      style: TextStyle(
+        color: context.rapigoPalette.textMuted,
+        fontSize: 11,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 1.4,
+      ),
+    ),
+  );
+}
+
+class _SettingsCard extends StatelessWidget {
+  const _SettingsCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.rapigoPalette;
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: palette.surfacePrimary,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: palette.outlineSoft),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: palette.accentBlue.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Icon(icon, size: 22, color: palette.accentBlue),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: palette.textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: palette.textSecondary,
+                        fontSize: 12,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingsSwitchRow extends StatelessWidget {
+  const _SettingsSwitchRow({
+    required this.label,
+    required this.value,
+    required this.busy,
+    required this.onChanged,
+  });
+  final String label;
+  final bool value;
+  final bool busy;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Expanded(
+        child: Text(
+          label,
+          style: TextStyle(
+            color: context.rapigoPalette.textPrimary,
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+      if (busy)
+        const Padding(
+          padding: EdgeInsets.only(right: 8),
+          child: SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      Semantics(
+        label: label,
+        child: Switch.adaptive(
+          value: value,
+          onChanged: busy ? null : onChanged,
+          activeThumbColor: const Color(0xFF0D1828),
+          activeTrackColor: const Color(0xFFFFC400),
+        ),
+      ),
+    ],
+  );
 }
 
 class _DriverProtectedSessionCard extends StatelessWidget {
@@ -1755,94 +2101,6 @@ class _DriverAboutSettingsCard extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _DriverServiceOptionButton extends StatelessWidget {
-  const _DriverServiceOptionButton({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.active,
-    this.trailing,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final bool active;
-  final Widget? trailing;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final borderColor = active
-        ? const Color(0x661D4ED8)
-        : const Color(0x33475569);
-    final iconColor = active
-        ? const Color(0xFF60A5FA)
-        : const Color(0xFF94A3B8);
-    return Material(
-      color: active ? const Color(0x191D4ED8) : const Color(0xFF0B1220),
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 82),
-          padding: const EdgeInsets.all(11),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: borderColor),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Row(
-                children: [
-                  Icon(icon, color: iconColor, size: 22),
-                  const Spacer(),
-                  trailing ??
-                      Icon(
-                        active
-                            ? Icons.check_circle_rounded
-                            : Icons.schedule_rounded,
-                        color: active
-                            ? const Color(0xFF22C55E)
-                            : const Color(0xFFFACC15),
-                        size: 17,
-                      ),
-                ],
-              ),
-              const SizedBox(height: 9),
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.plusJakartaSans(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Color(0xFFDCE6F2),
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -2244,35 +2502,20 @@ class _DriverStatisticsPageState extends ConsumerState<DriverStatisticsPage> {
   @override
   Widget build(BuildContext context) {
     final palette = context.rapigoPalette;
-    final history =
-        ref.watch(driverTripHistoryProvider).value ?? const <DriverTrip>[];
-    final now = DateTime.now();
-    final filtered = history
-        .where((trip) {
-          final date = DateTime.tryParse(trip.requestedAt ?? '');
-          if (date == null) {
-            return false;
-          }
-          final local = date.toLocal();
-          if (_range == 'Dia') {
-            return local.year == now.year &&
-                local.month == now.month &&
-                local.day == now.day;
-          }
-          if (_range == 'Semana') {
-            return now.difference(local).inDays < 7;
-          }
-          return local.year == now.year && local.month == now.month;
-        })
-        .toList(growable: false);
-
-    final completed = filtered
-        .where((trip) => trip.status == 'completed')
-        .length;
-    final totalCompleted = history
-        .where((trip) => trip.status == 'completed')
-        .length;
-    final promoTrips = filtered.where((trip) => trip.isPromotional).length;
+    final historyAsync = ref.watch(driverStatisticsProvider(_range));
+    if (historyAsync.isLoading) {
+      return const _DetailScaffold(title: 'Estadísticas', child: Center(child: CircularProgressIndicator()));
+    }
+    if (historyAsync.hasError) {
+      return _DetailScaffold(title: 'Estadísticas', child: Center(child: TextButton(
+        onPressed: () => ref.invalidate(driverStatisticsProvider(_range)),
+        child: const Text('No se pudo cargar el historial. Reintentar'),
+      )));
+    }
+    final summary = historyAsync.requireValue;
+    final completed = summary.completed;
+    final totalCompleted = summary.totalCompleted;
+    final promoTrips = summary.promotional;
 
     return _DetailScaffold(
       title: 'Estadistica',
@@ -2287,16 +2530,16 @@ class _DriverStatisticsPageState extends ConsumerState<DriverStatisticsPage> {
                 Expanded(
                   child: _DriverStatisticsMetricButton(
                     icon: Icons.workspace_premium_outlined,
-                    label: 'Prioridad',
-                    value: '+${totalCompleted < 120 ? 120 : totalCompleted}',
+                    label: 'Viajes totales',
+                    value: '$totalCompleted',
                   ),
                 ),
                 const SizedBox(width: 10),
-                const Expanded(
+                Expanded(
                   child: _DriverStatisticsMetricButton(
                     icon: Icons.star_border_rounded,
                     label: 'Calificación',
-                    value: '5.0',
+                    value: summary.ratingLabel,
                   ),
                 ),
               ],
@@ -2341,6 +2584,10 @@ class _DriverStatisticsPageState extends ConsumerState<DriverStatisticsPage> {
                   setState(() => _range = selection.first),
             ),
             const SizedBox(height: 18),
+            _DriverSettingsInfoCard(
+              title: 'Bs ${summary.revenue.toStringAsFixed(2)}',
+              subtitle: 'Importe de viajes completados. No es un saldo de billetera ni confirma el cobro.',
+            ),
             _DriverSettingsInfoCard(
               title: 'Viajes completados',
               subtitle: '$completed viaje(s) cerrados en este periodo.',

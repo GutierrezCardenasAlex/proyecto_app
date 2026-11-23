@@ -160,6 +160,7 @@ class NearbyDriver {
   final double lng;
   final double distanceMeters;
   final double rating;
+  String get ratingLabel => rating.isFinite && rating > 0 ? rating.toStringAsFixed(1) : 'Sin valoraciones';
   final int etaMinutes;
   final String vehicleType;
   final String vehicleLabel;

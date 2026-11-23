@@ -21,6 +21,7 @@ class _DriverActiveTripListenerState
     return trip != null &&
         !trip.hasPendingCounterOffer &&
         const {
+          'completed',
           'accepted',
           'arriving',
           'at_pickup',

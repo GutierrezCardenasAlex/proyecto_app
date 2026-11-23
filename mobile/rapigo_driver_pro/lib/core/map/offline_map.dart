@@ -16,7 +16,9 @@ const _offlineMinZoom = 12;
 const _offlineMaxZoom = 18;
 
 final offlineMapProvider =
-    NotifierProvider<OfflineMapController, OfflineMapState>(OfflineMapController.new);
+    NotifierProvider<OfflineMapController, OfflineMapState>(
+      OfflineMapController.new,
+    );
 
 class OfflineMapBootstrap {
   static Future<void> ensureInitialized() async {
@@ -71,10 +73,12 @@ class OfflineMapState {
 }
 
 class OfflineMapController extends Notifier<OfflineMapState> {
-  static const _offlinePackInstalledKey = 'rapigo_pro_offline_pack_installed_v1';
+  static const _offlinePackInstalledKey =
+      'rapigo_pro_offline_pack_installed_v1';
 
   final FMTCStore _store = const FMTCStore(_potosiStoreName);
-  bool _isRefreshing = false;
+  Future<void>? _refreshTask;
+  bool _automaticDownloadAttempted = false;
   Future<void>? _downloadTask;
 
   @override
@@ -88,7 +92,9 @@ class OfflineMapController extends Notifier<OfflineMapState> {
     return _store.getTileProvider(
       loadingStrategy: BrowseLoadingStrategy.cacheFirst,
       storeStrategy: BrowseStoreStrategy.readUpdateCreate,
-      cachedValidDuration: const Duration(days: 30),
+      cachedValidDuration: AppConfig.hasDedicatedOfflineTileSource
+          ? Duration.zero
+          : const Duration(days: 30),
       errorHandler: (error) {
         debugPrint('FMTC tile error: $error');
         return null;
@@ -98,6 +104,8 @@ class OfflineMapController extends Notifier<OfflineMapState> {
 
   TileLayer buildTileLayer({
     required String userAgentPackageName,
+    int keepBuffer = 4,
+    TileUpdateTransformer? tileUpdateTransformer,
   }) {
     return TileLayer(
       urlTemplate: AppConfig.effectiveMapTilesUrlTemplate,
@@ -109,7 +117,8 @@ class OfflineMapController extends Notifier<OfflineMapState> {
       maxZoom: _offlineMaxZoom.toDouble(),
       maxNativeZoom: _offlineMaxZoom,
       tileBounds: AppConfig.potosiViewBounds,
-      keepBuffer: 4,
+      keepBuffer: keepBuffer,
+      tileUpdateTransformer: tileUpdateTransformer,
       panBuffer: 1,
       tileDisplay: const TileDisplay.instantaneous(),
     );
@@ -137,37 +146,44 @@ class OfflineMapController extends Notifier<OfflineMapState> {
   }
 
   Future<void> refreshStatus() async {
-    if (_isRefreshing) {
-      return;
+    final pending = _refreshTask;
+    if (pending != null) return pending;
+    _refreshTask = _refreshStatus();
+    try {
+      await _refreshTask;
+    } finally {
+      _refreshTask = null;
     }
+  }
 
-    _isRefreshing = true;
+  Future<void> _refreshStatus() async {
     try {
       final isReady = await _store.manage.ready;
-      final stats = isReady ? await _store.stats.all : (size: 0.0, length: 0, hits: 0, misses: 0);
+      final stats = isReady
+          ? await _store.stats.all
+          : (size: 0.0, length: 0, hits: 0, misses: 0);
+      final installed = stats.length > 0 && await _isOfflinePackInstalled();
       state = state.copyWith(
         isReady: stats.length > 0,
         downloadedTiles: stats.length,
         statusMessage: stats.length > 0
             ? AppConfig.hasDedicatedOfflineTileSource
-                ? 'Mapa offline de ${potosiCityPack.name} listo'
-                : 'Cache inteligente activo. El mapa guardara las zonas vistas para seguir mostrandolas cuando la señal baje.'
+                  ? (installed
+                        ? 'Mapa offline de ${potosiCityPack.name} listo'
+                        : 'Mapa parcial guardado. Puedes completar la descarga.')
+                  : 'Cache inteligente activo. El mapa guardara las zonas vistas para seguir mostrandolas cuando la señal baje.'
             : (AppConfig.hasDedicatedOfflineTileSource
                   ? 'Modo online listo. Puedes descargar ${potosiCityPack.name} cuando quieras.'
                   : 'Modo online listo. Mientras avances, el mapa ira guardando en cache las zonas que ya viste.'),
         clearError: true,
       );
-      if (stats.length > 0) {
-        await _markOfflinePackInstalled();
-      } else {
+      if (stats.length == 0) {
         await _clearOfflinePackInstalled();
       }
     } catch (error) {
       state = state.copyWith(
         errorMessage: 'No pudimos leer el cache offline: $error',
       );
-    } finally {
-      _isRefreshing = false;
     }
   }
 
@@ -214,7 +230,8 @@ class OfflineMapController extends Notifier<OfflineMapState> {
       return;
     }
 
-    if (forceDownload || !state.isReady) {
+    if (forceDownload || !_automaticDownloadAttempted) {
+      _automaticDownloadAttempted = true;
       await downloadPotosiMap();
     }
   }
@@ -238,18 +255,19 @@ class OfflineMapController extends Notifier<OfflineMapState> {
         await _store.manage.create();
       }
 
-      final region = RectangleRegion(AppConfig.potosiOfflineBounds).toDownloadable(
-        minZoom: _offlineMinZoom,
-        maxZoom: _offlineMaxZoom,
-        options: TileLayer(
-          urlTemplate: AppConfig.effectiveOfflineTilesUrlTemplate,
-          userAgentPackageName: 'bo.rapigo.driver.offline',
-          tileDimension: AppConfig.mapTileDimension,
-          zoomOffset: AppConfig.mapTileZoomOffset,
-          minZoom: _offlineMinZoom.toDouble(),
-          maxZoom: _offlineMaxZoom.toDouble(),
-        ),
-      );
+      final region = RectangleRegion(AppConfig.potosiOfflineBounds)
+          .toDownloadable(
+            minZoom: _offlineMinZoom,
+            maxZoom: _offlineMaxZoom,
+            options: TileLayer(
+              urlTemplate: AppConfig.effectiveOfflineTilesUrlTemplate,
+              userAgentPackageName: 'bo.rapigo.driver.offline',
+              tileDimension: AppConfig.mapTileDimension,
+              zoomOffset: AppConfig.mapTileZoomOffset,
+              minZoom: _offlineMinZoom.toDouble(),
+              maxZoom: _offlineMaxZoom.toDouble(),
+            ),
+          );
 
       final download = _store.download.startForeground(
         region: region,
@@ -262,7 +280,10 @@ class OfflineMapController extends Notifier<OfflineMapState> {
       DownloadProgress? lastProgress;
       await for (final progress in download.downloadProgress) {
         lastProgress = progress;
-        final progressRatio = (progress.percentageProgress / 100).clamp(0.0, 1.0);
+        final progressRatio = (progress.percentageProgress / 100).clamp(
+          0.0,
+          1.0,
+        );
         state = state.copyWith(
           isDownloading: true,
           progress: progressRatio,
@@ -275,25 +296,30 @@ class OfflineMapController extends Notifier<OfflineMapState> {
       }
 
       final stats = await _store.stats.all;
-      final failedCount = (lastProgress?.failedTilesCount ?? 0) +
-          (lastProgress?.failedRequestTilesCount ?? 0) +
-          (lastProgress?.negativeResponseTilesCount ?? 0);
-
+      final completed =
+          lastProgress != null &&
+          lastProgress.maxTilesCount > 0 &&
+          lastProgress.successfulTilesCount + lastProgress.existingTilesCount >=
+              lastProgress.maxTilesCount &&
+          stats.length > 0;
       state = state.copyWith(
         isDownloading: false,
         isReady: stats.length > 0,
-        progress: failedCount == 0 ? 1 : state.progress,
+        progress: completed ? 1 : state.progress,
         downloadedTiles: stats.length,
         totalTiles: lastProgress?.maxTilesCount ?? state.totalTiles,
-        statusMessage: failedCount == 0
+        statusMessage: completed
             ? 'Mapa instalado correctamente'
             : 'Descarga completada con algunos errores. El cache guardado sigue disponible.',
-        errorMessage: failedCount == 0 ? null : 'Algunas teselas no pudieron descargarse. Revisa tu conexion.',
+        errorMessage: completed
+            ? null
+            : 'Algunas teselas no pudieron descargarse. Revisa tu conexion.',
       );
-      if (stats.length > 0) {
+      if (completed) {
         await _markOfflinePackInstalled();
+      } else {
+        await _clearOfflinePackInstalled();
       }
-      await refreshStatus();
     } catch (error) {
       state = state.copyWith(
         isDownloading: false,
@@ -303,26 +329,34 @@ class OfflineMapController extends Notifier<OfflineMapState> {
     }
   }
 
+  // Includes source and pack geometry: old CARTO images cannot satisfy this pack.
+  String get _packIdentity =>
+      '${AppConfig.effectiveOfflineTilesUrlTemplate}|$_offlineMinZoom|$_offlineMaxZoom|'
+      '${AppConfig.mapTileDimension}|${AppConfig.mapTileZoomOffset}|'
+      '${AppConfig.potosiOfflineBounds.southWest}|${AppConfig.potosiOfflineBounds.northEast}';
+
   Future<bool> _isOfflinePackInstalled() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_offlinePackInstalledKey) ?? false;
+    return prefs.getString('${_offlinePackInstalledKey}_source_v2') ==
+        _packIdentity;
   }
 
   Future<void> _markOfflinePackInstalled() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_offlinePackInstalledKey, true);
+    await prefs.setString(
+      '${_offlinePackInstalledKey}_source_v2',
+      _packIdentity,
+    );
   }
 
   Future<void> _clearOfflinePackInstalled() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_offlinePackInstalledKey);
+    await prefs.remove('${_offlinePackInstalledKey}_source_v2');
   }
 }
 
 class OfflineMapDownloadButton extends ConsumerWidget {
-  const OfflineMapDownloadButton({
-    super.key,
-  });
+  const OfflineMapDownloadButton({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -353,8 +387,12 @@ class OfflineMapDownloadButton extends ConsumerWidget {
               Expanded(
                 child: Text(
                   offlineState.isReady
-                      ? (AppConfig.hasDedicatedOfflineTileSource ? 'Mapa offline listo' : 'Cache del mapa lista')
-                      : (AppConfig.hasDedicatedOfflineTileSource ? 'Descargar mapa' : 'Cache inteligente'),
+                      ? (AppConfig.hasDedicatedOfflineTileSource
+                            ? 'Mapa offline listo'
+                            : 'Cache del mapa lista')
+                      : (AppConfig.hasDedicatedOfflineTileSource
+                            ? 'Descargar mapa'
+                            : 'Cache inteligente'),
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
@@ -370,7 +408,9 @@ class OfflineMapDownloadButton extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
-                  offlineState.isReady ? Icons.check_circle_rounded : Icons.download_rounded,
+                  offlineState.isReady
+                      ? Icons.check_circle_rounded
+                      : Icons.download_rounded,
                   color: AppBrand.primaryBlue,
                   size: 18,
                 ),
@@ -428,22 +468,30 @@ class OfflineMapDownloadButton extends ConsumerWidget {
               width: double.infinity,
               height: 40,
               child: FilledButton.icon(
-                onPressed: AppConfig.hasDedicatedOfflineTileSource ? controller.downloadPotosiMap : controller.refreshStatus,
+                onPressed: AppConfig.hasDedicatedOfflineTileSource
+                    ? controller.downloadPotosiMap
+                    : controller.refreshStatus,
                 icon: Icon(
                   AppConfig.hasDedicatedOfflineTileSource
-                      ? (offlineState.isReady ? Icons.refresh_rounded : Icons.download_rounded)
+                      ? (offlineState.isReady
+                            ? Icons.refresh_rounded
+                            : Icons.download_rounded)
                       : Icons.wifi_tethering_rounded,
                 ),
                 label: Text(
                   AppConfig.hasDedicatedOfflineTileSource
-                      ? (offlineState.isReady ? 'Actualizar cache' : 'Guardar Potosi ciudad')
+                      ? (offlineState.isReady
+                            ? 'Completar mapa'
+                            : 'Guardar Potosi ciudad')
                       : 'Usar cache automatica',
                 ),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppBrand.primaryBlue,
                   foregroundColor: AppBrand.surface,
                   textStyle: const TextStyle(fontWeight: FontWeight.w800),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                 ),
               ),
             ),
@@ -467,28 +515,28 @@ class OfflineMapReadyBadge extends ConsumerWidget {
     final accentColor = isDownloading
         ? AppBrand.accentYellow
         : isReady
-            ? AppBrand.primaryBlue
-            : AppBrand.accentYellow;
+        ? AppBrand.primaryBlue
+        : AppBrand.accentYellow;
     final backgroundColor = isDownloading
         ? AppBrand.surface
         : isReady
-            ? AppBrand.surface
-            : AppBrand.surface;
+        ? AppBrand.surface
+        : AppBrand.surface;
     final borderColor = isDownloading
         ? const Color(0x33FACC15)
         : isReady
-            ? const Color(0x330F6CBD)
-            : const Color(0x33FACC15);
+        ? const Color(0x330F6CBD)
+        : const Color(0x33FACC15);
     final label = isDownloading
         ? 'Descargando offline'
         : isReady
-            ? 'Offline listo'
-            : 'Online';
+        ? 'Offline listo'
+        : 'Online';
     final detail = isDownloading
         ? '${(offlineState.progress * 100).toStringAsFixed(0)}%'
         : hasOfflineSource
-            ? 'cache disponible'
-            : 'solo online';
+        ? 'cache disponible'
+        : 'solo online';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -603,7 +651,7 @@ Future<void> showOfflineMapSheet(BuildContext context) {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'Mapa offline de ${AppConfig.offlineRegionName}',
+                        'Mapa y caché de ${AppConfig.offlineRegionName}',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
@@ -634,7 +682,7 @@ Future<void> showOfflineMapSheet(BuildContext context) {
                             border: Border.all(color: const Color(0x330F6CBD)),
                           ),
                           child: const Text(
-                            'Mapa instalado correctamente. Ya puedes seguir viendo Potosi ciudad y usar el cache offline cuando la señal baje.',
+                            'Las zonas guardadas se conservan al cerrar la app y pueden verse sin conexión. Las zonas nuevas necesitan internet.',
                             style: TextStyle(
                               color: AppBrand.textPrimary,
                               fontSize: 12,
@@ -654,7 +702,7 @@ Future<void> showOfflineMapSheet(BuildContext context) {
                             border: Border.all(color: const Color(0x33FACC15)),
                           ),
                           child: const Text(
-                            'Modo online con cache inteligente activo. El mapa ira guardando automaticamente las zonas que recorras para seguir mostrandolas con poca señal. Cuando tengamos un paquete offline dedicado, esta misma pantalla permitira descargarlo completo.',
+                            'La caché se guarda automáticamente al recorrer o explorar el mapa. Solo estarán disponibles sin conexión las zonas y niveles de acercamiento que se hayan cargado.',
                             style: TextStyle(
                               color: AppBrand.textSecondary,
                               fontSize: 12,

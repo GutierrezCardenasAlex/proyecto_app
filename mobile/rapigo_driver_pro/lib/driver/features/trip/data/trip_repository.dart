@@ -77,6 +77,7 @@ class DriverTripRepository {
       ),
       counterOfferStatus: item['counter_offer_status']?.toString(),
       requestedAt: item['requested_at']?.toString(),
+      completedAt: item['completed_at']?.toString(),
       vehicleType: item['vehicle_type']?.toString(),
       vehicleLabel: _joinVehicleLabel(
         item['vehicle_brand'],
@@ -342,6 +343,7 @@ class DriverTripRepository {
       ),
       counterOfferStatus: item['counter_offer_status']?.toString(),
       requestedAt: item['requested_at']?.toString(),
+      completedAt: item['completed_at']?.toString(),
       vehicleType: item['vehicle_type']?.toString(),
       vehicleLabel: _joinVehicleLabel(
         item['vehicle_brand'],
@@ -398,6 +400,7 @@ class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
   bool _isLoadingOffer = false;
   final DriverTripStateCache _cache = DriverTripStateCache();
   bool _restoredPersistedTrip = false;
+  int _tripRevision = 0;
 
   DriverTripRepository get _repository => ref.read(tripRepositoryProvider);
 
@@ -411,8 +414,9 @@ class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
   }
 
   Future<void> _restorePersistedTrip() async {
+    final revision = _tripRevision;
     final cached = await _cache.readActiveTrip();
-    if (cached == null) {
+    if (cached == null || revision != _tripRevision || state.value != null) {
       return;
     }
     state = AsyncData(cached);
@@ -439,20 +443,36 @@ class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
       return;
     }
 
+    // The summary is dismissed only by the driver's explicit return-home action.
+    if (state.value?.status == 'completed') return;
+
     _isLoadingOffer = true;
+    final revision = _tripRevision;
     final previousTrip = state.value;
     if (state.value == null) {
       state = const AsyncLoading();
     }
     try {
+      final saved = await _cache.readActiveTrip();
+      if (revision != _tripRevision) return;
+      if (saved?.status == 'completed') {
+        state = AsyncData(saved);
+        return;
+      }
       final trip = await _repository.fetchOffer(
         token: session.token,
         driverId: session.driverId,
       );
+      if (revision != _tripRevision || state.value?.status == 'completed') {
+        return;
+      }
       state = AsyncData(trip);
       await _persistTrip();
     } catch (_) {
       final cached = await _cache.readActiveTrip();
+      if (revision != _tripRevision || state.value?.status == 'completed') {
+        return;
+      }
       state = AsyncData(previousTrip ?? cached);
     } finally {
       _isLoadingOffer = false;
@@ -494,6 +514,7 @@ class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
         trip: current,
         status: status,
       );
+      _tripRevision++;
       state = AsyncData(updatedTrip);
       await _persistTrip();
     } catch (error) {
@@ -509,11 +530,14 @@ class DriverTripController extends Notifier<AsyncValue<DriverTrip?>> {
     if (current == null) {
       return;
     }
+    if (current.status == 'completed') return;
+    _tripRevision++;
     state = AsyncData(current.copyWith(status: status));
     unawaited(_persistTrip());
   }
 
   Future<void> clearTrip() async {
+    _tripRevision++;
     state = const AsyncData(null);
     await _persistTrip();
   }

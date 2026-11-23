@@ -44,10 +44,10 @@ class RapigoDriverPalette extends ThemeExtension<RapigoDriverPalette> {
   final Color shadowSoft;
 
   static const dark = RapigoDriverPalette(
-    backgroundBase: Color(0xFF020617),
-    backgroundRaised: Color(0xFF091223),
-    surfacePrimary: Color(0xFF0F172A),
-    surfaceSecondary: Color(0xFF131D33),
+    backgroundBase: Color(0xFF111827),
+    backgroundRaised: Color(0xFF171F2D),
+    surfacePrimary: Color(0xFF202938),
+    surfaceSecondary: Color(0xFF263141),
     surfaceInteractive: Color(0xFFF8FAFC),
     surfaceMuted: Color(0xFFF3F6FD),
     outlineSoft: Color(0x1FFFFFFF),
@@ -114,10 +114,22 @@ class RapigoDriverPalette extends ThemeExtension<RapigoDriverPalette> {
     }
     return RapigoDriverPalette(
       backgroundBase: Color.lerp(backgroundBase, other.backgroundBase, t)!,
-      backgroundRaised: Color.lerp(backgroundRaised, other.backgroundRaised, t)!,
+      backgroundRaised: Color.lerp(
+        backgroundRaised,
+        other.backgroundRaised,
+        t,
+      )!,
       surfacePrimary: Color.lerp(surfacePrimary, other.surfacePrimary, t)!,
-      surfaceSecondary: Color.lerp(surfaceSecondary, other.surfaceSecondary, t)!,
-      surfaceInteractive: Color.lerp(surfaceInteractive, other.surfaceInteractive, t)!,
+      surfaceSecondary: Color.lerp(
+        surfaceSecondary,
+        other.surfaceSecondary,
+        t,
+      )!,
+      surfaceInteractive: Color.lerp(
+        surfaceInteractive,
+        other.surfaceInteractive,
+        t,
+      )!,
       surfaceMuted: Color.lerp(surfaceMuted, other.surfaceMuted, t)!,
       outlineSoft: Color.lerp(outlineSoft, other.outlineSoft, t)!,
       outlineStrong: Color.lerp(outlineStrong, other.outlineStrong, t)!,
@@ -161,10 +173,10 @@ class RapigoDriverMetrics extends ThemeExtension<RapigoDriverMetrics> {
     pagePadding: 18,
     sectionGap: 24,
     itemGap: 14,
-    radiusSmall: 18,
-    radiusMedium: 22,
-    radiusLarge: 28,
-    radiusXLarge: 34,
+    radiusSmall: 12,
+    radiusMedium: 16,
+    radiusLarge: 20,
+    radiusXLarge: 24,
     buttonHeight: 58,
     heroButtonHeight: 64,
   );
@@ -211,7 +223,11 @@ class RapigoDriverMetrics extends ThemeExtension<RapigoDriverMetrics> {
       radiusLarge: lerpDouble(radiusLarge, other.radiusLarge, t)!,
       radiusXLarge: lerpDouble(radiusXLarge, other.radiusXLarge, t)!,
       buttonHeight: lerpDouble(buttonHeight, other.buttonHeight, t)!,
-      heroButtonHeight: lerpDouble(heroButtonHeight, other.heroButtonHeight, t)!,
+      heroButtonHeight: lerpDouble(
+        heroButtonHeight,
+        other.heroButtonHeight,
+        t,
+      )!,
     );
   }
 }
@@ -221,76 +237,78 @@ class RapigoTheme {
     final palette = RapigoDriverPalette.dark;
     final metrics = RapigoDriverMetrics.dark;
     final baseTextTheme = GoogleFonts.manropeTextTheme();
-    final textTheme = baseTextTheme.copyWith(
-      displayLarge: GoogleFonts.plusJakartaSans(
-        fontSize: 34,
-        fontWeight: FontWeight.w900,
-        height: 1.04,
-        color: palette.textPrimary,
-      ),
-      displayMedium: GoogleFonts.plusJakartaSans(
-        fontSize: 30,
-        fontWeight: FontWeight.w900,
-        height: 1.06,
-        color: palette.textPrimary,
-      ),
-      headlineLarge: GoogleFonts.plusJakartaSans(
-        fontSize: 25,
-        fontWeight: FontWeight.w800,
-        height: 1.08,
-        color: palette.textPrimary,
-      ),
-      headlineMedium: GoogleFonts.plusJakartaSans(
-        fontSize: 21,
-        fontWeight: FontWeight.w800,
-        height: 1.1,
-        color: palette.textPrimary,
-      ),
-      titleLarge: GoogleFonts.plusJakartaSans(
-        fontSize: 18,
-        fontWeight: FontWeight.w800,
-        color: palette.textPrimary,
-      ),
-      titleMedium: GoogleFonts.plusJakartaSans(
-        fontSize: 16,
-        fontWeight: FontWeight.w700,
-        color: palette.textPrimary,
-      ),
-      bodyLarge: GoogleFonts.manrope(
-        fontSize: 15,
-        fontWeight: FontWeight.w700,
-        color: palette.textSecondary,
-      ),
-      bodyMedium: GoogleFonts.manrope(
-        fontSize: 14,
-        fontWeight: FontWeight.w600,
-        height: 1.35,
-        color: palette.textSecondary,
-      ),
-      bodySmall: GoogleFonts.manrope(
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        color: palette.textMuted,
-      ),
-      labelLarge: GoogleFonts.plusJakartaSans(
-        fontSize: 15,
-        fontWeight: FontWeight.w800,
-        color: palette.textPrimary,
-      ),
-      labelMedium: GoogleFonts.plusJakartaSans(
-        fontSize: 13,
-        fontWeight: FontWeight.w700,
-        color: palette.textMuted,
-      ),
-      labelSmall: GoogleFonts.plusJakartaSans(
-        fontSize: 11,
-        fontWeight: FontWeight.w700,
-        color: palette.textMuted,
-      ),
-    ).apply(
-      bodyColor: palette.textPrimary,
-      displayColor: palette.textPrimary,
-    );
+    final textTheme = baseTextTheme
+        .copyWith(
+          displayLarge: GoogleFonts.plusJakartaSans(
+            fontSize: 34,
+            fontWeight: FontWeight.w900,
+            height: 1.04,
+            color: palette.textPrimary,
+          ),
+          displayMedium: GoogleFonts.plusJakartaSans(
+            fontSize: 30,
+            fontWeight: FontWeight.w900,
+            height: 1.06,
+            color: palette.textPrimary,
+          ),
+          headlineLarge: GoogleFonts.plusJakartaSans(
+            fontSize: 25,
+            fontWeight: FontWeight.w800,
+            height: 1.08,
+            color: palette.textPrimary,
+          ),
+          headlineMedium: GoogleFonts.plusJakartaSans(
+            fontSize: 21,
+            fontWeight: FontWeight.w800,
+            height: 1.1,
+            color: palette.textPrimary,
+          ),
+          titleLarge: GoogleFonts.plusJakartaSans(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: palette.textPrimary,
+          ),
+          titleMedium: GoogleFonts.plusJakartaSans(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: palette.textPrimary,
+          ),
+          bodyLarge: GoogleFonts.manrope(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: palette.textSecondary,
+          ),
+          bodyMedium: GoogleFonts.manrope(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            height: 1.35,
+            color: palette.textSecondary,
+          ),
+          bodySmall: GoogleFonts.manrope(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: palette.textMuted,
+          ),
+          labelLarge: GoogleFonts.plusJakartaSans(
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+            color: palette.textPrimary,
+          ),
+          labelMedium: GoogleFonts.plusJakartaSans(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: palette.textMuted,
+          ),
+          labelSmall: GoogleFonts.plusJakartaSans(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: palette.textMuted,
+          ),
+        )
+        .apply(
+          bodyColor: palette.textPrimary,
+          displayColor: palette.textPrimary,
+        );
 
     return ThemeData(
       useMaterial3: true,
@@ -334,9 +352,14 @@ class RapigoTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: palette.surfaceSecondary,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 18,
+        ),
         hintStyle: textTheme.bodyLarge?.copyWith(color: palette.textMuted),
-        labelStyle: textTheme.titleMedium?.copyWith(color: palette.textSecondary),
+        labelStyle: textTheme.titleMedium?.copyWith(
+          color: palette.textSecondary,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(metrics.radiusMedium),
           borderSide: BorderSide.none,
@@ -347,9 +370,14 @@ class RapigoTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(metrics.radiusMedium),
-          borderSide: const BorderSide(color: AppBrand.accentYellow, width: 1.4),
+          borderSide: const BorderSide(
+            color: AppBrand.accentYellow,
+            width: 1.4,
+          ),
         ),
-        helperStyle: textTheme.bodySmall?.copyWith(color: const Color(0xFFB7C4D6)),
+        helperStyle: textTheme.bodySmall?.copyWith(
+          color: const Color(0xFFB7C4D6),
+        ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
@@ -405,7 +433,9 @@ class RapigoTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: palette.surfacePrimary,
-        contentTextStyle: textTheme.bodyMedium?.copyWith(color: palette.textPrimary),
+        contentTextStyle: textTheme.bodyMedium?.copyWith(
+          color: palette.textPrimary,
+        ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(metrics.radiusSmall),
         ),
@@ -417,8 +447,10 @@ class RapigoTheme {
 
 extension RapigoDriverThemeContext on BuildContext {
   RapigoDriverPalette get rapigoPalette =>
-      Theme.of(this).extension<RapigoDriverPalette>() ?? RapigoDriverPalette.dark;
+      Theme.of(this).extension<RapigoDriverPalette>() ??
+      RapigoDriverPalette.dark;
 
   RapigoDriverMetrics get rapigoMetrics =>
-      Theme.of(this).extension<RapigoDriverMetrics>() ?? RapigoDriverMetrics.dark;
+      Theme.of(this).extension<RapigoDriverMetrics>() ??
+      RapigoDriverMetrics.dark;
 }

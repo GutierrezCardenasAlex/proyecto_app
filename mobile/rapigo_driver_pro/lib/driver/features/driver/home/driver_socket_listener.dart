@@ -12,9 +12,6 @@ class DriverSocketListener extends ConsumerStatefulWidget {
 
 class _DriverSocketListenerState extends ConsumerState<DriverSocketListener>
     with WidgetsBindingObserver {
-  static const String _backgroundNoticeSeenKey =
-      'rapigo_pro_driver_background_notice_seen';
-
   io.Socket? _socket;
   String? _joinedDriverId;
   String? _joinedTripId;
@@ -121,6 +118,8 @@ class _DriverSocketListenerState extends ConsumerState<DriverSocketListener>
           .build(),
     );
     _socket?.onConnect((_) {
+      if (!mounted) return;
+      ref.read(driverConnectionProvider.notifier).setConnected(true);
       _socketReconnectAttempt = 0;
       _socket?.emit('join:driver', driverId);
       _joinedDriverId = driverId;
@@ -270,6 +269,9 @@ class _DriverSocketListenerState extends ConsumerState<DriverSocketListener>
   }
 
   void _scheduleSocketReconnect(String driverId) {
+    if (mounted) {
+      ref.read(driverConnectionProvider.notifier).setConnected(false);
+    }
     if (!mounted || _socketReconnectTimer?.isActive == true) {
       return;
     }
@@ -294,7 +296,7 @@ class _DriverSocketListenerState extends ConsumerState<DriverSocketListener>
     _isPreparingExperience = true;
     try {
       await _ensureCriticalPermissions();
-      await _maybeShowBackgroundServiceNotice();
+      if (mounted) await _restoreDriverOperationalState();
       await LocalNotifications.ensureInitialized();
 
       if (!mounted) {
@@ -311,131 +313,11 @@ class _DriverSocketListenerState extends ConsumerState<DriverSocketListener>
   }
 
   Future<void> _ensureCriticalPermissions() async {
-    while (mounted) {
-      final notificationStatus = await Permission.notification.request();
-      final locationStatus = await Permission.locationWhenInUse.request();
-      PermissionStatus backgroundLocationStatus = PermissionStatus.granted;
-      if (Platform.isAndroid &&
-          (locationStatus.isGranted || locationStatus.isLimited)) {
-        backgroundLocationStatus = await Permission.locationAlways.request();
-      }
-      final notificationsReady =
-          notificationStatus.isGranted || notificationStatus.isLimited;
-      final locationReady =
-          (locationStatus.isGranted || locationStatus.isLimited) &&
-          (backgroundLocationStatus.isGranted ||
-              backgroundLocationStatus.isLimited);
-      if (notificationsReady && locationReady) {
-        return;
-      }
-      await _showPermissionsRequiredDialog(
-        notificationsReady: notificationsReady,
-        locationReady: locationReady,
-      );
-    }
-  }
-
-  Future<void> _showPermissionsRequiredDialog({
-    required bool notificationsReady,
-    required bool locationReady,
-  }) {
-    return showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF17181B),
-          title: const Text(
-            'Activa los permisos',
-            style: TextStyle(
-              color: Color(0xFFFFF4EC),
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'RAPIGO PRO necesita ubicacion y notificaciones activas para trabajar correctamente desde el inicio.',
-                style: TextStyle(color: Color(0xFFFFD8BF)),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                '${locationReady ? '✓' : '•'} Ubicacion siempre activa',
-                style: TextStyle(
-                  color: locationReady
-                      ? const Color(0xFF86EFAC)
-                      : const Color(0xFFFFF4EC),
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '${notificationsReady ? '✓' : '•'} Notificaciones activas',
-                style: TextStyle(
-                  color: notificationsReady
-                      ? const Color(0xFF86EFAC)
-                      : const Color(0xFFFFF4EC),
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () async => openAppSettings(),
-              child: const Text('Configuracion'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(),
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFF97316),
-                foregroundColor: const Color(0xFF0F0F10),
-              ),
-              child: const Text('Reintentar'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _maybeShowBackgroundServiceNotice() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool(_backgroundNoticeSeenKey) == true || !mounted) {
-      return;
-    }
-    await showDialog<void>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF17181B),
-          title: const Text(
-            'RAPIGO PRO seguira activo',
-            style: TextStyle(
-              color: Color(0xFFFFF4EC),
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          content: const Text(
-            'Veras una notificacion fija con el estado "Buscando Pasajeros Cercanos......" mientras RAPIGO - PRO siga activo en segundo plano.',
-            style: TextStyle(color: Color(0xFFFFD8BF), height: 1.5),
-          ),
-          actions: [
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(),
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFF97316),
-                foregroundColor: const Color(0xFF0F0F10),
-              ),
-              child: const Text('Entendido'),
-            ),
-          ],
-        );
-      },
-    );
-    await prefs.setBool(_backgroundNoticeSeenKey, true);
+    if (!mounted) return;
+    await LocationConsent.request(context, driver: true);
+    if (!mounted) return;
+    // Notifications are optional; refusal must never trap the user in a loop.
+    await Permission.notification.request();
   }
 
   Future<void> _restoreDriverOperationalState() async {

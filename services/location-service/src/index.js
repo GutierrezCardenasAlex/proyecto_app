@@ -248,7 +248,7 @@ async function bootstrap() {
          ORDER BY dl.driver_id, dl.recorded_at DESC
        )
        SELECT d.id AS driver_id,
-              d.rating,
+              (SELECT ROUND(AVG(r.score)::numeric, 2) FROM trip_ratings r WHERE r.to_driver_id = d.id) AS rating,
               ST_Y(ll.location::geometry) AS lat,
               ST_X(ll.location::geometry) AS lng,
               ll.heading,
