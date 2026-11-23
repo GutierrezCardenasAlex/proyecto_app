@@ -19,8 +19,42 @@ class PrivacyPage extends StatefulWidget {
 class _PrivacyPageState extends State<PrivacyPage> {
   bool _sending = false;
   String? _message;
-  static const policyUrl = String.fromEnvironment('PRIVACY_POLICY_URL');
-  static const deletionUrl = String.fromEnvironment('ACCOUNT_DELETION_URL');
+  String policyUrl = const String.fromEnvironment('PRIVACY_POLICY_URL');
+  String deletionUrl = const String.fromEnvironment('ACCOUNT_DELETION_URL');
+  String _organization = 'Stellar Labs';
+  String? _contactEmail;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPublicLegal();
+  }
+
+  Future<void> _loadPublicLegal() async {
+    try {
+      final base = '${AppConfig.apiBaseUrl}/admin/public/legal';
+      final response = await http
+          .get(Uri.parse('$base/config'))
+          .timeout(const Duration(seconds: 8));
+      if (!mounted || response.statusCode != 200) return;
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      if (data['published'] != true) return;
+      final organization = data['organization'];
+      final email = data['email'];
+      if (organization is! String || email is! String) return;
+      setState(() {
+        _organization = organization;
+        _contactEmail = email;
+        // Release configuration supplies an HTTPS gateway.
+        if (Uri.parse(base).scheme == 'https') {
+          policyUrl = '$base/privacidad';
+          deletionUrl = '$base/eliminar-cuenta';
+        }
+      });
+    } catch (_) {
+      // Preserve the bundled legal links when the central is unavailable.
+    }
+  }
 
   Future<void> _open(String value) async {
     final uri = Uri.tryParse(value);
@@ -111,9 +145,11 @@ class _PrivacyPageState extends State<PrivacyPage> {
         padding: const EdgeInsets.all(20),
         children: [
           Text(
-            'Stellar Labs · RAPIGO',
+            '$_organization · RAPIGO',
             style: Theme.of(context).textTheme.titleLarge,
           ),
+          if (_contactEmail != null)
+            SelectableText('Privacidad y eliminación: $_contactEmail'),
           const SizedBox(height: 12),
           const Text(
             'Usamos tus datos de perfil y contacto para gestionar tu cuenta, los puntos de recogida y destino para prestar el servicio, y los datos de viajes para mostrar el historial y atender reportes. En RAPIGO PRO también se gestionan documentos del conductor y del vehículo para su revisión por la central.',

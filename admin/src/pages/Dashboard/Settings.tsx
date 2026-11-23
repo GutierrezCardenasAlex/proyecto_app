@@ -1,4 +1,5 @@
 import SubscriptionPanel from '../../components/dashboard/SubscriptionPanel'
+import LegalSettingsPanel from '../../components/dashboard/LegalSettingsPanel'
 import Button from '../../components/common/Button'
 import Card from '../../components/cards/Card'
 import StatCard from '../../components/dashboard/StatCard'
@@ -35,6 +36,7 @@ export default function SettingsPage() {
       </section>
 
       <SubscriptionPanel />
+      <LegalSettingsPanel />
       <section className="settings-page-grid">
         <Card title="Perfil institucional" subtitle="Datos visibles de la central y estado actual de la sesion." className="saas-panel-dark">
           <div className="settings-stack">

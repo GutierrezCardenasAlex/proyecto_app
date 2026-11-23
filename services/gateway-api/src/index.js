@@ -3,6 +3,7 @@ const cors = require("@fastify/cors");
 const jwt = require("@fastify/jwt");
 const proxy = require("@fastify/http-proxy");
 const { registerAppUpdatesRoutes } = require("./app-updates");
+const { isPublicLegalRequest } = require("./public-legal");
 
 const app = Fastify({ logger: true });
 const port = Number(process.env.PORT || 3000);
@@ -42,7 +43,10 @@ async function bootstrap() {
       upstream,
       prefix,
       rewritePrefix: "",
-      preHandler: prefix === "/api/auth" ? undefined : app.authenticate
+      preHandler: prefix === "/api/auth" ? undefined : async (request, reply) => {
+        if (prefix === "/api/admin" && isPublicLegalRequest(request)) return;
+        return app.authenticate(request, reply);
+      }
     });
   }
 
