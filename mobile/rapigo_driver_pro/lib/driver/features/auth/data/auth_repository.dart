@@ -234,7 +234,24 @@ class DriverAuthRepository {
   Future<DriverProfileDetails> fetchDriverProfile({
     required String token,
     required String userId,
+    bool forceRefresh = false,
   }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final cacheKey = 'driver_profile_v1_$userId';
+    final saved = prefs.getString(cacheKey);
+    if (!forceRefresh && saved != null &&
+        prefs.getString('driver_session_user_id') == userId &&
+        prefs.getString('driver_session_token') == token) {
+      try {
+        final cache = jsonDecode(saved) as Map<String, dynamic>;
+        final age = DateTime.now().millisecondsSinceEpoch - (cache['savedAt'] as int);
+        if (age >= 0 && age < const Duration(minutes: 5).inMilliseconds) {
+          return DriverProfileDetails.fromJson(cache['profile'] as Map<String, dynamic>);
+        }
+      } catch (_) {
+        await prefs.remove(cacheKey);
+      }
+    }
     final response = await _safeRequest(
       () => http.get(
         Uri.parse('${AppConfig.apiBaseUrl}/drivers/by-user/$userId'),
@@ -250,6 +267,14 @@ class DriverAuthRepository {
       fallbackMessage: 'No se pudo cargar el perfil del conductor',
     );
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    // Do not restore another account's cache after logout or an account switch.
+    if (prefs.getString('driver_session_user_id') == userId &&
+        prefs.getString('driver_session_token') == token) {
+      await prefs.setString(cacheKey, jsonEncode({
+        'savedAt': DateTime.now().millisecondsSinceEpoch,
+        'profile': payload,
+      }));
+    }
     return DriverProfileDetails.fromJson(payload);
   }
 
@@ -484,6 +509,8 @@ class DriverAuthRepository {
     DriverUploadedDocument? licensePhoto,
     DriverUploadedDocument? vehiclePhoto,
   }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('driver_profile_v1_$userId');
     final documents =
         driverPhoto != null && licensePhoto != null && vehiclePhoto != null
         ? {
@@ -628,7 +655,7 @@ class DriverAuthRepository {
     required String fallbackMessage,
   }) async {
     try {
-      return await request();
+      return await request().timeout(const Duration(seconds: 30));
     } on SocketException {
       throw Exception(
         'No se pudo conectar con RAPIGO - PRO. Revisa internet o el acceso al servidor.',
@@ -701,6 +728,9 @@ class DriverAuthRepository {
 
 class DriverSessionController extends Notifier<DriverSession> {
   late final DriverAuthRepository _repository;
+  bool _refreshingSession = false;
+  DateTime? _lastSessionAttempt;
+  String? _lastSessionToken;
 
   @override
   DriverSession build() {
@@ -882,7 +912,10 @@ class DriverSessionController extends Notifier<DriverSession> {
   }
 
   Future<void> logout() async {
+    final previousUserId = state.userId;
+    state = state.copyWith(token: '', loggedIn: false);
     final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('driver_profile_v1_$previousUserId');
     await prefs.remove('driver_session_logged_in');
     await prefs.remove('driver_session_user_id');
     await prefs.remove('driver_session_driver_id');
@@ -932,12 +965,15 @@ class DriverSessionController extends Notifier<DriverSession> {
       return;
     }
 
+    final token = state.token;
     try {
       final profile = await _repository.fetchDriverProfile(
         token: state.token,
         userId: state.userId,
+        forceRefresh: true,
       );
       final prefs = await SharedPreferences.getInstance();
+      if (state.token != token || !state.loggedIn) return;
       await prefs.setString(
         'driver_session_access_status',
         profile.accessStatus,
@@ -951,6 +987,7 @@ class DriverSessionController extends Notifier<DriverSession> {
           profile.vehicleType,
         );
       }
+      if (state.token != token || !state.loggedIn) return;
       state = state.copyWith(
         accessStatus: profile.accessStatus,
         driverId: profile.driverId.isNotEmpty
@@ -962,6 +999,7 @@ class DriverSessionController extends Notifier<DriverSession> {
         clearError: true,
       );
     } catch (error) {
+      if (state.token != token || !state.loggedIn) return;
       state = state.copyWith(
         errorMessage: error.toString().replaceFirst('Exception: ', ''),
       );
@@ -1038,13 +1076,27 @@ class DriverSessionController extends Notifier<DriverSession> {
     DriverStartupTrace.markSessionRestored();
   }
 
-  Future<void> refreshSessionStatus() async {
+  Future<void> refreshSessionStatus({bool force = false}) async {
     if (!state.loggedIn || state.token.isEmpty) {
       return;
     }
 
+    final token = state.token;
+    final now = DateTime.now();
+    if (_refreshingSession ||
+        (!force &&
+            _lastSessionToken == token &&
+            _lastSessionAttempt != null &&
+            now.difference(_lastSessionAttempt!) < const Duration(minutes: 1))) {
+      return;
+    }
+    _refreshingSession = true;
+    _lastSessionAttempt = now;
+    _lastSessionToken = token;
+
     try {
-      final status = await _repository.fetchSessionStatus(token: state.token);
+      final status = await _repository.fetchSessionStatus(token: token);
+      if (state.token != token || !state.loggedIn) return;
       String resolvedAccessStatus = state.accessStatus;
       String resolvedDriverId = state.driverId;
       String resolvedVehicleType = state.vehicleType;
@@ -1053,6 +1105,7 @@ class DriverSessionController extends Notifier<DriverSession> {
           final profile = await _repository.fetchDriverProfile(
             token: state.token,
             userId: state.userId,
+            forceRefresh: true,
           );
           resolvedAccessStatus = profile.accessStatus;
           resolvedDriverId = profile.driverId.isNotEmpty
@@ -1066,6 +1119,7 @@ class DriverSessionController extends Notifier<DriverSession> {
         }
       }
       final prefs = await SharedPreferences.getInstance();
+      if (state.token != token || !state.loggedIn) return;
       await prefs.setString(
         'driver_session_device_status',
         status.deviceStatus,
@@ -1085,6 +1139,7 @@ class DriverSessionController extends Notifier<DriverSession> {
       await prefs.setString('driver_session_last_name', status.lastName);
       await prefs.setString('driver_session_email', status.email);
       await prefs.setString('driver_session_address', status.address);
+      if (state.token != token || !state.loggedIn) return;
       state = state.copyWith(
         deviceStatus: status.deviceStatus,
         accessStatus: resolvedAccessStatus,
@@ -1099,9 +1154,12 @@ class DriverSessionController extends Notifier<DriverSession> {
         clearError: true,
       );
     } catch (error) {
+      if (state.token != token || !state.loggedIn) return;
       state = state.copyWith(
         errorMessage: error.toString().replaceFirst('Exception: ', ''),
       );
+    } finally {
+      _refreshingSession = false;
     }
   }
 }

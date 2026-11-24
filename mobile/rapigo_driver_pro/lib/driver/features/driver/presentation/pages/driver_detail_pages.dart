@@ -808,7 +808,7 @@ class _DriverEditProfilePageState extends ConsumerState<DriverEditProfilePage> {
       showTopNotice(context, session.errorMessage!, tone: NoticeTone.error);
       return;
     }
-    await ref.read(driverSessionProvider.notifier).refreshSessionStatus();
+    await ref.read(driverSessionProvider.notifier).refreshSessionStatus(force: true);
     if (!mounted) {
       return;
     }

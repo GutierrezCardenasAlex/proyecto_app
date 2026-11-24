@@ -38,7 +38,7 @@ services:
   gateway-api:
     build: ./services/gateway-api
     environment:
-      PORT: ${GATEWAY_PORT:-3000}
+      PORT: 3000
       JWT_SECRET: ${JWT_SECRET:-super-secret}
       APP_UPDATES_MANIFEST_PATH: "/app/src/app-updates.manifest.json"
       AUTH_SERVICE_URL: "http://auth-service:3001"
@@ -49,8 +49,8 @@ services:
       NOTIFICATION_SERVICE_URL: "http://notification-service:3006"
       ADMIN_SERVICE_URL: "http://admin-service:3007"
       WEBSOCKET_SERVICE_URL: "http://websocket-service:3008"
-    ports:
-      - "${GATEWAY_PORT:-3000}:${GATEWAY_PORT:-3000}"
+    expose:
+      - "3000"
     volumes:
       - ./services/gateway-api/src/app-updates.manifest.json:/app/src/app-updates.manifest.json
     depends_on:
@@ -62,6 +62,16 @@ services:
       - notification-service
       - admin-service
       - websocket-service
+
+  gateway-edge:
+    image: nginx:1.28-alpine
+    ports:
+      - "${GATEWAY_PORT:-3000}:80"
+    volumes:
+      - ./infra/nginx/gateway.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - gateway-api
+    restart: unless-stopped
 
   auth-service:
     build: ./services/auth-service
@@ -215,7 +225,7 @@ services:
     ports:
       - "${ADMIN_WEB_PORT:-8081}:80"
     depends_on:
-      - gateway-api
+      - gateway-edge
 
   websocket-service:
     build: ./services/websocket-service
@@ -250,7 +260,7 @@ services:
       - certbot_www:/var/www/certbot
       - letsencrypt:/etc/letsencrypt
     depends_on:
-      - gateway-api
+      - gateway-edge
       - admin-web
       - websocket-service
       - tileserver

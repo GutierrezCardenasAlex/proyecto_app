@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:rapigo_driver_pro/driver/features/auth/data/auth_repository.dart';
 import 'package:rapigo_driver_pro/driver/features/driver/presentation/widgets/driver_profile_photo_card.dart';
 
@@ -23,6 +24,8 @@ Map<String, dynamic> savedProfile() => {
 };
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(() => SharedPreferences.setMockInitialValues({}));
   test('loads all three registration photos including vehicle photo', () {
     final profile = DriverProfileDetails.fromJson(savedProfile());
     expect(profile.driverPhoto?.publicId, 'drivers/ana/driver');

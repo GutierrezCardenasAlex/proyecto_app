@@ -320,7 +320,7 @@ class AuthRepository {
     required String fallbackMessage,
   }) async {
     try {
-      return await request();
+      return await request().timeout(const Duration(seconds: 30));
     } on SocketException {
       throw Exception('No se pudo conectar con RAPIGO. Revisa internet o el acceso al servidor.');
     } on http.ClientException {
@@ -359,6 +359,9 @@ class AuthRepository {
 
 class SessionController extends Notifier<Session> {
   late final AuthRepository _repository;
+  bool _refreshingSession = false;
+  DateTime? _lastSessionAttempt;
+  String? _lastSessionToken;
 
   @override
   Session build() {
@@ -464,6 +467,7 @@ class SessionController extends Notifier<Session> {
   }
 
   Future<void> signOut() async {
+    state = state.copyWith(token: '', isAuthenticated: false);
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('session_authenticated');
     await prefs.remove('session_user_id');
@@ -573,15 +577,30 @@ class SessionController extends Notifier<Session> {
     );
   }
 
-  Future<bool> refreshSessionStatus() async {
+  Future<bool> refreshSessionStatus({bool force = false}) async {
     if (!state.isAuthenticated || state.token.isEmpty) {
       return false;
     }
 
+    final token = state.token;
+    final now = DateTime.now();
+    if (_refreshingSession ||
+        (!force &&
+            _lastSessionToken == token &&
+            _lastSessionAttempt != null &&
+            now.difference(_lastSessionAttempt!) < const Duration(minutes: 1))) {
+      return false;
+    }
+    _refreshingSession = true;
+    _lastSessionAttempt = now;
+    _lastSessionToken = token;
+
     try {
-      final status = await _repository.fetchSessionStatus(token: state.token);
+      final status = await _repository.fetchSessionStatus(token: token);
+      if (state.token != token || !state.isAuthenticated) return false;
       final previousCredits = state.freeTripCredits;
       final prefs = await SharedPreferences.getInstance();
+      if (state.token != token || !state.isAuthenticated) return false;
       await prefs.setString('session_device_status', status.deviceStatus);
       await prefs.setBool('session_profile_completed', status.profileCompleted);
       await prefs.setString('session_full_name', status.fullName);
@@ -594,6 +613,7 @@ class SessionController extends Notifier<Session> {
       await prefs.setInt('session_free_trip_credits', status.freeTripCredits);
       await prefs.setBool('session_promo_enabled', status.promoEnabled);
       await prefs.setInt('session_promo_cycle_length', status.promoCycleLength);
+      if (state.token != token || !state.isAuthenticated) return false;
       state = state.copyWith(
         deviceStatus: status.deviceStatus,
         profileCompleted: status.profileCompleted,
@@ -611,8 +631,11 @@ class SessionController extends Notifier<Session> {
       );
       return status.freeTripCredits > previousCredits;
     } catch (error) {
+      if (state.token != token || !state.isAuthenticated) return false;
       state = state.copyWith(errorMessage: error.toString().replaceFirst('Exception: ', ''));
       return false;
+    } finally {
+      _refreshingSession = false;
     }
   }
 }

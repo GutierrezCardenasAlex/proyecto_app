@@ -347,11 +347,7 @@ class _DriverSocketListenerState extends ConsumerState<DriverSocketListener>
 
   Future<void> _refreshDriverAccessState() async {
     await ref.read(driverSessionProvider.notifier).refreshSessionStatus();
-    final updatedSession = ref.read(driverSessionProvider);
-    if (updatedSession.deviceStatus != 'AUTORIZADO') {
-      return;
-    }
-    await _refreshAuthorizationStatus();
+
   }
 
   @override

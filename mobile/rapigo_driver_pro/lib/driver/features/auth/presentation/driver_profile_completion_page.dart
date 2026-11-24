@@ -459,7 +459,7 @@ class _DriverProfileCompletionPageState
 
   Future<void> _finishVerification() async {
     if (_profileSubmitted) {
-      await ref.read(driverSessionProvider.notifier).refreshSessionStatus();
+      await ref.read(driverSessionProvider.notifier).refreshSessionStatus(force: true);
       return;
     }
     await ref
